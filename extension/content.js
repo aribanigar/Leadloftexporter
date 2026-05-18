@@ -19,14 +19,83 @@
 
   const text = (el) => {
     if (!el) return '';
-    // Prefer aria-label/title for icon-only cells.
     const t = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
     if (t) return t;
+    // Icon-only cells: fall back to aria-label, title, or contained img alt.
     const aria = el.getAttribute && el.getAttribute('aria-label');
     if (aria) return aria.trim();
     const title = el.getAttribute && el.getAttribute('title');
     if (title) return title.trim();
+    if (el.querySelector) {
+      const img = el.querySelector('img[alt]');
+      if (img && img.alt) return img.alt.trim();
+    }
     return '';
+  };
+
+  // Pull contact info out of every <a href> inside the row element.
+  // Runs regardless of visibility — LeadLoft hides action icons until
+  // hover, but the hrefs are present in the DOM the whole time.
+  const extractRowContacts = (rowEl) => {
+    const emails = new Set();
+    const phones = new Set();
+    const linkedins = new Set();
+    const twitters = new Set();
+    const websites = new Set();
+    if (!rowEl || !rowEl.querySelectorAll) {
+      return { emails: '', phones: '', linkedins: '', twitters: '', websites: '' };
+    }
+    rowEl.querySelectorAll('a[href]').forEach((a) => {
+      const raw = a.getAttribute('href') || '';
+      if (!raw) return;
+      if (/^mailto:/i.test(raw)) {
+        const addr = decodeURIComponent(raw.slice(7).split('?')[0]).trim();
+        if (addr) emails.add(addr);
+      } else if (/^tel:/i.test(raw)) {
+        const num = decodeURIComponent(raw.slice(4)).trim();
+        if (num) phones.add(num);
+      } else if (/linkedin\.com\//i.test(raw)) {
+        linkedins.add(raw);
+      } else if (/(twitter|x)\.com\//i.test(raw)) {
+        twitters.add(raw);
+      } else if (/^https?:\/\//i.test(raw)) {
+        websites.add(raw);
+      }
+    });
+    // Fallback: scan visible text for bare email addresses (only emails —
+    // phone-shaped strings produce too many false positives like dates).
+    const allText = (rowEl.innerText || rowEl.textContent || '');
+    const emailMatches = allText.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g) || [];
+    emailMatches.forEach((e) => emails.add(e));
+    return {
+      emails: [...emails].join('; '),
+      phones: [...phones].join('; '),
+      linkedins: [...linkedins].join('; '),
+      twitters: [...twitters].join('; '),
+      websites: [...websites].join('; '),
+    };
+  };
+
+  const CONTACT_COLUMNS = ['Email', 'Phone', 'LinkedIn', 'Twitter', 'Website'];
+  const contactRow = (c) => [c.emails, c.phones, c.linkedins, c.twitters, c.websites];
+
+  // Drop columns whose header is blank AND every data row is blank.
+  // Re-labels remaining anonymous headers as Column 1..N for clarity.
+  const pruneEmptyColumns = (headers, rows) => {
+    const keep = headers.map((h, i) => {
+      if (h && h.trim()) return true;
+      return rows.some((r) => (r[i] ?? '').toString().trim() !== '');
+    });
+    const newHeaders = [];
+    const newRows = rows.map(() => []);
+    let colIdx = 0;
+    headers.forEach((h, i) => {
+      if (!keep[i]) return;
+      colIdx++;
+      newHeaders.push((h && h.trim()) || `Column ${colIdx}`);
+      rows.forEach((r, ri) => newRows[ri].push(r[i] ?? ''));
+    });
+    return { headers: newHeaders, rows: newRows };
   };
 
   const isVisible = (el) => {
@@ -275,10 +344,12 @@
       const cells = Array.from(tr.children);
       if (!cells.length) return;
       const row = visibleColIdx.map((i) => text(cells[i]));
-      if (row.some((v) => v !== '')) rows.push(row);
+      const contacts = extractRowContacts(tr);
+      const full = [...row, ...contactRow(contacts)];
+      if (full.some((v) => v !== '')) rows.push(full);
     });
     return {
-      headers: visibleColIdx.map((i) => headers[i] ?? `Column ${i + 1}`),
+      headers: [...visibleColIdx.map((i) => headers[i] ?? `Column ${i + 1}`), ...CONTACT_COLUMNS],
       rows,
     };
   };
@@ -298,10 +369,12 @@
       const cells = Array.from(row.querySelectorAll('[role="cell"], [role="gridcell"], [role="rowheader"]'));
       if (!cells.length) return;
       const extracted = visibleHeaderIdx.map((i) => text(cells[i]));
-      if (extracted.some((v) => v !== '')) rows.push(extracted);
+      const contacts = extractRowContacts(row);
+      const full = [...extracted, ...contactRow(contacts)];
+      if (full.some((v) => v !== '')) rows.push(full);
     });
     return {
-      headers: visibleHeaderIdx.map((i) => headers[i] ?? `Column ${i + 1}`),
+      headers: [...visibleHeaderIdx.map((i) => headers[i] ?? `Column ${i + 1}`), ...CONTACT_COLUMNS],
       rows,
     };
   };
@@ -310,26 +383,33 @@
     const sig = classSignature(entry.element.children);
     const sigCls = sig ? sig.cls : null;
     const matching = Array.from(entry.element.children).filter((c) => primaryClass(c) === sigCls);
-    const rows = [];
+    const textRows = [];
     let maxCells = 0;
     matching.forEach((r) => {
       const cells = leafTextCells(r).map(text).filter((s) => s !== '');
       maxCells = Math.max(maxCells, cells.length);
-      if (cells.length) rows.push(cells);
+      textRows.push({ cells, el: r });
     });
-    // Pad rows to maxCells so CSV is rectangular.
-    rows.forEach((r) => { while (r.length < maxCells) r.push(''); });
-    const headers = entry.headers.length === maxCells
+    const rows = [];
+    textRows.forEach(({ cells, el }) => {
+      while (cells.length < maxCells) cells.push('');
+      const contacts = extractRowContacts(el);
+      const full = [...cells, ...contactRow(contacts)];
+      if (full.some((v) => v !== '')) rows.push(full);
+    });
+    const baseHeaders = entry.headers.length === maxCells
       ? entry.headers
       : Array.from({ length: maxCells }, (_, i) => entry.headers[i] || `Column ${i + 1}`);
-    return { headers, rows };
+    return { headers: [...baseHeaders, ...CONTACT_COLUMNS], rows };
   };
 
   const extractFromEntry = (entry, includeHidden) => {
-    if (entry.kind === 'native') return extractNative(entry.element, includeHidden);
-    if (entry.kind === 'aria') return extractAria(entry.element, includeHidden);
-    if (entry.kind === 'repeat') return extractRepeating(entry);
-    return { headers: [], rows: [] };
+    let result;
+    if (entry.kind === 'native') result = extractNative(entry.element, includeHidden);
+    else if (entry.kind === 'aria') result = extractAria(entry.element, includeHidden);
+    else if (entry.kind === 'repeat') result = extractRepeating(entry);
+    else return { headers: [], rows: [] };
+    return pruneEmptyColumns(result.headers, result.rows);
   };
 
   // ---------- auto-scroll ----------
