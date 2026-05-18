@@ -53,17 +53,47 @@
     return null;
   };
 
-  const inferLeadName = (lead) => {
-    if (!lead) return '';
-    const direct = ['full_name', 'fullName', 'name', 'display_name', 'displayName'];
-    for (const k of direct) {
-      if (lead[k] && typeof lead[k] === 'string') return lead[k].trim();
+  const findKey = (obj, regex) => {
+    if (!obj || typeof obj !== 'object') return null;
+    for (const k of Object.keys(obj)) {
+      if (regex.test(k)) return k;
     }
-    const first = lead.first_name || lead.firstName || lead.given_name || '';
-    const last = lead.last_name || lead.lastName || lead.family_name || '';
+    return null;
+  };
+
+  const getStr = (obj, key) => {
+    if (!key) return '';
+    const v = obj[key];
+    return (typeof v === 'string') ? v.trim() : (v == null ? '' : String(v).trim());
+  };
+
+  const inferLeadName = (lead) => {
+    if (!lead || typeof lead !== 'object') return '';
+    const direct = findKey(lead, /^(full_?name|display_?name|contact_?name|lead_?name)$/i)
+                || findKey(lead, /^name$/i);
+    if (direct) {
+      const v = getStr(lead, direct);
+      if (v) return v;
+    }
+    const first = getStr(lead, findKey(lead, /^(first_?name|given_?name|fname)$/i));
+    const last  = getStr(lead, findKey(lead, /^(last_?name|family_?name|surname|lname)$/i));
     const joined = `${first} ${last}`.trim();
     if (joined) return joined;
+    // Last resort: any key containing "name".
+    const looseKey = findKey(lead, /name/i);
+    if (looseKey) return getStr(lead, looseKey);
     return '';
+  };
+
+  const normalizeName = (s) => {
+    if (!s) return '';
+    return s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')   // strip diacritics
+      .replace(/[^\w\s]/g, ' ')           // strip punctuation
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   };
 
   const matchFieldValue = (lead, regex) => {
@@ -96,17 +126,21 @@
   const ingestCapturedLeads = (leads) => {
     let added = 0;
     for (const lead of leads) {
-      const id = leadId(lead) || `name:${inferLeadName(lead).toLowerCase()}`;
-      if (!id || id === 'name:') continue;
+      if (!lead || typeof lead !== 'object') continue;
+      const nm = inferLeadName(lead);
+      const id = leadId(lead) || (nm ? `name:${normalizeName(nm)}` : null);
+      if (!id) continue;
       if (seenLeadIdentities.has(id)) continue;
       seenLeadIdentities.add(id);
       capturedLeads.set(id, lead);
-      const nm = inferLeadName(lead);
-      if (nm) capturedLeadsByName.set(nm.toLowerCase(), lead);
+      if (nm) capturedLeadsByName.set(normalizeName(nm), lead);
       added++;
     }
     if (added) {
-      console.log(`[LeadLoft Exporter] captured ${added} new lead(s); total ${capturedLeads.size}`);
+      const sampleKeys = capturedLeads.size
+        ? Object.keys(capturedLeads.values().next().value).slice(0, 8).join(', ')
+        : '';
+      console.log(`[LeadLoft Exporter] +${added} leads (total ${capturedLeads.size}); fields: ${sampleKeys}`);
     }
   };
 
@@ -118,15 +152,80 @@
     }
   });
 
+  // ---------- safety-net probe ----------
+  // Hooks only catch requests fired AFTER the page loaded with the
+  // extension active. If the user opens the popup on a tab that was
+  // already loaded, we replay every API-looking URL the page recorded
+  // in the Performance API. Browser cookies make these calls authenticate.
+
+  const probedUrls = new Set();
+
+  const looksLikeApiUrl = (url) => {
+    if (!url || !/^https?:\/\//i.test(url)) return false;
+    if (/\.(png|jpe?g|gif|svg|webp|css|woff2?|ttf|ico|map|mp4|mp3)(\?|#|$)/i.test(url)) return false;
+    if (/\.(js)(\?|#|$)/i.test(url) && !/api|graphql/i.test(url)) return false;
+    return /api|graphql|leads?|contacts?|pipeline|prospects?|deals?|opportunit|crm|v\d+/i.test(url);
+  };
+
+  const collectArraysFromJson = (data) => {
+    const out = [];
+    const seen = new WeakSet();
+    const visit = (node, depth) => {
+      if (!node || typeof node !== 'object' || depth > 10) return;
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        if (node.length && node.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+          out.push(node);
+        }
+        for (const item of node) visit(item, depth + 1);
+      } else {
+        for (const v of Object.values(node)) visit(v, depth + 1);
+      }
+    };
+    visit(data, 0);
+    return out;
+  };
+
+  const probeForLeads = async () => {
+    let entries = [];
+    try { entries = performance.getEntriesByType('resource') || []; } catch (_) {}
+    const urls = Array.from(new Set(entries.map((e) => e.name).filter(looksLikeApiUrl)))
+      .filter((u) => !probedUrls.has(u));
+    if (!urls.length) return 0;
+    console.log(`[LeadLoft Exporter] probing ${urls.length} API URLs from performance entries`);
+    let added = 0;
+    await Promise.all(urls.map(async (url) => {
+      probedUrls.add(url);
+      try {
+        const res = await fetch(url, { credentials: 'include', cache: 'no-cache' });
+        if (!res.ok) return;
+        const ct = res.headers.get('content-type') || '';
+        const txt = await res.text();
+        let data = null;
+        try { data = JSON.parse(txt); } catch (_) { return; }
+        const arrays = collectArraysFromJson(data);
+        for (const arr of arrays) {
+          const before = capturedLeads.size;
+          ingestCapturedLeads(arr);
+          added += capturedLeads.size - before;
+        }
+      } catch (e) {
+        // CORS or auth failures are expected for some endpoints — silent.
+      }
+    }));
+    return added;
+  };
+
   // Find a captured lead whose name appears inside the given row text.
   const findLeadForRow = (rowText) => {
     if (!rowText || !capturedLeadsByName.size) return null;
-    const lc = rowText.toLowerCase();
+    const norm = normalizeName(rowText);
     let best = null;
     let bestLen = 0;
     for (const [name, lead] of capturedLeadsByName) {
       if (name.length < 3) continue;
-      if (lc.includes(name) && name.length > bestLen) {
+      if (norm.includes(name) && name.length > bestLen) {
         best = lead;
         bestLen = name.length;
       }
@@ -666,8 +765,12 @@
           return;
         }
         if (message?.type === 'DETECT_TABLES') {
+          if (capturedLeads.size === 0) {
+            // Tab was loaded before the hook installed — replay API URLs.
+            await probeForLeads();
+          }
           const tables = detectAll();
-          sendResponse({ ok: true, tables });
+          sendResponse({ ok: true, tables, capturedCount: capturedLeads.size });
           return;
         }
         if (message?.type === 'EXTRACT_TABLE') {
@@ -679,8 +782,11 @@
           if (message.autoScroll) {
             await autoScrollToLoad(entry);
           }
+          // One more probe attempt — scrolling may have triggered new
+          // API requests we didn't observe live.
+          await probeForLeads();
           const result = extractFromEntry(entry, !!message.includeHidden);
-          sendResponse({ ok: true, headers: result.headers, rows: result.rows });
+          sendResponse({ ok: true, headers: result.headers, rows: result.rows, capturedCount: capturedLeads.size });
           return;
         }
         sendResponse({ ok: false, error: 'Unknown message type' });

@@ -100,6 +100,7 @@ const scan = async () => {
       throw new Error(response?.error || 'Unknown error');
     }
     detectedTables = response.tables || [];
+    const capturedCount = response.capturedCount || 0;
 
     if (detectedTables.length === 0) {
       setStatus('No tables detected on this page. Navigate to a lead list view and click Rescan.', 'warn');
@@ -108,7 +109,10 @@ const scan = async () => {
       return;
     }
 
-    setStatus(`Found ${detectedTables.length} table${detectedTables.length === 1 ? '' : 's'}. Choose one to export.`, 'success');
+    const capMsg = capturedCount
+      ? ` ${capturedCount} lead${capturedCount === 1 ? '' : 's'} captured from API.`
+      : ' No API data captured yet — try reloading the LeadLoft tab so emails/phones populate.';
+    setStatus(`Found ${detectedTables.length} table${detectedTables.length === 1 ? '' : 's'}.${capMsg}`, capturedCount ? 'success' : 'warn');
     els.tablesSection.hidden = false;
     els.optionsSection.hidden = false;
     els.export.disabled = false;
@@ -158,7 +162,9 @@ const exportSelected = async () => {
       throw new Error(dl?.error || 'Download failed');
     }
 
-    setStatus(`Exported ${rows.length} rows to ${finalName}.`, 'success');
+    const cap = dl.capturedCount != null ? dl.capturedCount : (response.capturedCount || 0);
+    const capNote = cap ? ` (${cap} leads available via API)` : '';
+    setStatus(`Exported ${rows.length} rows to ${finalName}.${capNote}`, 'success');
   } catch (err) {
     console.error('[LeadLoft Exporter] export failed:', err);
     setStatus(`Export failed: ${err.message}`, 'error');
