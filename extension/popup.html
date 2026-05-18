@@ -50,12 +50,13 @@
   </section>
 
   <section id="actions">
+    <button id="reload" class="secondary" type="button" title="Reloads the LeadLoft tab so the network hook captures the API responses from scratch.">Reload tab</button>
     <button id="rescan" class="secondary" type="button">Rescan</button>
     <button id="export" class="primary" type="button" disabled>Export CSV</button>
   </section>
 
   <footer>
-    <span id="footer-hint">Tip: scroll the lead list first so all rows are loaded.</span>
+    <span id="footer-hint">Tip: if Email/Phone are blank, click "Reload tab" — the hook needs to be active before the page's first API call.</span>
   </footer>
 
   <script src="popup.js"></script>

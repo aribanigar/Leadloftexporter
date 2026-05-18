@@ -13,6 +13,7 @@ const els = {
   includeHidden: document.getElementById('include-hidden'),
   filename: document.getElementById('filename'),
   rescan: document.getElementById('rescan'),
+  reload: document.getElementById('reload'),
   export: document.getElementById('export'),
 };
 
@@ -100,7 +101,10 @@ const scan = async () => {
       throw new Error(response?.error || 'Unknown error');
     }
     detectedTables = response.tables || [];
-    const capturedCount = response.capturedCount || 0;
+    const totalSources = response.totalSources || 0;
+    const totalRecords = response.totalRecords || 0;
+    const bestScore = response.bestScore || 0;
+    const bestCount = response.bestCount || 0;
 
     if (detectedTables.length === 0) {
       setStatus('No tables detected on this page. Navigate to a lead list view and click Rescan.', 'warn');
@@ -109,10 +113,18 @@ const scan = async () => {
       return;
     }
 
-    const capMsg = capturedCount
-      ? ` ${capturedCount} lead${capturedCount === 1 ? '' : 's'} captured from API.`
-      : ' No API data captured yet — try reloading the LeadLoft tab so emails/phones populate.';
-    setStatus(`Found ${detectedTables.length} table${detectedTables.length === 1 ? '' : 's'}.${capMsg}`, capturedCount ? 'success' : 'warn');
+    let msg, level;
+    if (bestScore >= 8) {
+      msg = `Best match: ${bestCount} likely lead${bestCount === 1 ? '' : 's'} (score ${bestScore}). Picked it for you — review and Export.`;
+      level = 'success';
+    } else if (totalRecords > 0) {
+      msg = `Captured ${totalRecords} record(s) across ${totalSources} source(s), but none look like leads. Click "Reload tab" so the hook can capture the lead list from scratch.`;
+      level = 'warn';
+    } else {
+      msg = 'No API data captured yet. Click "Reload tab" — the hook must be active before the page makes its first request.';
+      level = 'warn';
+    }
+    setStatus(msg, level);
     els.tablesSection.hidden = false;
     els.optionsSection.hidden = false;
     els.export.disabled = false;
@@ -162,8 +174,8 @@ const exportSelected = async () => {
       throw new Error(dl?.error || 'Download failed');
     }
 
-    const cap = dl.capturedCount != null ? dl.capturedCount : (response.capturedCount || 0);
-    const capNote = cap ? ` (${cap} leads available via API)` : '';
+    const totalRecords = response.totalRecords || 0;
+    const capNote = totalRecords ? ` (${totalRecords} record(s) captured across ${response.totalSources} source(s))` : '';
     setStatus(`Exported ${rows.length} rows to ${finalName}.${capNote}`, 'success');
   } catch (err) {
     console.error('[LeadLoft Exporter] export failed:', err);
@@ -203,7 +215,45 @@ els.tableSelect.addEventListener('change', () => {
   renderPreview(detectedTables[idx]);
 });
 
+const reloadTab = async () => {
+  setStatus('Reloading LeadLoft tab and reinstalling capture hook…', 'info');
+  els.export.disabled = true;
+  els.reload.disabled = true;
+  try {
+    const tab = await getActiveTab();
+    await chrome.tabs.reload(tab.id, { bypassCache: false });
+    // Poll until the tab is complete; cap at ~15s.
+    const ready = await waitForTabComplete(tab.id, 15000);
+    if (!ready) {
+      setStatus('Tab did not finish loading in time. Try Rescan once it loads.', 'warn');
+      return;
+    }
+    // Give the SPA a moment to fire its initial API calls.
+    await new Promise((r) => setTimeout(r, 1500));
+    await scan();
+  } catch (err) {
+    setStatus(`Reload failed: ${err.message}`, 'error');
+  } finally {
+    els.reload.disabled = false;
+  }
+};
+
+const waitForTabComplete = (tabId, timeoutMs) =>
+  new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      chrome.tabs.get(tabId, (tab) => {
+        if (chrome.runtime.lastError || !tab) { resolve(false); return; }
+        if (tab.status === 'complete') { resolve(true); return; }
+        if (Date.now() - start > timeoutMs) { resolve(false); return; }
+        setTimeout(tick, 250);
+      });
+    };
+    tick();
+  });
+
 els.rescan.addEventListener('click', scan);
+els.reload.addEventListener('click', reloadTab);
 els.export.addEventListener('click', exportSelected);
 
 scan();

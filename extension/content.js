@@ -17,11 +17,11 @@
   // Track candidate tables across messages by id.
   let candidateRegistry = new Map();
 
-  // Captured API lead objects (filled by inject.js via postMessage).
-  // Keyed by a derived ID so we dedupe across paginated responses.
-  const capturedLeads = new Map();           // id -> lead
-  const capturedLeadsByName = new Map();     // lower-cased name -> lead
-  const seenLeadIdentities = new Set();
+  // Each captured array (e.g. one API response page) is kept as its own
+  // "source" so the user can pick which dataset to export. A source is
+  // identified by URL (query string stripped) — paginated responses to
+  // the same endpoint merge into one source.
+  const captureSources = new Map(); // sourceKey -> { url, items: Map, score, label }
 
   const PREFERRED_FIELDS = [
     'name', 'full_name', 'fullName', 'first_name', 'firstName',
@@ -45,12 +45,49 @@
     Company:  /^(company|company_name|organization|employer|account|business)$/i,
   };
 
-  const leadId = (lead) => {
-    if (!lead || typeof lead !== 'object') return null;
-    for (const k of ['id', '_id', 'uuid', 'lead_id', 'leadId', 'contact_id', 'contactId']) {
-      if (lead[k] != null) return `${k}:${lead[k]}`;
+  // Score a captured array for "lead-likeness". Positive signals for
+  // typical contact fields, strong negative signals for clearly-not-leads
+  // payloads (user accounts, billing, saved filter definitions).
+  const scoreArrayAsLeads = (items) => {
+    if (!items || !items.length) return 0;
+    const lcKeys = new Set();
+    let valueSignal = 0;
+    const sample = items.slice(0, 8);
+    for (const obj of sample) {
+      if (!obj || typeof obj !== 'object') continue;
+      for (const [k, v] of Object.entries(obj)) {
+        lcKeys.add(k.toLowerCase());
+        if (typeof v === 'string') {
+          if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(v)) valueSignal += 3; // looks like an email
+          else if (/linkedin\.com\//i.test(v)) valueSignal += 2;
+          else if (/^\+?\d[\d\s\-().]{6,}\d$/.test(v)) valueSignal += 1;
+        }
+      }
     }
-    return null;
+    let score = 0;
+    const has = (re) => [...lcKeys].some((k) => re.test(k));
+    if (has(/^email$|email_address|^emails$/)) score += 10;
+    if (has(/^phone$|^mobile$|^cell$|phone_number|^phones$/)) score += 6;
+    if (has(/^first_?name$|^given_?name$|^fname$/)) score += 4;
+    if (has(/^last_?name$|^family_?name$|^surname$|^lname$/)) score += 4;
+    if (has(/^full_?name$|^display_?name$|^contact_?name$/)) score += 3;
+    if (has(/linked_?in/)) score += 5;
+    if (has(/twitter|x_url/)) score += 2;
+    if (has(/^company$|company_name|organization|employer|account_name/)) score += 2;
+    if (has(/^title$|job_?title|position|role|headline/)) score += 2;
+    if (has(/^website$|^domain$|company_url/)) score += 1;
+    if (has(/lead|prospect|contact|person|deal/)) score += 2;
+    // Negative signals — clearly not leads.
+    if (has(/signature|daily_?email_sending|provider|smtp|imap|inbox/)) score -= 25;
+    if (has(/^price$|monthly_?credits|subscription|stripe|invoice|^plan$|^quantity$|^unit_?amount$/)) score -= 25;
+    if (has(/promo_?code|referral_link|campaign_id|customer_promo|promoter_id|^visitors_count$|^sales_total$/)) score -= 25;
+    if (has(/^filter$|filter_?detail|saved_?view|view_?config/)) score -= 25;
+    if (has(/^role$|^permissions?$|^settings?$/) && !has(/email|name|phone/)) score -= 15;
+    score += Math.min(valueSignal, 30);
+    // Slight bonus for larger arrays — real lead lists are big.
+    if (items.length >= 20) score += 3;
+    if (items.length >= 100) score += 5;
+    return score;
   };
 
   const findKey = (obj, regex) => {
@@ -79,7 +116,6 @@
     const last  = getStr(lead, findKey(lead, /^(last_?name|family_?name|surname|lname)$/i));
     const joined = `${first} ${last}`.trim();
     if (joined) return joined;
-    // Last resort: any key containing "name".
     const looseKey = findKey(lead, /name/i);
     if (looseKey) return getStr(lead, looseKey);
     return '';
@@ -89,11 +125,90 @@
     if (!s) return '';
     return s
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')   // strip diacritics
-      .replace(/[^\w\s]/g, ' ')           // strip punctuation
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
+  };
+
+  const leadId = (lead) => {
+    if (!lead || typeof lead !== 'object') return null;
+    for (const k of ['id', '_id', 'uuid', 'lead_id', 'leadId', 'contact_id', 'contactId']) {
+      if (lead[k] != null) return `${k}:${lead[k]}`;
+    }
+    return null;
+  };
+
+  const itemKey = (item) => {
+    return leadId(item) || `name:${normalizeName(inferLeadName(item))}` || JSON.stringify(item).slice(0, 200);
+  };
+
+  const sourceKeyForUrl = (url) => {
+    try {
+      const u = new URL(url, location.href);
+      return `${u.origin}${u.pathname}`;
+    } catch (_) {
+      return String(url || 'unknown');
+    }
+  };
+
+  const sourceLabel = (url, count, score) => {
+    let path = url;
+    try {
+      const u = new URL(url, location.href);
+      path = `${u.pathname}`.replace(/^\/+/, '/');
+    } catch (_) {}
+    return `API ${path} — ${count} record${count === 1 ? '' : 's'} (score ${score})`;
+  };
+
+  const ingestCapture = (url, items) => {
+    if (!Array.isArray(items) || items.length === 0) return;
+    const key = sourceKeyForUrl(url);
+    let src = captureSources.get(key);
+    if (!src) {
+      src = { url: String(url || ''), items: new Map(), score: 0, label: '' };
+      captureSources.set(key, src);
+    }
+    let added = 0;
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const id = itemKey(item);
+      if (src.items.has(id)) continue;
+      src.items.set(id, item);
+      added++;
+    }
+    // Recompute score against the merged sample.
+    const merged = Array.from(src.items.values());
+    src.score = scoreArrayAsLeads(merged);
+    src.label = sourceLabel(src.url, merged.length, src.score);
+    if (added) {
+      const sampleKeys = Object.keys(merged[0] || {}).slice(0, 8).join(', ');
+      console.log(`[LeadLoft Exporter] source ${src.url} +${added} (total ${merged.length}, score ${src.score}); fields: ${sampleKeys}`);
+    }
+    rebuildLeadNameIndex();
+  };
+
+  // Rebuild the name -> lead index from the highest-scoring source.
+  // Used to enrich DOM-scraped rows.
+  let capturedLeadsByName = new Map();
+  const rebuildLeadNameIndex = () => {
+    capturedLeadsByName = new Map();
+    const best = bestLeadSource();
+    if (!best) return;
+    for (const item of best.items.values()) {
+      const nm = inferLeadName(item);
+      if (nm) capturedLeadsByName.set(normalizeName(nm), item);
+    }
+  };
+
+  const bestLeadSource = () => {
+    let best = null;
+    for (const src of captureSources.values()) {
+      if (src.items.size === 0) continue;
+      if (!best || src.score > best.score) best = src;
+    }
+    return (best && best.score > 0) ? best : null;
   };
 
   const matchFieldValue = (lead, regex) => {
@@ -123,32 +238,11 @@
     return Array.from(new Set(found)).join('; ');
   };
 
-  const ingestCapturedLeads = (leads) => {
-    let added = 0;
-    for (const lead of leads) {
-      if (!lead || typeof lead !== 'object') continue;
-      const nm = inferLeadName(lead);
-      const id = leadId(lead) || (nm ? `name:${normalizeName(nm)}` : null);
-      if (!id) continue;
-      if (seenLeadIdentities.has(id)) continue;
-      seenLeadIdentities.add(id);
-      capturedLeads.set(id, lead);
-      if (nm) capturedLeadsByName.set(normalizeName(nm), lead);
-      added++;
-    }
-    if (added) {
-      const sampleKeys = capturedLeads.size
-        ? Object.keys(capturedLeads.values().next().value).slice(0, 8).join(', ')
-        : '';
-      console.log(`[LeadLoft Exporter] +${added} leads (total ${capturedLeads.size}); fields: ${sampleKeys}`);
-    }
-  };
-
   window.addEventListener('message', (event) => {
     const data = event && event.data;
     if (!data || !data.__leadloftExporter) return;
-    if (data.kind === 'LEADS' && Array.isArray(data.leads)) {
-      ingestCapturedLeads(data.leads);
+    if (data.kind === 'CAPTURE' && Array.isArray(data.items)) {
+      ingestCapture(data.url, data.items);
     }
   });
 
@@ -159,6 +253,22 @@
   // in the Performance API. Browser cookies make these calls authenticate.
 
   const probedUrls = new Set();
+
+  const captureStats = () => {
+    let totalSources = 0;
+    let totalRecords = 0;
+    let bestScore = 0;
+    let bestCount = 0;
+    for (const src of captureSources.values()) {
+      totalSources++;
+      totalRecords += src.items.size;
+      if (src.score > bestScore) {
+        bestScore = src.score;
+        bestCount = src.items.size;
+      }
+    }
+    return { totalSources, totalRecords, bestScore, bestCount };
+  };
 
   const looksLikeApiUrl = (url) => {
     if (!url || !/^https?:\/\//i.test(url)) return false;
@@ -200,15 +310,14 @@
       try {
         const res = await fetch(url, { credentials: 'include', cache: 'no-cache' });
         if (!res.ok) return;
-        const ct = res.headers.get('content-type') || '';
         const txt = await res.text();
         let data = null;
         try { data = JSON.parse(txt); } catch (_) { return; }
         const arrays = collectArraysFromJson(data);
         for (const arr of arrays) {
-          const before = capturedLeads.size;
-          ingestCapturedLeads(arr);
-          added += capturedLeads.size - before;
+          if (arr.length === 0) continue;
+          ingestCapture(url, arr);
+          added += arr.length;
         }
       } catch (e) {
         // CORS or auth failures are expected for some endpoints — silent.
@@ -535,46 +644,17 @@
     return fallback;
   };
 
-  const buildApiCandidate = () => {
-    if (capturedLeads.size === 0) return null;
-    const headers = buildApiHeaders(capturedLeads);
-    return {
-      id: 'api-capture',
-      kind: 'api',
-      element: null,
-      label: `API capture (${capturedLeads.size} leads)`,
-      headers,
-      rowCount: capturedLeads.size,
-    };
-  };
-
-  const buildApiHeaders = (leadsMap) => {
-    // Union of keys across all leads, preferred fields first.
+  const buildApiHeaders = (itemsMap) => {
     const keys = new Set();
-    for (const lead of leadsMap.values()) {
+    for (const lead of itemsMap.values()) {
       Object.keys(lead).forEach((k) => keys.add(k));
     }
     const ordered = [];
     for (const p of PREFERRED_FIELDS) {
       if (keys.has(p)) { ordered.push(p); keys.delete(p); }
     }
-    // Append any remaining scalar-ish keys.
-    for (const k of keys) {
-      const sample = sampleValueForKey(leadsMap, k);
-      if (sample === '__SKIP__') continue;
-      ordered.push(k);
-    }
+    for (const k of keys) ordered.push(k);
     return ordered;
-  };
-
-  const sampleValueForKey = (leadsMap, key) => {
-    for (const lead of leadsMap.values()) {
-      const v = lead[key];
-      if (v == null) continue;
-      if (typeof v === 'object' && !Array.isArray(v)) return '__SKIP__';
-      return v;
-    }
-    return '';
   };
 
   const stringifyVal = (v) => {
@@ -586,14 +666,35 @@
     return String(v);
   };
 
-  const extractApi = () => {
-    if (capturedLeads.size === 0) return { headers: [], rows: [] };
-    const headers = buildApiHeaders(capturedLeads);
+  const extractApiSource = (sourceKey) => {
+    const src = captureSources.get(sourceKey);
+    if (!src || src.items.size === 0) return { headers: [], rows: [] };
+    const headers = buildApiHeaders(src.items);
     const rows = [];
-    for (const lead of capturedLeads.values()) {
-      rows.push(headers.map((h) => stringifyVal(lead[h])));
+    for (const item of src.items.values()) {
+      rows.push(headers.map((h) => stringifyVal(item[h])));
     }
     return { headers, rows };
+  };
+
+  const buildApiCandidates = () => {
+    const out = [];
+    for (const [key, src] of captureSources.entries()) {
+      if (src.items.size === 0) continue;
+      out.push({
+        id: `api:${key}`,
+        kind: 'api',
+        sourceKey: key,
+        element: null,
+        label: src.label,
+        headers: buildApiHeaders(src.items),
+        rowCount: src.items.size,
+        score: src.score,
+      });
+    }
+    // Sort: highest lead-likeness score first, then largest array.
+    out.sort((a, b) => (b.score - a.score) || (b.rowCount - a.rowCount));
+    return out;
   };
 
   const detectAll = () => {
@@ -603,11 +704,9 @@
       ...detectAriaGrids(),
       ...detectRepeatingRowLists(),
     ];
-    // Sort: most rows first.
     tables.sort((a, b) => b.rowCount - a.rowCount);
-    const apiCandidate = buildApiCandidate();
-    const all = apiCandidate ? [apiCandidate, ...tables] : tables;
-    // Register and return sanitized descriptors.
+    const apiCandidates = buildApiCandidates();
+    const all = [...apiCandidates, ...tables];
     return all.map((t) => {
       candidateRegistry.set(t.id, t);
       return {
@@ -616,6 +715,7 @@
         label: t.label,
         headers: t.headers,
         rowCount: t.rowCount,
+        score: t.score,
       };
     });
   };
@@ -698,7 +798,7 @@
 
   const extractFromEntry = (entry, includeHidden) => {
     let result;
-    if (entry.kind === 'api') result = extractApi();
+    if (entry.kind === 'api') result = extractApiSource(entry.sourceKey);
     else if (entry.kind === 'native') result = extractNative(entry.element, includeHidden);
     else if (entry.kind === 'aria') result = extractAria(entry.element, includeHidden);
     else if (entry.kind === 'repeat') result = extractRepeating(entry);
@@ -724,7 +824,10 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const countRowsForEntry = (entry) => {
-    if (entry.kind === 'api') return capturedLeads.size;
+    if (entry.kind === 'api') {
+      const src = captureSources.get(entry.sourceKey);
+      return src ? src.items.size : 0;
+    }
     if (entry.kind === 'native') return entry.element.querySelectorAll('tbody tr, tr').length;
     if (entry.kind === 'aria') return entry.element.querySelectorAll('[role="row"]').length;
     if (entry.kind === 'repeat') {
@@ -765,12 +868,13 @@
           return;
         }
         if (message?.type === 'DETECT_TABLES') {
-          if (capturedLeads.size === 0) {
-            // Tab was loaded before the hook installed — replay API URLs.
+          const best = bestLeadSource();
+          if (!best || best.items.size < 5) {
             await probeForLeads();
           }
           const tables = detectAll();
-          sendResponse({ ok: true, tables, capturedCount: capturedLeads.size });
+          const stats = captureStats();
+          sendResponse({ ok: true, tables, ...stats });
           return;
         }
         if (message?.type === 'EXTRACT_TABLE') {
@@ -782,11 +886,10 @@
           if (message.autoScroll) {
             await autoScrollToLoad(entry);
           }
-          // One more probe attempt — scrolling may have triggered new
-          // API requests we didn't observe live.
           await probeForLeads();
           const result = extractFromEntry(entry, !!message.includeHidden);
-          sendResponse({ ok: true, headers: result.headers, rows: result.rows, capturedCount: capturedLeads.size });
+          const stats = captureStats();
+          sendResponse({ ok: true, headers: result.headers, rows: result.rows, ...stats });
           return;
         }
         sendResponse({ ok: false, error: 'Unknown message type' });
