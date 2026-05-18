@@ -17,6 +17,137 @@
   // Track candidate tables across messages by id.
   let candidateRegistry = new Map();
 
+  // Captured API lead objects (filled by inject.js via postMessage).
+  // Keyed by a derived ID so we dedupe across paginated responses.
+  const capturedLeads = new Map();           // id -> lead
+  const capturedLeadsByName = new Map();     // lower-cased name -> lead
+  const seenLeadIdentities = new Set();
+
+  const PREFERRED_FIELDS = [
+    'name', 'full_name', 'fullName', 'first_name', 'firstName',
+    'last_name', 'lastName', 'email', 'emails', 'email_address',
+    'phone', 'phones', 'phone_number', 'mobile', 'cell',
+    'linkedin', 'linkedin_url', 'linkedinUrl',
+    'twitter', 'twitter_url', 'website', 'site', 'url', 'domain',
+    'title', 'job_title', 'jobTitle', 'position', 'role',
+    'company', 'company_name', 'companyName', 'organization', 'employer',
+    'stage', 'status', 'tags', 'owner', 'created_at', 'createdAt',
+    'updated_at', 'updatedAt', 'last_activity', 'notes',
+  ];
+
+  const FIELD_PATTERNS = {
+    Email:    /^(email|email_address|primary_email)$|emails?$/i,
+    Phone:    /^(phone|phone_number|primary_phone|mobile|cell|telephone)$|phones?$/i,
+    LinkedIn: /linked_?in/i,
+    Twitter:  /twitter|x_url/i,
+    Website:  /^(website|site|url|domain|company_url)$/i,
+    Title:    /^(title|job_?title|position|role|headline)$/i,
+    Company:  /^(company|company_name|organization|employer|account|business)$/i,
+  };
+
+  const leadId = (lead) => {
+    if (!lead || typeof lead !== 'object') return null;
+    for (const k of ['id', '_id', 'uuid', 'lead_id', 'leadId', 'contact_id', 'contactId']) {
+      if (lead[k] != null) return `${k}:${lead[k]}`;
+    }
+    return null;
+  };
+
+  const inferLeadName = (lead) => {
+    if (!lead) return '';
+    const direct = ['full_name', 'fullName', 'name', 'display_name', 'displayName'];
+    for (const k of direct) {
+      if (lead[k] && typeof lead[k] === 'string') return lead[k].trim();
+    }
+    const first = lead.first_name || lead.firstName || lead.given_name || '';
+    const last = lead.last_name || lead.lastName || lead.family_name || '';
+    const joined = `${first} ${last}`.trim();
+    if (joined) return joined;
+    return '';
+  };
+
+  const matchFieldValue = (lead, regex) => {
+    const found = [];
+    const visit = (node, depth) => {
+      if (!node || depth > 3) return;
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          if (item && typeof item === 'object') visit(item, depth + 1);
+          else if (item != null && item !== '') found.push(String(item));
+        }
+        return;
+      }
+      if (typeof node === 'object') {
+        for (const [k, v] of Object.entries(node)) {
+          if (regex.test(k)) {
+            if (v == null || v === '') continue;
+            if (typeof v === 'object') visit(v, depth + 1);
+            else found.push(String(v));
+          } else if (v && typeof v === 'object') {
+            visit(v, depth + 1);
+          }
+        }
+      }
+    };
+    visit(lead, 0);
+    return Array.from(new Set(found)).join('; ');
+  };
+
+  const ingestCapturedLeads = (leads) => {
+    let added = 0;
+    for (const lead of leads) {
+      const id = leadId(lead) || `name:${inferLeadName(lead).toLowerCase()}`;
+      if (!id || id === 'name:') continue;
+      if (seenLeadIdentities.has(id)) continue;
+      seenLeadIdentities.add(id);
+      capturedLeads.set(id, lead);
+      const nm = inferLeadName(lead);
+      if (nm) capturedLeadsByName.set(nm.toLowerCase(), lead);
+      added++;
+    }
+    if (added) {
+      console.log(`[LeadLoft Exporter] captured ${added} new lead(s); total ${capturedLeads.size}`);
+    }
+  };
+
+  window.addEventListener('message', (event) => {
+    const data = event && event.data;
+    if (!data || !data.__leadloftExporter) return;
+    if (data.kind === 'LEADS' && Array.isArray(data.leads)) {
+      ingestCapturedLeads(data.leads);
+    }
+  });
+
+  // Find a captured lead whose name appears inside the given row text.
+  const findLeadForRow = (rowText) => {
+    if (!rowText || !capturedLeadsByName.size) return null;
+    const lc = rowText.toLowerCase();
+    let best = null;
+    let bestLen = 0;
+    for (const [name, lead] of capturedLeadsByName) {
+      if (name.length < 3) continue;
+      if (lc.includes(name) && name.length > bestLen) {
+        best = lead;
+        bestLen = name.length;
+      }
+    }
+    return best;
+  };
+
+  // Merge API-derived contacts into a row's existing contact dict.
+  const enrichContactsWithApi = (rowEl, contacts) => {
+    const rowText = (rowEl && (rowEl.innerText || rowEl.textContent)) || '';
+    const lead = findLeadForRow(rowText);
+    if (!lead) return contacts;
+    return {
+      emails:    contacts.emails    || matchFieldValue(lead, FIELD_PATTERNS.Email),
+      phones:    contacts.phones    || matchFieldValue(lead, FIELD_PATTERNS.Phone),
+      linkedins: contacts.linkedins || matchFieldValue(lead, FIELD_PATTERNS.LinkedIn),
+      twitters:  contacts.twitters  || matchFieldValue(lead, FIELD_PATTERNS.Twitter),
+      websites:  contacts.websites  || matchFieldValue(lead, FIELD_PATTERNS.Website),
+    };
+  };
+
   const text = (el) => {
     if (!el) return '';
     const t = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
@@ -305,6 +436,67 @@
     return fallback;
   };
 
+  const buildApiCandidate = () => {
+    if (capturedLeads.size === 0) return null;
+    const headers = buildApiHeaders(capturedLeads);
+    return {
+      id: 'api-capture',
+      kind: 'api',
+      element: null,
+      label: `API capture (${capturedLeads.size} leads)`,
+      headers,
+      rowCount: capturedLeads.size,
+    };
+  };
+
+  const buildApiHeaders = (leadsMap) => {
+    // Union of keys across all leads, preferred fields first.
+    const keys = new Set();
+    for (const lead of leadsMap.values()) {
+      Object.keys(lead).forEach((k) => keys.add(k));
+    }
+    const ordered = [];
+    for (const p of PREFERRED_FIELDS) {
+      if (keys.has(p)) { ordered.push(p); keys.delete(p); }
+    }
+    // Append any remaining scalar-ish keys.
+    for (const k of keys) {
+      const sample = sampleValueForKey(leadsMap, k);
+      if (sample === '__SKIP__') continue;
+      ordered.push(k);
+    }
+    return ordered;
+  };
+
+  const sampleValueForKey = (leadsMap, key) => {
+    for (const lead of leadsMap.values()) {
+      const v = lead[key];
+      if (v == null) continue;
+      if (typeof v === 'object' && !Array.isArray(v)) return '__SKIP__';
+      return v;
+    }
+    return '';
+  };
+
+  const stringifyVal = (v) => {
+    if (v == null) return '';
+    if (Array.isArray(v)) {
+      return v.map((x) => (x && typeof x === 'object' ? JSON.stringify(x) : String(x))).join('; ');
+    }
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
+  };
+
+  const extractApi = () => {
+    if (capturedLeads.size === 0) return { headers: [], rows: [] };
+    const headers = buildApiHeaders(capturedLeads);
+    const rows = [];
+    for (const lead of capturedLeads.values()) {
+      rows.push(headers.map((h) => stringifyVal(lead[h])));
+    }
+    return { headers, rows };
+  };
+
   const detectAll = () => {
     candidateRegistry = new Map();
     const tables = [
@@ -314,8 +506,10 @@
     ];
     // Sort: most rows first.
     tables.sort((a, b) => b.rowCount - a.rowCount);
+    const apiCandidate = buildApiCandidate();
+    const all = apiCandidate ? [apiCandidate, ...tables] : tables;
     // Register and return sanitized descriptors.
-    return tables.map((t) => {
+    return all.map((t) => {
       candidateRegistry.set(t.id, t);
       return {
         id: t.id,
@@ -344,7 +538,7 @@
       const cells = Array.from(tr.children);
       if (!cells.length) return;
       const row = visibleColIdx.map((i) => text(cells[i]));
-      const contacts = extractRowContacts(tr);
+      const contacts = enrichContactsWithApi(tr, extractRowContacts(tr));
       const full = [...row, ...contactRow(contacts)];
       if (full.some((v) => v !== '')) rows.push(full);
     });
@@ -369,7 +563,7 @@
       const cells = Array.from(row.querySelectorAll('[role="cell"], [role="gridcell"], [role="rowheader"]'));
       if (!cells.length) return;
       const extracted = visibleHeaderIdx.map((i) => text(cells[i]));
-      const contacts = extractRowContacts(row);
+      const contacts = enrichContactsWithApi(row, extractRowContacts(row));
       const full = [...extracted, ...contactRow(contacts)];
       if (full.some((v) => v !== '')) rows.push(full);
     });
@@ -393,7 +587,7 @@
     const rows = [];
     textRows.forEach(({ cells, el }) => {
       while (cells.length < maxCells) cells.push('');
-      const contacts = extractRowContacts(el);
+      const contacts = enrichContactsWithApi(el, extractRowContacts(el));
       const full = [...cells, ...contactRow(contacts)];
       if (full.some((v) => v !== '')) rows.push(full);
     });
@@ -405,7 +599,8 @@
 
   const extractFromEntry = (entry, includeHidden) => {
     let result;
-    if (entry.kind === 'native') result = extractNative(entry.element, includeHidden);
+    if (entry.kind === 'api') result = extractApi();
+    else if (entry.kind === 'native') result = extractNative(entry.element, includeHidden);
     else if (entry.kind === 'aria') result = extractAria(entry.element, includeHidden);
     else if (entry.kind === 'repeat') result = extractRepeating(entry);
     else return { headers: [], rows: [] };
@@ -430,6 +625,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const countRowsForEntry = (entry) => {
+    if (entry.kind === 'api') return capturedLeads.size;
     if (entry.kind === 'native') return entry.element.querySelectorAll('tbody tr, tr').length;
     if (entry.kind === 'aria') return entry.element.querySelectorAll('[role="row"]').length;
     if (entry.kind === 'repeat') {
