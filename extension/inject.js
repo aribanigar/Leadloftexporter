@@ -33,21 +33,11 @@
     return obj;
   };
 
-  const flattenOneLevel = (obj) => {
-    if (!obj || typeof obj !== 'object') return obj;
-    const out = { ...obj };
-    for (const [k, v] of Object.entries(obj)) {
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        for (const [k2, v2] of Object.entries(v)) {
-          if (v2 == null || typeof v2 === 'object') continue;
-          const composite = `${k}.${k2}`;
-          if (!(composite in out)) out[composite] = v2;
-          if (!(k2 in out)) out[k2] = v2;
-        }
-      }
-    }
-    return out;
-  };
+  const flattenOneLevel = (obj) => obj;  // intentionally a no-op now —
+  // the content script applies LeadLoft-aware normalisation instead, so
+  // we must NOT promote nested object keys (e.g. owner.email) up to the
+  // top level here — that's what caused every row to show the account
+  // owner's email as the lead's email.
 
   // Find every array of records in a response (depth-walk).
   const findArrays = (data) => {

@@ -65,7 +65,11 @@
       }
     }
     let score = 0;
-    const has = (re) => [...lcKeys].some((k) => re.test(k));
+    // Normalise keys (spaces/punctuation -> underscore) so human-readable
+    // header names like "First Name" or "LinkedIn URL" still match the
+    // patterns below.
+    const normKeys = [...lcKeys].map((k) => k.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
+    const has = (re) => normKeys.some((k) => re.test(k));
     if (has(/^email$|email_address|^emails$/)) score += 10;
     if (has(/^phone$|^mobile$|^cell$|phone_number|^phones$/)) score += 6;
     if (has(/^first_?name$|^given_?name$|^fname$/)) score += 4;
@@ -162,6 +166,111 @@
     return `API ${path} — ${count} record${count === 1 ? '' : 's'} (score ${score})`;
   };
 
+  // --- LeadLoft-specific normalisation ---
+  // LeadLoft's lead-list endpoint returns Deal objects; the real lead's
+  // contact info lives inside deal.primaryContact, and company info in
+  // deal.company. The top-level email/phone/firstName on a Deal are
+  // ambiguous (they may come from owner/createdBy depending on shape).
+  // We produce a curated record with explicit field mappings so the
+  // CSV has clean, correctly-sourced columns.
+
+  const tsToDate = (n) => {
+    if (n == null || n === '') return '';
+    const num = Number(n);
+    if (!Number.isFinite(num) || num <= 0) return String(n);
+    try { return new Date(num).toISOString().split('T')[0]; }
+    catch (_) { return String(n); }
+  };
+
+  const compact = (s, max = 500) =>
+    (s == null ? '' : String(s)).replace(/\s+/g, ' ').trim().slice(0, max);
+
+  const isDealShape = (item) => {
+    if (!item || typeof item !== 'object') return false;
+    const hasContact = item.primaryContact && typeof item.primaryContact === 'object';
+    const hasStage = (item.dealStage && typeof item.dealStage === 'object') || item.dealStageId != null;
+    return hasContact && hasStage;
+  };
+
+  const isContactShape = (item) => {
+    if (!item || typeof item !== 'object') return false;
+    if (item.primaryContact) return false;
+    const hasName = item.firstName || item.lastName || item.fullName;
+    const hasContactSignal = item.email || item.publicIdentifier || item.linkedInUrl;
+    return Boolean(hasName && hasContactSignal);
+  };
+
+  const normalizeDeal = (deal) => {
+    const c = deal.primaryContact || {};
+    const co = deal.company || {};
+    const ds = deal.dealStage || {};
+    const ow = deal.owner || {};
+    const segment = (co && co.segment) || {};
+    const fullName = c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim();
+    const ownerName = `${ow.firstName || ''} ${ow.lastName || ''}`.trim();
+    return {
+      'Name': fullName,
+      'First Name': c.firstName || '',
+      'Last Name': c.lastName || '',
+      'Email': c.email || '',
+      'Email Status': c.emailStatus || '',
+      'Phone': c.phone || c.mobile || '',
+      'Mobile': c.mobile || '',
+      'LinkedIn URL': c.linkedInUrl || '',
+      'LinkedIn Username': c.publicIdentifier || '',
+      'Title / Position': c.position || '',
+      'Location': c.location || '',
+      'Connection Status': c.connectionStatus || '',
+      'Company': co.name || '',
+      'Company Domain': co.domain || '',
+      'Company Website': co.website || '',
+      'Company Industry': co.industry || '',
+      'Company Employees': co.employees || '',
+      'Company Location': co.location || '',
+      'Company LinkedIn': co.linkedInUrl || '',
+      'Company Segment': segment.name || '',
+      'Stage': ds.name || '',
+      'Status': deal.status || '',
+      'Confidence': deal.confidence || '',
+      'Source': deal.source || '',
+      'Value': (deal.value != null && typeof deal.value !== 'object') ? deal.value : '',
+      'Created Date': tsToDate(deal.createdDate),
+      'Modified Date': tsToDate(deal.modifiedDate),
+      'Expected Close Date': tsToDate(deal.expectedCloseDate),
+      'Owner': ownerName,
+      'Owner Email': ow.email || '',
+      'Summary': compact(c.summary, 400),
+      'Deal ID': deal.id || '',
+      'Contact ID': c.id || '',
+      'Company ID': co.id || '',
+    };
+  };
+
+  const normalizeContact = (c) => ({
+    'Name': c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+    'First Name': c.firstName || '',
+    'Last Name': c.lastName || '',
+    'Email': c.email || '',
+    'Email Status': c.emailStatus || '',
+    'Phone': c.phone || c.mobile || '',
+    'Mobile': c.mobile || '',
+    'LinkedIn URL': c.linkedInUrl || '',
+    'LinkedIn Username': c.publicIdentifier || '',
+    'Title / Position': c.position || '',
+    'Location': c.location || '',
+    'Connection Status': c.connectionStatus || '',
+    'Summary': compact(c.summary, 400),
+    'Created Date': tsToDate(c.createdDate),
+    'Modified Date': tsToDate(c.modifiedDate),
+    'Contact ID': c.id || '',
+  });
+
+  const normalizeRecord = (item) => {
+    if (isDealShape(item)) return normalizeDeal(item);
+    if (isContactShape(item)) return normalizeContact(item);
+    return item;
+  };
+
   const ingestCapture = (url, items) => {
     if (!Array.isArray(items) || items.length === 0) return;
     const key = sourceKeyForUrl(url);
@@ -171,11 +280,12 @@
       captureSources.set(key, src);
     }
     let added = 0;
-    for (const item of items) {
-      if (!item || typeof item !== 'object') continue;
-      const id = itemKey(item);
+    for (const raw of items) {
+      if (!raw || typeof raw !== 'object') continue;
+      const id = itemKey(raw);
       if (src.items.has(id)) continue;
-      src.items.set(id, item);
+      const normalized = normalizeRecord(raw);
+      src.items.set(id, normalized);
       added++;
     }
     // Recompute score against the merged sample.
@@ -645,15 +755,15 @@
   };
 
   const buildApiHeaders = (itemsMap) => {
-    const keys = new Set();
-    for (const lead of itemsMap.values()) {
-      Object.keys(lead).forEach((k) => keys.add(k));
-    }
+    // Preserve insertion order from the first item (which, for normalised
+    // LeadLoft records, is the curated column order we want).
     const ordered = [];
-    for (const p of PREFERRED_FIELDS) {
-      if (keys.has(p)) { ordered.push(p); keys.delete(p); }
+    const seen = new Set();
+    for (const item of itemsMap.values()) {
+      for (const k of Object.keys(item)) {
+        if (!seen.has(k)) { seen.add(k); ordered.push(k); }
+      }
     }
-    for (const k of keys) ordered.push(k);
     return ordered;
   };
 
