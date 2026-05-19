@@ -574,15 +574,20 @@
       const headers = headerTable ? extractElTableHeaders(headerTable) : [];
       const rowCount = bodyTable.querySelectorAll('tbody tr').length;
       if (rowCount === 0) return;
+      const pages = countPages(tbl);
+      const label = pages > 1
+        ? `LeadLoft Table #${i + 1} — ${rowCount}/page × ${pages} pages`
+        : `LeadLoft Table #${i + 1}`;
       out.push({
         id: `eltable-${i}`,
         kind: 'eltable',
         element: tbl,
         headerTable,
         bodyTable,
-        label: tableLabel(tbl, `LeadLoft Table #${i + 1}`),
+        label: tableLabel(tbl, label),
         headers,
         rowCount,
+        pages,
       });
     });
     return out;
@@ -991,6 +996,107 @@
     return pruneEmptyColumns(result.headers, result.rows);
   };
 
+  // ---------- el-table pagination ----------
+
+  const findPaginationContainer = (tableEl) => {
+    if (!tableEl) return null;
+    // Element UI pagination is usually a sibling or close ancestor sibling.
+    let scope = tableEl.parentElement;
+    for (let hop = 0; hop < 6 && scope; hop++) {
+      const pag = scope.querySelector('.el-pagination');
+      if (pag && isVisible(pag)) return pag;
+      scope = scope.parentElement;
+    }
+    return null;
+  };
+
+  const pageSignature = (entry) => {
+    if (!entry.bodyTable) return '';
+    const firstRow = entry.bodyTable.querySelector('tbody tr');
+    if (!firstRow) return '';
+    return (firstRow.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  };
+
+  const waitForPageChange = async (entry, prevSig, timeoutMs = 6000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await sleep(200);
+      const sig = pageSignature(entry);
+      if (sig && sig !== prevSig) return true;
+    }
+    return false;
+  };
+
+  const goToFirstPage = async (pagContainer, entry) => {
+    if (!pagContainer) return;
+    // Click prev until disabled.
+    for (let i = 0; i < 100; i++) {
+      const prev = pagContainer.querySelector('button.btn-prev');
+      if (!prev) return;
+      if (prev.disabled || prev.classList.contains('is-disabled') || prev.classList.contains('disabled')) return;
+      const sig = pageSignature(entry);
+      prev.click();
+      const changed = await waitForPageChange(entry, sig, 3000);
+      if (!changed) return;
+    }
+  };
+
+  const extractElTableAllPages = async (entry, includeHidden) => {
+    const pagContainer = findPaginationContainer(entry.element);
+    if (pagContainer) await goToFirstPage(pagContainer, entry);
+
+    const allRows = [];
+    const seen = new Set();
+    let headers = null;
+    let stagnantPages = 0;
+
+    for (let page = 0; page < 500; page++) {
+      const pageResult = extractElTable(entry, includeHidden);
+      if (!headers) headers = pageResult.headers;
+      let added = 0;
+      for (const row of pageResult.rows) {
+        const sig = row.join('');
+        if (!seen.has(sig)) {
+          seen.add(sig);
+          allRows.push(row);
+          added++;
+        }
+      }
+      if (added === 0) stagnantPages++; else stagnantPages = 0;
+      if (stagnantPages >= 2) break;
+
+      if (!pagContainer) break;
+      const nextBtn = pagContainer.querySelector('button.btn-next');
+      if (!nextBtn) break;
+      if (nextBtn.disabled || nextBtn.classList.contains('is-disabled') || nextBtn.classList.contains('disabled')) break;
+
+      const beforeSig = pageSignature(entry);
+      nextBtn.click();
+      const changed = await waitForPageChange(entry, beforeSig, 6000);
+      if (!changed) break;
+    }
+
+    console.log(`[LeadLoft Exporter] paginated extract: ${allRows.length} rows`);
+    return { headers: headers || [], rows: allRows };
+  };
+
+  const countPages = (tableEl) => {
+    const pag = findPaginationContainer(tableEl);
+    if (!pag) return 0;
+    const pagerNumbers = pag.querySelectorAll('.el-pager li.number, li[role="button"]');
+    if (pagerNumbers.length) {
+      const last = pagerNumbers[pagerNumbers.length - 1];
+      const n = parseInt((last.textContent || '').trim(), 10);
+      if (Number.isFinite(n)) return n;
+    }
+    const total = pag.querySelector('.el-pagination__total');
+    if (total) {
+      const m = (total.textContent || '').match(/(\d+)/);
+      if (m) return Math.max(1, Math.ceil(Number(m[1]) / 20));
+    }
+    return 0;
+  };
+
   // ---------- auto-scroll ----------
 
   const findScrollContainer = (el) => {
@@ -1067,6 +1173,14 @@
           const entry = candidateRegistry.get(message.tableId);
           if (!entry) {
             sendResponse({ ok: false, error: 'Table no longer present. Click Rescan.' });
+            return;
+          }
+          // For Element UI tables, "auto-scroll" means "page through all".
+          if (entry.kind === 'eltable' && message.autoScroll && findPaginationContainer(entry.element)) {
+            const raw = await extractElTableAllPages(entry, !!message.includeHidden);
+            const pruned = pruneEmptyColumns(raw.headers, raw.rows);
+            const stats = captureStats();
+            sendResponse({ ok: true, headers: pruned.headers, rows: pruned.rows, ...stats });
             return;
           }
           if (message.autoScroll) {

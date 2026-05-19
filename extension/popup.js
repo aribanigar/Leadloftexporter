@@ -81,6 +81,14 @@ const renderTables = (tables) => {
   });
   els.tableSelect.value = '0';
   renderPreview(tables[0]);
+  // If the picked table has more than one page, default Auto-scroll on
+  // so the user gets the whole list, not just the first page.
+  if (tables[0] && tables[0].pages && tables[0].pages > 1) {
+    if (!els.autoScroll.checked) {
+      els.autoScroll.checked = true;
+      persist();
+    }
+  }
 };
 
 const renderPreview = (table) => {
@@ -204,7 +212,11 @@ const exportSelected = async () => {
   if (!table) return;
 
   els.export.disabled = true;
-  setStatus('Extracting rows...', 'info');
+  if (table.pages && table.pages > 1 && els.autoScroll.checked) {
+    setStatus(`Paging through ${table.pages} pages... this may take a minute.`, 'info');
+  } else {
+    setStatus('Extracting rows...', 'info');
+  }
 
   try {
     const response = await sendToTab(activeTabId, {
