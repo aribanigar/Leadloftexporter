@@ -103,6 +103,11 @@ export default function PipelinePage() {
               <tr>
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Title</th>
+                <th className="px-3 py-2 text-left">Company</th>
+                <th className="px-3 py-2 text-left">Email</th>
+                <th className="px-3 py-2 text-left">Phone</th>
+                <th className="px-3 py-2 text-left">LinkedIn</th>
+                <th className="px-3 py-2 text-left">Location</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Owner</th>
                 <th className="px-3 py-2 text-left">Date Created</th>
@@ -126,6 +131,32 @@ export default function PipelinePage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-slate-700">{lead.title || "—"}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{lead.company?.name || "—"}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">
+                      {lead.email ? (
+                        <a href={`mailto:${lead.email}`} className="text-brand-600 hover:underline">
+                          {lead.email}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{lead.phone || "—"}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">
+                      {lead.linkedin_url ? (
+                        <a
+                          href={lead.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-600 hover:underline"
+                        >
+                          Profile
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{lead.location || "—"}</td>
                     <td className="px-3 py-2 text-sm">
                       <span className="pill" style={{ backgroundColor: (stage?.color || "#e2e8f0") + "22", color: stage?.color || "#475569" }}>
                         {stage?.name || "—"}
