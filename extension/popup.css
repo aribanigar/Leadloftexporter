@@ -209,3 +209,60 @@ footer {
   color: var(--muted);
   text-align: center;
 }
+
+.muted { color: var(--muted); font-weight: 400; }
+.dot { color: var(--muted); margin: 0 2px; }
+
+#columns-section details summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.columns-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0 6px;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 0;
+  font-weight: 500;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.link-button:hover { text-decoration: underline; }
+
+.columns-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  background: white;
+}
+
+.column-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+.column-row:hover { background: var(--secondary-bg); }
+.column-row input[type="checkbox"] { margin: 0; flex: 0 0 auto; }
+.column-row .col-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

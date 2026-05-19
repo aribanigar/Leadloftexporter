@@ -5,6 +5,12 @@ const els = {
   status: document.getElementById('status'),
   tablesSection: document.getElementById('tables-section'),
   optionsSection: document.getElementById('options-section'),
+  columnsSection: document.getElementById('columns-section'),
+  columnsList: document.getElementById('columns-list'),
+  columnsCount: document.getElementById('columns-count'),
+  selectAll: document.getElementById('select-all'),
+  selectNone: document.getElementById('select-none'),
+  selectEssential: document.getElementById('select-essential'),
   tableSelect: document.getElementById('table-select'),
   rowCount: document.getElementById('row-count'),
   colCount: document.getElementById('col-count'),
@@ -16,6 +22,16 @@ const els = {
   reload: document.getElementById('reload'),
   export: document.getElementById('export'),
 };
+
+const ESSENTIAL_COLUMNS = new Set([
+  'Name', 'First Name', 'Last Name', 'Email', 'Phone', 'Mobile',
+  'LinkedIn URL', 'Title / Position', 'Company', 'Location', 'Stage',
+  'Status', 'Owner',
+  'Emails', 'Phone Number', 'Phone Numbers', // names from LeadLoft's UI
+]);
+
+let disabledColumns = new Set();
+let currentTableHeaders = [];
 
 let detectedTables = [];
 let activeTabId = null;
@@ -78,6 +94,51 @@ const renderPreview = (table) => {
     chip.textContent = h || '(blank)';
     els.headersPreview.appendChild(chip);
   });
+  renderColumnPicker(table.headers);
+};
+
+const renderColumnPicker = (headers) => {
+  currentTableHeaders = headers.slice();
+  els.columnsList.innerHTML = '';
+  headers.forEach((h) => {
+    const row = document.createElement('label');
+    row.className = 'column-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !disabledColumns.has(h);
+    cb.dataset.name = h;
+    cb.addEventListener('change', () => {
+      if (cb.checked) disabledColumns.delete(h);
+      else disabledColumns.add(h);
+      persistDisabled();
+      updateColumnsCount();
+    });
+    const span = document.createElement('span');
+    span.className = 'col-name';
+    span.textContent = h || '(blank)';
+    row.appendChild(cb);
+    row.appendChild(span);
+    els.columnsList.appendChild(row);
+  });
+  els.columnsSection.hidden = false;
+  updateColumnsCount();
+};
+
+const updateColumnsCount = () => {
+  const enabled = currentTableHeaders.filter((h) => !disabledColumns.has(h)).length;
+  els.columnsCount.textContent = `${enabled} / ${currentTableHeaders.length}`;
+};
+
+const persistDisabled = () => {
+  chrome.storage.local.set({ disabledColumns: [...disabledColumns] });
+};
+
+const filterColumns = (headers, rows) => {
+  const keep = headers.map((h, i) => disabledColumns.has(h) ? -1 : i).filter((i) => i >= 0);
+  return {
+    headers: keep.map((i) => headers[i]),
+    rows: rows.map((r) => keep.map((i) => r[i])),
+  };
 };
 
 const scan = async () => {
@@ -157,8 +218,9 @@ const exportSelected = async () => {
       throw new Error(response?.error || 'Extraction failed');
     }
 
-    const { headers, rows } = response;
-    setStatus(`Extracted ${rows.length} rows. Generating CSV...`, 'info');
+    const filtered = filterColumns(response.headers, response.rows);
+    const { headers, rows } = filtered;
+    setStatus(`Extracted ${rows.length} rows (${headers.length}/${response.headers.length} columns). Generating CSV...`, 'info');
 
     const filename = (els.filename.value.trim() || 'leadloft-leads').replace(/\.csv$/i, '');
     const finalName = `${filename}-${tsForFilename()}.csv`;
@@ -192,10 +254,30 @@ const tsForFilename = () => {
 };
 
 // Restore stored options
-chrome.storage.local.get(['autoScroll', 'includeHidden', 'filename'], (s) => {
+chrome.storage.local.get(['autoScroll', 'includeHidden', 'filename', 'disabledColumns'], (s) => {
   els.autoScroll.checked = !!s.autoScroll;
   els.includeHidden.checked = !!s.includeHidden;
   els.filename.value = s.filename || '';
+  if (Array.isArray(s.disabledColumns)) disabledColumns = new Set(s.disabledColumns);
+});
+
+els.selectAll.addEventListener('click', () => {
+  currentTableHeaders.forEach((h) => disabledColumns.delete(h));
+  persistDisabled();
+  renderColumnPicker(currentTableHeaders);
+});
+els.selectNone.addEventListener('click', () => {
+  currentTableHeaders.forEach((h) => disabledColumns.add(h));
+  persistDisabled();
+  renderColumnPicker(currentTableHeaders);
+});
+els.selectEssential.addEventListener('click', () => {
+  currentTableHeaders.forEach((h) => {
+    if (ESSENTIAL_COLUMNS.has(h)) disabledColumns.delete(h);
+    else disabledColumns.add(h);
+  });
+  persistDisabled();
+  renderColumnPicker(currentTableHeaders);
 });
 
 const persist = () => {

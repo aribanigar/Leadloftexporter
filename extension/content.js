@@ -468,9 +468,10 @@
 
   const text = (el) => {
     if (!el) return '';
-    const t = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    // textContent first — innerText respects CSS text-overflow: ellipsis
+    // in some Chrome versions, which would truncate emails to "foo@bar...".
+    const t = (el.textContent || el.innerText || '').replace(/\s+/g, ' ').trim();
     if (t) return t;
-    // Icon-only cells: fall back to aria-label, title, or contained img alt.
     const aria = el.getAttribute && el.getAttribute('aria-label');
     if (aria) return aria.trim();
     const title = el.getAttribute && el.getAttribute('title');
@@ -557,10 +558,82 @@
 
   // ---------- detection ----------
 
+  // Element UI (and LeadLoft, which is built on it) renders a table as
+  // separate header and body <table> elements inside .el-table. Treat
+  // the whole .el-table container as one logical table.
+  const detectElementUITables = () => {
+    const out = [];
+    const containers = document.querySelectorAll('.el-table');
+    containers.forEach((tbl, i) => {
+      if (!isVisible(tbl)) return;
+      const headerTable = tbl.querySelector('.el-table__header-wrapper:not(.is-fixed) table.el-table__header')
+                       || tbl.querySelector('.el-table__header-wrapper table.el-table__header');
+      const bodyTable = tbl.querySelector('.el-table__body-wrapper:not(.is-fixed) table.el-table__body')
+                     || tbl.querySelector('.el-table__body-wrapper table.el-table__body');
+      if (!bodyTable) return;
+      const headers = headerTable ? extractElTableHeaders(headerTable) : [];
+      const rowCount = bodyTable.querySelectorAll('tbody tr').length;
+      if (rowCount === 0) return;
+      out.push({
+        id: `eltable-${i}`,
+        kind: 'eltable',
+        element: tbl,
+        headerTable,
+        bodyTable,
+        label: tableLabel(tbl, `LeadLoft Table #${i + 1}`),
+        headers,
+        rowCount,
+      });
+    });
+    return out;
+  };
+
+  const extractElTableHeaders = (headerTable) => {
+    if (!headerTable) return [];
+    const headerRows = headerTable.querySelectorAll('thead tr');
+    if (!headerRows.length) return [];
+    const lastRow = headerRows[headerRows.length - 1];
+    const ths = lastRow.querySelectorAll('th');
+    return Array.from(ths).map(text);
+  };
+
+  const extractElTable = (entry, includeHidden) => {
+    const headers = extractElTableHeaders(entry.headerTable);
+    // Drop columns we know are non-data (checkbox selection, action icons).
+    const skipIdx = new Set();
+    Array.from(entry.headerTable?.querySelectorAll('thead tr:last-child th') || []).forEach((th, i) => {
+      if (!includeHidden && !isVisible(th)) skipIdx.add(i);
+      if (th.querySelector('.el-checkbox')) skipIdx.add(i);
+      if (/coutomColumns|customColumns|operate/i.test(th.className || '')) {
+        // keep if its rendered text isn't empty — these are sometimes real columns
+        if (!text(th)) skipIdx.add(i);
+      }
+    });
+    const keepIdx = headers.map((_, i) => i).filter((i) => !skipIdx.has(i));
+    const finalHeaders = keepIdx.map((i) => headers[i] || `Column ${i + 1}`);
+
+    const rows = [];
+    entry.bodyTable.querySelectorAll('tbody tr').forEach((tr) => {
+      const cells = Array.from(tr.querySelectorAll('td'));
+      if (cells.length === 0) return;
+      const row = keepIdx.map((i) => text(cells[i]));
+      const contacts = enrichContactsWithApi(tr, extractRowContacts(tr));
+      const full = [...row, ...contactRow(contacts)];
+      if (full.some((v) => v !== '')) rows.push(full);
+    });
+    return {
+      headers: [...finalHeaders, ...CONTACT_COLUMNS],
+      rows,
+    };
+  };
+
   const detectNativeTables = () => {
     const out = [];
     document.querySelectorAll('table').forEach((tbl, i) => {
       if (!isVisible(tbl)) return;
+      // Skip tables that are part of an Element UI split table — handled
+      // by detectElementUITables() as one logical table.
+      if (tbl.closest('.el-table')) return;
       const headers = extractNativeHeaders(tbl);
       const rows = tbl.querySelectorAll('tbody tr, tr');
       const rowCount = countDataRows(tbl);
@@ -810,6 +883,7 @@
   const detectAll = () => {
     candidateRegistry = new Map();
     const tables = [
+      ...detectElementUITables(),
       ...detectNativeTables(),
       ...detectAriaGrids(),
       ...detectRepeatingRowLists(),
@@ -909,6 +983,7 @@
   const extractFromEntry = (entry, includeHidden) => {
     let result;
     if (entry.kind === 'api') result = extractApiSource(entry.sourceKey);
+    else if (entry.kind === 'eltable') result = extractElTable(entry, includeHidden);
     else if (entry.kind === 'native') result = extractNative(entry.element, includeHidden);
     else if (entry.kind === 'aria') result = extractAria(entry.element, includeHidden);
     else if (entry.kind === 'repeat') result = extractRepeating(entry);
@@ -938,6 +1013,7 @@
       const src = captureSources.get(entry.sourceKey);
       return src ? src.items.size : 0;
     }
+    if (entry.kind === 'eltable') return entry.bodyTable.querySelectorAll('tbody tr').length;
     if (entry.kind === 'native') return entry.element.querySelectorAll('tbody tr, tr').length;
     if (entry.kind === 'aria') return entry.element.querySelectorAll('[role="row"]').length;
     if (entry.kind === 'repeat') {
