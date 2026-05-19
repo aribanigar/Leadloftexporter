@@ -249,14 +249,34 @@
       if (window.__lcEnrichmentRan) return;
       window.__lcEnrichmentRan = true;
 
-      // Human-paced reading pause: 1.5–4s base, 12% long-tail up to 8s.
-      const base = Human.rand(1500, 4000);
-      const longTail = Math.random() < 0.12 ? Human.rand(2000, 8000) : 0;
+      // Human-paced reading pause: 2.5–6s base, 12% long-tail up to 10s. We
+      // intentionally wait longer than the foreground auto-enrich because
+      // Chrome throttles background tabs — LinkedIn's React tree needs more
+      // time to hydrate before the Contact info link will respond.
+      const base = Human.rand(2500, 6000);
+      const longTail = Math.random() < 0.12 ? Human.rand(2500, 10000) : 0;
       await Human.sleep(base + longTail);
 
       // scrapeProfileWithContact() handles both the overlay-URL (modal already
       // open) and the regular-URL (clicks the Contact info link) cases.
-      const profile = await Scraper.scrapeProfileWithContact();
+      // Use a 2s settleMs to let LinkedIn's React fully populate the modal's
+      // mailto:/tel: anchors before we read them.
+      const profile = await Scraper.scrapeProfile();
+      const contact = await Scraper.scrapeContactInfo({ settleMs: 2000 });
+      if (contact.email) profile.email = contact.email;
+      if (contact.phone) profile.phone = contact.phone;
+      if (contact.website) profile.company_url = contact.website;
+      // Text-scan fallback so we still catch emails/phones the user put in
+      // their About/Experience (works even when the modal click failed).
+      if ((!profile.email || !profile.phone) && Scraper._scrapeFromProfileText) {
+        try {
+          const fromText = Scraper._scrapeFromProfileText();
+          if (!profile.email && fromText.email) profile.email = fromText.email;
+          if (!profile.phone && fromText.phone) profile.phone = fromText.phone;
+        } catch {}
+      }
+      profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
+
       try {
         await globalThis.__lcApi.syncProfile(profile);
       } catch (e) {

@@ -275,14 +275,12 @@
     }
   }
 
-  async function scrapeContactInfo({ timeoutMs = 9000 } = {}) {
+  async function scrapeContactInfo({ timeoutMs = 9000, settleMs = 1500 } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null };
     }
 
-    // When the service worker opens a background tab at the overlay URL
-    // (/in/<handle>/overlay/contact-info/), LinkedIn pre-opens the modal via
-    // its SPA router — we just wait for it instead of clicking anything.
+    const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
     const isOverlayUrl = location.pathname.includes("/overlay/contact-info");
 
     let modal = _findContactModal();
@@ -290,13 +288,23 @@
 
     if (!modal) {
       if (!isOverlayUrl) {
-        // On a regular profile page: click the Contact info link to open modal
         const link = _findContactInfoLink();
-        if (!link) return { email: null, phone: null, website: null };
-        link.click();
+        if (link) {
+          // Synthetic .click() can be no-op'd in background tabs / by React's
+          // event listeners. Use a full pointer event sequence — the same
+          // approach automate.js uses for connect/message — so LinkedIn's
+          // React handlers actually fire.
+          try { link.focus?.(); } catch {}
+          await _sleep(120);
+          try {
+            if (dispatchHumanClick) dispatchHumanClick(link);
+            else link.click();
+          } catch {
+            try { link.click(); } catch {}
+          }
+        }
       }
-      // Use MutationObserver-backed waitFor so we wake immediately when ready
-      const { waitFor } = globalThis.__lcDom;
+
       modal = await waitFor(
         [
           "div[role='dialog'][aria-labelledby*='contact' i]",
@@ -304,15 +312,53 @@
           "#artdeco-modal-outlet div[role='dialog']",
           "artdeco-modal div[role='dialog']",
           "div.artdeco-modal__content",
+          "div[role='dialog']",
         ],
         { timeout: timeoutMs }
       );
       if (!_isValidContactModal(modal)) modal = null;
+
+      // Last-resort backup: push the overlay URL into the SPA router. Some
+      // background-tab states won't dispatch the click reliably; navigating
+      // forces LinkedIn's react-router to open the modal route directly.
+      if (!modal && !isOverlayUrl) {
+        try {
+          const overlayPath =
+            location.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
+          history.pushState({}, "", overlayPath + location.search);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        } catch {
+          /* pushState fails in some sandboxed contexts */
+        }
+        modal = await waitFor(
+          [
+            "div[role='dialog'][aria-labelledby*='contact' i]",
+            "#artdeco-modal-outlet div[role='dialog']",
+            "div[role='dialog']",
+          ],
+          { timeout: 4000 }
+        );
+        if (!_isValidContactModal(modal)) modal = null;
+      }
     }
 
     if (!modal) return { email: null, phone: null, website: null };
-    await _sleep(350); // Let dynamic content settle
-    const data = _scrapeFromContactModal(modal);
+
+    // Wait for modal contents to fully hydrate. The mailto: anchor is added
+    // by React in a second tick after the dialog mounts — reading too early
+    // returns null email even though the modal is visible.
+    await _sleep(settleMs);
+
+    let data = _scrapeFromContactModal(modal);
+
+    // Retry once if the modal opened but contents weren't rendered yet.
+    if (!data.email && !data.phone) {
+      await _sleep(1500);
+      // Re-query modal in case it remounted
+      modal = _findContactModal() || modal;
+      data = _scrapeFromContactModal(modal);
+    }
+
     if (!isOverlayUrl) _closeContactModal();
     return data;
   }
@@ -621,5 +667,6 @@
     scrapeSearchResults,
     scrapeSalesNavSearch,
     scrapeCurrentPage,
+    _scrapeFromProfileText,
   };
 })();

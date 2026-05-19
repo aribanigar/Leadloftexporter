@@ -400,13 +400,28 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* The save row is appended as the LAST child of the card root (LI/ARTICLE).
-   * Because <li>/<article> are block-level by default, their children stack
-   * vertically — so the save row appears below the existing card content
-   * (photo + name + headline row, action buttons row) regardless of whether
-   * those internal sections use flex layout. */
+  /* Global registry of save buttons we've injected, keyed by canonical
+   * LinkedIn URL. Without this, LinkedIn's two anchors per card (photo
+   * link + name link) cause us to inject twice, and pagination/virtual
+   * scroll lets stale buttons linger on recycled <li>s. With it, we
+   * guarantee exactly one Save chip per profile globally. */
+  const injectedSaves = new Map(); // canonical url -> wrap element
+
+  function _gcInjected() {
+    for (const [url, node] of injectedSaves.entries()) {
+      if (!node || !document.body.contains(node)) injectedSaves.delete(url);
+    }
+  }
+
   function injectInlineSave(card, profile) {
-    if (card.querySelector(".lc-inline-save")) return;
+    const url = profile.linkedin_url;
+    if (!url) return;
+    // De-dupe: if we already have a save chip for this URL still in the DOM,
+    // don't add another. If the recorded element was removed (pagination,
+    // SPA re-render), let it through.
+    const existing = injectedSaves.get(url);
+    if (existing && document.body.contains(existing)) return;
+    if (existing) injectedSaves.delete(url);
 
     const textSpan = el("span", { class: "lc-inline-save-text" }, "Save");
     const btn = el(
@@ -434,9 +449,6 @@
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
         }
-        // Kick off background-tab enrichment. The service worker handles
-        // jittered delay + safe-zone caps; the content script in the new
-        // tab clicks Contact info and also scans the profile text.
         const settings = await Storage.getSettings();
         if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
           chrome.runtime.sendMessage(
@@ -458,7 +470,20 @@
     });
 
     const wrap = el("div", { class: "lc-save-row" }, btn);
+    wrap.dataset.lcUrl = url;
+
+    // The chip floats absolute at the top-right of the card, just inboard of
+    // LinkedIn's Connect/Pending button. The card needs position:relative
+    // for the absolute child to anchor correctly.
+    try {
+      if (getComputedStyle(card).position === "static") {
+        card.style.position = "relative";
+      }
+    } catch {
+      card.style.position = "relative";
+    }
     card.appendChild(wrap);
+    injectedSaves.set(url, wrap);
   }
 
   function _cardFromLink(link) {
@@ -531,31 +556,46 @@
   function decorateSearchCards() {
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
-    // Find unique profile cards by iterating /in/ (and /sales/lead/) anchors.
-    // The same approach as the scraper, kept in sync.
+
+    // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
+    _gcInjected();
+
+    // Iterate anchors, but dedupe by canonical URL FIRST so the photo-link
+    // anchor and the name-link anchor for the same profile never both make
+    // it to injection. This is the bug that produced multiple Save chips.
     const links = document.querySelectorAll(
       "a[href*='/in/'], a[href*='/sales/lead/']"
     );
-    const seenCards = new Set();
+    const seenUrls = new Set();
+
     links.forEach((link) => {
-      const card = _cardFromLink(link);
-      if (!card || seenCards.has(card)) return;
-      seenCards.add(card);
-      const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
-      // Track decoration by the URL of the link inside the card. LinkedIn
-      // recycles <li> elements on pagination / virtual scroll, so flagging
-      // by element alone misses cards that got re-populated with a different
-      // profile. If the stored URL no longer matches, blow away the old
-      // Save button so we can re-inject for the new profile.
-      if (card.dataset.lcUrl && card.dataset.lcUrl !== url) {
-        card.querySelector(".lc-inline-save")?.remove();
-        delete card.dataset.lcUrl;
+      try {
+        const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
+        if (!url || seenUrls.has(url)) return;
+        seenUrls.add(url);
+
+        // If a save chip already exists for this URL anywhere in the DOM,
+        // skip — the inject function would also bail, but doing it here
+        // saves us the card-walk cost.
+        const existing = injectedSaves.get(url);
+        if (existing && document.body.contains(existing)) return;
+
+        const card = _cardFromLink(link);
+        if (!card) return;
+        // Defensive: if THIS card already has a save chip but it's pointing
+        // at a different URL (recycled <li>), remove it.
+        const stray = card.querySelector(".lc-save-row");
+        if (stray && stray.dataset.lcUrl !== url) {
+          injectedSaves.delete(stray.dataset.lcUrl);
+          stray.remove();
+        }
+
+        const profile = profileFromCard(card, link);
+        if (!profile?.linkedin_url) return;
+        injectInlineSave(card, profile);
+      } catch (e) {
+        console.warn("[LeadCaptura] decorate failed", e?.message);
       }
-      if (card.dataset.lcUrl === url) return;
-      const profile = profileFromCard(card, link);
-      if (!profile?.linkedin_url) return;
-      injectInlineSave(card, profile);
-      card.dataset.lcUrl = url;
     });
   }
 
