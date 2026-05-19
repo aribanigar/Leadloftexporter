@@ -215,6 +215,58 @@ def ingest(
     return LeadIngestResponse(lead=_serialize(lead), created=created)
 
 
+@router.post("/enrich-emails")
+def enrich_emails_batch(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+    limit: int = Query(100, le=500),
+):
+    """Find emails for the next batch of leads in this workspace that don't have one yet."""
+    from app.services.email_finder import find_best_email
+
+    rows = (
+        db.query(Lead)
+        .options(joinedload(Lead.company))
+        .filter(
+            Lead.workspace_id == ctx.workspace_id,
+            Lead.email.is_(None),
+            Lead.email_status.is_(None),
+        )
+        .limit(limit)
+        .all()
+    )
+    found = 0
+    invalid = 0
+    skipped = 0
+    for lead in rows:
+        try:
+            company = lead.company
+            best, status_, candidates = find_best_email(
+                first_name=lead.first_name,
+                last_name=lead.last_name,
+                company_name=company.name if company else None,
+                website=company.website if company else None,
+                explicit_domain=company.domain if company else None,
+            )
+            if best:
+                lead.email = best
+                lead.email_status = status_
+                merged_custom = dict(lead.custom or {})
+                merged_custom["email_candidates"] = candidates
+                lead.custom = merged_custom
+                found += 1
+            elif status_ == "invalid":
+                lead.email_status = "invalid"
+                invalid += 1
+            else:
+                skipped += 1
+        except Exception:
+            skipped += 1
+            continue
+    db.commit()
+    return {"checked": len(rows), "found": found, "invalid": invalid, "skipped": skipped}
+
+
 @router.post("/export.csv")
 def export_csv(
     ctx: AuthContext = Depends(get_workspace_context),
