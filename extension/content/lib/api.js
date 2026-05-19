@@ -29,10 +29,12 @@
   globalThis.__lcApi = {
     me: () => call("me"),
     options: () => call("options"),
-    syncProfile: (profile) => call("syncProfile", { profile }),
+    // Routes through saveWithEnrich: Voyager API contact lookup then backend sync
+    syncProfile: (profile) => call("saveWithEnrich", { profile }),
     syncSearch: (data) => call("syncSearch", data),
     enrollBatch: (playbook_id, lead_ids) => call("enrollBatch", { playbook_id, lead_ids }),
     nextJobs: (limit = 1) => call("nextJobs", { limit }),
     submitJobResult: (jobId, result) => call("submitJobResult", { jobId, result }),
+    getLinkedInContact: (linkedinUrl) => call("getLinkedInContact", { linkedinUrl }),
   };
 })();
