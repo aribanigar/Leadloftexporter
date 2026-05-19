@@ -5,11 +5,21 @@
  *   /in/<handle>                     → profile detail
  *   /search/results/people/?...      → people search
  *   /sales/lead/<id> + /sales/search → Sales Navigator
- *   /mynetwork/invite-connect/...    → invites (limited)
+ *
+ * Implementation philosophy: LinkedIn class names are HASHED and rotate.
+ * `text-heading-xlarge` / `entity-result__title-text` / `pv-top-card` only
+ * work for a few weeks before they're rewritten. We avoid class selectors
+ * entirely and instead use:
+ *   - element type (h1, main, img, a)
+ *   - href / data-* / aria-* attributes (LinkedIn keeps these stable
+ *     because their own product code depends on them)
+ *   - structural relationships (h1 inside main; nearest <li> ancestor of
+ *     an /in/ link)
+ *   - text fingerprints ("Contact info") for action affordances
  */
 (() => {
   if (globalThis.__lcScraper) return;
-  const { text, first, all, normalizeProfileUrl } = globalThis.__lcDom;
+  const { normalizeProfileUrl } = globalThis.__lcDom;
 
   function pageType() {
     const p = location.pathname;
@@ -22,282 +32,218 @@
     return "unknown";
   }
 
-  /* ---------- Profile page (/in/handle) ---------- */
-
-  function scrapeProfile() {
-    const root = document;
-    const fullName = text(
-      first(root, [
-        "h1.text-heading-xlarge",
-        ".pv-top-card h1",
-        "main h1",
-        "[data-generated-suggestion-target] h1",
-      ])
-    );
-    const headline = text(
-      first(root, [
-        ".text-body-medium.break-words",
-        ".pv-text-details__left-panel .text-body-medium",
-        "main .pv-text-details__about-this-profile-entrypoint + div .text-body-medium",
-      ])
-    );
-    const location_ = text(
-      first(root, [
-        ".pv-text-details__left-panel .text-body-small.inline.t-black--light.break-words",
-        ".text-body-small.inline.t-black--light.break-words",
-      ])
-    );
-    const avatar =
-      first(root, ["img.pv-top-card-profile-picture__image--show", ".pv-top-card__photo img", ".profile-photo-edit__preview"])
-        ?.getAttribute("src") || null;
-
-    // Current company can usually be read from the "experience" section's
-    // first occupation or the headline annotation.
-    let companyName = "";
-    let companyUrl = "";
-    const expSection = first(root, [
-      "section[data-section='experience']",
-      "section.experience",
-      "section#experience",
-      "section[aria-label*='experience' i]",
-    ]);
-    if (expSection) {
-      const firstRow = first(expSection, ["li", "div.pvs-entity"]);
-      if (firstRow) {
-        companyName = text(
-          first(firstRow, [
-            ".t-14.t-normal span[aria-hidden='true']",
-            ".pv-entity__secondary-title",
-            "span.t-14.t-normal",
-          ])
-        );
-        const a = first(firstRow, ["a[data-field='experience_company_logo']", "a[href*='/company/']"]);
-        if (a) companyUrl = a.href;
-      }
-    }
-    if (!companyName) {
-      const headlinePart = (headline || "").split(" at ");
-      if (headlinePart.length > 1) companyName = headlinePart.slice(1).join(" at ").trim();
-    }
-
-    // Title heuristic: first occupation title, or split from headline
-    let title = "";
-    if (expSection) {
-      const firstRow = first(expSection, ["li", "div.pvs-entity"]);
-      if (firstRow) {
-        title = text(first(firstRow, [".t-bold span[aria-hidden='true']", ".pv-entity__summary-info h3"]));
-      }
-    }
-    if (!title && headline) {
-      title = headline.split(" at ")[0].trim();
-    }
-
-    const linkedinUrl = normalizeProfileUrl(location.href);
-    const [first_name, ...rest] = (fullName || "").split(/\s+/);
-    const last_name = rest.join(" ") || null;
-
-    return {
-      linkedin_url: linkedinUrl,
-      full_name: fullName || null,
-      first_name: first_name || null,
-      last_name: last_name,
-      headline: headline || null,
-      title: title || null,
-      location: location_ || null,
-      avatar_url: avatar,
-      company_name: companyName || null,
-      company_url: companyUrl || null,
-      raw: { source_url: location.href, page_type: "profile" },
-    };
-  }
-
-  /* ---------- People search page ---------- */
-
-  function scrapeSearchResults() {
-    const cards = all(document, [
-      "li.reusable-search__result-container",
-      "li.search-result__occluded-item",
-      "div.search-results-container li",
-      "ul.reusable-search__entity-result-list > li",
-    ]);
-    const results = [];
-    const seen = new Set();
-    for (const card of cards) {
-      try {
-        const link = first(card, ["a[href*='/in/']"]);
-        if (!link) continue;
-        const url = normalizeProfileUrl(link.href);
-        if (!url || seen.has(url)) continue;
-        seen.add(url);
-        const name = text(first(card, ["span.entity-result__title-text a span[aria-hidden='true']", ".entity-result__title-text a", "a span[aria-hidden='true']"]));
-        const sub = text(first(card, [".entity-result__primary-subtitle", ".entity-result__subtitle"]));
-        const loc = text(first(card, [".entity-result__secondary-subtitle"]));
-        const avatar = first(card, ["img.presence-entity__image", "img.ivm-view-attr__img--centered"])?.getAttribute("src") || null;
-        if (!name) continue;
-        const [first_name, ...rest] = name.split(/\s+/);
-        results.push({
-          linkedin_url: url,
-          full_name: name,
-          first_name,
-          last_name: rest.join(" ") || null,
-          headline: sub || null,
-          title: (sub || "").split(" at ")[0] || null,
-          company_name: (sub || "").split(" at ")[1] || null,
-          location: loc || null,
-          avatar_url: avatar,
-          raw: { source_url: location.href, page_type: "search-people" },
-        });
-      } catch {
-        /* skip malformed card */
-      }
-    }
-    return results;
-  }
-
-  /* ---------- Sales Navigator profile ---------- */
-
-  function scrapeSalesNavProfile() {
-    const fullName = text(first(document, ["h1[data-anonymize='person-name']", "main h1"]));
-    const headline = text(first(document, ["[data-anonymize='headline']", "main h1 + div"]));
-    const company = text(first(document, ["a[data-anonymize='company-name']", "[data-anonymize='company-name']"]));
-    const title = text(first(document, ["[data-anonymize='job-title']"]));
-    const location_ = text(first(document, ["[data-anonymize='location']"]));
-    const liUrl = first(document, ["a[data-control-name='visit_linkedin_profile']", "a[href*='/in/']"])?.href || location.href;
-    const url = normalizeProfileUrl(liUrl);
-    const [first_name, ...rest] = (fullName || "").split(/\s+/);
-    return {
-      linkedin_url: url,
-      full_name: fullName || null,
-      first_name: first_name || null,
-      last_name: rest.join(" ") || null,
-      headline: headline || null,
-      title: title || null,
-      company_name: company || null,
-      location: location_ || null,
-      raw: { source_url: location.href, page_type: "salesnav-profile" },
-    };
-  }
-
-  function scrapeSalesNavSearch() {
-    const cards = all(document, [
-      "li.artdeco-list__item",
-      "li.search-results__result-item",
-      "li[data-x-search-result]",
-    ]);
-    const out = [];
-    const seen = new Set();
-    for (const card of cards) {
-      const link = first(card, ["a[data-control-name='view_lead_panel_via_search_lead_name']", "a[href*='/sales/lead/']", "a[data-anonymize='person-name']"]);
-      const name = text(first(card, ["[data-anonymize='person-name']", "a[data-control-name='view_lead_panel_via_search_lead_name']"]));
-      if (!link || !name) continue;
-      const url = normalizeProfileUrl(link.href);
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      const title = text(first(card, ["[data-anonymize='title']"]));
-      const company = text(first(card, ["[data-anonymize='company-name']"]));
-      const loc = text(first(card, ["[data-anonymize='location']"]));
-      const [first_name, ...rest] = name.split(/\s+/);
-      out.push({
-        linkedin_url: url,
-        full_name: name,
-        first_name,
-        last_name: rest.join(" ") || null,
-        title: title || null,
-        company_name: company || null,
-        location: loc || null,
-        raw: { source_url: location.href, page_type: "salesnav-search" },
-      });
-    }
-    return out;
-  }
-
-  /* ---------- Contact info modal ----------
-   *
-   * On /in/<handle> there's a "Contact info" link that opens a modal exposing
-   * the email + phone the profile owner has shared. This is rendered DOM —
-   * not a private API — so it's safe to read by clicking the user-visible
-   * affordance. We click → wait → scrape → close, same as a human would. */
-
+  const _txt = (n) => (n?.textContent || "").replace(/\s+/g, " ").trim() || null;
   const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function _findContactInfoLink() {
-    const candidates = all(document, [
-      "a#top-card-text-details-contact-info",
-      "a[href*='/overlay/contact-info/']",
-      "a[data-control-name='contact_see_more']",
-      "button[aria-label*='Contact info' i]",
-      "a[aria-label*='Contact info' i]",
-    ]);
-    for (const c of candidates) {
-      const t = (c.textContent || c.getAttribute("aria-label") || "").toLowerCase();
-      if (t.includes("contact info") || t.includes("contact information")) return c;
+  /* ---------- Profile page (/in/handle) ----------
+   *
+   * The top card is a <section> (or <div>) inside <main> that contains the
+   * single <h1> for the page. We anchor on that h1 and walk relative to it
+   * — every other field is a near neighbour.
+   */
+
+  function _findTopCard() {
+    const h1 = document.querySelector("main h1") || document.querySelector("h1");
+    if (!h1) return { h1: null, card: null };
+    // Walk up to the nearest sectioning element that contains the photo and
+    // the action buttons (Message / Connect). A reasonable proxy: the deepest
+    // ancestor that still contains both the h1 and an <img>.
+    let card = h1.parentElement;
+    for (let i = 0; i < 8 && card; i++) {
+      if (card.querySelector("img") && card.querySelector("a[href*='/overlay/']")) break;
+      card = card.parentElement;
     }
-    return candidates[0] || null;
+    return { h1, card: card || h1.parentElement };
   }
 
-  function _findContactModal() {
-    return first(document, [
-      "div.artdeco-modal[role='dialog'][aria-labelledby*='contact' i]",
-      "div[role='dialog'][aria-label*='Contact info' i]",
-      "section.pv-contact-info",
-      "div.artdeco-modal__content section.pv-contact-info",
-      "#artdeco-modal-outlet div.artdeco-modal[role='dialog']",
-    ]);
+  function _firstTextAfter(h1) {
+    // Walk DOM order after the h1 and return the first sibling-ish element
+    // that has text > 4 chars and is NOT the name itself. This is the
+    // "headline" line LinkedIn renders directly under the name.
+    const seen = new Set();
+    const queue = [h1.parentElement];
+    let foundH1 = false;
+    while (queue.length) {
+      const node = queue.shift();
+      if (!node || seen.has(node)) continue;
+      seen.add(node);
+      for (const child of node.children) {
+        if (child === h1) {
+          foundH1 = true;
+          continue;
+        }
+        if (!foundH1) continue;
+        const t = _txt(child);
+        if (t && t.length > 4 && t.length < 240 && !/connect|message|follow|more/i.test(t)) {
+          return t;
+        }
+        if (child.children?.length) queue.push(child);
+      }
+    }
+    return null;
   }
 
-  function _scrapeFromContactModal(modal) {
-    const root = modal || document;
-    const emailLink =
-      first(root, ["a[href^='mailto:']"]) || null;
-    const email = emailLink
-      ? emailLink.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
-      : null;
-    // Phone numbers in LinkedIn contact-info live in a list with a section
-    // header "Phone" / a phone icon. We grab anything that looks like a phone.
-    let phone = null;
-    const phoneAnchor = first(root, ["a[href^='tel:']"]);
-    if (phoneAnchor) {
-      phone = phoneAnchor.getAttribute("href").replace(/^tel:/, "").trim();
-    } else {
-      const liNodes = all(root, ["li", "div.pv-contact-info__contact-type", "section"]);
-      for (const li of liNodes) {
-        const label = (li.querySelector("h3, .pv-contact-info__header")?.textContent || "")
-          .toLowerCase();
-        if (!label.includes("phone")) continue;
-        const span = li.querySelector("span, .pv-contact-info__contact-item, .t-14");
-        const txt = (span?.textContent || "").trim();
-        const m = txt.match(/\+?[\d\s\-().]{7,}/);
-        if (m) {
-          phone = m[0].replace(/\s+/g, " ").trim();
+  function _findAvatar(card) {
+    if (!card) return null;
+    const imgs = card.querySelectorAll("img");
+    for (const img of imgs) {
+      const src = img.getAttribute("src") || "";
+      if (src.includes("/profile-displayphoto") || src.includes("media.licdn.com") || src.includes("profile-")) {
+        return src;
+      }
+    }
+    return imgs[0]?.getAttribute("src") || null;
+  }
+
+  function scrapeProfile() {
+    const { h1, card } = _findTopCard();
+    const fullName = _txt(h1);
+
+    // Headline: the text line directly under the name. Multiple fallbacks
+    // because LinkedIn sometimes wraps it in different structures.
+    let headline = null;
+    if (h1) {
+      // Try the immediate next sibling first
+      let n = h1.nextElementSibling;
+      while (n && !headline) {
+        const t = _txt(n);
+        if (t && t.length > 4) headline = t;
+        n = n.nextElementSibling;
+      }
+      if (!headline) headline = _firstTextAfter(h1);
+    }
+
+    // Location: typically a short string in the top card with a city/country
+    // pattern, lives in a div with "text-body-small" inheritance — but we
+    // match it positionally instead. Heuristic: among the text-bearing
+    // descendants of the top card, the one that's NOT the name, headline,
+    // or connection counts, and has a comma or short length.
+    let location_ = null;
+    if (card) {
+      const candidates = Array.from(card.querySelectorAll("div, span"))
+        .map((n) => _txt(n))
+        .filter(Boolean);
+      for (const t of candidates) {
+        if (t === fullName || t === headline) continue;
+        if (/connect|follower|mutual|message/i.test(t)) continue;
+        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi)\b/i.test(t))) {
+          location_ = t;
           break;
         }
       }
     }
-    const websiteAnchor = first(root, ["a[data-control-name='contact_see_more']"]);
-    // Some profiles list a personal website under contact info — surface it
-    // because the email finder can use it later as the company domain.
+
+    const avatar = _findAvatar(card);
+
+    // Company: parse from headline ("Title at Company") as a reliable
+    // fallback. The Experience section's first row varies too wildly to
+    // depend on without classes.
+    let companyName = null;
+    let title = null;
+    if (headline) {
+      const parts = headline.split(/\s+at\s+/i);
+      if (parts.length >= 2) {
+        title = parts[0].trim();
+        companyName = parts.slice(1).join(" at ").trim();
+      } else {
+        title = headline;
+      }
+    }
+
+    const linkedinUrl = normalizeProfileUrl(location.href);
+    const [first_name, ...rest] = (fullName || "").split(/\s+/);
+
+    return {
+      linkedin_url: linkedinUrl,
+      full_name: fullName,
+      first_name: first_name || null,
+      last_name: rest.join(" ") || null,
+      headline,
+      title,
+      location: location_,
+      avatar_url: avatar,
+      company_name: companyName,
+      company_url: null,
+      raw: { source_url: location.href, page_type: "profile" },
+    };
+  }
+
+  /* ---------- Contact info modal ----------
+   *
+   * The "Contact info" anchor on a profile has a stable URL:
+   * /in/<handle>/overlay/contact-info/. We anchor on the href, not on text.
+   */
+
+  function _findContactInfoLink() {
+    return (
+      document.querySelector("a[href*='/overlay/contact-info/']") ||
+      document.querySelector("a[id*='contact-info']") ||
+      // Text fallback — slow path
+      Array.from(document.querySelectorAll("a, button")).find((n) =>
+        /^\s*Contact info\s*$/i.test(n.textContent || "")
+      )
+    );
+  }
+
+  function _findContactModal() {
+    // After clicking Contact info, LinkedIn renders an artdeco-modal whose
+    // labelled-by id contains "contact". Multiple selectors as fallback.
+    return (
+      document.querySelector("div[role='dialog'][aria-labelledby*='contact' i]") ||
+      document.querySelector("div[role='dialog'][aria-label*='Contact' i]") ||
+      // Last-resort: any dialog open right now
+      document.querySelector("#artdeco-modal-outlet div[role='dialog']") ||
+      document.querySelector("div[role='dialog']")
+    );
+  }
+
+  function _scrapeFromContactModal(modal) {
+    if (!modal) return { email: null, phone: null, website: null };
+    const emailAnchor = modal.querySelector("a[href^='mailto:']");
+    const email = emailAnchor
+      ? emailAnchor.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
+      : null;
+
+    let phone = null;
+    const phoneAnchor = modal.querySelector("a[href^='tel:']");
+    if (phoneAnchor) {
+      phone = phoneAnchor.getAttribute("href").replace(/^tel:/, "").trim();
+    } else {
+      // Some profiles list the phone as plain text under a "Phone" header.
+      const sections = modal.querySelectorAll("section, li, div");
+      for (const s of sections) {
+        const h = _txt(s.querySelector("h3, h4, span"));
+        if (h && /phone/i.test(h)) {
+          const m = (_txt(s) || "").match(/\+?[\d\s\-().]{7,}/);
+          if (m) {
+            phone = m[0].replace(/\s+/g, " ").trim();
+            break;
+          }
+        }
+      }
+    }
+
     let website = null;
-    const personalSiteAnchor = all(root, ["a[href^='http']"]).find((a) => {
+    const externalAnchors = Array.from(modal.querySelectorAll("a[href^='http']"));
+    for (const a of externalAnchors) {
       const href = a.getAttribute("href") || "";
-      return (
-        href &&
+      if (
+        !href.includes("linkedin.com") &&
         !href.startsWith("mailto:") &&
         !href.startsWith("tel:") &&
-        !href.includes("linkedin.com") &&
         !href.includes("/overlay/")
-      );
-    });
-    if (personalSiteAnchor) website = personalSiteAnchor.getAttribute("href");
+      ) {
+        website = href;
+        break;
+      }
+    }
     return { email, phone, website };
   }
 
   function _closeContactModal() {
-    const dismiss = first(document, [
-      "button[aria-label='Dismiss'][data-test-modal-close-btn]",
-      "div.artdeco-modal__dismiss",
-      "button.artdeco-modal__dismiss",
-      "button[aria-label='Dismiss']",
-    ]);
+    const dismiss =
+      document.querySelector("button[aria-label='Dismiss']") ||
+      document.querySelector("[data-test-modal-close-btn]");
     if (dismiss) {
       dismiss.click();
     } else {
@@ -305,11 +251,10 @@
     }
   }
 
-  async function scrapeContactInfo({ timeoutMs = 4000 } = {}) {
+  async function scrapeContactInfo({ timeoutMs = 5000 } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null };
     }
-    // If the modal is already open, just read it.
     let modal = _findContactModal();
     if (!modal) {
       const link = _findContactInfoLink();
@@ -317,14 +262,20 @@
       link.click();
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        await _sleep(150);
+        await _sleep(180);
         modal = _findContactModal();
-        if (modal) break;
+        // Make sure the dialog isn't just any leftover; require either an
+        // email link, phone link, or a heading containing "Contact info".
+        if (modal && (
+          modal.querySelector("a[href^='mailto:']") ||
+          modal.querySelector("a[href^='tel:']") ||
+          /contact info/i.test(modal.textContent || "")
+        )) break;
+        modal = null;
       }
     }
     if (!modal) return { email: null, phone: null, website: null };
-    // Give the modal one extra tick so async-rendered email links exist.
-    await _sleep(250);
+    await _sleep(280);
     const data = _scrapeFromContactModal(modal);
     _closeContactModal();
     return data;
@@ -339,9 +290,189 @@
       if (contact.website && !base.company_url) base.company_url = contact.website;
       base.raw = { ...(base.raw || {}), contact_info_scraped: true };
     } catch {
-      // Contact info is best-effort. Never block a save on it.
+      /* enrichment is best-effort */
     }
     return base;
+  }
+
+  /* ---------- People search page ----------
+   *
+   * Class names rotate constantly here. Instead we look for every anchor
+   * whose href contains "/in/" — those are the profile links — and walk
+   * up to the smallest ancestor that contains an image + the link. That
+   * ancestor is the card.
+   */
+
+  function _profileCardFromLink(link) {
+    let node = link.parentElement;
+    for (let i = 0; i < 10 && node; i++) {
+      // A "card" is an element that has the profile link AND a visible
+      // distinguishing block (image or action button).
+      if (
+        node.tagName === "LI" ||
+        node.tagName === "ARTICLE" ||
+        (node.querySelector("img") && node.querySelector("a[href*='/in/']"))
+      ) {
+        // Prefer the highest ancestor whose width spans the search column
+        // (a card is usually a wide row). Walk up while the parent still
+        // looks like the same card.
+        let candidate = node;
+        let p = node.parentElement;
+        while (
+          p &&
+          p.querySelectorAll("a[href*='/in/']").length === 1 &&
+          p.tagName !== "MAIN" &&
+          p.tagName !== "BODY"
+        ) {
+          candidate = p;
+          p = p.parentElement;
+        }
+        return candidate;
+      }
+      node = node.parentElement;
+    }
+    return link.parentElement;
+  }
+
+  function _profileFromCard(card, link) {
+    const url = normalizeProfileUrl(link.href);
+    // Name: try aria-hidden span first (LinkedIn duplicates the name there
+    // for screen readers), fallback to link text. Skip cards where the name
+    // is the generic "LinkedIn Member" placeholder — those have no
+    // identifying data we can capture.
+    let name =
+      _txt(link.querySelector("span[aria-hidden='true']")) ||
+      _txt(link);
+    if (!name || /linkedin member/i.test(name)) return null;
+    // Strip degree badges that sometimes get concatenated in
+    name = name.replace(/\s*•\s*(1st|2nd|3rd\+?|3rd)\s*$/i, "").trim();
+
+    // Headline/subtitle: the next sibling text region of the card after the
+    // name link. We approximate by walking siblings of the link's container.
+    let headline = null;
+    let location_ = null;
+    const linkBox = link.closest("div") || link.parentElement;
+    if (linkBox) {
+      const candidates = Array.from(card.querySelectorAll("div, p, span"))
+        .map((n) => _txt(n))
+        .filter(Boolean)
+        .filter((t) => t !== name && !/connect|message|follow|view profile/i.test(t));
+      headline = candidates[0] || null;
+      // Location often contains a comma or named country
+      location_ =
+        candidates.find(
+          (t) =>
+            t !== headline &&
+            t.length < 80 &&
+            (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
+        ) || null;
+    }
+    const avatar = card.querySelector("img")?.getAttribute("src") || null;
+    const [first_name, ...rest] = name.split(/\s+/);
+    const sub = headline || "";
+    return {
+      linkedin_url: url,
+      full_name: name,
+      first_name,
+      last_name: rest.join(" ") || null,
+      headline: sub || null,
+      title: sub.split(/\s+at\s+/i)[0] || null,
+      company_name: sub.split(/\s+at\s+/i)[1] || null,
+      location: location_,
+      avatar_url: avatar,
+      raw: { source_url: location.href, page_type: "search-people" },
+    };
+  }
+
+  function scrapeSearchResults() {
+    const results = [];
+    const seen = new Set();
+    // Every profile on the search page is reachable via an /in/ href.
+    const links = document.querySelectorAll("a[href*='/in/']");
+    for (const link of links) {
+      try {
+        const url = normalizeProfileUrl(link.href);
+        if (!url || seen.has(url)) continue;
+        // Skip anchors that live in side modules (people-also-viewed, etc.)
+        // by requiring a name attached to the link.
+        const card = _profileCardFromLink(link);
+        const p = _profileFromCard(card, link);
+        if (!p) continue;
+        seen.add(url);
+        results.push(p);
+      } catch {
+        /* skip malformed */
+      }
+    }
+    return results;
+  }
+
+  /* ---------- Sales Navigator ---------- */
+
+  function scrapeSalesNavProfile() {
+    const fullName = _txt(
+      document.querySelector("h1[data-anonymize='person-name']") ||
+        document.querySelector("main h1")
+    );
+    const headline = _txt(
+      document.querySelector("[data-anonymize='headline']") ||
+        document.querySelector("main h1 + div")
+    );
+    const company = _txt(
+      document.querySelector("a[data-anonymize='company-name']") ||
+        document.querySelector("[data-anonymize='company-name']")
+    );
+    const title = _txt(document.querySelector("[data-anonymize='job-title']"));
+    const location_ = _txt(document.querySelector("[data-anonymize='location']"));
+    const liUrl =
+      document.querySelector("a[data-control-name='visit_linkedin_profile']")?.href ||
+      document.querySelector("a[href*='/in/']")?.href ||
+      location.href;
+    const url = normalizeProfileUrl(liUrl);
+    const [first_name, ...rest] = (fullName || "").split(/\s+/);
+    return {
+      linkedin_url: url,
+      full_name: fullName,
+      first_name: first_name || null,
+      last_name: rest.join(" ") || null,
+      headline,
+      title,
+      company_name: company,
+      location: location_,
+      raw: { source_url: location.href, page_type: "salesnav-profile" },
+    };
+  }
+
+  function scrapeSalesNavSearch() {
+    const links = document.querySelectorAll(
+      "a[data-control-name='view_lead_panel_via_search_lead_name'], a[href*='/sales/lead/']"
+    );
+    const out = [];
+    const seen = new Set();
+    for (const link of links) {
+      const url = normalizeProfileUrl(link.href);
+      if (!url || seen.has(url)) continue;
+      const card = _profileCardFromLink(link);
+      const name =
+        _txt(card.querySelector("[data-anonymize='person-name']")) || _txt(link);
+      if (!name) continue;
+      const title = _txt(card.querySelector("[data-anonymize='title']"));
+      const company = _txt(card.querySelector("[data-anonymize='company-name']"));
+      const loc = _txt(card.querySelector("[data-anonymize='location']"));
+      const [first_name, ...rest] = name.split(/\s+/);
+      seen.add(url);
+      out.push({
+        linkedin_url: url,
+        full_name: name,
+        first_name,
+        last_name: rest.join(" ") || null,
+        title,
+        company_name: company,
+        location: loc,
+        raw: { source_url: location.href, page_type: "salesnav-search" },
+      });
+    }
+    return out;
   }
 
   function scrapeCurrentPage() {
