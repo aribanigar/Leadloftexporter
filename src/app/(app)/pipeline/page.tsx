@@ -15,6 +15,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Lead, LeadList, PipelineStage } from "@/lib/types";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
+import { EnrollPlaybookModal } from "@/components/enroll-playbook-modal";
 
 export default function PipelinePage() {
   const qc = useQueryClient();
@@ -243,15 +244,24 @@ function LeadCard({ lead }: { lead: Lead }) {
 }
 
 function RowActions({ lead }: { lead: Lead }) {
+  const [enrolling, setEnrolling] = useState(false);
   return (
     <div className="ml-auto hidden items-center gap-1 group-hover:flex">
-      <Link
-        href={`/leads/${lead.id}`}
+      <button
+        type="button"
+        onClick={() => setEnrolling(true)}
         className="action-icon"
-        title={`Open ${lead.full_name || "lead"}`}
+        title={`Add ${lead.full_name || "lead"} to a Playbook`}
       >
         <Send className="h-3.5 w-3.5" />
-      </Link>
+      </button>
+      {enrolling && (
+        <EnrollPlaybookModal
+          leadId={lead.id}
+          leadName={lead.full_name}
+          onClose={() => setEnrolling(false)}
+        />
+      )}
       {lead.email ? (
         <Link
           href={`/leads/${lead.id}?tab=email`}

@@ -21,6 +21,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Lead, PipelineStage } from "@/lib/types";
 import { fmtDate, initials } from "@/lib/utils";
+import { EnrollPlaybookModal } from "@/components/enroll-playbook-modal";
 
 type ComposerTab = "email" | "linkedin" | "note" | "call";
 
@@ -108,6 +109,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     return m;
   }, [stages]);
   const stage = lead?.stage_id ? stageById.get(lead.stage_id) : undefined;
+  const [enrolling, setEnrolling] = useState(false);
 
   if (!lead) {
     return <div className="p-6 text-sm text-slate-500">Loading…</div>;
@@ -167,6 +169,20 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               <Linkedin className="h-4 w-4" />
             </ActionBtn>
           </div>
+
+          <button
+            className="btn-primary mt-3 w-full"
+            onClick={() => setEnrolling(true)}
+          >
+            <Send className="h-4 w-4" /> Add to Playbook
+          </button>
+          {enrolling && (
+            <EnrollPlaybookModal
+              leadId={id}
+              leadName={lead.full_name}
+              onClose={() => setEnrolling(false)}
+            />
+          )}
 
           <div className="mt-4 rounded-md border border-slate-200 p-3">
             <div className="flex items-center justify-between text-xs text-slate-500">
