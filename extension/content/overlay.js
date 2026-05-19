@@ -163,10 +163,27 @@
   }
 
   async function saveCurrentProfile(profile) {
+    flashStatus("Reading contact info…");
+    let enriched = profile;
+    try {
+      // On /in/ pages we open the Contact info modal and read email/phone the
+      // same way a human would — opens the visible modal, scrapes, closes.
+      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
+        enriched = await Scraper.scrapeProfileWithContact();
+      }
+    } catch {
+      enriched = profile;
+    }
     flashStatus("Saving…");
     try {
-      const result = await Api.syncProfile(profile);
-      flashStatus(result.created ? "Saved new lead ✓" : "Lead updated ✓", "ok");
+      const result = await Api.syncProfile(enriched);
+      const gotEmail = !!(enriched.email && !profile.email);
+      const gotPhone = !!(enriched.phone && !profile.phone);
+      const extras = [gotEmail && "email", gotPhone && "phone"].filter(Boolean).join(" + ");
+      const msg = result.created
+        ? `Saved new lead ✓${extras ? ` (${extras})` : ""}`
+        : `Lead updated ✓${extras ? ` (${extras})` : ""}`;
+      flashStatus(msg, "ok");
       if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
       maybeAutoEnroll();
     } catch (e) {
@@ -401,6 +418,21 @@
         if (result.lead?.id) {
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
+        }
+        // Kick off Contact-info enrichment in a background tab. The new tab's
+        // content script will scrape email + phone from the modal and push an
+        // update (deduped by linkedin_url), then close itself.
+        const settings = await Storage.getSettings();
+        if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
+          try {
+            chrome.runtime.sendMessage({
+              type: "lc:enrichProfile",
+              url: profile.linkedin_url,
+            });
+            btn.querySelector(".lc-inline-save-text").textContent = "Saved · enriching…";
+          } catch (enrichErr) {
+            console.warn("[LeadCaptura] enrichment dispatch failed", enrichErr);
+          }
         }
       } catch (err) {
         btn.dataset.state = "error";

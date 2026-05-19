@@ -102,7 +102,51 @@
     }
   });
 
+  // Auto-enrichment trigger: when the search-card Save flow opens a profile
+  // in a new tab with ?lc_enrich=1, we wait for the page to settle, open the
+  // Contact info modal, scrape the email/phone, push it to the backend (which
+  // dedupes by linkedin_url, so it updates the existing lead), then close the
+  // tab so the user can keep working on the search page. We only do this on
+  // /in/ URLs to avoid feedback loops, and we sleep a human-paced delay before
+  // touching the page so it doesn't look scripted.
+  async function maybeRunEnrichmentTrigger() {
+    try {
+      const params = new URLSearchParams(location.search);
+      if (!params.has("lc_enrich")) return;
+      if (!location.pathname.startsWith("/in/")) return;
+      if (window.__lcEnrichmentRan) return;
+      window.__lcEnrichmentRan = true;
+
+      // 1.2-3.5s reading pause, then a small jitter, then scrape.
+      await Human.sleep(Human.rand(1500, 3500));
+      const profile = await Scraper.scrapeProfileWithContact();
+      try {
+        await globalThis.__lcApi.syncProfile(profile);
+      } catch (e) {
+        console.warn("[LeadCaptura] enrichment sync failed", e);
+      }
+      // Final small pause then close. window.close() works when the tab was
+      // opened by chrome.tabs.create / window.open from our service worker.
+      await Human.sleep(Human.rand(400, 900));
+      try {
+        chrome.runtime.sendMessage({ type: "lc:closeMe" });
+      } catch {
+        /* fall through */
+      }
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch {
+          /* sandboxed, leave the tab open */
+        }
+      }, 300);
+    } catch (e) {
+      console.warn("[LeadCaptura] enrichment trigger failed", e);
+    }
+  }
+
   // Boot
   onPathChange();
   startAutopilot();
+  maybeRunEnrichmentTrigger();
 })();

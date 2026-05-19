@@ -211,6 +211,139 @@
     return out;
   }
 
+  /* ---------- Contact info modal ----------
+   *
+   * On /in/<handle> there's a "Contact info" link that opens a modal exposing
+   * the email + phone the profile owner has shared. This is rendered DOM —
+   * not a private API — so it's safe to read by clicking the user-visible
+   * affordance. We click → wait → scrape → close, same as a human would. */
+
+  const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function _findContactInfoLink() {
+    const candidates = all(document, [
+      "a#top-card-text-details-contact-info",
+      "a[href*='/overlay/contact-info/']",
+      "a[data-control-name='contact_see_more']",
+      "button[aria-label*='Contact info' i]",
+      "a[aria-label*='Contact info' i]",
+    ]);
+    for (const c of candidates) {
+      const t = (c.textContent || c.getAttribute("aria-label") || "").toLowerCase();
+      if (t.includes("contact info") || t.includes("contact information")) return c;
+    }
+    return candidates[0] || null;
+  }
+
+  function _findContactModal() {
+    return first(document, [
+      "div.artdeco-modal[role='dialog'][aria-labelledby*='contact' i]",
+      "div[role='dialog'][aria-label*='Contact info' i]",
+      "section.pv-contact-info",
+      "div.artdeco-modal__content section.pv-contact-info",
+      "#artdeco-modal-outlet div.artdeco-modal[role='dialog']",
+    ]);
+  }
+
+  function _scrapeFromContactModal(modal) {
+    const root = modal || document;
+    const emailLink =
+      first(root, ["a[href^='mailto:']"]) || null;
+    const email = emailLink
+      ? emailLink.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
+      : null;
+    // Phone numbers in LinkedIn contact-info live in a list with a section
+    // header "Phone" / a phone icon. We grab anything that looks like a phone.
+    let phone = null;
+    const phoneAnchor = first(root, ["a[href^='tel:']"]);
+    if (phoneAnchor) {
+      phone = phoneAnchor.getAttribute("href").replace(/^tel:/, "").trim();
+    } else {
+      const liNodes = all(root, ["li", "div.pv-contact-info__contact-type", "section"]);
+      for (const li of liNodes) {
+        const label = (li.querySelector("h3, .pv-contact-info__header")?.textContent || "")
+          .toLowerCase();
+        if (!label.includes("phone")) continue;
+        const span = li.querySelector("span, .pv-contact-info__contact-item, .t-14");
+        const txt = (span?.textContent || "").trim();
+        const m = txt.match(/\+?[\d\s\-().]{7,}/);
+        if (m) {
+          phone = m[0].replace(/\s+/g, " ").trim();
+          break;
+        }
+      }
+    }
+    const websiteAnchor = first(root, ["a[data-control-name='contact_see_more']"]);
+    // Some profiles list a personal website under contact info — surface it
+    // because the email finder can use it later as the company domain.
+    let website = null;
+    const personalSiteAnchor = all(root, ["a[href^='http']"]).find((a) => {
+      const href = a.getAttribute("href") || "";
+      return (
+        href &&
+        !href.startsWith("mailto:") &&
+        !href.startsWith("tel:") &&
+        !href.includes("linkedin.com") &&
+        !href.includes("/overlay/")
+      );
+    });
+    if (personalSiteAnchor) website = personalSiteAnchor.getAttribute("href");
+    return { email, phone, website };
+  }
+
+  function _closeContactModal() {
+    const dismiss = first(document, [
+      "button[aria-label='Dismiss'][data-test-modal-close-btn]",
+      "div.artdeco-modal__dismiss",
+      "button.artdeco-modal__dismiss",
+      "button[aria-label='Dismiss']",
+    ]);
+    if (dismiss) {
+      dismiss.click();
+    } else {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    }
+  }
+
+  async function scrapeContactInfo({ timeoutMs = 4000 } = {}) {
+    if (!location.pathname.startsWith("/in/")) {
+      return { email: null, phone: null, website: null };
+    }
+    // If the modal is already open, just read it.
+    let modal = _findContactModal();
+    if (!modal) {
+      const link = _findContactInfoLink();
+      if (!link) return { email: null, phone: null, website: null };
+      link.click();
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        await _sleep(150);
+        modal = _findContactModal();
+        if (modal) break;
+      }
+    }
+    if (!modal) return { email: null, phone: null, website: null };
+    // Give the modal one extra tick so async-rendered email links exist.
+    await _sleep(250);
+    const data = _scrapeFromContactModal(modal);
+    _closeContactModal();
+    return data;
+  }
+
+  async function scrapeProfileWithContact() {
+    const base = scrapeProfile();
+    try {
+      const contact = await scrapeContactInfo();
+      if (contact.email && !base.email) base.email = contact.email;
+      if (contact.phone && !base.phone) base.phone = contact.phone;
+      if (contact.website && !base.company_url) base.company_url = contact.website;
+      base.raw = { ...(base.raw || {}), contact_info_scraped: true };
+    } catch {
+      // Contact info is best-effort. Never block a save on it.
+    }
+    return base;
+  }
+
   function scrapeCurrentPage() {
     switch (pageType()) {
       case "profile":
@@ -229,6 +362,8 @@
   globalThis.__lcScraper = {
     pageType,
     scrapeProfile,
+    scrapeProfileWithContact,
+    scrapeContactInfo,
     scrapeSalesNavProfile,
     scrapeSearchResults,
     scrapeSalesNavSearch,

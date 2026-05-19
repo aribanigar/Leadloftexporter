@@ -68,6 +68,37 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
     return true;
   }
+  // Open a profile in a background tab with ?lc_enrich=1 so the content
+  // script there auto-scrapes the Contact info modal and updates the lead.
+  if (msg?.type === "lc:enrichProfile") {
+    const target = String(msg.url || "");
+    if (!target) {
+      sendResponse({ ok: false, error: "url_required" });
+      return true;
+    }
+    let withParam = target;
+    try {
+      const u = new URL(target);
+      u.searchParams.set("lc_enrich", "1");
+      withParam = u.toString();
+    } catch {
+      withParam = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
+    }
+    chrome.tabs.create({ url: withParam, active: false }, (tab) => {
+      sendResponse({ ok: true, tabId: tab?.id });
+    });
+    return true;
+  }
+  // The enrichment-trigger content script asks us to close its own tab.
+  if (msg?.type === "lc:closeMe") {
+    const tabId = _sender?.tab?.id;
+    if (tabId != null) {
+      chrome.tabs.remove(tabId, () => sendResponse({ ok: true }));
+    } else {
+      sendResponse({ ok: false });
+    }
+    return true;
+  }
   if (msg?.type !== "lc:api") return;
   const handler = handlers[msg.action];
   if (!handler) {
