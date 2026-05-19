@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_extension_context
-from app.models import ApiKey, ExtensionJob, Lead, LinkedInMessage, Membership, Playbook, SavedView, User
+from app.models import ApiKey, ConnectedAccount, ExtensionJob, Lead, LinkedInMessage, Membership, Playbook, SavedView, User
 from app.schemas import (
     ExtensionJobOut,
     ExtensionJobResult,
@@ -33,6 +33,31 @@ def _bump_api_key(db: Session, ctx: AuthContext) -> None:
     ).update({ApiKey.last_used_at: datetime.now(timezone.utc)})
 
 
+def _mark_linkedin_connected(db: Session, ctx: AuthContext) -> None:
+    """Extension authenticating proves LinkedIn is active in the user's browser."""
+    existing = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+            ConnectedAccount.user_id == ctx.user_id,
+            ConnectedAccount.provider == "linkedin",
+        )
+        .first()
+    )
+    if existing:
+        existing.status = "active"
+    else:
+        db.add(
+            ConnectedAccount(
+                workspace_id=ctx.workspace_id,
+                user_id=ctx.user_id,
+                provider="linkedin",
+                label="Chrome Extension",
+                status="active",
+            )
+        )
+
+
 def _serialize_lead(lead) -> LeadOut:
     out = LeadOut.model_validate(lead)
     if lead.company_id and getattr(lead, "company", None):
@@ -43,6 +68,7 @@ def _serialize_lead(lead) -> LeadOut:
 @router.get("/me")
 def extension_me(ctx: AuthContext = Depends(get_extension_context), db: Session = Depends(get_db)):
     _bump_api_key(db, ctx)
+    _mark_linkedin_connected(db, ctx)
     db.commit()
     return {
         "user": {"id": ctx.user_id, "email": ctx.user.email},
