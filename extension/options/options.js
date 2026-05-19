@@ -24,6 +24,23 @@ function setStatus(msg, level = "") {
   el.className = "status " + level;
 }
 
+async function ensureHostPermission(apiUrl) {
+  let origin;
+  try {
+    origin = new URL(apiUrl).origin + "/*";
+  } catch {
+    throw new Error("Backend URL is not a valid URL.");
+  }
+  const granted = await chrome.permissions.contains({ origins: [origin] });
+  if (granted) return;
+  const ok = await chrome.permissions.request({ origins: [origin] });
+  if (!ok) {
+    throw new Error(
+      "Browser blocked access to " + origin + ". Click Save & verify again and approve the prompt."
+    );
+  }
+}
+
 async function testConnection() {
   setStatus("Checking…");
   const settings = await load();
@@ -32,11 +49,13 @@ async function testConnection() {
     return;
   }
   try {
+    await ensureHostPermission(settings.apiUrl);
     const res = await fetch(`${settings.apiUrl}/api/v1/extension/me`, {
       headers: { "X-API-Key": settings.apiKey, Accept: "application/json" },
     });
     if (!res.ok) {
-      setStatus(`Backend rejected (${res.status}). Check your API key.`, "err");
+      const body = await res.text().catch(() => "");
+      setStatus(`Backend rejected (${res.status}). ${body.slice(0, 140)}`, "err");
       return;
     }
     const data = await res.json();
@@ -45,7 +64,7 @@ async function testConnection() {
       "ok"
     );
   } catch (err) {
-    setStatus(err.message, "err");
+    setStatus(err.message || "Failed to fetch — is the backend reachable?", "err");
   }
 }
 
