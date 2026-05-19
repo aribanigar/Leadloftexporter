@@ -1,84 +1,89 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository.
 
 ## What this project is
 
-A single-purpose Chrome extension (Manifest V3) that scrapes lead tables on `*.leadloft.com` pages and exports them to CSV. No build step, no package manager, no tests — the `extension/` directory is loaded directly via **chrome://extensions → Load unpacked**.
+The **LeadCaptura Chrome extension** for LinkedIn lead capture and human-paced automated outreach. Manifest V3, no build step.
+
+It pairs with the SaaS backend + frontend in the sibling repo `aribanigar/leadautocapture`.
 
 ## Commands
 
-There is no build system. Common tasks:
-
-- **Install for local testing**: `chrome://extensions` → Developer mode on → Load unpacked → select `extension/`.
-- **After editing**: click the reload icon on the extension card in `chrome://extensions`. For content-script changes, also reload the LeadLoft tab.
-- **Syntax-check JS / JSON before committing**:
+- Install locally: `chrome://extensions` → Developer mode → Load unpacked → select `extension/`.
+- Reload after edits: click the reload icon on the extension card. For content-script changes, also reload the LinkedIn tab.
+- Syntax-check before commit:
   ```
-  node --check extension/content.js
-  node --check extension/popup.js
-  node --check extension/background.js
+  for f in $(find extension -name '*.js'); do node --check "$f"; done
   python3 -c "import json; json.load(open('extension/manifest.json'))"
   ```
-- **Regenerate icons** (PNG, no PIL dependency): the Python snippet that originally created them lives in the git history of the first commit — re-run it from there if you change branding.
-- **Package a zip for distribution**: `zip -r leadloft-exporter.zip extension` (already gitignored).
-- **Debug**:
-  - Popup: right-click the toolbar icon → Inspect popup.
-  - Content script: open DevTools on the LeadLoft tab; logs are prefixed `[LeadLoft Exporter]`.
-  - Service worker: `chrome://extensions` → extension card → "Service worker" link.
+- Package: `zip -r leadcaptura-extension.zip extension`
 
 ## Architecture
 
-Three JS contexts cooperate via `chrome.runtime` / `chrome.tabs` messaging. Understanding the message flow is the key to being productive here.
+```
+extension/
+  manifest.json                 # MV3 manifest, host: linkedin.com
+  background/
+    service-worker.js           # API proxy for content scripts; fetch->backend
+  content/
+    main.js                     # entry: hooks SPA nav, boots overlay + autopilot
+    overlay.js                  # floating capture panel, per-card Save chips
+    overlay.css                 # overlay styles (lc-* prefix; no shadow DOM)
+    scraper.js                  # /in, /search, /sales/* DOM scrapers
+    automate.js                 # human-paced executor for connect/message jobs
+    lib/
+      api.js                    # talks to service-worker via runtime.sendMessage
+      dom.js                    # querySelector helpers, human-click, type
+      human.js                  # paceBetweenActions, scrollLikeHuman, etc.
+      storage.js                # chrome.storage wrappers
+  popup/                        # toolbar popup: status, autopilot toggle, Save current
+  options/                      # API key + capture behavior settings
+  icons/
+```
+
+### Bot-detection avoidance — design rules
+
+1. **Never call LinkedIn's internal APIs.** We only read the rendered DOM the user has already loaded.
+2. **Never automate in a hidden tab.** `automate.js` waits for `document.visibilityState === "visible"` before each action.
+3. **Human-paced everything.**
+   - 45-180 seconds between consequential actions (with a ~18% long-tail to 3 min).
+   - Per-character typing 40-140ms.
+   - Scrolls use eased animation and randomised target offsets.
+   - "Reading" pause 1.2-3.5s after navigation before clicking.
+4. **Real DOM events.** Clicks use `dispatchHumanClick`, which fires `pointerover`/`pointerdown`/`pointerup`/`click` with realistic coordinates.
+5. **Abort on challenge.** `detectChallenge()` aborts the action and reports failure if a captcha/checkpoint surfaces.
+6. **Daily caps live server-side.** The extension just runs what the backend hands it via `/extension/jobs/next`; it never schedules outreach itself.
+
+### Message flow
 
 ```
-popup.js  ──(chrome.tabs.sendMessage)──▶  content.js   (runs in LeadLoft page)
-   │                                          │
-   │                                          ├─ DETECT_TABLES → returns candidate list
-   │                                          └─ EXTRACT_TABLE → returns { headers, rows }
-   │
-   └─(chrome.runtime.sendMessage)──▶  background.js  (service worker)
-                                          └─ DOWNLOAD_CSV → chrome.downloads.download
+LinkedIn page (main.js → overlay.js)
+        │
+        │ chrome.runtime.sendMessage({ type: "lc:api", action })
+        ▼
+service-worker.js  ─ fetch ─▶  LeadCaptura backend
 ```
 
-### `extension/content.js` — the scraper (most of the complexity lives here)
+Job execution:
 
-Detects three different DOM patterns and registers each as a candidate keyed by an id:
+```
+1. main.js setInterval(60s) → automate.tick()
+2. automate.tick() → api.nextJobs(1)
+3. service-worker → GET /extension/jobs/next
+4. backend returns at most one job (connect | message)
+5. automate.executeOne(job) → human-paced DOM interaction
+6. automate → api.submitJobResult(job.id, { status, error? })
+```
 
-1. **`native`** — `<table>` elements. Headers come from `<thead>` last row, or first row's `<th>`s.
-2. **`aria`** — `[role="grid"]` / `[role="table"]`. Headers come from `[role="columnheader"]`; rows from `[role="row"]` (excluding header rows); cells from `[role="cell"]` / `[role="gridcell"]` / `[role="rowheader"]`.
-3. **`repeat`** — A heuristic for virtualized React/Vue lists: any element whose direct children share a dominant class signature (≥ `MIN_ROWS_FOR_HEURISTIC` siblings with the same primary class, ≥ 60% of children, ≥ 2 leaf text cells per row, and not already inside a detected `table`/grid). Headers are guessed from a sibling header bar above the container, or fall back to `Column N`.
+## Things to watch for
 
-Candidates are stored in a module-level `candidateRegistry` Map by id. When the popup sends `EXTRACT_TABLE`, the content script looks the entry up there — so `DETECT_TABLES` must run before `EXTRACT_TABLE` for the same page load, and the page must not have been re-rendered in a way that invalidates the cached element reference. If extraction fails because the page mutated, the user is told to click Rescan.
+- **Selectors drift.** LinkedIn rewrites its DOM often. Prefer multiple selectors via `first(root, [...])`. Tests would be flaky against the live site; instead, log failures with the selectors we attempted.
+- **Sales Navigator markup is different.** `scrapeSalesNavProfile` / `scrapeSalesNavSearch` use `data-anonymize` attributes which are stable-ish.
+- **Don't add `web_accessible_resources` you don't reference.** Causes a manifest warning.
+- **Don't grant `<all_urls>`.** Host permissions are limited to `linkedin.com`; optional permissions exist for future server-routed flows.
+- **No external dependencies, no build step.** Keep raw JS, no npm.
 
-`autoScrollToLoad(entry)` finds the nearest scrolling ancestor of the table element (via `findScrollContainer`, which walks parents looking for `overflow-y: auto|scroll`) and scrolls it to the bottom in a loop until the row count stops growing for `SCROLL_NO_GROWTH_LIMIT` consecutive iterations. This is how virtualized lists get fully materialized before extraction.
+## Backend dependency
 
-Cell text is read via the `text()` helper, which prefers `innerText`, then `aria-label`, then `title` — so icon-only action cells don't end up empty.
-
-The content script is idempotent (`window.__leadloftExporterInstalled` guard) because the popup re-injects it on demand via `chrome.scripting.executeScript` when `PING` fails on tabs that were loaded before the extension was installed/reloaded.
-
-### `extension/popup.js` — UI orchestration
-
-State: `detectedTables` (array of candidates returned by content script) and `activeTabId`. Flow:
-
-1. On open, `scan()` checks the active tab matches the `leadloft.com` host pattern, ensures the content script is present, sends `DETECT_TABLES`, and renders the dropdown + header chip preview.
-2. On Export click, sends `EXTRACT_TABLE` with the selected id and current options, then forwards `{ headers, rows }` to the background worker via `DOWNLOAD_CSV`.
-3. Options (`autoScroll`, `includeHidden`, base `filename`) are persisted in `chrome.storage.local`.
-
-### `extension/background.js` — CSV + download
-
-Service worker. Renders headers+rows to RFC 4180 CSV with `\r\n` line endings, doubling internal quotes and only quoting fields containing `"`, `,`, `\r`, or `\n`. Prepends a UTF-8 BOM (`﻿`) so Excel auto-detects encoding.
-
-Because MV3 service workers cannot create `blob:` URLs, the CSV is base64-encoded into a `data:text/csv;charset=utf-8;base64,…` URL and passed to `chrome.downloads.download`. The base64 step uses `btoa` over a `TextEncoder`'d byte buffer chunked at 0x8000 to avoid `String.fromCharCode` argument-count limits on large exports.
-
-### `extension/manifest.json`
-
-MV3. Host permissions limited to `leadloft.com`. Content script auto-injects at `document_idle`. The popup can also re-inject it on demand via `scripting` permission. `activeTab` covers tabs the user explicitly clicked the action on; `downloads` and `storage` are self-explanatory.
-
-## Things to watch for when editing
-
-- **Don't break the candidate-id contract** between `content.js` and `popup.js`. The popup sends back an opaque id; if you change id generation, also handle the registry-miss path in the popup ("Click Rescan").
-- **Repeating-row heuristic is fragile by design.** It's the fallback for non-semantic markup, so trust the order: native → aria → repeat. The detector deliberately skips repeating-list candidates that overlap with detected tables/grids (`el.closest('table, [role="grid"], [role="table"]')`).
-- **Auto-scroll uses the table's nearest scrolling ancestor, not the window.** LeadLoft lead lists are likely embedded in a scrollable panel, so scrolling `document.scrollingElement` would do nothing.
-- **CSV encoding**: keep the BOM. Removing it makes Excel mis-detect UTF-8 and corrupts non-ASCII names.
-- **No external dependencies, no build step.** Resist the temptation to add a bundler unless someone is materially blocked by raw JS — it would add far more friction than it removes for a project this size.
-- **Don't add `web_accessible_resources` unless you actually reference the file.** A stale entry causes a manifest warning on load. (There was one earlier in this branch's history; it was removed.)
+Requires the LeadCaptura backend (`aribanigar/leadautocapture`) reachable at the URL configured in the options page. Generate an API key in `Settings → API Keys` and paste it into the extension options.
