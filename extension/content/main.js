@@ -259,10 +259,15 @@
 
       // scrapeProfileWithContact() handles both the overlay-URL (modal already
       // open) and the regular-URL (clicks the Contact info link) cases.
-      // Use a 2s settleMs to let LinkedIn's React fully populate the modal's
-      // mailto:/tel: anchors before we read them.
+      // 2s settleMs to let LinkedIn's React fully populate the modal's
+      // mailto:/tel: anchors. allowPushStateFallback: true is safe here
+      // because this is a background tab about to be closed — rewriting
+      // history.state won't disturb a user-visible URL.
       const profile = await Scraper.scrapeProfile();
-      const contact = await Scraper.scrapeContactInfo({ settleMs: 2000 });
+      const contact = await Scraper.scrapeContactInfo({
+        settleMs: 2000,
+        allowPushStateFallback: true,
+      });
       if (contact.email) profile.email = contact.email;
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;

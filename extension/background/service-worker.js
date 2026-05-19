@@ -21,28 +21,47 @@ const SAFE_ZONES = {
   perDay: 80,   // max 80 per day
 };
 
-async function canEnrich() {
+// In-memory mirror of the enrichment timestamps. The async chrome.storage
+// read-modify-write in recordEnrich() races when 20 cards are clicked at
+// once: every handler reads the same pre-record value and all pass the
+// limit gate. Doing reserve+record synchronously in this in-memory array
+// closes that window — the service worker is single-threaded, so an array
+// push between two awaits cannot be interleaved by another handler.
+const _enrichMem = { hourly: [], daily: [], loaded: false };
+
+async function _hydrateEnrichMem() {
+  if (_enrichMem.loaded) return;
   const { safeZone } = await chrome.storage.local.get("safeZone");
+  // Double-check after the await: another handler may have hydrated AND
+  // reserved while we were suspended. Overwriting would discard their
+  // reservation, defeating the in-memory race fix.
+  if (_enrichMem.loaded) return;
   const now = Date.now();
-  const hourly = (safeZone?.hourly || []).filter((t) => now - t < 3_600_000);
-  const daily = (safeZone?.daily || []).filter((t) => now - t < 86_400_000);
-  if (hourly.length >= SAFE_ZONES.perHour) return false;
-  if (daily.length >= SAFE_ZONES.perDay) return false;
+  _enrichMem.hourly = (safeZone?.hourly || []).filter((t) => now - t < 3_600_000);
+  _enrichMem.daily = (safeZone?.daily || []).filter((t) => now - t < 86_400_000);
+  _enrichMem.loaded = true;
+}
+
+async function canEnrich() {
+  await _hydrateEnrichMem();
+  const now = Date.now();
+  _enrichMem.hourly = _enrichMem.hourly.filter((t) => now - t < 3_600_000);
+  _enrichMem.daily = _enrichMem.daily.filter((t) => now - t < 86_400_000);
+  if (_enrichMem.hourly.length >= SAFE_ZONES.perHour) return false;
+  if (_enrichMem.daily.length >= SAFE_ZONES.perDay) return false;
   return true;
 }
 
-async function recordEnrich() {
-  const { safeZone } = await chrome.storage.local.get("safeZone");
+// Synchronous reserve: atomically increments the in-memory counters so a
+// concurrent canEnrich call in the same task tick sees the reservation.
+// Persistence to chrome.storage happens fire-and-forget afterwards.
+function reserveEnrich() {
   const now = Date.now();
-  const hourly = [
-    ...(safeZone?.hourly || []).filter((t) => now - t < 3_600_000),
-    now,
-  ];
-  const daily = [
-    ...(safeZone?.daily || []).filter((t) => now - t < 86_400_000),
-    now,
-  ];
-  await chrome.storage.local.set({ safeZone: { hourly, daily } });
+  _enrichMem.hourly.push(now);
+  _enrichMem.daily.push(now);
+  chrome.storage.local
+    .set({ safeZone: { hourly: _enrichMem.hourly, daily: _enrichMem.daily } })
+    .catch(() => { /* best-effort persist */ });
 }
 
 // Jittered delay: base range with 20% chance of "distracted user" extra pause
@@ -130,9 +149,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ ok: false, error: "safe_zone_limit_reached" });
           return;
         }
+        // Reserve the slot synchronously NOW so concurrent handlers can't
+        // all pass the canEnrich gate before any of them have recorded.
+        // The persist to chrome.storage is fire-and-forget inside reserve.
+        reserveEnrich();
         // Jittered delay before opening to avoid time-pattern detection
         await sleep(jitter(800, 4000));
-        await recordEnrich();
         // Navigate to the plain profile URL (NOT the /overlay/contact-info
         // sub-path) so the about/experience sections render normally — that
         // way the content script can both click Contact info AND scan the

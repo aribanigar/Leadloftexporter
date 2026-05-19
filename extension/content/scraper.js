@@ -275,13 +275,21 @@
     }
   }
 
-  async function scrapeContactInfo({ timeoutMs = 9000, settleMs = 1500 } = {}) {
+  async function scrapeContactInfo({
+    timeoutMs = 9000,
+    settleMs = 1500,
+    allowPushStateFallback = false,
+  } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null };
     }
 
     const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
     const isOverlayUrl = location.pathname.includes("/overlay/contact-info");
+    // Track whether the pushState fallback fired so the close-modal branch
+    // can skip dismissing — the modal is bound to the URL we just navigated
+    // to, and dismissing would just bounce the browser back without scrape.
+    let didPushState = false;
 
     let modal = _findContactModal();
     if (!_isValidContactModal(modal)) modal = null;
@@ -318,15 +326,19 @@
       );
       if (!_isValidContactModal(modal)) modal = null;
 
-      // Last-resort backup: push the overlay URL into the SPA router. Some
-      // background-tab states won't dispatch the click reliably; navigating
-      // forces LinkedIn's react-router to open the modal route directly.
-      if (!modal && !isOverlayUrl) {
+      // Last-resort backup: navigate the SPA router to /overlay/contact-info/.
+      // GATED behind allowPushStateFallback because pushState mutates the
+      // visible URL. Foreground callers (saveCurrentProfile from the floating
+      // panel, maybeAutoEnrichCurrentProfile on profile-page open) must NOT
+      // pass the flag — otherwise the user's URL bar would get rewritten
+      // mid-browse. Only the background-tab enrichment trigger opts in.
+      if (!modal && !isOverlayUrl && allowPushStateFallback) {
         try {
           const overlayPath =
             location.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
           history.pushState({}, "", overlayPath + location.search);
           window.dispatchEvent(new PopStateEvent("popstate"));
+          didPushState = true;
         } catch {
           /* pushState fails in some sandboxed contexts */
         }
@@ -359,7 +371,9 @@
       data = _scrapeFromContactModal(modal);
     }
 
-    if (!isOverlayUrl) _closeContactModal();
+    // Skip the dismiss if we navigated via pushState — the close button
+    // would just send us back, not actually clean up.
+    if (!isOverlayUrl && !didPushState) _closeContactModal();
     return data;
   }
 
