@@ -2,6 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -68,6 +69,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const qc = useQueryClient();
   const { user, workspace } = useAuth();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab: ComposerTab =
+    tabParam === "linkedin" || tabParam === "note" || tabParam === "call"
+      ? tabParam
+      : "email";
 
   const { data: lead } = useQuery<Lead>({
     queryKey: ["lead", id],
@@ -213,6 +220,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           lead={lead}
           fromEmail={user?.email || ""}
           workspaceName={workspace?.name || "Workspace"}
+          initialTab={initialTab}
         />
         <Timeline items={timeline || []} />
       </main>
@@ -385,14 +393,16 @@ function Composer({
   lead,
   fromEmail,
   workspaceName,
+  initialTab,
 }: {
   leadId: string;
   lead: Lead;
   fromEmail: string;
   workspaceName: string;
+  initialTab: ComposerTab;
 }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<ComposerTab>("email");
+  const [tab, setTab] = useState<ComposerTab>(initialTab);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [noteBody, setNoteBody] = useState("");

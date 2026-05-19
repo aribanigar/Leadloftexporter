@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Columns3, List, Plus } from "lucide-react";
+import { Columns3, List, Plus, Mail, Phone, Linkedin, Send } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -119,17 +119,27 @@ export default function PipelinePage() {
               {leads?.items.map((lead) => {
                 const stage = stages?.find((s) => s.id === lead.stage_id);
                 return (
-                  <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <tr key={lead.id} className="group border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2 text-sm">
-                      <Link href={`/leads/${lead.id}`} className="flex items-center gap-2 hover:text-brand-700">
-                        <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold uppercase">
-                          {initials(lead.full_name)}
-                        </div>
-                        <div>
-                          <div className="font-medium hover:underline">{lead.full_name || "—"}</div>
-                          <div className="text-xs text-slate-500">{fmtDate(lead.close_date) || "$--"}</div>
-                        </div>
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/leads/${lead.id}`}
+                          className="flex items-center gap-2 hover:text-brand-700"
+                        >
+                          <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold uppercase">
+                            {initials(lead.full_name)}
+                          </div>
+                          <div>
+                            <div className="font-medium hover:underline">
+                              {lead.full_name || "—"}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {fmtDate(lead.close_date) || "$--"}
+                            </div>
+                          </div>
+                        </Link>
+                        <RowActions lead={lead} />
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-slate-700">{lead.title || "—"}</td>
                     <td className="px-3 py-2 text-sm text-slate-700">{lead.company?.name || "—"}</td>
@@ -228,6 +238,61 @@ function LeadCard({ lead }: { lead: Lead }) {
         <span>{fmtDate(lead.close_date) || "—"}</span>
         <span>{fmtMoney(lead.estimated_value)}</span>
       </div>
+    </div>
+  );
+}
+
+function RowActions({ lead }: { lead: Lead }) {
+  return (
+    <div className="ml-auto hidden items-center gap-1 group-hover:flex">
+      <Link
+        href={`/leads/${lead.id}`}
+        className="action-icon"
+        title={`Open ${lead.full_name || "lead"}`}
+      >
+        <Send className="h-3.5 w-3.5" />
+      </Link>
+      {lead.email ? (
+        <Link
+          href={`/leads/${lead.id}?tab=email`}
+          className="action-icon"
+          title={`Email ${lead.full_name || ""}`.trim()}
+        >
+          <Mail className="h-3.5 w-3.5" />
+        </Link>
+      ) : (
+        <span className="action-icon opacity-40" title="No email">
+          <Mail className="h-3.5 w-3.5" />
+        </span>
+      )}
+      {lead.phone ? (
+        <a
+          href={`tel:${lead.phone}`}
+          className="action-icon"
+          title={`Call ${lead.phone}`}
+        >
+          <Phone className="h-3.5 w-3.5" />
+        </a>
+      ) : (
+        <span className="action-icon opacity-40" title="No phone">
+          <Phone className="h-3.5 w-3.5" />
+        </span>
+      )}
+      {lead.linkedin_url ? (
+        <a
+          href={lead.linkedin_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="action-icon"
+          title="Open LinkedIn profile"
+        >
+          <Linkedin className="h-3.5 w-3.5" />
+        </a>
+      ) : (
+        <span className="action-icon opacity-40" title="No LinkedIn URL">
+          <Linkedin className="h-3.5 w-3.5" />
+        </span>
+      )}
     </div>
   );
 }
