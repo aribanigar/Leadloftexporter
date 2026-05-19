@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "LeadLoft Exporter",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Detect lead tables on LeadLoft pages and export them to a CSV file with proper columns.",
   "permissions": [
     "activeTab",
     "scripting",
-    "downloads",
     "storage",
     "tabs"
   ],

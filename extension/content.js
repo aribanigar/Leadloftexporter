@@ -386,6 +386,7 @@
   };
 
   window.addEventListener('message', (event) => {
+    if (event.source !== window) return; // block cross-origin iframe injection
     const data = event && event.data;
     if (!data || !data.__leadloftExporter) return;
     if (data.kind === 'CAPTURE' && Array.isArray(data.items)) {
@@ -1203,7 +1204,7 @@
     let lastCount = countRowsForEntry(entry);
     let noGrowth = 0;
     for (let i = 0; i < SCROLL_MAX_ITERATIONS; i++) {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'instant' in window ? 'auto' : 'auto' });
+      container.scrollTo({ top: container.scrollHeight, behavior: 'instant' });
       await sleep(SCROLL_SETTLE_MS);
       const current = countRowsForEntry(entry);
       if (current <= lastCount) {
@@ -1214,7 +1215,7 @@
       }
       lastCount = current;
     }
-    container.scrollTo({ top: 0, behavior: 'instant' in window ? 'auto' : 'auto' });
+    container.scrollTo({ top: 0, behavior: 'instant' });
     await sleep(150);
   };
 

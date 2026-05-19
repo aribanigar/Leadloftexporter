@@ -1,5 +1,34 @@
 // Popup orchestration: talks to the content script to detect tables,
-// previews them, and triggers CSV export via the background worker.
+// previews them, and triggers CSV export.
+
+const escapeField = (val) => {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  if (s === '') return '';
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+
+const toCsv = (headers, rows) => {
+  const width = headers.length;
+  const lines = [headers.map(escapeField).join(',')];
+  for (const r of rows) {
+    const cells = [];
+    for (let i = 0; i < width; i++) cells.push(escapeField(r[i]));
+    lines.push(cells.join(','));
+  }
+  return '﻿' + lines.join('\r\n'); // UTF-8 BOM for Excel
+};
+
+const downloadCsv = (csv, filename) => {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 const els = {
   status: document.getElementById('status'),
@@ -48,16 +77,24 @@ const getActiveTab = async () => {
 
 const isLeadLoftUrl = (url) => /^https?:\/\/([^/]+\.)?leadloft\.com\//.test(url || '');
 
-// Ensure content script is present — re-inject on demand for tabs that
+// Ensure content scripts are present — re-inject on demand for tabs that
 // loaded before the extension was installed/reloaded.
 const ensureContentScript = async (tabId) => {
   try {
     await chrome.tabs.sendMessage(tabId, { type: 'PING' });
   } catch {
+    // Inject inject.js (MAIN world, network hooks) first, then content.js.
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['inject.js'],
+      world: 'MAIN',
+    });
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js'],
     });
+    // Wait for the freshly-injected listener to register before proceeding.
+    await new Promise((r) => setTimeout(r, 200));
   }
 };
 
@@ -238,20 +275,12 @@ const exportSelected = async () => {
     const filename = (els.filename.value.trim() || 'leadloft-leads').replace(/\.csv$/i, '');
     const finalName = `${filename}-${tsForFilename()}.csv`;
 
-    const dl = await chrome.runtime.sendMessage({
-      type: 'DOWNLOAD_CSV',
-      filename: finalName,
-      headers,
-      rows,
-    });
-
-    if (!dl || !dl.ok) {
-      throw new Error(dl?.error || 'Download failed');
-    }
+    const csv = toCsv(headers, rows);
+    downloadCsv(csv, finalName);
 
     const totalRecords = response.totalRecords || 0;
     const capNote = totalRecords ? ` (${totalRecords} record(s) captured across ${response.totalSources} source(s))` : '';
-    setStatus(`Exported ${rows.length} rows to ${finalName}.${capNote}`, 'success');
+    setStatus(`Saved ${rows.length} rows to ${finalName}.${capNote}`, 'success');
   } catch (err) {
     console.error('[LeadLoft Exporter] export failed:', err);
     setStatus(`Export failed: ${err.message}`, 'error');
