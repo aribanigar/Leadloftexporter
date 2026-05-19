@@ -62,9 +62,11 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   const text = await res.text();
   const data = text ? safeParse(text) : null;
   if (!res.ok) {
-    const message =
-      (data && typeof data === "object" && "detail" in (data as object) && String((data as { detail?: unknown }).detail)) ||
-      `Error ${res.status}`;
+    let message = `Error ${res.status}`;
+    if (data && typeof data === "object" && "detail" in (data as Record<string, unknown>)) {
+      const detail = (data as { detail?: unknown }).detail;
+      if (typeof detail === "string") message = detail;
+    }
     throw new ApiError(res.status, data, message);
   }
   return data as T;
