@@ -144,8 +144,37 @@
     return null;
   };
 
+  // Stable contact-level identifier. A Deal containing primaryContact X
+  // and a standalone Contact X should hash to the same key so we dedupe
+  // across endpoints that return overlapping people.
+  const contactIdFor = (item) => {
+    if (!item || typeof item !== 'object') return null;
+    if (item.primaryContact && typeof item.primaryContact === 'object' && item.primaryContact.id != null) {
+      return String(item.primaryContact.id);
+    }
+    // Treat top-level item as a contact only if it has contact-like signal.
+    if (item.publicIdentifier || item.linkedInUrl || item.emailStatus) {
+      if (item.id != null) return String(item.id);
+    }
+    return null;
+  };
+
   const itemKey = (item) => {
+    const cid = contactIdFor(item);
+    if (cid) return `contact:${cid}`;
     return leadId(item) || `name:${normalizeName(inferLeadName(item))}` || JSON.stringify(item).slice(0, 200);
+  };
+
+  const countNonEmpty = (obj) => {
+    if (!obj || typeof obj !== 'object') return 0;
+    let n = 0;
+    for (const v of Object.values(obj)) {
+      if (v == null || v === '') continue;
+      if (typeof v === 'object' && !Array.isArray(v)) continue;
+      if (Array.isArray(v) && v.length === 0) continue;
+      n++;
+    }
+    return n;
   };
 
   const sourceKeyForUrl = (url) => {
@@ -283,8 +312,16 @@
     for (const raw of items) {
       if (!raw || typeof raw !== 'object') continue;
       const id = itemKey(raw);
-      if (src.items.has(id)) continue;
       const normalized = normalizeRecord(raw);
+      const existing = src.items.get(id);
+      if (existing) {
+        // Same person seen twice (e.g. as Deal and as Contact) — keep
+        // the version with more non-empty fields.
+        if (countNonEmpty(normalized) > countNonEmpty(existing)) {
+          src.items.set(id, normalized);
+        }
+        continue;
+      }
       src.items.set(id, normalized);
       added++;
     }
@@ -1041,6 +1078,37 @@
     }
   };
 
+  // Drive pagination through all pages WITHOUT extracting DOM rows —
+  // used when the user picked an API source: the goal is to make the
+  // SPA fetch each page so the network hook captures every record.
+  const drivePaginationForCapture = async (entry) => {
+    const pag = findPaginationContainer(entry.element);
+    if (!pag) return 0;
+    await goToFirstPage(pag, entry);
+    let pagesNavigated = 1;
+    for (let i = 0; i < 500; i++) {
+      const nextBtn = pag.querySelector('button.btn-next');
+      if (!nextBtn) break;
+      if (nextBtn.disabled || nextBtn.classList.contains('is-disabled') || nextBtn.classList.contains('disabled')) break;
+      const sig = pageSignature(entry);
+      nextBtn.click();
+      const changed = await waitForPageChange(entry, sig, 6000);
+      if (!changed) break;
+      pagesNavigated++;
+      // Let the API hook ingest the response that fires on page change.
+      await sleep(250);
+    }
+    console.log(`[LeadLoft Exporter] drove pagination through ${pagesNavigated} pages`);
+    return pagesNavigated;
+  };
+
+  const findFirstEltableEntry = () => {
+    for (const e of candidateRegistry.values()) {
+      if (e.kind === 'eltable') return e;
+    }
+    return null;
+  };
+
   const extractElTableAllPages = async (entry, includeHidden) => {
     const pagContainer = findPaginationContainer(entry.element);
     if (pagContainer) await goToFirstPage(pagContainer, entry);
@@ -1175,6 +1243,7 @@
             sendResponse({ ok: false, error: 'Table no longer present. Click Rescan.' });
             return;
           }
+
           // For Element UI tables, "auto-scroll" means "page through all".
           if (entry.kind === 'eltable' && message.autoScroll && findPaginationContainer(entry.element)) {
             const raw = await extractElTableAllPages(entry, !!message.includeHidden);
@@ -1183,7 +1252,19 @@
             sendResponse({ ok: true, headers: pruned.headers, rows: pruned.rows, ...stats });
             return;
           }
-          if (message.autoScroll) {
+
+          // When the user picked an API source and the page has an el-table
+          // with pagination, drive that pagination behind the scenes so the
+          // SPA fetches every page — each XHR is captured by the hook,
+          // populating the API source across all pages.
+          if (entry.kind === 'api' && message.autoScroll) {
+            const elEntry = findFirstEltableEntry();
+            if (elEntry && findPaginationContainer(elEntry.element)) {
+              await drivePaginationForCapture(elEntry);
+            }
+          }
+
+          if (message.autoScroll && entry.kind !== 'api') {
             await autoScrollToLoad(entry);
           }
           await probeForLeads();

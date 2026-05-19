@@ -212,8 +212,9 @@ const exportSelected = async () => {
   if (!table) return;
 
   els.export.disabled = true;
-  if (table.pages && table.pages > 1 && els.autoScroll.checked) {
-    setStatus(`Paging through ${table.pages} pages... this may take a minute.`, 'info');
+  const eltablePages = (detectedTables.find((t) => t.kind === 'eltable')?.pages) || 0;
+  if (els.autoScroll.checked && eltablePages > 1) {
+    setStatus(`Paging through ${eltablePages} pages... this may take a minute.`, 'info');
   } else {
     setStatus('Extracting rows...', 'info');
   }
