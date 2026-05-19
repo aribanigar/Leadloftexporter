@@ -385,16 +385,28 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* We try to inject the Save button into the same row as LinkedIn's
-   * native action buttons (Connect / Message / Follow) so it looks
-   * native. Falls back to a floating chip if no action row is found. */
+  /* LinkedIn rotates class names every few weeks, so we anchor by the
+   * stable elements: the profile link (href contains "/in/") and the
+   * Message / Connect action button (selected by aria-label, which their
+   * own product depends on). The "action row" is the parent of those
+   * action buttons; we drop the Save button right after them. */
+  function _findActionRow(card) {
+    const actionBtn = card.querySelector(
+      "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
+    );
+    if (actionBtn) return actionBtn.parentElement;
+    // Fallback: any element that holds multiple sibling buttons
+    const buttons = card.querySelectorAll("button");
+    for (const b of buttons) {
+      const p = b.parentElement;
+      if (p && p.querySelectorAll("button").length >= 2) return p;
+    }
+    return null;
+  }
+
   function injectInlineSave(card, profile) {
     if (card.querySelector(".lc-inline-save")) return;
-    const actionRow =
-      card.querySelector(
-        ".entity-result__actions, .reusable-search__actions, [class*='actions-container'], .search-result__actions"
-      ) ||
-      card.querySelector("button.artdeco-button[aria-label*='Message' i],button.artdeco-button[aria-label*='Connect' i]")?.parentElement;
+    const actionRow = _findActionRow(card);
 
     const btn = el(
       "button",
@@ -452,25 +464,63 @@
     }
   }
 
-  function profileFromCard(card) {
-    const linkEl = card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
+  function _cardFromLink(link) {
+    let node = link.parentElement;
+    for (let i = 0; i < 10 && node; i++) {
+      if (
+        node.tagName === "LI" ||
+        node.tagName === "ARTICLE" ||
+        (node.querySelector("img") &&
+          node.querySelector("button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"))
+      ) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return link.parentElement;
+  }
+
+  function profileFromCard(card, link) {
+    const linkEl = link || card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
     if (!linkEl) return null;
     const nameNode =
-      card.querySelector(".entity-result__title-text a span[aria-hidden='true']") ||
-      card.querySelector("[data-anonymize='person-name']") ||
-      card.querySelector("a[href*='/in/'] span[aria-hidden='true']");
-    const avatarImg = card.querySelector("img.presence-entity__image, img.ivm-view-attr__img--centered, img[src*='media.licdn.com']");
+      linkEl.querySelector("span[aria-hidden='true']") ||
+      card.querySelector("[data-anonymize='person-name']");
+    const name = (nameNode?.textContent || linkEl.textContent || "").trim();
+    if (!name || /linkedin member/i.test(name)) return null;
+    // Headline is typically the first descriptive text region in the card
+    // that isn't the name itself or an action label.
+    const textCandidates = Array.from(card.querySelectorAll("div, p, span"))
+      .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .filter(
+        (t) =>
+          t !== name &&
+          !/connect|message|follow|view profile|premium/i.test(t) &&
+          t.length > 4 &&
+          t.length < 240
+      );
+    const headline = textCandidates[0] || null;
+    const location_ =
+      textCandidates.find(
+        (t) =>
+          t !== headline &&
+          t.length < 80 &&
+          (t.includes(",") ||
+            /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
+      ) || null;
+    const avatar = card.querySelector("img")?.getAttribute("src") || null;
+    const [first_name, ...rest] = name.split(/\s+/);
     return {
       linkedin_url: globalThis.__lcDom.normalizeProfileUrl(linkEl.href),
-      full_name: nameNode?.textContent?.trim() || null,
-      headline:
-        card.querySelector(".entity-result__primary-subtitle, [data-anonymize='title']")?.textContent?.trim() ||
-        null,
-      location:
-        card
-          .querySelector(".entity-result__secondary-subtitle, [data-anonymize='location']")
-          ?.textContent?.trim() || null,
-      avatar_url: avatarImg?.src || null,
+      full_name: name,
+      first_name,
+      last_name: rest.join(" ") || null,
+      headline,
+      title: (headline || "").split(/\s+at\s+/i)[0] || null,
+      company_name: (headline || "").split(/\s+at\s+/i)[1] || null,
+      location: location_,
+      avatar_url: avatar,
       raw: { source_url: location.href, page_type: "card-inline" },
     };
   }
@@ -478,12 +528,18 @@
   function decorateSearchCards() {
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
-    const cards = document.querySelectorAll(
-      "li.reusable-search__result-container, li.search-result__occluded-item, ul.reusable-search__entity-result-list > li, .artdeco-list__item, li.search-results__cluster-item, li.search-results__result-item"
+    // Find unique profile cards by iterating /in/ (and /sales/lead/) anchors.
+    // The same approach as the scraper, kept in sync.
+    const links = document.querySelectorAll(
+      "a[href*='/in/'], a[href*='/sales/lead/']"
     );
-    cards.forEach((card) => {
+    const seenCards = new Set();
+    links.forEach((link) => {
+      const card = _cardFromLink(link);
+      if (!card || seenCards.has(card)) return;
+      seenCards.add(card);
       if (card.dataset.lcDecorated) return;
-      const profile = profileFromCard(card);
+      const profile = profileFromCard(card, link);
       if (!profile?.linkedin_url) return;
       injectInlineSave(card, profile);
       card.dataset.lcDecorated = "1";
