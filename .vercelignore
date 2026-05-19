@@ -1,0 +1,7 @@
+# The FastAPI backend deploys to Render via render.yaml.
+# Vercel only needs the Next.js app at the repo root.
+api/
+extension/
+docker-compose.yml
+render.yaml
+railway.json
