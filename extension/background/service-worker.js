@@ -63,6 +63,11 @@ const handlers = {
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // Content scripts cannot call chrome.runtime.openOptionsPage; proxy it here.
+  if (msg?.type === "lc:openOptions") {
+    chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
+    return true;
+  }
   if (msg?.type !== "lc:api") return;
   const handler = handlers[msg.action];
   if (!handler) {

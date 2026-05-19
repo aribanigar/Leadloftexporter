@@ -18,6 +18,16 @@
   const Api = globalThis.__lcApi;
   const Storage = globalThis.__lcStorage;
 
+  // chrome.runtime.openOptionsPage is only callable from extension pages and
+  // the service worker — not from content scripts. Route through the SW.
+  function openOptions() {
+    try {
+      chrome.runtime.sendMessage({ type: "lc:openOptions" });
+    } catch (e) {
+      console.warn("[LeadCaptura] could not open options page", e);
+    }
+  }
+
   const state = {
     profilePanel: null,
     toolbar: null,
@@ -137,13 +147,13 @@
           !connected
             ? el(
                 "button",
-                { class: "lc-btn lc-btn-primary", onclick: () => chrome.runtime.openOptionsPage() },
+                { class: "lc-btn lc-btn-primary", onclick: () => openOptions() },
                 "Connect workspace"
               )
             : null,
           el(
             "button",
-            { class: "lc-btn lc-btn-ghost", onclick: () => chrome.runtime.openOptionsPage(), title: "Settings" },
+            { class: "lc-btn lc-btn-ghost", onclick: () => openOptions(), title: "Settings" },
             "⚙"
           )
         ),
@@ -237,7 +247,7 @@
           el("span", { class: "lc-muted" }, "Not connected — "),
           el(
             "button",
-            { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => chrome.runtime.openOptionsPage() },
+            { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => openOptions() },
             "Connect workspace"
           )
         )
@@ -303,7 +313,7 @@
             {
               class: "lc-dd-item",
               type: "button",
-              onclick: () => chrome.runtime.openOptionsPage(),
+              onclick: () => openOptions(),
             },
             "Settings"
           ),
