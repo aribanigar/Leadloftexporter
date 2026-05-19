@@ -1,24 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Lead Exporter",
-  "version": "2.0.0",
-  "description": "Export leads from LinkedIn and LeadLoft pages to CSV.",
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "tabs"
-  ],
+  "name": "LeadCaptura — LinkedIn Capture",
+  "version": "1.0.0",
+  "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms", "notifications"],
   "host_permissions": [
-    "https://*.leadloft.com/*",
-    "https://leadloft.com/*",
-    "https://*.linkedin.com/*",
-    "https://linkedin.com/*",
-    "https://*.licdn.com/*"
+    "https://www.linkedin.com/*",
+    "https://linkedin.com/*"
   ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "Lead Exporter",
+    "default_popup": "popup/popup.html",
+    "default_title": "LeadCaptura",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -26,8 +19,10 @@
     }
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/service-worker.js",
+    "type": "module"
   },
+  "options_page": "options/options.html",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -36,26 +31,28 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.leadloft.com/*",
-        "https://leadloft.com/*",
-        "https://*.linkedin.com/*",
+        "https://www.linkedin.com/*",
         "https://linkedin.com/*"
       ],
-      "js": ["inject.js"],
-      "run_at": "document_start",
-      "world": "MAIN",
-      "all_frames": false
-    },
-    {
-      "matches": [
-        "https://*.leadloft.com/*",
-        "https://leadloft.com/*",
-        "https://*.linkedin.com/*",
-        "https://linkedin.com/*"
+      "css": ["content/overlay.css"],
+      "js": [
+        "content/lib/storage.js",
+        "content/lib/human.js",
+        "content/lib/api.js",
+        "content/lib/dom.js",
+        "content/scraper.js",
+        "content/overlay.js",
+        "content/automate.js",
+        "content/main.js"
       ],
-      "js": ["content.js"],
       "run_at": "document_idle",
       "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/overlay.css", "icons/*"],
+      "matches": ["https://*.linkedin.com/*"]
     }
   ]
 }

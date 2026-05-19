@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LeadCaptura — Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hd">
+        <div class="logo">L</div>
+        <div class="title">LeadCaptura</div>
+        <span class="sub">Extension options</span>
+      </header>
+
+      <section class="card">
+        <h2>Workspace connection</h2>
+        <p class="muted">
+          Generate an API key in your workspace at <a id="docs-link" href="http://localhost:3000/settings/api-keys" target="_blank">Settings → API Keys</a> and paste it below.
+        </p>
+
+        <label class="lbl">Backend URL</label>
+        <input id="apiUrl" class="inp" type="url" placeholder="https://api.leadcaptura.com" />
+
+        <label class="lbl">API key</label>
+        <div class="row">
+          <input id="apiKey" class="inp" type="password" placeholder="lcx_…" autocomplete="off" />
+          <button class="btn ghost" id="toggle-show">Show</button>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" id="save">Save &amp; verify</button>
+          <button class="btn ghost" id="test">Test connection</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="card">
+        <h2>Capture behavior</h2>
+        <label class="row checkbox">
+          <input type="checkbox" id="enabled" /> <span>Extension enabled on LinkedIn</span>
+        </label>
+        <label class="row checkbox">
+          <input type="checkbox" id="showOverlay" /> <span>Show floating capture panel</span>
+        </label>
+        <label class="row checkbox">
+          <input type="checkbox" id="autopilot" /> <span>Autopilot: run queued LinkedIn actions in the background tab</span>
+        </label>
+        <p class="muted small">
+          Autopilot runs at a human pace (~45–180s between actions), pauses when the tab is hidden, and aborts on captchas. Daily caps are enforced server-side from your workspace outreach settings.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Privacy</h2>
+        <p class="muted small">
+          This extension reads only the DOM of LinkedIn pages you're already viewing. It never calls LinkedIn's internal APIs, never spawns headless sessions, and never reads any other site. Scraped data is sent only to your configured backend URL.
+        </p>
+      </section>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>

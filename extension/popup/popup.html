@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LeadCaptura</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="hd">
+      <div class="logo">L</div>
+      <div class="title">LeadCaptura</div>
+      <span class="badge" id="status-badge">Loading…</span>
+    </header>
+
+    <section class="section" id="me-section" hidden>
+      <div class="kv"><span>Workspace</span><b id="me-workspace">—</b></div>
+      <div class="kv"><span>User</span><b id="me-user">—</b></div>
+    </section>
+
+    <section class="section">
+      <label class="toggle">
+        <input type="checkbox" id="autopilot-toggle" />
+        <span>Autopilot LinkedIn actions</span>
+      </label>
+      <p class="hint">When on, queued connects &amp; messages run automatically while you keep a LinkedIn tab in the foreground. Always human-paced.</p>
+    </section>
+
+    <section class="section">
+      <button class="btn primary" id="save-current">Save current page</button>
+      <button class="btn ghost" id="open-options">Options</button>
+      <button class="btn ghost" id="open-app">Open LeadCaptura</button>
+    </section>
+
+    <div class="status" id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
