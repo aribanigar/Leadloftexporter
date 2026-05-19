@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
 
 const SAFE_ZONES = {
   perHour: 20,  // max 20 background-tab enrichments per hour
-  perDay: 80,   // max 80 per day
+  perDay: 100,  // max 100 per day
 };
 
 // In-memory mirror of the enrichment timestamps. The async chrome.storage
