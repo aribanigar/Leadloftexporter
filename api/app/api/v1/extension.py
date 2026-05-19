@@ -99,20 +99,35 @@ def sync_search(
     _bump_api_key(db, ctx)
     created_count = 0
     updated_count = 0
+    skipped_count = 0
     ids: list[str] = []
+    errors: list[dict] = []
     for profile in body.profiles:
-        lead, created = ingest_lead(db, ctx.workspace_id, ctx.user_id, profile.model_dump())
-        ids.append(lead.id)
-        if created:
-            created_count += 1
-        else:
-            updated_count += 1
+        # Per-profile savepoint: one bad row (FK error, encoding glitch,
+        # whatever) must not abort the whole batch. Without this, the user
+        # sees "Failed: Internal Server Error" on Save All Leads even when
+        # 99% of profiles are perfectly valid.
+        try:
+            with db.begin_nested():
+                lead, created = ingest_lead(
+                    db, ctx.workspace_id, ctx.user_id, profile.model_dump()
+                )
+                ids.append(lead.id)
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
+        except Exception as e:
+            skipped_count += 1
+            errors.append({"linkedin_url": profile.linkedin_url, "error": str(e)[:200]})
     db.commit()
     return {
         "imported": len(ids),
         "created": created_count,
         "updated": updated_count,
+        "skipped": skipped_count,
         "lead_ids": ids,
+        "errors": errors[:20],  # cap response size
     }
 
 
