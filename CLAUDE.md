@@ -4,9 +4,15 @@ Guidance for Claude Code working in this repository.
 
 ## What this project is
 
-The **LeadCaptura Chrome extension** for LinkedIn lead capture and human-paced automated outreach. Manifest V3, no build step.
+The **LeadCaptura monorepo** — a full-stack LinkedIn lead-generation SaaS:
 
-It pairs with the SaaS backend + frontend in the sibling repo `aribanigar/leadautocapture`.
+```
+/api          FastAPI backend (Postgres + Redis + Celery)
+/web          Next.js 15 frontend
+/extension    Chrome MV3 extension (LinkedIn capture + human-paced outreach)
+```
+
+This document covers the **extension**. Backend has its own conventions in `/api`; frontend in `/web`.
 
 ## Commands
 
@@ -86,4 +92,4 @@ Job execution:
 
 ## Backend dependency
 
-Requires the LeadCaptura backend (`aribanigar/leadautocapture`) reachable at the URL configured in the options page. Generate an API key in `Settings → API Keys` and paste it into the extension options.
+Requires the LeadCaptura backend (`/api` in this same repo, or deployed via `render.yaml`) reachable at the URL configured in the options page. Generate an API key in `Settings → API Keys` in the web app and paste it into the extension options.

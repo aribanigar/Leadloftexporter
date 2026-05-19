@@ -1,40 +1,53 @@
-# LeadCaptura — LinkedIn Chrome Extension
+# LeadCaptura
 
-A Manifest V3 Chrome extension that captures LinkedIn leads to your LeadCaptura workspace and executes outreach actions (connect, message) at a human pace inside your own browser session.
-
-Pairs with the SaaS backend + frontend in [`aribanigar/leadautocapture`](https://github.com/aribanigar/leadautocapture).
-
-## Features
-
-- Floating capture panel on `/in/<handle>`, search results, and Sales Navigator.
-- Per-card "Save" chip on each visible search result.
-- "Save all on page" for bulk sync.
-- Autopilot: executes queued LinkedIn connects and messages at a human pace, only while the LinkedIn tab is in the foreground, with captcha detection and abort.
-- Server-side daily caps (set in `Settings → Outreach`): 80 emails / 15 connects / 30 messages by default.
-
-## Why it can't be bot-detected
-
-It uses the **user's own logged-in browser session**. There are no headless flags, no fetch overrides on LinkedIn's URLs, no fake user-agent. The extension reads only the rendered DOM the user has already loaded and dispatches real DOM events at human pace. See `CLAUDE.md` for the design rules.
-
-## Installation (local dev)
-
-1. Clone this repo.
-2. Open `chrome://extensions`, enable **Developer mode**.
-3. Click **Load unpacked** → select the `extension/` directory.
-4. Click the LeadCaptura icon → **Options** → paste your backend URL and API key.
-
-Generate an API key in your workspace at `Settings → API Keys`.
-
-## Permissions used
-
-- `activeTab` / `scripting` — inject the content script on demand.
-- `storage` — remember API key, capture toggles.
-- `tabs` — open the workspace web UI from the popup.
-- `alarms` / `notifications` — keep the service worker awake periodically.
-- Host permission: `https://www.linkedin.com/*` only.
-
-The extension never reads or sends data from any other site. Captured lead data is sent only to the backend URL you configure.
+Full-stack LinkedIn lead-generation SaaS — LeadLoft-style CRM + outreach engine + Chrome capture extension, all in one monorepo.
 
 ## Layout
 
-See `CLAUDE.md` for the full architecture, message flow, and bot-detection design rules.
+```
+/api         FastAPI backend (Postgres + Redis + Celery)
+/web         Next.js 15 frontend (App Router, Tailwind, TanStack Query)
+/extension   Chrome MV3 extension (LinkedIn capture + human-paced outreach)
+```
+
+## What it does
+
+- **Capture LinkedIn leads** without bot detection: the extension only reads the DOM the user has already loaded in their own authenticated Chrome — no LinkedIn API calls, no headless browsers, no fetch overrides.
+- **Run multi-step outreach playbooks** across email (Gmail OAuth / SMTP), LinkedIn connect, LinkedIn message, calls, tasks. Daily caps enforced server-side with humanised timing inside the user's configured time window.
+- **Manage everything in a CRM**: customisable columns, saved views (All List / New / Go Follow Up / 90 Day Follow Up / My Deals), kanban + list pipeline, inbox with reply tracking, AI writer (Claude Opus 4.7 + Haiku 4.5 reply classifier).
+
+## Quick start
+
+### Local with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+That starts Postgres + Redis + the FastAPI API + a Celery worker + Celery beat. The frontend runs separately:
+
+```bash
+cd web && npm install && npm run dev
+```
+
+Open <http://localhost:3000>, register, then go to **Settings → API Keys** and generate an extension key.
+
+### Load the Chrome extension
+
+1. `chrome://extensions` → Developer mode → **Load unpacked** → select `extension/`.
+2. The Options page opens automatically — paste the backend URL and API key.
+3. Visit any `linkedin.com/in/<handle>` page → the floating LeadCaptura panel appears → **Save Lead**.
+
+## Deployment
+
+See [`DEPLOY.md`](./DEPLOY.md) for the full recipe. One-paragraph version:
+
+- `/web` → **Vercel** (zero-config; `vercel.json` is in the repo root, root directory = `web`)
+- `/api` + Celery worker + Celery beat + Redis → **Render** (uses `render.yaml` blueprint) or **Railway** (`railway.json`)
+- Postgres → **Neon** (free tier)
+
+After deploying, update `FRONTEND_ORIGINS` on the API to your Vercel URL, and `NEXT_PUBLIC_API_URL` on Vercel to your API URL. Generate an API key in the web app and load it into the extension Options page.
+
+## Why the extension can't be bot-detected
+
+It uses the **user's own logged-in browser session**. There are no headless flags, no fetch overrides on LinkedIn's URLs, no fake user-agent. The extension reads only the rendered DOM the user has already loaded and dispatches real DOM events at human pace. Daily caps live server-side. See [`CLAUDE.md`](./CLAUDE.md) for the design rules.

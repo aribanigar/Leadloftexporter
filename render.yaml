@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: leadcaptura-api
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    rootDir: api
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: leadcaptura-redis
+          property: connectionString
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-7
+      - key: ANTHROPIC_FAST_MODEL
+        value: claude-haiku-4-5
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: worker
+    name: leadcaptura-worker
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    rootDir: api
+    plan: starter
+    dockerCommand: celery -A app.workers.celery_app worker --loglevel=info
+    autoDeploy: true
+    envVars:
+      - fromGroup: leadcaptura-api
+
+  - type: worker
+    name: leadcaptura-beat
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    rootDir: api
+    plan: starter
+    dockerCommand: celery -A app.workers.celery_app beat --loglevel=info
+    autoDeploy: true
+    envVars:
+      - fromGroup: leadcaptura-api
+
+  - type: redis
+    name: leadcaptura-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
