@@ -6,7 +6,6 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models import Activity, Company, Lead, PipelineStage
-from app.services.email_finder import find_best_email
 
 
 def _domain_from_url(url: Optional[str]) -> Optional[str]:
@@ -166,25 +165,6 @@ def ingest_lead(
         db.add(lead)
         created = True
     db.flush()
-    if not lead.email:
-        try:
-            best, status, candidates = find_best_email(
-                first_name=lead.first_name,
-                last_name=lead.last_name,
-                company_name=company.name if company else payload.get("company_name"),
-                website=company.website if company else None,
-                explicit_domain=company.domain if company else None,
-            )
-            if best:
-                lead.email = best
-                lead.email_status = status
-                merged_custom = dict(lead.custom or {})
-                merged_custom["email_candidates"] = candidates
-                lead.custom = merged_custom
-            elif status in ("invalid", "unknown"):
-                lead.email_status = status
-        except Exception:
-            pass  # enrichment is best-effort; never block lead ingestion
     db.add(
         Activity(
             workspace_id=workspace_id,

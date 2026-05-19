@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3, Mail } from "lucide-react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3 } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
@@ -63,20 +63,6 @@ export default function ProspectingPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 
-  const enrichEmails = useMutation<{
-    checked: number;
-    found: number;
-    invalid: number;
-    skipped: number;
-  }>({
-    mutationFn: () => api("/leads/enrich-emails", { method: "POST" }),
-    onSuccess: (r) => {
-      qc.invalidateQueries({ queryKey: ["leads"] });
-      alert(`Checked ${r.checked} leads — found ${r.found} emails, ${r.invalid} invalid, ${r.skipped} skipped.`);
-    },
-    onError: (e: Error) => alert(`Failed: ${e.message}`),
-  });
-
   function exportCsv() {
     const token = getToken();
     const ws = getWorkspaceId();
@@ -111,15 +97,6 @@ export default function ProspectingPage() {
           </button>
           <button className="btn-secondary">
             <Filter className="h-4 w-4" /> Filter
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() => enrichEmails.mutate()}
-            disabled={enrichEmails.isPending}
-            title="Find emails for leads that don't have one yet"
-          >
-            <Mail className="h-4 w-4" />
-            {enrichEmails.isPending ? "Finding emails…" : "Find Emails"}
           </button>
           <button className="btn-secondary" onClick={exportCsv}>
             <Download className="h-4 w-4" /> Export

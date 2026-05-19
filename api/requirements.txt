@@ -24,5 +24,4 @@ orjson==3.10.12
 slugify==0.0.1
 python-slugify==8.0.4
 tenacity==9.0.0
-dnspython==2.7.0
 sentry-sdk[fastapi]==2.19.2
