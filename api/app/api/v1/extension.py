@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_extension_context
-from app.models import ApiKey, ExtensionJob, LinkedInMessage
+from app.models import ApiKey, ExtensionJob, Lead, LinkedInMessage, Membership, Playbook, SavedView, User
 from app.schemas import (
     ExtensionJobOut,
     ExtensionJobResult,
@@ -22,6 +22,7 @@ from app.schemas import (
 )
 from app.schemas.lead import CompanyMini, LeadOut
 from app.services.leads import ingest_lead
+from app.services.outreach import enroll_lead
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
@@ -156,6 +157,75 @@ def submit_result(
         db.add(rec)
     db.commit()
     return {"ok": True}
+
+
+@router.get("/options")
+def options(ctx: AuthContext = Depends(get_extension_context), db: Session = Depends(get_db)):
+    """Populate the bottom-toolbar dropdowns: Segment / Playbook / User."""
+    playbooks = (
+        db.query(Playbook)
+        .filter(Playbook.workspace_id == ctx.workspace_id, Playbook.is_active.is_(True))
+        .order_by(Playbook.created_at.desc())
+        .all()
+    )
+    segments = (
+        db.query(SavedView)
+        .filter(SavedView.workspace_id == ctx.workspace_id, SavedView.is_shared.is_(True))
+        .order_by(SavedView.position.asc())
+        .all()
+    )
+    members = (
+        db.query(Membership, User)
+        .join(User, User.id == Membership.user_id)
+        .filter(Membership.workspace_id == ctx.workspace_id)
+        .all()
+    )
+    return {
+        "user": {"id": ctx.user_id, "email": ctx.user.email, "name": (ctx.user.first_name or ctx.user.email.split("@")[0])},
+        "workspace": {"id": ctx.workspace.id, "name": ctx.workspace.name, "slug": ctx.workspace.slug},
+        "playbooks": [{"id": p.id, "name": p.name, "steps_count": len(p.steps)} for p in playbooks],
+        "segments": [{"id": s.id, "name": s.name, "icon": s.icon} for s in segments],
+        "users": [
+            {
+                "id": u.id,
+                "name": (u.first_name or u.email.split("@")[0]),
+                "email": u.email,
+                "role": m.role,
+            }
+            for (m, u) in members
+        ],
+    }
+
+
+@router.post("/enroll")
+def enroll_batch(
+    body: dict,
+    ctx: AuthContext = Depends(get_extension_context),
+    db: Session = Depends(get_db),
+):
+    """Bulk-enroll a list of saved leads into a playbook. Called by the
+    extension immediately after Save All Leads when the user has selected a
+    Playbook in the bottom toolbar."""
+    playbook_id = body.get("playbook_id")
+    lead_ids: list[str] = body.get("lead_ids") or []
+    if not playbook_id or not lead_ids:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "playbook_id_and_lead_ids_required")
+    pb = (
+        db.query(Playbook)
+        .filter(Playbook.id == playbook_id, Playbook.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not pb:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "playbook_not_found")
+    enrolled = []
+    for lid in lead_ids:
+        lead = db.query(Lead).filter(Lead.id == lid, Lead.workspace_id == ctx.workspace_id).first()
+        if not lead:
+            continue
+        e = enroll_lead(db, pb, lead)
+        enrolled.append(e.id)
+    db.commit()
+    return {"enrolled": enrolled, "count": len(enrolled)}
 
 
 @router.get("/health")

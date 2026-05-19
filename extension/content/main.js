@@ -16,13 +16,23 @@
     if (location.pathname === lastPath) return;
     lastPath = location.pathname;
     const type = Scraper.pageType();
-    if (type === "unknown" || type === "feed") {
-      Overlay.unmount();
-      return;
-    }
+
+    // Always tear down everything before deciding what to render.
+    Overlay.unmountProfilePanel();
+    Overlay.unmountToolbar();
+    document.body.classList.remove("lc-toolbar-mounted");
+
+    if (type === "unknown" || type === "feed") return;
+
     // Small settling delay because LinkedIn is a heavy SPA
     setTimeout(() => {
-      Overlay.renderProfilePanel();
+      const isProfile = type === "profile" || type === "salesnav-profile";
+      const isList = type === "search-people" || type === "salesnav-search";
+      if (isProfile) Overlay.renderProfilePanel();
+      if (isList) {
+        Overlay.renderToolbar();
+        document.body.classList.add("lc-toolbar-mounted");
+      }
       Overlay.decorateSearchCards();
     }, 600);
   }

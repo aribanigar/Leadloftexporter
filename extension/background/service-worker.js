@@ -51,9 +51,12 @@ async function fetchJson(path, opts = {}) {
 
 const handlers = {
   me: () => fetchJson("/extension/me"),
+  options: () => fetchJson("/extension/options"),
   syncProfile: ({ profile }) =>
     fetchJson("/extension/sync/profile", { method: "POST", body: profile }),
   syncSearch: (body) => fetchJson("/extension/sync/search", { method: "POST", body }),
+  enrollBatch: ({ playbook_id, lead_ids }) =>
+    fetchJson("/extension/enroll", { method: "POST", body: { playbook_id, lead_ids } }),
   nextJobs: ({ limit }) => fetchJson(`/extension/jobs/next?limit=${limit || 1}`),
   submitJobResult: ({ jobId, result }) =>
     fetchJson(`/extension/jobs/${jobId}/result`, { method: "POST", body: result }),

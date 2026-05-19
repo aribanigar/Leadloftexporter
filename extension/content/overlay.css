@@ -1,116 +1,254 @@
-/* Overlay styles live in a top-level stylesheet because Shadow-DOM CSS is
- * already isolated. We use a tight prefix and high z-index instead of full
- * shadow encapsulation so the overlay can pierce LinkedIn's modal stack. */
+/* LeadCaptura overlay — three surfaces:
+ *   #lc-profile-panel   compact card top-right on /in/<handle>
+ *   #lc-toolbar         persistent bottom bar on search / sales nav
+ *   .lc-inline-save     per-card Save button styled like LinkedIn's native pills
+ *
+ * Class prefix `lc-` and high z-index instead of Shadow DOM, so we can layer
+ * above LinkedIn's chat / modal stack.
+ */
 
-#lc-root {
+#lc-profile-panel,
+#lc-toolbar {
   all: initial;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
-  position: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
   z-index: 2147483646;
-  bottom: 24px;
-  right: 24px;
-  width: 340px;
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-  transition: transform 0.18s ease, opacity 0.18s ease;
-}
-#lc-root.lc-collapsed {
-  width: auto;
-  max-width: 200px;
-}
-#lc-root * {
+  color: #1f2328;
   box-sizing: border-box;
 }
+#lc-profile-panel *,
+#lc-toolbar * {
+  box-sizing: border-box;
+  font-family: inherit;
+}
 
-#lc-root .lc-header {
+/* ------------ Profile card ------------ */
+
+#lc-profile-panel {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  transition: transform 0.18s ease;
+}
+#lc-profile-panel.lc-collapsed .lc-card-body { display: none; }
+
+.lc-card-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: linear-gradient(135deg, #2563eb 0%, #db2777 100%);
-  color: white;
-  cursor: pointer;
-  user-select: none;
+  background: linear-gradient(135deg, #0a66c2 0%, #1e88e5 100%);
+  color: #fff;
 }
-#lc-root .lc-logo {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.18);
-  font-weight: 700;
-  font-size: 12px;
-}
-#lc-root .lc-title {
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-}
-#lc-root .lc-spacer { flex: 1; }
-#lc-root .lc-pill {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  text-transform: uppercase;
-}
-#lc-root .lc-body { padding: 12px; display: grid; gap: 10px; }
+.lc-card-title { font-weight: 600; font-size: 13px; }
+.lc-card-body { padding: 12px; display: grid; gap: 10px; }
 
-#lc-root .lc-row {
-  display: flex; align-items: center; gap: 8px;
+.lc-logo {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700; font-size: 12px;
 }
-#lc-root .lc-name {
-  font-weight: 600; font-size: 14px; line-height: 1.2; min-width: 0;
+
+.lc-flex { flex: 1; }
+.lc-muted { color: #64748b; font-size: 12px; }
+
+.lc-profile-meta { display: flex; gap: 10px; align-items: center; }
+.lc-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover;
+  background: #e0e0e0;
+}
+.lc-avatar-placeholder {
+  display: inline-grid; place-items: center;
+  color: #475569; font-weight: 600;
+}
+.lc-profile-text { min-width: 0; flex: 1; }
+.lc-profile-name {
+  font-weight: 600; font-size: 14px; line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-#lc-root .lc-sub { font-size: 12px; color: #64748b; line-height: 1.2; }
+.lc-profile-sub {
+  font-size: 12px; color: #64748b; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
-#lc-root .lc-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-#lc-root .lc-btn {
+.lc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ------------ Bottom toolbar ------------ */
+
+#lc-toolbar {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
+  color: #fff;
+  padding: 10px 16px 12px;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.18);
+}
+#lc-toolbar.lc-collapsed { transform: translateY(calc(100% - 24px)); }
+.lc-toolbar-inner {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 1400px; margin: 0 auto;
+}
+.lc-tb-title { font-weight: 600; font-size: 13px; letter-spacing: 0.01em; }
+
+/* ------------ Dropdowns inside the toolbar ------------ */
+
+.lc-dd { position: relative; }
+.lc-dd-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  border: none; border-radius: 8px; padding: 7px 10px; font-size: 12px;
-  font-weight: 600; cursor: pointer; line-height: 1; transition: background 0.12s;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
 }
-#lc-root .lc-btn-primary { background: #2563eb; color: #fff; }
-#lc-root .lc-btn-primary:hover { background: #1d4ed8; }
-#lc-root .lc-btn-secondary { background: #f1f5f9; color: #0f172a; }
-#lc-root .lc-btn-secondary:hover { background: #e2e8f0; }
-#lc-root .lc-btn-ghost { background: transparent; color: #64748b; padding: 4px 6px; }
-#lc-root .lc-btn-ghost:hover { background: #f1f5f9; color: #0f172a; }
-#lc-root .lc-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.lc-dd-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.lc-dd-label { color: rgba(255, 255, 255, 0.7); }
+.lc-dd-value { font-weight: 600; }
+.lc-dd-caret { font-size: 10px; opacity: 0.8; margin-left: 2px; }
 
-#lc-root .lc-status {
-  font-size: 12px; padding: 7px 9px; border-radius: 8px;
-  background: #f8fafc; color: #334155;
-  display: flex; align-items: center; gap: 6px;
-}
-#lc-root .lc-status.lc-ok { background: #ecfdf5; color: #047857; }
-#lc-root .lc-status.lc-err { background: #fef2f2; color: #b91c1c; }
-#lc-root .lc-status.lc-warn { background: #fefce8; color: #854d0e; }
-
-#lc-root .lc-divider { height: 1px; background: #e2e8f0; }
-
-#lc-root.lc-collapsed .lc-body { display: none; }
-
-#lc-root .lc-mini {
-  font-size: 11px; color: #64748b;
-}
-
-/* Floating per-card "Save" chips on search results */
-.lc-card-chip {
+.lc-dd-menu {
   position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  padding: 4px;
+  display: none;
+}
+.lc-dd-menu.lc-open { display: block; }
+.lc-dd-item {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  background: transparent; border: none;
+  text-align: left;
+  font-size: 12px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #0f172a;
+}
+.lc-dd-item:hover { background: #f1f5f9; }
+
+.lc-overflow {
+  bottom: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  min-width: 160px;
+}
+
+/* ------------ Buttons (shared) ------------ */
+
+.lc-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.lc-btn-sm { padding: 5px 10px; font-size: 12px; }
+.lc-btn-primary {
+  background: #2563eb; color: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.lc-btn-primary:hover { background: #1d4ed8; }
+.lc-btn-ghost {
+  background: transparent;
+  color: #64748b;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.lc-btn-ghost:hover { background: #f1f5f9; color: #0f172a; }
+#lc-toolbar .lc-btn-primary {
+  background: #ffffff; color: #1d4ed8;
+}
+#lc-toolbar .lc-btn-primary:hover { background: #f1f5f9; }
+
+.lc-icon-btn {
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px;
+  border: none; border-radius: 6px; background: transparent;
+  color: inherit; cursor: pointer; font-size: 14px;
+  opacity: 0.85;
+}
+.lc-icon-btn:hover { background: rgba(255, 255, 255, 0.1); opacity: 1; }
+.lc-icon-btn-light { color: #fff; }
+
+/* ------------ Status pill ------------ */
+
+.lc-status-slot { display: inline-flex; align-items: center; min-height: 22px; }
+.lc-status {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.lc-status.lc-ok    { background: rgba(16, 185, 129, 0.18); color: #d1fae5; }
+.lc-status.lc-err   { background: rgba(239, 68, 68, 0.22); color: #fecaca; }
+.lc-status.lc-warn  { background: rgba(245, 158, 11, 0.22); color: #fde68a; }
+#lc-profile-panel .lc-status { background: #f1f5f9; color: #475569; }
+#lc-profile-panel .lc-status.lc-ok  { background: #ecfdf5; color: #047857; }
+#lc-profile-panel .lc-status.lc-err { background: #fef2f2; color: #b91c1c; }
+#lc-profile-panel .lc-status.lc-warn { background: #fefce8; color: #854d0e; }
+
+/* ------------ Inline per-card Save button ------------ *
+ * We use LinkedIn's own .artdeco-button class scaffolding so the button
+ * inherits the right size/padding/shape. Override the colors via our
+ * .lc-inline-save modifier so it stands out without looking foreign. */
+
+.lc-inline-save.artdeco-button {
+  margin-left: 6px;
+  background: #ffffff !important;
+  color: #0a66c2 !important;
+  border: 1px solid #0a66c2 !important;
+  font-weight: 600 !important;
+}
+.lc-inline-save.artdeco-button:hover {
+  background: #eaf3fb !important;
+  box-shadow: inset 0 0 0 1px #0a66c2 !important;
+}
+.lc-inline-save[data-state="saved"].artdeco-button {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #10b981 !important;
+}
+.lc-inline-save[data-state="error"].artdeco-button {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+  border-color: #ef4444 !important;
+}
+.lc-inline-save[data-state="saving"].artdeco-button { opacity: 0.7; cursor: progress; }
+
+/* Floating fallback when no LinkedIn action row is found */
+.lc-inline-save-floating {
+  position: absolute !important;
   top: 8px; right: 8px;
   z-index: 999;
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(37, 99, 235, 0.95); color: #fff;
-  border: none; border-radius: 999px; padding: 4px 10px;
-  font-size: 11px; font-weight: 600;
-  cursor: pointer; box-shadow: 0 2px 6px rgba(15,23,42,0.2);
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
 }
-.lc-card-chip[data-state="saved"] { background: rgba(16, 185, 129, 0.95); }
-.lc-card-chip[data-state="error"] { background: rgba(220, 38, 38, 0.95); }
+
+/* Make room for the bottom bar on the underlying page */
+body.lc-toolbar-mounted { padding-bottom: 64px !important; }
