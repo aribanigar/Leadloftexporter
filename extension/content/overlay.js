@@ -129,8 +129,8 @@
               el(
                 "div",
                 { class: "lc-profile-text" },
-                el("div", { class: "lc-profile-name" }, profile.full_name || "Unknown profile"),
-                el("div", { class: "lc-profile-sub" }, profile.headline || profile.title || "")
+                el("div", { class: "lc-profile-name" }, profile.full_name || "Profile detected"),
+                el("div", { class: "lc-profile-sub" }, profile.headline || profile.title || profile.linkedin_url || "")
               )
             )
           : el("div", { class: "lc-muted" }, "Open a LinkedIn profile to capture it."),
