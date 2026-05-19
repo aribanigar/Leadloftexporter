@@ -1,15 +1,14 @@
 // Runs in the page's MAIN world at document_start.
 // Hooks fetch / XMLHttpRequest / WebSocket and forwards every JSON
-// array-of-objects payload it sees to the isolated content script,
-// tagged with the source URL. The isolated script decides which
-// arrays are actual leads.
+// array-of-objects payload to the isolated content script.
+// Works on both LinkedIn (/voyager/api/*) and LeadLoft.
 
 (() => {
   if (window.__leadloftNetHookInstalled) return;
   window.__leadloftNetHookInstalled = true;
 
   const TAG = '__leadloftExporter';
-  const LOG = '[LeadLoft Exporter:hook]';
+  const LOG = '[Lead Exporter:hook]';
 
   const stats = (window.__leadloftExporterCaptured = { events: 0 });
 
@@ -17,8 +16,7 @@
     try { window.postMessage({ [TAG]: true, ...payload }, '*'); } catch (_) {}
   };
 
-  // Unwrap GraphQL-style edges/nodes and other single-key wrappers so
-  // downstream code sees flat record objects.
+  // Unwrap GraphQL-style edges/nodes and other single-key wrappers.
   const unwrap = (obj) => {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
     const keys = Object.keys(obj);
@@ -33,11 +31,7 @@
     return obj;
   };
 
-  const flattenOneLevel = (obj) => obj;  // intentionally a no-op now —
-  // the content script applies LeadLoft-aware normalisation instead, so
-  // we must NOT promote nested object keys (e.g. owner.email) up to the
-  // top level here — that's what caused every row to show the account
-  // owner's email as the lead's email.
+  const flattenOneLevel = (obj) => obj;
 
   // Find every array of records in a response (depth-walk).
   const findArrays = (data) => {
@@ -70,7 +64,6 @@
     if (!arrays.length) return;
     for (const arr of arrays) {
       if (arr.length === 0) continue;
-      // Skip trivial 1-item arrays of tiny objects (often metadata).
       if (arr.length === 1 && Object.keys(arr[0]).length < 4) continue;
       stats.events++;
       post({ kind: 'CAPTURE', url: String(url || ''), method: method || 'GET', items: arr });
@@ -126,20 +119,20 @@
   // ---- WebSocket hook ----
   if (typeof WebSocket === 'function') {
     const OrigWS = window.WebSocket;
-    function HookedWS(url, protocols) {
-      const ws = protocols ? new OrigWS(url, protocols) : new OrigWS(url);
-      ws.addEventListener('message', (ev) => {
-        try {
-          const txt = typeof ev.data === 'string' ? ev.data : null;
-          if (!txt) return;
-          const data = safeParse(txt);
-          if (!data) return;
-          dispatch(data, `ws:${url}`, 'WS');
-        } catch (_) {}
-      });
-      return ws;
+    class HookedWS extends OrigWS {
+      constructor(url, protocols) {
+        super(url, protocols);
+        this.addEventListener('message', (ev) => {
+          try {
+            const txt = typeof ev.data === 'string' ? ev.data : null;
+            if (!txt) return;
+            const data = safeParse(txt);
+            if (!data) return;
+            dispatch(data, `ws:${url}`, 'WS');
+          } catch (_) {}
+        });
+      }
     }
-    HookedWS.prototype = OrigWS.prototype;
     HookedWS.CONNECTING = OrigWS.CONNECTING;
     HookedWS.OPEN = OrigWS.OPEN;
     HookedWS.CLOSING = OrigWS.CLOSING;

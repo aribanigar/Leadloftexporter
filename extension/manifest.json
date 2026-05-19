@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LeadLoft Exporter",
-  "version": "1.8.0",
-  "description": "Detect lead tables on LeadLoft pages and export them to a CSV file with proper columns.",
+  "name": "Lead Exporter",
+  "version": "2.0.0",
+  "description": "Export leads from LinkedIn and LeadLoft pages to CSV.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -11,11 +11,14 @@
   ],
   "host_permissions": [
     "https://*.leadloft.com/*",
-    "https://leadloft.com/*"
+    "https://leadloft.com/*",
+    "https://*.linkedin.com/*",
+    "https://linkedin.com/*",
+    "https://*.licdn.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LeadLoft Exporter",
+    "default_title": "Lead Exporter",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -34,7 +37,9 @@
     {
       "matches": [
         "https://*.leadloft.com/*",
-        "https://leadloft.com/*"
+        "https://leadloft.com/*",
+        "https://*.linkedin.com/*",
+        "https://linkedin.com/*"
       ],
       "js": ["inject.js"],
       "run_at": "document_start",
@@ -44,7 +49,9 @@
     {
       "matches": [
         "https://*.leadloft.com/*",
-        "https://leadloft.com/*"
+        "https://leadloft.com/*",
+        "https://*.linkedin.com/*",
+        "https://linkedin.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle",

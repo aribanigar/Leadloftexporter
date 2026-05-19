@@ -1,9 +1,10 @@
-// Content script — runs on leadloft.com pages.
+// Content script — runs on leadloft.com and linkedin.com pages.
 // Detects tabular lead lists and extracts them as { headers, rows } arrays
 // when the popup asks. Supports:
 //   1. Native <table> elements
 //   2. ARIA grids (role="grid" / role="table" with role="row"/"cell")
 //   3. Repeating-row patterns common in virtualized React/Vue lead lists
+//   4. LinkedIn Voyager API intercepted responses
 
 (() => {
   if (window.__leadloftExporterInstalled) return;
@@ -81,6 +82,13 @@
     if (has(/^title$|job_?title|position|role|headline/)) score += 2;
     if (has(/^website$|^domain$|company_url/)) score += 1;
     if (has(/lead|prospect|contact|person|deal/)) score += 2;
+    // LinkedIn Voyager API signals
+    if (has(/public_?identifier|publicidentifier/)) score += 8;
+    if (has(/object_?urn|entity_?urn/) && normKeys.some((k) => /member|profile/.test(k))) score += 5;
+    if (has(/occupation|headline/)) score += 3;
+    if (has(/mini_?profile|miniprofile/)) score += 5;
+    // Sales Navigator signals
+    if (has(/current_?positions|vanity_?name/)) score += 6;
     // Negative signals — clearly not leads.
     if (has(/signature|daily_?email_sending|provider|smtp|imap|inbox/)) score -= 25;
     if (has(/^price$|monthly_?credits|subscription|stripe|invoice|^plan$|^quantity$|^unit_?amount$/)) score -= 25;
@@ -162,6 +170,11 @@
   const itemKey = (item) => {
     const cid = contactIdFor(item);
     if (cid) return `contact:${cid}`;
+    // LinkedIn: use URN as stable key
+    const urn = item.objectUrn || item.entityUrn || item.backendUrn || item.memberUrn;
+    if (urn) return `urn:${urn}`;
+    // LinkedIn publicIdentifier is unique
+    if (item.publicIdentifier) return `li:${item.publicIdentifier}`;
     return leadId(item) || `name:${normalizeName(inferLeadName(item))}` || JSON.stringify(item).slice(0, 200);
   };
 
@@ -294,9 +307,104 @@
     'Contact ID': c.id || '',
   });
 
+  // --- LinkedIn normalisation ---
+
+  // LinkedIn MiniProfile (from /voyager/api/search, /voyager/api/identity/profiles)
+  const isMiniProfile = (item) => {
+    if (!item || typeof item !== 'object') return false;
+    if (item.primaryContact) return false; // LeadLoft Deal
+    const hasName = item.firstName || item.lastName;
+    const hasLinkedInSignal = item.publicIdentifier ||
+      (typeof item.objectUrn === 'string' && /member|profile/i.test(item.objectUrn)) ||
+      (typeof item.entityUrn === 'string' && /profile|member/i.test(item.entityUrn)) ||
+      item.miniProfile;
+    return Boolean(hasName && hasLinkedInSignal);
+  };
+
+  // LinkedIn contact info endpoint (/voyager/api/identity/profiles/*/profileContactInfo)
+  const isLinkedInContactInfo = (item) => {
+    if (!item || typeof item !== 'object') return false;
+    return item.emailAddress !== undefined || item.phoneNumbers !== undefined;
+  };
+
+  // LinkedIn Sales Navigator people search (/sales-api/salesApiPeopleSearch)
+  const isSalesNavProfile = (item) => {
+    if (!item || typeof item !== 'object') return false;
+    if (item.primaryContact) return false;
+    const hasName = item.fullName || (item.firstName && item.lastName);
+    const hasSalesNavSignal = item.currentPositions !== undefined ||
+      item.vanityName !== undefined ||
+      item.memberBadges !== undefined;
+    return Boolean(hasName && hasSalesNavSignal);
+  };
+
+  const normalizeMiniProfile = (item) => {
+    const p = item.miniProfile || item;
+    const firstName = p.firstName || item.firstName || '';
+    const lastName = p.lastName || item.lastName || '';
+    const occupation = p.occupation || item.occupation || item.headline || '';
+    const publicId = p.publicIdentifier || item.publicIdentifier || '';
+    // Try to split "Title at Company" from occupation
+    let title = occupation;
+    let company = '';
+    const atMatch = occupation.match(/^(.+?)\s+at\s+(.+)$/i);
+    if (atMatch) { title = atMatch[1].trim(); company = atMatch[2].trim(); }
+    // Location
+    const loc = p.location?.basicLocation?.countryCode ||
+      item.location?.basicLocation?.countryCode ||
+      item.geoRegion || '';
+    const urn = item.backendUrn || item.objectUrn || item.entityUrn ||
+      p.objectUrn || p.entityUrn || '';
+    return {
+      'Name': `${firstName} ${lastName}`.trim(),
+      'First Name': firstName,
+      'Last Name': lastName,
+      'Title': title,
+      'Company': company,
+      'LinkedIn URL': publicId ? `https://www.linkedin.com/in/${publicId}` : '',
+      'Location': loc,
+      'URN': urn,
+    };
+  };
+
+  const normalizeLinkedInContactInfo = (item) => ({
+    'Email': item.emailAddress || '',
+    'Phone': Array.isArray(item.phoneNumbers)
+      ? item.phoneNumbers.map((p) => p.number || '').filter(Boolean).join('; ')
+      : '',
+    'Twitter': Array.isArray(item.twitterHandles)
+      ? item.twitterHandles.map((t) => t.name || '').filter(Boolean).join('; ')
+      : '',
+    'Website': Array.isArray(item.websites)
+      ? item.websites.map((w) => w.url || '').filter(Boolean).join('; ')
+      : '',
+  });
+
+  const normalizeSalesNavProfile = (item) => {
+    const pos = Array.isArray(item.currentPositions) ? item.currentPositions[0] : null;
+    return {
+      'Name': item.fullName || `${item.firstName || ''} ${item.lastName || ''}`.trim(),
+      'First Name': item.firstName || '',
+      'Last Name': item.lastName || '',
+      'Title': pos?.title || item.title || '',
+      'Company': pos?.companyName || item.companyName || '',
+      'Email': item.email || (Array.isArray(item.emails) ? item.emails[0] || '' : '') || '',
+      'Phone': Array.isArray(item.phones) ? (item.phones[0]?.phoneNumber || '') : '',
+      'LinkedIn URL': item.vanityName
+        ? `https://www.linkedin.com/in/${item.vanityName}`
+        : item.profileUrl || '',
+      'Location': item.geoRegion || item.location || '',
+      'Industry': item.industry || '',
+      'URN': item.entityUrn || item.memberUrn || '',
+    };
+  };
+
   const normalizeRecord = (item) => {
     if (isDealShape(item)) return normalizeDeal(item);
     if (isContactShape(item)) return normalizeContact(item);
+    if (isSalesNavProfile(item)) return normalizeSalesNavProfile(item);
+    if (isMiniProfile(item)) return normalizeMiniProfile(item);
+    if (isLinkedInContactInfo(item)) return normalizeLinkedInContactInfo(item);
     return item;
   };
 
@@ -422,7 +530,7 @@
     if (!url || !/^https?:\/\//i.test(url)) return false;
     if (/\.(png|jpe?g|gif|svg|webp|css|woff2?|ttf|ico|map|mp4|mp3)(\?|#|$)/i.test(url)) return false;
     if (/\.(js)(\?|#|$)/i.test(url) && !/api|graphql/i.test(url)) return false;
-    return /api|graphql|leads?|contacts?|pipeline|prospects?|deals?|opportunit|crm|v\d+/i.test(url);
+    return /api|graphql|leads?|contacts?|pipeline|prospects?|deals?|opportunit|crm|v\d+|voyager|sales-api/i.test(url);
   };
 
   const collectArraysFromJson = (data) => {

@@ -1,5 +1,6 @@
 // Popup orchestration: talks to the content script to detect tables,
 // previews them, and triggers CSV export.
+// Supports: leadloft.com and linkedin.com (Voyager API + DOM)
 
 const escapeField = (val) => {
   if (val === null || val === undefined) return '';
@@ -76,6 +77,8 @@ const getActiveTab = async () => {
 };
 
 const isLeadLoftUrl = (url) => /^https?:\/\/([^/]+\.)?leadloft\.com\//.test(url || '');
+const isLinkedInUrl = (url) => /^https?:\/\/([^/]+\.)?linkedin\.com\//.test(url || '');
+const isSupportedUrl = (url) => isLeadLoftUrl(url) || isLinkedInUrl(url);
 
 // Ensure content scripts are present — re-inject on demand for tabs that
 // loaded before the extension was installed/reloaded.
@@ -193,8 +196,8 @@ const scan = async () => {
   const tab = await getActiveTab();
   activeTabId = tab.id;
 
-  if (!isLeadLoftUrl(tab.url)) {
-    setStatus('Open a LeadLoft page (leadloft.com) to use this extension.', 'warn');
+  if (!isSupportedUrl(tab.url)) {
+    setStatus('Open a LinkedIn or LeadLoft page to use this extension.', 'warn');
     els.tablesSection.hidden = true;
     els.optionsSection.hidden = true;
     return;
@@ -219,12 +222,16 @@ const scan = async () => {
       return;
     }
 
+    const isLI = isLinkedInUrl(tab.url);
     let msg, level;
     if (bestScore >= 8) {
-      msg = `Best match: ${bestCount} likely lead${bestCount === 1 ? '' : 's'} (score ${bestScore}). Picked it for you — review and Export.`;
+      msg = `${bestCount} lead${bestCount === 1 ? '' : 's'} captured (score ${bestScore}). Review columns and Export.`;
       level = 'success';
     } else if (totalRecords > 0) {
-      msg = `Captured ${totalRecords} record(s) across ${totalSources} source(s), but none look like leads. Click "Reload tab" so the hook can capture the lead list from scratch.`;
+      msg = `Captured ${totalRecords} record(s) across ${totalSources} source(s), but none look like leads. Click "Reload tab" to recapture from scratch.`;
+      level = 'warn';
+    } else if (isLI) {
+      msg = 'No leads captured yet. Click "Reload tab", then scroll through your LinkedIn search results to trigger the API calls.';
       level = 'warn';
     } else {
       msg = 'No API data captured yet. Click "Reload tab" — the hook must be active before the page makes its first request.';
