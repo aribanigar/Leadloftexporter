@@ -1,7 +1,17 @@
 /* Content-script entry point. Coordinates the scraper, overlay, and
  * autopilot tick on LinkedIn pages. */
 (() => {
-  if (window.__leadCapturaMounted) return;
+  // If we were mounted under a previous extension load, the chrome.runtime
+  // we registered our message listener against is now invalidated — the
+  // popup gets "Could not establish connection" when it tries to reach us.
+  // Detect that here and allow a fresh re-mount so the new listener attaches
+  // to the live runtime.
+  if (window.__leadCapturaMounted) {
+    let runtimeAlive = false;
+    try { runtimeAlive = !!chrome.runtime?.id; } catch { runtimeAlive = false; }
+    if (runtimeAlive) return;
+    window.__leadCapturaMounted = false;
+  }
   window.__leadCapturaMounted = true;
 
   const Overlay = globalThis.__lcOverlay;
@@ -123,27 +133,95 @@
   });
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    // Liveness ping so the popup can verify the content script is responsive
+    // (and re-inject if not) before sending real commands.
+    if (msg?.type === "lc:ping") {
+      sendResponse({
+        ok: true,
+        pageType: Scraper.pageType(),
+        url: location.href,
+      });
+      return true;
+    }
     if (msg?.type === "lc:scrape") {
       sendResponse(Scraper.scrapeCurrentPage());
       return true;
     }
     if (msg?.type === "lc:saveCurrent") {
       const scraped = Scraper.scrapeCurrentPage();
-      if (scraped.kind === "profile") {
+      if (scraped.kind === "profile" && scraped.profile?.linkedin_url) {
         globalThis.__lcApi
           .syncProfile(scraped.profile)
           .then((r) => sendResponse({ ok: true, ...r }))
           .catch((e) => sendResponse({ ok: false, error: e.message }));
         return true;
       }
-      if (scraped.kind === "search") {
+      if (scraped.kind === "search" && scraped.profiles?.length) {
         globalThis.__lcApi
-          .syncSearch({ page_url: location.href, captured_at: new Date().toISOString(), profiles: scraped.profiles })
+          .syncSearch({
+            page_url: location.href,
+            captured_at: new Date().toISOString(),
+            profiles: scraped.profiles,
+          })
           .then((r) => sendResponse({ ok: true, ...r }))
           .catch((e) => sendResponse({ ok: false, error: e.message }));
         return true;
       }
-      sendResponse({ ok: false, error: "nothing_to_save" });
+      // Fallback #1: URL says we're on a profile but pageType returned
+      // "unknown" — try scrapeProfile() directly. Helps when the SPA hasn't
+      // hydrated yet or LinkedIn ships a sub-path we don't recognise.
+      if (location.pathname.startsWith("/in/")) {
+        try {
+          const profile = Scraper.scrapeProfile();
+          if (profile?.linkedin_url) {
+            globalThis.__lcApi
+              .syncProfile(profile)
+              .then((r) => sendResponse({ ok: true, ...r }))
+              .catch((e) => sendResponse({ ok: false, error: e.message }));
+            return true;
+          }
+        } catch (e) {
+          /* fall through */
+        }
+      }
+      // Fallback #2: Sales Navigator profile page
+      if (location.pathname.startsWith("/sales/lead/")) {
+        try {
+          const profile = Scraper.scrapeSalesNavProfile();
+          if (profile?.linkedin_url) {
+            globalThis.__lcApi
+              .syncProfile(profile)
+              .then((r) => sendResponse({ ok: true, ...r }))
+              .catch((e) => sendResponse({ ok: false, error: e.message }));
+            return true;
+          }
+        } catch (e) {
+          /* fall through */
+        }
+      }
+      // Fallback #3: Any page with /in/ anchors → try search-results scrape
+      if (document.querySelector("a[href*='/in/']")) {
+        try {
+          const profiles = Scraper.scrapeSearchResults();
+          if (profiles.length) {
+            globalThis.__lcApi
+              .syncSearch({
+                page_url: location.href,
+                captured_at: new Date().toISOString(),
+                profiles,
+              })
+              .then((r) => sendResponse({ ok: true, ...r }))
+              .catch((e) => sendResponse({ ok: false, error: e.message }));
+            return true;
+          }
+        } catch (e) {
+          /* fall through */
+        }
+      }
+      sendResponse({
+        ok: false,
+        error: "Navigate to a LinkedIn profile or people-search page to capture.",
+      });
       return true;
     }
   });

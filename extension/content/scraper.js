@@ -25,9 +25,21 @@
     const p = location.pathname;
     if (p.startsWith("/in/")) return "profile";
     if (p.startsWith("/sales/lead/")) return "salesnav-profile";
-    if (p.startsWith("/sales/search")) return "salesnav-search";
-    if (p.startsWith("/sales/people") || p.startsWith("/sales/connections")) return "salesnav-search";
+    // Sales Navigator has many list-type surfaces — match them all.
+    if (
+      p.startsWith("/sales/search") ||
+      p.startsWith("/sales/people") ||
+      p.startsWith("/sales/connections") ||
+      p.startsWith("/sales/lists/people") ||
+      p.startsWith("/sales/lists/saved-leads") ||
+      p.startsWith("/sales/lists/accounts") ||
+      p.startsWith("/sales/discover")
+    ) return "salesnav-search";
     if (p.startsWith("/search/results/people")) return "search-people";
+    // Generic /search/results/ may include people too; we'll fall through to
+    // scrapeSearchResults() which simply returns [] if no /in/ links exist.
+    if (p.startsWith("/search/results/")) return "search-people";
+    if (p.startsWith("/mynetwork/invitation-manager") || p.startsWith("/mynetwork/invite-connect/connections")) return "search-people";
     if (p === "/" || p.startsWith("/feed")) return "feed";
     return "unknown";
   }
