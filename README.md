@@ -6,7 +6,7 @@ Full-stack LinkedIn lead-generation SaaS — LeadLoft-style CRM + outreach engin
 
 ```
 /api         FastAPI backend (Postgres + Redis + Celery)
-/web         Next.js 15 frontend (App Router, Tailwind, TanStack Query)
+(root)       Next.js 15 frontend (App Router, Tailwind, TanStack Query)
 /extension   Chrome MV3 extension (LinkedIn capture + human-paced outreach)
 ```
 
@@ -27,7 +27,7 @@ docker compose up --build
 That starts Postgres + Redis + the FastAPI API + a Celery worker + Celery beat. The frontend runs separately:
 
 ```bash
-cd web && npm install && npm run dev
+npm install && npm run dev
 ```
 
 Open <http://localhost:3000>, register, then go to **Settings → API Keys** and generate an extension key.
@@ -42,7 +42,7 @@ Open <http://localhost:3000>, register, then go to **Settings → API Keys** and
 
 See [`DEPLOY.md`](./DEPLOY.md) for the full recipe. One-paragraph version:
 
-- `/web` → **Vercel** (zero-config; `vercel.json` is in the repo root, root directory = `web`)
+- repo root → **Vercel** (zero-config; `vercel.json` is in the repo root, root directory = repo root)
 - `/api` + Celery worker + Celery beat + Redis → **Render** (uses `render.yaml` blueprint) or **Railway** (`railway.json`)
 - Postgres → **Neon** (free tier)
 

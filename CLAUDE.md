@@ -8,11 +8,11 @@ The **LeadCaptura monorepo** — a full-stack LinkedIn lead-generation SaaS:
 
 ```
 /api          FastAPI backend (Postgres + Redis + Celery)
-/web          Next.js 15 frontend
+(root)        Next.js 15 frontend
 /extension    Chrome MV3 extension (LinkedIn capture + human-paced outreach)
 ```
 
-This document covers the **extension**. Backend has its own conventions in `/api`; frontend in `/web`.
+This document covers the **extension**. Backend has its own conventions in `/api`; frontend in repo root.
 
 ## Commands
 

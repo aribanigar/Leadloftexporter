@@ -4,7 +4,7 @@ The stack splits into three independent deployables:
 
 | Component | Hosting | Cost on free/starter |
 |---|---|---|
-| Next.js frontend (`/web`) | Vercel | $0 |
+| Next.js frontend (repo root) | Vercel | $0 |
 | FastAPI API + Celery worker + beat (`/api`) | Render (or Railway/Fly) | $7/mo each on starter |
 | Postgres | Neon | $0 |
 | Redis | Render's managed Redis (or Upstash) | $0–$10 |
@@ -71,7 +71,7 @@ docker compose up --build
 That starts Postgres, Redis, the API, worker, and beat. Frontend runs separately:
 
 ```bash
-cd web && npm install && npm run dev
+npm install && npm run dev
 ```
 
 ## Health check & smoke test
