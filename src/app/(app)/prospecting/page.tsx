@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Download, MoreHorizontal, Plus, Filter, Columns3 } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
+import Link from "next/link";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
 import { CreateLeadModal } from "@/components/create-lead-modal";
 import { ColumnPicker } from "@/components/column-picker";
@@ -210,15 +211,18 @@ function renderCell(col: string, lead: Lead, stageById: Map<string, PipelineStag
   switch (col) {
     case "full_name":
       return (
-        <div className="flex items-center gap-2">
+        <Link
+          href={`/leads/${lead.id}`}
+          className="flex items-center gap-2 hover:text-brand-700"
+        >
           <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold uppercase text-slate-600">
             {initials(lead.full_name || lead.email)}
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="font-medium text-slate-800">{lead.full_name || "—"}</span>
+            <span className="font-medium text-slate-800 hover:text-brand-700 hover:underline">{lead.full_name || "—"}</span>
             {lead.headline && <span className="text-xs text-slate-500">{lead.headline}</span>}
           </div>
-        </div>
+        </Link>
       );
     case "title":
       return <span className="text-slate-700">{lead.title || "—"}</span>;

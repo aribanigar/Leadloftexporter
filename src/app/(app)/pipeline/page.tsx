@@ -11,6 +11,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Lead, LeadList, PipelineStage } from "@/lib/types";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
@@ -120,15 +121,15 @@ export default function PipelinePage() {
                 return (
                   <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
+                      <Link href={`/leads/${lead.id}`} className="flex items-center gap-2 hover:text-brand-700">
                         <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold uppercase">
                           {initials(lead.full_name)}
                         </div>
                         <div>
-                          <div className="font-medium">{lead.full_name || "—"}</div>
+                          <div className="font-medium hover:underline">{lead.full_name || "—"}</div>
                           <div className="text-xs text-slate-500">{fmtDate(lead.close_date) || "$--"}</div>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-3 py-2 text-sm text-slate-700">{lead.title || "—"}</td>
                     <td className="px-3 py-2 text-sm text-slate-700">{lead.company?.name || "—"}</td>
