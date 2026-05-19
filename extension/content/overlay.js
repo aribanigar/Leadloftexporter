@@ -400,66 +400,109 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* We inject the Save button as a floating chip in the top-right of each
-   * search-result card. Earlier we tried to drop it inside LinkedIn's own
-   * action row next to Connect/Message, but that overlaps the native
-   * buttons because their parent isn't a flex container that grows. The
-   * floating chip is positioned `absolute` against the card itself, so it
-   * never collides regardless of LinkedIn's CSS churn. */
+  /* Locates the container element that holds Connect / Message / Follow
+   * buttons. We walk up from the first action button we find, stopping at the
+   * smallest ancestor that still contains all of them. We intentionally do NOT
+   * match LinkedIn's own "Save" button (Sales Nav) to avoid mis-detecting it.
+   */
+  function _findActionContainer(card) {
+    const actionBtn = (
+      card.querySelector("button[aria-label*='Connect' i]") ||
+      card.querySelector("button[aria-label*='Message' i]") ||
+      card.querySelector("button[aria-label*='InMail' i]") ||
+      card.querySelector("button[aria-label*='Follow' i]")
+    );
+    if (!actionBtn) return null;
+
+    // Walk up from the button's parent until we reach an element that either:
+    // (a) directly contains all the action buttons, or
+    // (b) spans the full card width (that's gone too far — stop one level below)
+    let container = actionBtn.parentElement;
+    for (let i = 0; i < 7; i++) {
+      if (!container || container === card || container.tagName === "MAIN") break;
+      const parent = container.parentElement;
+      if (!parent || parent === card || parent.tagName === "MAIN") break;
+      // Stop when the parent starts spanning more than the action group
+      const parentBtnCount = parent.querySelectorAll(
+        "button[aria-label*='Connect' i], button[aria-label*='Message' i]," +
+        "button[aria-label*='InMail' i], button[aria-label*='Follow' i]"
+      ).length;
+      const containerBtnCount = container.querySelectorAll(
+        "button[aria-label*='Connect' i], button[aria-label*='Message' i]," +
+        "button[aria-label*='InMail' i], button[aria-label*='Follow' i]"
+      ).length;
+      if (parentBtnCount === containerBtnCount) {
+        container = parent; // same button count — parent is still the action group
+      } else {
+        break; // parent has more buttons (card-level) — stop here
+      }
+    }
+    return container;
+  }
 
   function injectInlineSave(card, profile) {
     if (card.querySelector(".lc-inline-save")) return;
 
+    const textSpan = el("span", { class: "lc-inline-save-text" }, "Save");
     const btn = el(
       "button",
       {
-        class: "lc-inline-save lc-inline-save-floating",
+        class: "lc-inline-save",
         type: "button",
         title: "Save to LeadCaptura",
       },
-      el("span", { class: "lc-inline-save-text" }, "Save")
+      textSpan
     );
     btn.dataset.state = "ready";
+
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
-      btn.querySelector(".lc-inline-save-text").textContent = "Saving…";
+      textSpan.textContent = "Saving…";
       try {
         const result = await Api.syncProfile(profile);
         btn.dataset.state = "saved";
-        btn.querySelector(".lc-inline-save-text").textContent = "Saved";
+        textSpan.textContent = "Saved ✓";
         if (result.lead?.id) {
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
         }
-        // Kick off Contact-info enrichment in a background tab. The new tab's
-        // content script will scrape email + phone from the modal and push an
-        // update (deduped by linkedin_url), then close itself.
+        // Kick off background enrichment. The service worker will check safe-
+        // zone limits, apply a jittered delay, then open the overlay URL so
+        // the contact-info modal is pre-opened without a synthetic click.
         const settings = await Storage.getSettings();
         if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
-          try {
-            chrome.runtime.sendMessage({
-              type: "lc:enrichProfile",
-              url: profile.linkedin_url,
-            });
-            btn.querySelector(".lc-inline-save-text").textContent = "Saved · enriching…";
-          } catch (enrichErr) {
-            console.warn("[LeadCaptura] enrichment dispatch failed", enrichErr);
-          }
+          chrome.runtime.sendMessage(
+            { type: "lc:enrichProfile", url: profile.linkedin_url },
+            (resp) => {
+              if (resp?.ok) {
+                textSpan.textContent = "Saved · enriching…";
+              } else if (resp?.error === "safe_zone_limit_reached") {
+                textSpan.textContent = "Saved (daily limit)";
+              }
+            }
+          );
         }
       } catch (err) {
         btn.dataset.state = "error";
-        btn.querySelector(".lc-inline-save-text").textContent = "Retry";
+        textSpan.textContent = "Retry";
         console.warn("[LeadCaptura] save failed", err);
       }
     });
 
-    // Always float in the top-right of the card so we never collide with
-    // LinkedIn's native Connect/Message/Follow buttons.
-    const computed = getComputedStyle(card);
-    if (computed.position === "static") card.style.position = "relative";
-    card.appendChild(btn);
+    // Preferred: insert a centered row directly below the action buttons.
+    // Fallback: floating chip (top-right) when we can't locate the row.
+    const actionContainer = _findActionContainer(card);
+    if (actionContainer) {
+      const wrap = el("div", { class: "lc-save-row" }, btn);
+      actionContainer.after(wrap);
+    } else {
+      btn.classList.add("lc-inline-save-floating");
+      if (getComputedStyle(card).position === "static") card.style.position = "relative";
+      card.appendChild(btn);
+    }
   }
 
   function _cardFromLink(link) {

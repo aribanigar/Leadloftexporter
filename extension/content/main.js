@@ -8,9 +8,52 @@
   const Automate = globalThis.__lcAutomate;
   const Scraper = globalThis.__lcScraper;
   const Human = globalThis.__lcHuman;
+  const Storage = globalThis.__lcStorage;
 
   let lastPath = null;
   let autopilotInterval = null;
+
+  // Track which profile URLs we've already auto-enriched in this page session
+  // to avoid re-running on every SPA nav back to the same profile.
+  const autoEnrichedUrls = new Set();
+
+  // Auto-enrich the current profile page: after a human-paced delay, open
+  // the Contact info modal and push email/phone to the backend. This runs
+  // silently in the background — the user just sees the profile page.
+  async function maybeAutoEnrichCurrentProfile() {
+    try {
+      if (Scraper.pageType() !== "profile") return;
+      const params = new URLSearchParams(location.search);
+      if (params.has("lc_enrich")) return; // Already in enrichment mode
+      const path = location.pathname;
+      if (autoEnrichedUrls.has(path)) return;
+      autoEnrichedUrls.add(path);
+
+      const settings = await Storage.getSettings();
+      if (settings.autoEnrichOnSave === false) return;
+
+      // 3–9s reading delay so it looks like the user is viewing the page.
+      // 15% chance of an extra 5–12s pause ("they got distracted").
+      const base = Human.rand(3000, 9000);
+      const bonus = Math.random() < 0.15 ? Human.rand(5000, 12000) : 0;
+      await Human.sleep(base + bonus);
+
+      const contact = await Scraper.scrapeContactInfo();
+      if (!contact.email && !contact.phone) return; // Nothing new to add
+
+      const profile = Scraper.scrapeProfile();
+      if (!profile?.linkedin_url) return;
+      if (contact.email) profile.email = contact.email;
+      if (contact.phone) profile.phone = contact.phone;
+      if (contact.website) profile.company_url = contact.website;
+      profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
+
+      await globalThis.__lcApi.syncProfile(profile);
+    } catch (e) {
+      // Silently fail — enrichment is always best-effort
+      console.warn("[LeadCaptura] auto-enrich failed:", e?.message);
+    }
+  }
 
   function onPathChange() {
     if (location.pathname === lastPath) return;
@@ -28,7 +71,10 @@
     setTimeout(() => {
       const isProfile = type === "profile" || type === "salesnav-profile";
       const isList = type === "search-people" || type === "salesnav-search";
-      if (isProfile) Overlay.renderProfilePanel();
+      if (isProfile) {
+        Overlay.renderProfilePanel();
+        maybeAutoEnrichCurrentProfile();
+      }
       if (isList) {
         Overlay.renderToolbar();
         document.body.classList.add("lc-toolbar-mounted");
@@ -102,46 +148,45 @@
     }
   });
 
-  // Auto-enrichment trigger: when the search-card Save flow opens a profile
-  // in a new tab with ?lc_enrich=1, we wait for the page to settle, open the
-  // Contact info modal, scrape the email/phone, push it to the backend (which
-  // dedupes by linkedin_url, so it updates the existing lead), then close the
-  // tab so the user can keep working on the search page. We only do this on
-  // /in/ URLs to avoid feedback loops, and we sleep a human-paced delay before
-  // touching the page so it doesn't look scripted.
+  // Auto-enrichment trigger: when the service worker opens a background tab at
+  // /in/<handle>/overlay/contact-info/?lc_enrich=1, the content script runs
+  // here. We wait for the page to settle, scrape the contact info (the modal
+  // is pre-opened by LinkedIn's SPA router for the overlay URL), sync to the
+  // backend (deduped by linkedin_url → updates the existing lead), then close.
   async function maybeRunEnrichmentTrigger() {
     try {
       const params = new URLSearchParams(location.search);
       if (!params.has("lc_enrich")) return;
+      // Accept both the direct profile URL and the overlay sub-path
       if (!location.pathname.startsWith("/in/")) return;
       if (window.__lcEnrichmentRan) return;
       window.__lcEnrichmentRan = true;
 
-      // 1.2-3.5s reading pause, then a small jitter, then scrape.
-      await Human.sleep(Human.rand(1500, 3500));
+      // Human-paced reading pause: 1.5–4s base, 12% long-tail up to 8s.
+      const base = Human.rand(1500, 4000);
+      const longTail = Math.random() < 0.12 ? Human.rand(2000, 8000) : 0;
+      await Human.sleep(base + longTail);
+
+      // scrapeProfileWithContact() handles both the overlay-URL (modal already
+      // open) and the regular-URL (clicks the Contact info link) cases.
       const profile = await Scraper.scrapeProfileWithContact();
       try {
         await globalThis.__lcApi.syncProfile(profile);
       } catch (e) {
-        console.warn("[LeadCaptura] enrichment sync failed", e);
+        console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
-      // Final small pause then close. window.close() works when the tab was
-      // opened by chrome.tabs.create / window.open from our service worker.
-      await Human.sleep(Human.rand(400, 900));
+
+      await Human.sleep(Human.rand(300, 800));
       try {
         chrome.runtime.sendMessage({ type: "lc:closeMe" });
       } catch {
         /* fall through */
       }
       setTimeout(() => {
-        try {
-          window.close();
-        } catch {
-          /* sandboxed, leave the tab open */
-        }
-      }, 300);
+        try { window.close(); } catch { /* sandboxed — leave tab */ }
+      }, 250);
     } catch (e) {
-      console.warn("[LeadCaptura] enrichment trigger failed", e);
+      console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     }
   }
 

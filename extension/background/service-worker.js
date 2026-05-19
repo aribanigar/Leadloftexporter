@@ -14,6 +14,48 @@ const DEFAULT_SETTINGS = {
   showOverlay: true,
 };
 
+// ---- Safe zones: limit how many enrichments we open per hour/day ----------
+
+const SAFE_ZONES = {
+  perHour: 20,  // max 20 background-tab enrichments per hour
+  perDay: 80,   // max 80 per day
+};
+
+async function canEnrich() {
+  const { safeZone } = await chrome.storage.local.get("safeZone");
+  const now = Date.now();
+  const hourly = (safeZone?.hourly || []).filter((t) => now - t < 3_600_000);
+  const daily = (safeZone?.daily || []).filter((t) => now - t < 86_400_000);
+  if (hourly.length >= SAFE_ZONES.perHour) return false;
+  if (daily.length >= SAFE_ZONES.perDay) return false;
+  return true;
+}
+
+async function recordEnrich() {
+  const { safeZone } = await chrome.storage.local.get("safeZone");
+  const now = Date.now();
+  const hourly = [
+    ...(safeZone?.hourly || []).filter((t) => now - t < 3_600_000),
+    now,
+  ];
+  const daily = [
+    ...(safeZone?.daily || []).filter((t) => now - t < 86_400_000),
+    now,
+  ];
+  await chrome.storage.local.set({ safeZone: { hourly, daily } });
+}
+
+// Jittered delay: base range with 20% chance of "distracted user" extra pause
+function jitter(minMs, maxMs) {
+  const base = minMs + Math.random() * (maxMs - minMs);
+  const bonus = Math.random() < 0.2 ? base * (0.4 + Math.random() * 0.8) : 0;
+  return Math.round(base + bonus);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   return Object.assign({}, DEFAULT_SETTINGS, settings || {});
@@ -68,25 +110,49 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
     return true;
   }
-  // Open a profile in a background tab with ?lc_enrich=1 so the content
-  // script there auto-scrapes the Contact info modal and updates the lead.
+  // Open a profile in a background tab for contact-info enrichment.
+  // Key improvements vs the old approach:
+  //   1. Navigate directly to /overlay/contact-info/ so LinkedIn's SPA router
+  //      pre-opens the modal — no button click needed in the content script.
+  //   2. Check safe-zone rate limits before opening any tab.
+  //   3. Jittered delay (0.8–4s, with 20% long-tail) so tabs don't open in
+  //      rapid bursts which would look bot-like.
   if (msg?.type === "lc:enrichProfile") {
     const target = String(msg.url || "");
     if (!target) {
       sendResponse({ ok: false, error: "url_required" });
       return true;
     }
-    let withParam = target;
-    try {
-      const u = new URL(target);
-      u.searchParams.set("lc_enrich", "1");
-      withParam = u.toString();
-    } catch {
-      withParam = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
-    }
-    chrome.tabs.create({ url: withParam, active: false }, (tab) => {
-      sendResponse({ ok: true, tabId: tab?.id });
-    });
+    (async () => {
+      try {
+        const allowed = await canEnrich();
+        if (!allowed) {
+          sendResponse({ ok: false, error: "safe_zone_limit_reached" });
+          return;
+        }
+        // Jittered delay before opening to avoid time-pattern detection
+        await sleep(jitter(800, 4000));
+        await recordEnrich();
+        // Build the overlay URL — navigating there directly pre-opens the
+        // Contact info modal without requiring a synthetic click.
+        let enrichUrl = target;
+        try {
+          const u = new URL(target);
+          if (u.pathname.startsWith("/in/")) {
+            u.pathname = u.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
+          }
+          u.searchParams.set("lc_enrich", "1");
+          enrichUrl = u.toString();
+        } catch {
+          enrichUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
+        }
+        chrome.tabs.create({ url: enrichUrl, active: false }, (tab) => {
+          sendResponse({ ok: true, tabId: tab?.id });
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
     return true;
   }
   // The enrichment-trigger content script asks us to close its own tab.

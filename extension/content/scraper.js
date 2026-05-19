@@ -186,14 +186,26 @@
   }
 
   function _findContactModal() {
-    // After clicking Contact info, LinkedIn renders an artdeco-modal whose
-    // labelled-by id contains "contact". Multiple selectors as fallback.
+    // After clicking Contact info (or navigating to the overlay URL), LinkedIn
+    // renders an artdeco-modal. Multiple selectors as fallback — LinkedIn
+    // occasionally changes the labelling attributes.
     return (
       document.querySelector("div[role='dialog'][aria-labelledby*='contact' i]") ||
       document.querySelector("div[role='dialog'][aria-label*='Contact' i]") ||
-      // Last-resort: any dialog open right now
       document.querySelector("#artdeco-modal-outlet div[role='dialog']") ||
+      // artdeco-modal is the host element; the inner dialog is what we want
+      document.querySelector("artdeco-modal div[role='dialog']") ||
+      document.querySelector("div.artdeco-modal__content") ||
       document.querySelector("div[role='dialog']")
+    );
+  }
+
+  function _isValidContactModal(modal) {
+    if (!modal) return false;
+    return (
+      modal.querySelector("a[href^='mailto:']") ||
+      modal.querySelector("a[href^='tel:']") ||
+      /contact info/i.test(modal.textContent || "")
     );
   }
 
@@ -251,33 +263,45 @@
     }
   }
 
-  async function scrapeContactInfo({ timeoutMs = 5000 } = {}) {
+  async function scrapeContactInfo({ timeoutMs = 9000 } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null };
     }
+
+    // When the service worker opens a background tab at the overlay URL
+    // (/in/<handle>/overlay/contact-info/), LinkedIn pre-opens the modal via
+    // its SPA router — we just wait for it instead of clicking anything.
+    const isOverlayUrl = location.pathname.includes("/overlay/contact-info");
+
     let modal = _findContactModal();
+    if (!_isValidContactModal(modal)) modal = null;
+
     if (!modal) {
-      const link = _findContactInfoLink();
-      if (!link) return { email: null, phone: null, website: null };
-      link.click();
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        await _sleep(180);
-        modal = _findContactModal();
-        // Make sure the dialog isn't just any leftover; require either an
-        // email link, phone link, or a heading containing "Contact info".
-        if (modal && (
-          modal.querySelector("a[href^='mailto:']") ||
-          modal.querySelector("a[href^='tel:']") ||
-          /contact info/i.test(modal.textContent || "")
-        )) break;
-        modal = null;
+      if (!isOverlayUrl) {
+        // On a regular profile page: click the Contact info link to open modal
+        const link = _findContactInfoLink();
+        if (!link) return { email: null, phone: null, website: null };
+        link.click();
       }
+      // Use MutationObserver-backed waitFor so we wake immediately when ready
+      const { waitFor } = globalThis.__lcDom;
+      modal = await waitFor(
+        [
+          "div[role='dialog'][aria-labelledby*='contact' i]",
+          "div[role='dialog'][aria-label*='Contact' i]",
+          "#artdeco-modal-outlet div[role='dialog']",
+          "artdeco-modal div[role='dialog']",
+          "div.artdeco-modal__content",
+        ],
+        { timeout: timeoutMs }
+      );
+      if (!_isValidContactModal(modal)) modal = null;
     }
+
     if (!modal) return { email: null, phone: null, website: null };
-    await _sleep(280);
+    await _sleep(350); // Let dynamic content settle
     const data = _scrapeFromContactModal(modal);
-    _closeContactModal();
+    if (!isOverlayUrl) _closeContactModal();
     return data;
   }
 
@@ -444,33 +468,61 @@
   }
 
   function scrapeSalesNavSearch() {
+    // Sales Nav search pages may use either the lead-panel link attribute or
+    // plain /sales/lead/ hrefs. Try both, dedupe by normalised URL.
     const links = document.querySelectorAll(
-      "a[data-control-name='view_lead_panel_via_search_lead_name'], a[href*='/sales/lead/']"
+      "a[data-control-name='view_lead_panel_via_search_lead_name']," +
+      "a[data-control-name='view_lead_panel_via_browse_map_list_lead_name']," +
+      "a[href*='/sales/lead/']"
     );
     const out = [];
     const seen = new Set();
     for (const link of links) {
-      const url = normalizeProfileUrl(link.href);
-      if (!url || seen.has(url)) continue;
-      const card = _profileCardFromLink(link);
-      const name =
-        _txt(card.querySelector("[data-anonymize='person-name']")) || _txt(link);
-      if (!name) continue;
-      const title = _txt(card.querySelector("[data-anonymize='title']"));
-      const company = _txt(card.querySelector("[data-anonymize='company-name']"));
-      const loc = _txt(card.querySelector("[data-anonymize='location']"));
-      const [first_name, ...rest] = name.split(/\s+/);
-      seen.add(url);
-      out.push({
-        linkedin_url: url,
-        full_name: name,
-        first_name,
-        last_name: rest.join(" ") || null,
-        title,
-        company_name: company,
-        location: loc,
-        raw: { source_url: location.href, page_type: "salesnav-search" },
-      });
+      try {
+        const url = normalizeProfileUrl(link.href);
+        if (!url || seen.has(url)) continue;
+        const card = _profileCardFromLink(link);
+        // data-anonymize attributes are stable in Sales Nav
+        const nameEl =
+          card.querySelector("[data-anonymize='person-name']") ||
+          card.querySelector("[data-anonymize='name']") ||
+          link.querySelector("span[aria-hidden='true']") ||
+          link;
+        const name = (_txt(nameEl) || "")
+          .replace(/\s*•\s*(1st|2nd|3rd\+?)\s*$/i, "")
+          .trim();
+        if (!name || /linkedin member/i.test(name)) continue;
+        const titleEl =
+          card.querySelector("[data-anonymize='title']") ||
+          card.querySelector("[data-anonymize='job-title']");
+        const companyEl =
+          card.querySelector("[data-anonymize='company-name']") ||
+          card.querySelector("a[data-anonymize='company-name']");
+        const locEl = card.querySelector("[data-anonymize='location']");
+        const title = _txt(titleEl);
+        const company = _txt(companyEl);
+        const loc = _txt(locEl);
+        // Prefer the /in/ URL over /sales/lead/ if Sales Nav exposes it
+        const liAnchor = card.querySelector("a[href*='/in/']");
+        const canonicalUrl = liAnchor
+          ? normalizeProfileUrl(liAnchor.href)
+          : url;
+        const [first_name, ...rest] = name.split(/\s+/);
+        seen.add(url);
+        out.push({
+          linkedin_url: canonicalUrl || url,
+          full_name: name,
+          first_name,
+          last_name: rest.join(" ") || null,
+          headline: [title, company].filter(Boolean).join(" at ") || null,
+          title,
+          company_name: company,
+          location: loc,
+          raw: { source_url: location.href, page_type: "salesnav-search" },
+        });
+      } catch {
+        /* skip malformed */
+      }
     }
     return out;
   }
