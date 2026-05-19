@@ -133,14 +133,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // Jittered delay before opening to avoid time-pattern detection
         await sleep(jitter(800, 4000));
         await recordEnrich();
-        // Build the overlay URL — navigating there directly pre-opens the
-        // Contact info modal without requiring a synthetic click.
+        // Navigate to the plain profile URL (NOT the /overlay/contact-info
+        // sub-path) so the about/experience sections render normally — that
+        // way the content script can both click Contact info AND scan the
+        // visible profile text for email/phone patterns as a fallback.
         let enrichUrl = target;
         try {
           const u = new URL(target);
-          if (u.pathname.startsWith("/in/")) {
-            u.pathname = u.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
-          }
           u.searchParams.set("lc_enrich", "1");
           enrichUrl = u.toString();
         } catch {

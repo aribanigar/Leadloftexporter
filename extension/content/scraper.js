@@ -317,14 +317,72 @@
     return data;
   }
 
+  // Fallback enrichment: scan visible profile text for email / phone patterns.
+  // LinkedIn only shows the Contact info modal email/phone for 1st-degree
+  // connections (and sometimes 2nd) — for everyone else, the modal returns
+  // just the LinkedIn URL. But many users put their email or phone in their
+  // About section, headline, or experience descriptions to invite outreach,
+  // and that text is visible to anyone. We harvest it here.
+  const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  // Conservative phone regex — requires either a leading + or 8+ digits with
+  // separators. Avoids matching dates, post counts, etc.
+  const PHONE_RE = /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/;
+
+  function _scrapeFromProfileText() {
+    // Search the user-content regions of the profile only. Skip the global
+    // <body> scan because LinkedIn's chrome (navbar, ads, "people you may
+    // know") contains noise that would generate false positives.
+    const containers = [
+      document.querySelector("section[data-section='summary']"),
+      document.querySelector("section.pv-about-section"),
+      document.querySelector("section#about"),
+      document.querySelector("div[data-generated-suggestion-target]"),
+      document.querySelector("main"),
+    ].filter(Boolean);
+    let email = null;
+    let phone = null;
+    for (const c of containers) {
+      const text = (c.innerText || c.textContent || "").replace(/\s+/g, " ");
+      if (!email) {
+        const m = text.match(EMAIL_RE);
+        if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) email = m[0];
+      }
+      if (!phone) {
+        const m = text.match(PHONE_RE);
+        if (m) phone = m[0].replace(/\s+/g, " ").trim();
+      }
+      if (email && phone) break;
+    }
+    return { email, phone };
+  }
+
   async function scrapeProfileWithContact() {
     const base = scrapeProfile();
     try {
+      // Primary: Contact info modal (works for 1st-degree connections).
       const contact = await scrapeContactInfo();
       if (contact.email && !base.email) base.email = contact.email;
       if (contact.phone && !base.phone) base.phone = contact.phone;
       if (contact.website && !base.company_url) base.company_url = contact.website;
-      base.raw = { ...(base.raw || {}), contact_info_scraped: true };
+
+      // Fallback: scan About / Experience text for any publicly-shared email
+      // or phone. Reaches profiles where the modal hides contact info.
+      if (!base.email || !base.phone) {
+        const fromText = _scrapeFromProfileText();
+        if (!base.email && fromText.email) base.email = fromText.email;
+        if (!base.phone && fromText.phone) base.phone = fromText.phone;
+      }
+
+      base.raw = {
+        ...(base.raw || {}),
+        contact_info_scraped: true,
+        contact_source:
+          base.email || base.phone
+            ? contact.email || contact.phone
+              ? "contact_modal"
+              : "profile_text"
+            : "none",
+      };
     } catch {
       /* enrichment is best-effort */
     }

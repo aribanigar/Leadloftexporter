@@ -214,13 +214,21 @@
 
 /* ------------ Inline per-card Save button ------------ */
 
-/* Centered row injected below the Connect/Message action row */
+/* Centered row appended at the end of each card. The combination of
+ * flex-basis: 100% + order: 9999 forces a new line even when the card's
+ * direct parent happens to be a flex row container, and clear: both is
+ * defensive for the rare float-based card layout. */
 .lc-save-row {
   display: flex !important;
   justify-content: center !important;
-  padding: 6px 16px 10px !important;
+  align-items: center !important;
+  padding: 8px 16px 12px !important;
   width: 100% !important;
+  flex-basis: 100% !important;
+  order: 9999 !important;
+  clear: both !important;
   box-sizing: border-box !important;
+  margin-top: 4px !important;
 }
 
 .lc-inline-save {

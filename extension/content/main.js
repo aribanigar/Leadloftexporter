@@ -113,15 +113,24 @@
 
   // Autopilot tick: roughly every minute, but only when the tab is foreground,
   // and the actual gap between actions is enforced inside automate.js by
-  // paceBetweenActions().
+  // paceBetweenActions(). Self-terminates if it detects the extension was
+  // reloaded (stale chrome.runtime) so we don't spam "Cannot read properties
+  // of undefined (reading 'get')" errors forever.
   function startAutopilot() {
     if (autopilotInterval) return;
     autopilotInterval = setInterval(async () => {
+      let runtimeAlive = false;
+      try { runtimeAlive = !!chrome.runtime?.id; } catch { runtimeAlive = false; }
+      if (!runtimeAlive || !chrome?.storage?.local?.get) {
+        clearInterval(autopilotInterval);
+        autopilotInterval = null;
+        return;
+      }
       if (!Human.tabIsForeground()) return;
       try {
         await Automate.tick();
       } catch (e) {
-        console.warn("[LeadCaptura] autopilot tick failed", e);
+        console.warn("[LeadCaptura] autopilot tick failed", e?.message || e);
       }
     }, 60_000);
   }

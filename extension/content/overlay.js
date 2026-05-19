@@ -400,46 +400,11 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* Locates the container element that holds Connect / Message / Follow
-   * buttons. We walk up from the first action button we find, stopping at the
-   * smallest ancestor that still contains all of them. We intentionally do NOT
-   * match LinkedIn's own "Save" button (Sales Nav) to avoid mis-detecting it.
-   */
-  function _findActionContainer(card) {
-    const actionBtn = (
-      card.querySelector("button[aria-label*='Connect' i]") ||
-      card.querySelector("button[aria-label*='Message' i]") ||
-      card.querySelector("button[aria-label*='InMail' i]") ||
-      card.querySelector("button[aria-label*='Follow' i]")
-    );
-    if (!actionBtn) return null;
-
-    // Walk up from the button's parent until we reach an element that either:
-    // (a) directly contains all the action buttons, or
-    // (b) spans the full card width (that's gone too far — stop one level below)
-    let container = actionBtn.parentElement;
-    for (let i = 0; i < 7; i++) {
-      if (!container || container === card || container.tagName === "MAIN") break;
-      const parent = container.parentElement;
-      if (!parent || parent === card || parent.tagName === "MAIN") break;
-      // Stop when the parent starts spanning more than the action group
-      const parentBtnCount = parent.querySelectorAll(
-        "button[aria-label*='Connect' i], button[aria-label*='Message' i]," +
-        "button[aria-label*='InMail' i], button[aria-label*='Follow' i]"
-      ).length;
-      const containerBtnCount = container.querySelectorAll(
-        "button[aria-label*='Connect' i], button[aria-label*='Message' i]," +
-        "button[aria-label*='InMail' i], button[aria-label*='Follow' i]"
-      ).length;
-      if (parentBtnCount === containerBtnCount) {
-        container = parent; // same button count — parent is still the action group
-      } else {
-        break; // parent has more buttons (card-level) — stop here
-      }
-    }
-    return container;
-  }
-
+  /* The save row is appended as the LAST child of the card root (LI/ARTICLE).
+   * Because <li>/<article> are block-level by default, their children stack
+   * vertically — so the save row appears below the existing card content
+   * (photo + name + headline row, action buttons row) regardless of whether
+   * those internal sections use flex layout. */
   function injectInlineSave(card, profile) {
     if (card.querySelector(".lc-inline-save")) return;
 
@@ -469,9 +434,9 @@
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
         }
-        // Kick off background enrichment. The service worker will check safe-
-        // zone limits, apply a jittered delay, then open the overlay URL so
-        // the contact-info modal is pre-opened without a synthetic click.
+        // Kick off background-tab enrichment. The service worker handles
+        // jittered delay + safe-zone caps; the content script in the new
+        // tab clicks Contact info and also scans the profile text.
         const settings = await Storage.getSettings();
         if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
           chrome.runtime.sendMessage(
@@ -492,33 +457,30 @@
       }
     });
 
-    // Preferred: insert a centered row directly below the action buttons.
-    // Fallback: floating chip (top-right) when we can't locate the row.
-    const actionContainer = _findActionContainer(card);
-    if (actionContainer) {
-      const wrap = el("div", { class: "lc-save-row" }, btn);
-      actionContainer.after(wrap);
-    } else {
-      btn.classList.add("lc-inline-save-floating");
-      if (getComputedStyle(card).position === "static") card.style.position = "relative";
-      card.appendChild(btn);
-    }
+    const wrap = el("div", { class: "lc-save-row" }, btn);
+    card.appendChild(wrap);
   }
 
   function _cardFromLink(link) {
+    // Walk up, prioritising the LI/ARTICLE row root over any inner wrapper.
+    // Returning the inner flex wrapper means our Save row becomes a flex
+    // sibling next to LinkedIn's action buttons — which is the bug we saw.
     let node = link.parentElement;
-    for (let i = 0; i < 10 && node; i++) {
+    let fallback = null;
+    for (let i = 0; i < 12 && node; i++) {
+      if (node.tagName === "LI" || node.tagName === "ARTICLE") return node;
       if (
-        node.tagName === "LI" ||
-        node.tagName === "ARTICLE" ||
-        (node.querySelector("img") &&
-          node.querySelector("button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"))
+        !fallback &&
+        node.querySelector("img") &&
+        node.querySelector(
+          "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
+        )
       ) {
-        return node;
+        fallback = node;
       }
       node = node.parentElement;
     }
-    return link.parentElement;
+    return fallback || link.parentElement;
   }
 
   function profileFromCard(card, link) {
