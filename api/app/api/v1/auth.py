@@ -68,7 +68,10 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
     db.add(workspace)
     db.flush()
     db.add(Membership(user_id=user.id, workspace_id=workspace.id, role="owner"))
-    seed_workspace_defaults(db, workspace.id)
+    try:
+        seed_workspace_defaults(db, workspace.id)
+    except Exception:
+        pass  # seed failures are non-fatal; defaults can be missing but user still registers
     db.commit()
     db.refresh(user)
     return _build_token(db, user)

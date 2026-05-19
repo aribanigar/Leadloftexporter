@@ -55,4 +55,7 @@ body {
   .pill {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }
+  .action-icon {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-brand-300 hover:text-brand-700;
+  }
 }

@@ -1,3 +1,40 @@
-leadloft-exporter.zip
-*.zip
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.local
+.env.*.local
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.log
+next-env.d.ts
+*.tsbuildinfo
+
+# Editor / OS
 .DS_Store
+.idea/
+.vscode/
+*.pem
+
+# Build artifacts
+*.zip
+coverage/
+
+# Local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Vercel
+.vercel

@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import Enrollment, Lead, Playbook, PlaybookStep
+from app.models import EmailMessage, Enrollment, Lead, PipelineStage, Playbook, PlaybookStep
 from app.schemas import PlaybookCreate, PlaybookOut, PlaybookUpdate, StepOut
 from app.services.outreach import enroll_lead
 
@@ -169,3 +173,101 @@ def enroll(
         enrolled.append(e.id)
     db.commit()
     return {"enrolled": enrolled}
+
+
+@router.get("/stats/overview")
+def playbook_stats(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+    days: int = Query(90, ge=1, le=365),
+    sender_id: Optional[str] = None,
+):
+    """Aggregate outreach stats for the workspace dashboard.
+
+    `days` is the lookback window. `series` is daily outbound email counts.
+    `interested` counts leads currently sitting in a stage flagged is_won
+    or named like Interested/Customer — a useful "warm" cohort indicator.
+    """
+    to_at = datetime.now(timezone.utc)
+    from_at = to_at - timedelta(days=days)
+
+    email_q = (
+        db.query(EmailMessage)
+        .filter(
+            EmailMessage.workspace_id == ctx.workspace_id,
+            EmailMessage.direction == "outbound",
+            EmailMessage.created_at >= from_at,
+        )
+    )
+
+    contacted = email_q.filter(EmailMessage.status != "queued").count()
+    sent = email_q.filter(
+        EmailMessage.status.in_(["sent", "delivered", "opened", "clicked", "replied"])
+    ).count()
+    replied = email_q.filter(EmailMessage.replied_at.isnot(None)).count()
+
+    interested_stages = (
+        db.query(PipelineStage.id)
+        .filter(
+            PipelineStage.workspace_id == ctx.workspace_id,
+            (
+                PipelineStage.is_won.is_(True)
+                | PipelineStage.name.ilike("%interested%")
+                | PipelineStage.name.ilike("%customer%")
+                | PipelineStage.name.ilike("%proposal%")
+            ),
+        )
+        .all()
+    )
+    interested_stage_ids = [s[0] for s in interested_stages]
+    interested = 0
+    if interested_stage_ids:
+        interested = (
+            db.query(Lead)
+            .filter(
+                Lead.workspace_id == ctx.workspace_id,
+                Lead.stage_id.in_(interested_stage_ids),
+                Lead.updated_at >= from_at,
+            )
+            .count()
+        )
+
+    # Daily series of outbound emails (any non-queued status counts as activity)
+    rows = (
+        db.query(
+            func.date_trunc("day", EmailMessage.created_at).label("d"),
+            func.count(EmailMessage.id).label("n"),
+        )
+        .filter(
+            EmailMessage.workspace_id == ctx.workspace_id,
+            EmailMessage.direction == "outbound",
+            EmailMessage.created_at >= from_at,
+        )
+        .group_by("d")
+        .order_by("d")
+        .all()
+    )
+    series_map = {r.d.date().isoformat(): int(r.n) for r in rows}
+
+    # Fill gaps with zeros so the chart renders continuous days
+    series: list[dict] = []
+    cursor = from_at.date()
+    end = to_at.date()
+    while cursor <= end:
+        iso = cursor.isoformat()
+        series.append({"date": iso, "count": series_map.get(iso, 0)})
+        cursor = cursor + timedelta(days=1)
+
+    reply_rate = round((replied / sent) * 100, 1) if sent else 0.0
+    interested_rate = round((interested / contacted) * 100, 1) if contacted else 0.0
+
+    return {
+        "contacted": contacted,
+        "replied": replied,
+        "interested": interested,
+        "reply_rate": reply_rate,
+        "interested_rate": interested_rate,
+        "from": from_at.isoformat(),
+        "to": to_at.isoformat(),
+        "series": series,
+    }

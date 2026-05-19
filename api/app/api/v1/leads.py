@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import Activity, Company, Lead, PipelineStage
+from app.models import Activity, CallLog, Company, EmailMessage, Lead, Note, PipelineStage, Task
 from app.schemas import (
     LeadCreate,
     LeadIngest,
@@ -261,3 +261,215 @@ def export_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _ensure_lead(db: Session, lead_id: str, workspace_id: str) -> Lead:
+    lead = (
+        db.query(Lead).filter(Lead.id == lead_id, Lead.workspace_id == workspace_id).first()
+    )
+    if not lead:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    return lead
+
+
+@router.get("/{lead_id}/timeline")
+def lead_timeline(
+    lead_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Unified activity timeline: emails + notes + calls + system activities, newest first."""
+    _ensure_lead(db, lead_id, ctx.workspace_id)
+    items: list[dict] = []
+    for a in (
+        db.query(Activity)
+        .filter(Activity.workspace_id == ctx.workspace_id, Activity.lead_id == lead_id)
+        .all()
+    ):
+        items.append({"kind": "activity", "id": a.id, "type": a.type, "payload": a.payload, "at": a.created_at})
+    for m in (
+        db.query(EmailMessage)
+        .filter(EmailMessage.workspace_id == ctx.workspace_id, EmailMessage.lead_id == lead_id)
+        .all()
+    ):
+        items.append({
+            "kind": "email",
+            "id": m.id,
+            "direction": m.direction,
+            "from": m.from_address,
+            "to": m.to_address,
+            "subject": m.subject,
+            "preview": (m.body_text or "")[:280],
+            "status": m.status,
+            "at": m.sent_at or m.created_at,
+        })
+    for n in (
+        db.query(Note)
+        .filter(Note.workspace_id == ctx.workspace_id, Note.lead_id == lead_id)
+        .all()
+    ):
+        items.append({"kind": "note", "id": n.id, "body": n.body, "at": n.created_at})
+    for c in (
+        db.query(CallLog)
+        .filter(CallLog.workspace_id == ctx.workspace_id, CallLog.lead_id == lead_id)
+        .all()
+    ):
+        items.append({
+            "kind": "call",
+            "id": c.id,
+            "outcome": c.outcome,
+            "duration_seconds": c.duration_seconds,
+            "notes": c.notes,
+            "at": c.created_at,
+        })
+    items.sort(key=lambda x: x["at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return items
+
+
+@router.post("/{lead_id}/notes")
+def add_note(
+    lead_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    _ensure_lead(db, lead_id, ctx.workspace_id)
+    text = (body.get("body") or "").strip()
+    if not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "body_required")
+    note = Note(
+        workspace_id=ctx.workspace_id,
+        lead_id=lead_id,
+        author_id=ctx.user_id,
+        body=text,
+    )
+    db.add(note)
+    db.add(
+        Activity(
+            workspace_id=ctx.workspace_id,
+            lead_id=lead_id,
+            actor_id=ctx.user_id,
+            type="note_added",
+            payload={"preview": text[:200]},
+        )
+    )
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "body": note.body, "created_at": note.created_at}
+
+
+@router.post("/{lead_id}/log-call")
+def log_call(
+    lead_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    _ensure_lead(db, lead_id, ctx.workspace_id)
+    call = CallLog(
+        workspace_id=ctx.workspace_id,
+        lead_id=lead_id,
+        user_id=ctx.user_id,
+        outcome=body.get("outcome") or "connected",
+        duration_seconds=int(body.get("duration_seconds") or 0),
+        notes=body.get("notes"),
+    )
+    db.add(call)
+    db.add(
+        Activity(
+            workspace_id=ctx.workspace_id,
+            lead_id=lead_id,
+            actor_id=ctx.user_id,
+            type="call_logged",
+            payload={"outcome": call.outcome, "duration_seconds": call.duration_seconds},
+        )
+    )
+    db.commit()
+    db.refresh(call)
+    return {"id": call.id, "outcome": call.outcome, "created_at": call.created_at}
+
+
+@router.get("/{lead_id}/tasks")
+def list_lead_tasks(
+    lead_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    _ensure_lead(db, lead_id, ctx.workspace_id)
+    rows = (
+        db.query(Task)
+        .filter(Task.workspace_id == ctx.workspace_id, Task.lead_id == lead_id)
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": t.id,
+            "title": t.title,
+            "type": t.type,
+            "status": t.status,
+            "due_at": t.due_at,
+            "completed_at": t.completed_at,
+            "notes": t.notes,
+        }
+        for t in rows
+    ]
+
+
+@router.post("/{lead_id}/tasks")
+def add_lead_task(
+    lead_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    _ensure_lead(db, lead_id, ctx.workspace_id)
+    title = (body.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "title_required")
+    due_at_raw = body.get("due_at")
+    due_at = None
+    if due_at_raw:
+        try:
+            due_at = datetime.fromisoformat(due_at_raw.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            pass
+    task = Task(
+        workspace_id=ctx.workspace_id,
+        lead_id=lead_id,
+        assignee_id=ctx.user_id,
+        title=title,
+        type=body.get("type") or "todo",
+        notes=body.get("notes"),
+        due_at=due_at,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return {"id": task.id, "title": task.title, "status": task.status, "due_at": task.due_at}
+
+
+@router.patch("/tasks/{task_id}")
+def update_task(
+    task_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    task = (
+        db.query(Task)
+        .filter(Task.id == task_id, Task.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    if "status" in body:
+        task.status = body["status"]
+        if body["status"] == "done":
+            task.completed_at = datetime.now(timezone.utc)
+    if "title" in body:
+        task.title = body["title"]
+    if "notes" in body:
+        task.notes = body["notes"]
+    db.commit()
+    return {"ok": True}

@@ -1,31 +1,61 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { api } from "@/lib/api";
-
-interface ConnectedAccount {
-  id: string;
-  provider: string;
-  label?: string | null;
-  external_id?: string | null;
-  status: string;
-}
+import { useRouter } from "next/navigation";
 
 const INTEGRATIONS = [
-  { id: "gmail", name: "Gmail", description: "Send and receive emails from your Gmail inbox.", logo: "📧" },
-  { id: "smtp", name: "SMTP", description: "Connect any SMTP/IMAP mailbox.", logo: "📨" },
-  { id: "linkedin", name: "LinkedIn", description: "Pair the Chrome extension to enable LinkedIn capture & outreach.", logo: "in" },
-  { id: "hubspot", name: "HubSpot", description: "Bi-directional contact sync with HubSpot.", logo: "🟧" },
-  { id: "salesforce", name: "Salesforce", description: "Sync leads & opportunities with Salesforce.", logo: "☁️" },
-  { id: "zapier", name: "Zapier", description: "1,500+ apps via Zapier.", logo: "⚡" },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    description: "Pair the Chrome extension to enable LinkedIn capture & outreach.",
+    logo: "in",
+    action: "api-keys",
+    actionLabel: "Go to API Keys",
+  },
+  {
+    id: "gmail",
+    name: "Gmail",
+    description: "Send and receive emails from your Gmail inbox.",
+    logo: "📧",
+    action: "coming-soon",
+    actionLabel: "Coming Soon",
+  },
+  {
+    id: "smtp",
+    name: "SMTP",
+    description: "Connect any SMTP/IMAP mailbox.",
+    logo: "📨",
+    action: "coming-soon",
+    actionLabel: "Coming Soon",
+  },
+  {
+    id: "hubspot",
+    name: "HubSpot",
+    description: "Bi-directional contact sync with HubSpot.",
+    logo: "🟧",
+    action: "coming-soon",
+    actionLabel: "Coming Soon",
+  },
+  {
+    id: "salesforce",
+    name: "Salesforce",
+    description: "Sync leads & opportunities with Salesforce.",
+    logo: "☁️",
+    action: "coming-soon",
+    actionLabel: "Coming Soon",
+  },
+  {
+    id: "zapier",
+    name: "Zapier",
+    description: "1,500+ apps via Zapier.",
+    logo: "⚡",
+    action: "coming-soon",
+    actionLabel: "Coming Soon",
+  },
 ];
 
 export default function IntegrationsPage() {
-  const { data: accounts } = useQuery<ConnectedAccount[]>({
-    queryKey: ["accounts"],
-    queryFn: () => api("/integrations/accounts"),
-  });
+  const router = useRouter();
 
   return (
     <div className="card p-6">
@@ -39,26 +69,31 @@ export default function IntegrationsPage() {
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {INTEGRATIONS.map((integration) => {
-          const connected = accounts?.find((a) => a.provider === integration.id);
-          return (
-            <div key={integration.id} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-md bg-slate-100 text-lg font-bold">
-                  {integration.logo}
-                </div>
-                <div>
-                  <h3 className="font-semibold">{integration.name}</h3>
-                  {connected && <span className="pill bg-emerald-100 text-emerald-700">Connected</span>}
-                </div>
+        {INTEGRATIONS.map((integration) => (
+          <div key={integration.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-md bg-slate-100 text-lg font-bold">
+                {integration.logo}
               </div>
-              <p className="text-sm text-slate-500">{integration.description}</p>
-              <button className="btn-secondary mt-3 w-full">
-                {connected ? "Manage" : "Connect"}
-              </button>
+              <div>
+                <h3 className="font-semibold">{integration.name}</h3>
+              </div>
             </div>
-          );
-        })}
+            <p className="mb-3 text-sm text-slate-500">{integration.description}</p>
+            {integration.action === "api-keys" ? (
+              <button
+                className="btn-secondary w-full"
+                onClick={() => router.push("/settings/api-keys")}
+              >
+                {integration.actionLabel}
+              </button>
+            ) : (
+              <button className="btn-secondary w-full cursor-not-allowed opacity-50" disabled>
+                {integration.actionLabel}
+              </button>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

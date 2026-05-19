@@ -129,8 +129,8 @@
               el(
                 "div",
                 { class: "lc-profile-text" },
-                el("div", { class: "lc-profile-name" }, profile.full_name || "Profile detected"),
-                el("div", { class: "lc-profile-sub" }, profile.headline || profile.title || profile.linkedin_url || "")
+                el("div", { class: "lc-profile-name" }, profile.full_name || "Unknown profile"),
+                el("div", { class: "lc-profile-sub" }, profile.headline || profile.title || "")
               )
             )
           : el("div", { class: "lc-muted" }, "Open a LinkedIn profile to capture it."),
@@ -163,10 +163,27 @@
   }
 
   async function saveCurrentProfile(profile) {
+    flashStatus("Reading contact info…");
+    let enriched = profile;
+    try {
+      // On /in/ pages we open the Contact info modal and read email/phone the
+      // same way a human would — opens the visible modal, scrapes, closes.
+      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
+        enriched = await Scraper.scrapeProfileWithContact();
+      }
+    } catch {
+      enriched = profile;
+    }
     flashStatus("Saving…");
     try {
-      const result = await Api.syncProfile(profile);
-      flashStatus(result.created ? "Saved new lead ✓" : "Lead updated ✓", "ok");
+      const result = await Api.syncProfile(enriched);
+      const gotEmail = !!(enriched.email && !profile.email);
+      const gotPhone = !!(enriched.phone && !profile.phone);
+      const extras = [gotEmail && "email", gotPhone && "phone"].filter(Boolean).join(" + ");
+      const msg = result.created
+        ? `Saved new lead ✓${extras ? ` (${extras})` : ""}`
+        : `Lead updated ✓${extras ? ` (${extras})` : ""}`;
+      flashStatus(msg, "ok");
       if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
       maybeAutoEnroll();
     } catch (e) {
@@ -373,11 +390,16 @@
    * native. Falls back to a floating chip if no action row is found. */
   function injectInlineSave(card, profile) {
     if (card.querySelector(".lc-inline-save")) return;
+    const actionRow =
+      card.querySelector(
+        ".entity-result__actions, .reusable-search__actions, [class*='actions-container'], .search-result__actions"
+      ) ||
+      card.querySelector("button.artdeco-button[aria-label*='Message' i],button.artdeco-button[aria-label*='Connect' i]")?.parentElement;
 
     const btn = el(
       "button",
       {
-        class: "lc-inline-save",
+        class: "lc-inline-save artdeco-button artdeco-button--2 artdeco-button--secondary",
         type: "button",
         title: "Save to LeadCaptura",
       },
@@ -387,16 +409,30 @@
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
       btn.querySelector(".lc-inline-save-text").textContent = "Saving…";
       try {
         const result = await Api.syncProfile(profile);
         btn.dataset.state = "saved";
-        btn.querySelector(".lc-inline-save-text").textContent = "Saved ✓";
+        btn.querySelector(".lc-inline-save-text").textContent = "Saved";
         if (result.lead?.id) {
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
+        }
+        // Kick off Contact-info enrichment in a background tab. The new tab's
+        // content script will scrape email + phone from the modal and push an
+        // update (deduped by linkedin_url), then close itself.
+        const settings = await Storage.getSettings();
+        if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
+          try {
+            chrome.runtime.sendMessage({
+              type: "lc:enrichProfile",
+              url: profile.linkedin_url,
+            });
+            btn.querySelector(".lc-inline-save-text").textContent = "Saved · enriching…";
+          } catch (enrichErr) {
+            console.warn("[LeadCaptura] enrichment dispatch failed", enrichErr);
+          }
         }
       } catch (err) {
         btn.dataset.state = "error";
@@ -405,50 +441,35 @@
       }
     });
 
-    // Always inject as absolute-positioned button on the card container —
-    // same approach LinkedIn's own 3rd-party extensions use. Works regardless
-    // of how LinkedIn's hashed class names change.
-    const computed = getComputedStyle(card);
-    if (computed.position === "static") card.style.position = "relative";
-    card.appendChild(btn);
+    if (actionRow) {
+      actionRow.appendChild(btn);
+    } else {
+      // Floating fallback
+      const computed = getComputedStyle(card);
+      if (computed.position === "static") card.style.position = "relative";
+      btn.classList.add("lc-inline-save-floating");
+      card.appendChild(btn);
+    }
   }
 
   function profileFromCard(card) {
-    // Try /in/ profile link first, then Sales Nav
-    const linkEl =
-      card.querySelector("a[href*='/in/']") ||
-      card.querySelector("a[href*='/sales/lead/']");
+    const linkEl = card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
     if (!linkEl) return null;
-
-    // Name: try aria-hidden span inside the profile link (most reliable),
-    // then Sales Nav anonymized attribute, then any aria-hidden near top of card.
     const nameNode =
-      card.querySelector("a[href*='/in/'] span[aria-hidden='true']") ||
-      card.querySelector("[data-anonymize='person-name']") ||
       card.querySelector(".entity-result__title-text a span[aria-hidden='true']") ||
-      card.querySelector("span[aria-hidden='true']");
-
-    const avatarImg = card.querySelector(
-      "img.presence-entity__image, img.ivm-view-attr__img--centered, img[src*='media.licdn.com'], img[src*='licdn.com']"
-    );
-
-    // Headline/subtitle: try stable class, then data-anonymize, then second span
-    const headline =
-      card.querySelector(".entity-result__primary-subtitle")?.textContent?.trim() ||
-      card.querySelector("[data-anonymize='title']")?.textContent?.trim() ||
-      card.querySelector(".entity-result__summary")?.textContent?.trim() ||
-      null;
-
-    const location_ =
-      card.querySelector(".entity-result__secondary-subtitle")?.textContent?.trim() ||
-      card.querySelector("[data-anonymize='location']")?.textContent?.trim() ||
-      null;
-
+      card.querySelector("[data-anonymize='person-name']") ||
+      card.querySelector("a[href*='/in/'] span[aria-hidden='true']");
+    const avatarImg = card.querySelector("img.presence-entity__image, img.ivm-view-attr__img--centered, img[src*='media.licdn.com']");
     return {
       linkedin_url: globalThis.__lcDom.normalizeProfileUrl(linkEl.href),
       full_name: nameNode?.textContent?.trim() || null,
-      headline,
-      location: location_,
+      headline:
+        card.querySelector(".entity-result__primary-subtitle, [data-anonymize='title']")?.textContent?.trim() ||
+        null,
+      location:
+        card
+          .querySelector(".entity-result__secondary-subtitle, [data-anonymize='location']")
+          ?.textContent?.trim() || null,
       avatar_url: avatarImg?.src || null,
       raw: { source_url: location.href, page_type: "card-inline" },
     };
@@ -457,26 +478,11 @@
   function decorateSearchCards() {
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
-
-    // Cast a wide net — LinkedIn's class names are hashed and change frequently.
-    // We rely on structural selectors and look for anything containing a /in/ link.
-    const candidates = document.querySelectorAll(
-      [
-        "li.reusable-search__result-container",
-        "li.search-result__occluded-item",
-        "ul.reusable-search__entity-result-list > li",
-        "ul[class*='search'] > li",
-        ".artdeco-list > li.artdeco-list__item",
-        "li.search-results__result-item",
-        "li.search-results__cluster-item",
-        "li[id^='ember']",
-      ].join(", ")
+    const cards = document.querySelectorAll(
+      "li.reusable-search__result-container, li.search-result__occluded-item, ul.reusable-search__entity-result-list > li, .artdeco-list__item, li.search-results__cluster-item, li.search-results__result-item"
     );
-
-    candidates.forEach((card) => {
+    cards.forEach((card) => {
       if (card.dataset.lcDecorated) return;
-      // Only decorate if the card actually links to a profile
-      if (!card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']")) return;
       const profile = profileFromCard(card);
       if (!profile?.linkedin_url) return;
       injectInlineSave(card, profile);
