@@ -537,17 +537,29 @@
           (t.includes(",") ||
             /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
       ) || null;
-    const avatar = card.querySelector("img")?.getAttribute("src") || null;
+    // Strip signed query / hash from LinkedIn's avatar URLs. The image is
+    // identical without them and the JWT they append routinely pushes the
+    // full URL past the backend's String(500) column — which used to crash
+    // ingest with a 500 on page-2 search cards.
+    const rawAvatar = card.querySelector("img")?.getAttribute("src") || null;
+    const avatar = rawAvatar
+      ? rawAvatar.split("?")[0].split("#")[0].slice(0, 500)
+      : null;
     const [first_name, ...rest] = name.split(/\s+/);
+    // When headline has no " at " separator, .split()[0] returns the WHOLE
+    // headline as the title. Cap at the backend's String(240) so degenerate
+    // long bios never trigger the value-too-long Postgres error.
+    const titlePart = (headline || "").split(/\s+at\s+/i)[0] || null;
+    const companyPart = (headline || "").split(/\s+at\s+/i)[1] || null;
     return {
       linkedin_url: globalThis.__lcDom.normalizeProfileUrl(linkEl.href),
-      full_name: name,
-      first_name,
-      last_name: rest.join(" ") || null,
+      full_name: name.slice(0, 240),
+      first_name: first_name ? first_name.slice(0, 120) : null,
+      last_name: rest.join(" ").slice(0, 120) || null,
       headline,
-      title: (headline || "").split(/\s+at\s+/i)[0] || null,
-      company_name: (headline || "").split(/\s+at\s+/i)[1] || null,
-      location: location_,
+      title: titlePart ? titlePart.slice(0, 240) : null,
+      company_name: companyPart ? companyPart.slice(0, 200) : null,
+      location: location_ ? location_.slice(0, 200) : null,
       avatar_url: avatar,
       raw: { source_url: location.href, page_type: "card-inline" },
     };
@@ -560,30 +572,39 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // Iterate anchors, but dedupe by canonical URL FIRST so the photo-link
-    // anchor and the name-link anchor for the same profile never both make
-    // it to injection. This is the bug that produced multiple Save chips.
+    // LinkedIn renders TWO /in/ anchors per card: a PHOTO anchor (no text,
+    // <img> inside) and a NAME anchor (contains <span>Name</span>). DOM
+    // order has the photo first. The naive "first anchor wins" dedup would
+    // call profileFromCard() on the photo anchor → empty name → null
+    // profile → no injection, and then skip the name anchor as a duplicate
+    // URL. Result: ZERO save chips on every card. Fix: group anchors by
+    // canonical URL and pick the one with actual text content per group.
     const links = document.querySelectorAll(
       "a[href*='/in/'], a[href*='/sales/lead/']"
     );
-    const seenUrls = new Set();
+    const byUrl = new Map(); // url -> best anchor (preferring ones with text)
+    for (const link of links) {
+      const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
+      if (!url) continue;
+      const current = byUrl.get(url);
+      const linkHasText = (link.textContent || "").trim().length > 0;
+      if (!current) {
+        byUrl.set(url, link);
+      } else if (linkHasText && !(current.textContent || "").trim()) {
+        // Upgrade: the new candidate has the name text, the stored one didn't
+        byUrl.set(url, link);
+      }
+    }
 
-    links.forEach((link) => {
+    for (const [url, link] of byUrl.entries()) {
       try {
-        const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
-        if (!url || seenUrls.has(url)) return;
-        seenUrls.add(url);
-
-        // If a save chip already exists for this URL anywhere in the DOM,
-        // skip — the inject function would also bail, but doing it here
-        // saves us the card-walk cost.
         const existing = injectedSaves.get(url);
-        if (existing && document.body.contains(existing)) return;
+        if (existing && document.body.contains(existing)) continue;
 
         const card = _cardFromLink(link);
-        if (!card) return;
-        // Defensive: if THIS card already has a save chip but it's pointing
-        // at a different URL (recycled <li>), remove it.
+        if (!card) continue;
+        // Defensive: if THIS card already has a save chip pointing at a
+        // different URL (recycled <li>), remove it.
         const stray = card.querySelector(".lc-save-row");
         if (stray && stray.dataset.lcUrl !== url) {
           injectedSaves.delete(stray.dataset.lcUrl);
@@ -591,12 +612,12 @@
         }
 
         const profile = profileFromCard(card, link);
-        if (!profile?.linkedin_url) return;
+        if (!profile?.linkedin_url) continue;
         injectInlineSave(card, profile);
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
-    });
+    }
   }
 
   globalThis.__lcOverlay = {

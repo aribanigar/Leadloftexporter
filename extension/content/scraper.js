@@ -165,16 +165,22 @@
     const linkedinUrl = normalizeProfileUrl(location.href);
     const [first_name, ...rest] = (fullName || "").split(/\s+/);
 
+    // Strip the signed query string from LinkedIn's avatar CDN URL so it
+    // fits the backend's String(500) column — otherwise ingest crashes.
+    const cleanAvatar = avatar
+      ? String(avatar).split("?")[0].split("#")[0].slice(0, 500)
+      : null;
+
     return {
       linkedin_url: linkedinUrl,
-      full_name: fullName,
-      first_name: first_name || null,
-      last_name: rest.join(" ") || null,
-      headline,
-      title,
-      location: location_,
-      avatar_url: avatar,
-      company_name: companyName,
+      full_name: fullName ? fullName.slice(0, 240) : null,
+      first_name: first_name ? first_name.slice(0, 120) : null,
+      last_name: rest.join(" ").slice(0, 120) || null,
+      headline,  // TEXT column on the backend, no cap needed
+      title: title ? title.slice(0, 240) : null,
+      location: location_ ? location_.slice(0, 200) : null,
+      avatar_url: cleanAvatar,
+      company_name: companyName ? companyName.slice(0, 200) : null,
       company_url: null,
       raw: { source_url: location.href, page_type: "profile" },
     };
