@@ -105,6 +105,21 @@
     const connected = !!opts;
     const scraped = Scraper.scrapeCurrentPage();
     const profile = scraped.profile;
+    // LinkedIn renders the top card asynchronously; the h1 sometimes
+    // doesn't exist on the first onPathChange tick. If we have no name
+    // yet, schedule one re-render attempt 1.2s later so the panel fills
+    // in instead of staying stuck on "Open a LinkedIn profile to capture
+    // it." Cap retries via a tag on the panel so we don't loop forever.
+    if (
+      (!profile || !profile.full_name) &&
+      Number(root.dataset.lcRetries || 0) < 4
+    ) {
+      const n = Number(root.dataset.lcRetries || 0) + 1;
+      root.dataset.lcRetries = String(n);
+      setTimeout(() => renderProfilePanel(), 1200);
+    } else if (profile?.full_name) {
+      root.dataset.lcRetries = "0";
+    }
 
     root.textContent = "";
     root.append(
@@ -385,33 +400,20 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* LinkedIn rotates class names every few weeks, so we anchor by the
-   * stable elements: the profile link (href contains "/in/") and the
-   * Message / Connect action button (selected by aria-label, which their
-   * own product depends on). The "action row" is the parent of those
-   * action buttons; we drop the Save button right after them. */
-  function _findActionRow(card) {
-    const actionBtn = card.querySelector(
-      "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
-    );
-    if (actionBtn) return actionBtn.parentElement;
-    // Fallback: any element that holds multiple sibling buttons
-    const buttons = card.querySelectorAll("button");
-    for (const b of buttons) {
-      const p = b.parentElement;
-      if (p && p.querySelectorAll("button").length >= 2) return p;
-    }
-    return null;
-  }
+  /* We inject the Save button as a floating chip in the top-right of each
+   * search-result card. Earlier we tried to drop it inside LinkedIn's own
+   * action row next to Connect/Message, but that overlaps the native
+   * buttons because their parent isn't a flex container that grows. The
+   * floating chip is positioned `absolute` against the card itself, so it
+   * never collides regardless of LinkedIn's CSS churn. */
 
   function injectInlineSave(card, profile) {
     if (card.querySelector(".lc-inline-save")) return;
-    const actionRow = _findActionRow(card);
 
     const btn = el(
       "button",
       {
-        class: "lc-inline-save artdeco-button artdeco-button--2 artdeco-button--secondary",
+        class: "lc-inline-save lc-inline-save-floating",
         type: "button",
         title: "Save to LeadCaptura",
       },
@@ -453,15 +455,11 @@
       }
     });
 
-    if (actionRow) {
-      actionRow.appendChild(btn);
-    } else {
-      // Floating fallback
-      const computed = getComputedStyle(card);
-      if (computed.position === "static") card.style.position = "relative";
-      btn.classList.add("lc-inline-save-floating");
-      card.appendChild(btn);
-    }
+    // Always float in the top-right of the card so we never collide with
+    // LinkedIn's native Connect/Message/Follow buttons.
+    const computed = getComputedStyle(card);
+    if (computed.position === "static") card.style.position = "relative";
+    card.appendChild(btn);
   }
 
   function _cardFromLink(link) {
@@ -538,11 +536,21 @@
       const card = _cardFromLink(link);
       if (!card || seenCards.has(card)) return;
       seenCards.add(card);
-      if (card.dataset.lcDecorated) return;
+      const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
+      // Track decoration by the URL of the link inside the card. LinkedIn
+      // recycles <li> elements on pagination / virtual scroll, so flagging
+      // by element alone misses cards that got re-populated with a different
+      // profile. If the stored URL no longer matches, blow away the old
+      // Save button so we can re-inject for the new profile.
+      if (card.dataset.lcUrl && card.dataset.lcUrl !== url) {
+        card.querySelector(".lc-inline-save")?.remove();
+        delete card.dataset.lcUrl;
+      }
+      if (card.dataset.lcUrl === url) return;
       const profile = profileFromCard(card, link);
       if (!profile?.linkedin_url) return;
       injectInlineSave(card, profile);
-      card.dataset.lcDecorated = "1";
+      card.dataset.lcUrl = url;
     });
   }
 
