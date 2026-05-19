@@ -1,95 +1,162 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this project is
 
-The **LeadCaptura monorepo** — a full-stack LinkedIn lead-generation SaaS:
+The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in three independent deployables:
 
 ```
-/api          FastAPI backend (Postgres + Redis + Celery)
-(root)        Next.js 15 frontend
-/extension    Chrome MV3 extension (LinkedIn capture + human-paced outreach)
+/api         FastAPI backend (Postgres + Redis + Celery)  → Render
+(root)       Next.js 15 frontend (App Router + TanStack)  → Vercel
+/extension   Chrome MV3 extension (LinkedIn capture)      → unpacked / zipped
 ```
 
-This document covers the **extension**. Backend has its own conventions in `/api`; frontend in repo root.
+Each can be modified independently. The extension talks to the API; the frontend talks to the API; nothing talks to the extension.
 
 ## Commands
 
-- Install locally: `chrome://extensions` → Developer mode → Load unpacked → select `extension/`.
-- Reload after edits: click the reload icon on the extension card. For content-script changes, also reload the LinkedIn tab.
-- Syntax-check before commit:
-  ```
-  for f in $(find extension -name '*.js'); do node --check "$f"; done
-  python3 -c "import json; json.load(open('extension/manifest.json'))"
-  ```
-- Package: `zip -r leadcaptura-extension.zip extension`
+### Backend (`/api`)
 
-## Architecture
+```bash
+# Local dev (Docker Compose also brings up Postgres + Redis + worker + beat)
+docker compose up --build
 
-```
-extension/
-  manifest.json                 # MV3 manifest, host: linkedin.com
-  background/
-    service-worker.js           # API proxy for content scripts; fetch->backend
-  content/
-    main.js                     # entry: hooks SPA nav, boots overlay + autopilot
-    overlay.js                  # floating capture panel, per-card Save chips
-    overlay.css                 # overlay styles (lc-* prefix; no shadow DOM)
-    scraper.js                  # /in, /search, /sales/* DOM scrapers
-    automate.js                 # human-paced executor for connect/message jobs
-    lib/
-      api.js                    # talks to service-worker via runtime.sendMessage
-      dom.js                    # querySelector helpers, human-click, type
-      human.js                  # paceBetweenActions, scrollLikeHuman, etc.
-      storage.js                # chrome.storage wrappers
-  popup/                        # toolbar popup: status, autopilot toggle, Save current
-  options/                      # API key + capture behavior settings
-  icons/
+# Local dev (without Docker — needs Postgres + Redis running)
+cd api
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# New migration after editing models in app/models/base.py
+cd api && alembic revision --autogenerate -m "describe change"
+
+# Run Celery worker / beat against local Redis
+celery -A app.workers.celery_app worker --loglevel=info
+celery -A app.workers.celery_app beat --loglevel=info
 ```
 
-### Bot-detection avoidance — design rules
+The Dockerfile `CMD` runs `alembic upgrade head && uvicorn …`, so migrations run on every boot in production.
 
-1. **Never call LinkedIn's internal APIs.** We only read the rendered DOM the user has already loaded.
-2. **Never automate in a hidden tab.** `automate.js` waits for `document.visibilityState === "visible"` before each action.
-3. **Human-paced everything.**
-   - 45-180 seconds between consequential actions (with a ~18% long-tail to 3 min).
-   - Per-character typing 40-140ms.
-   - Scrolls use eased animation and randomised target offsets.
-   - "Reading" pause 1.2-3.5s after navigation before clicking.
-4. **Real DOM events.** Clicks use `dispatchHumanClick`, which fires `pointerover`/`pointerdown`/`pointerup`/`click` with realistic coordinates.
-5. **Abort on challenge.** `detectChallenge()` aborts the action and reports failure if a captcha/checkpoint surfaces.
-6. **Daily caps live server-side.** The extension just runs what the backend hands it via `/extension/jobs/next`; it never schedules outreach itself.
+### Frontend (repo root)
 
-### Message flow
-
-```
-LinkedIn page (main.js → overlay.js)
-        │
-        │ chrome.runtime.sendMessage({ type: "lc:api", action })
-        ▼
-service-worker.js  ─ fetch ─▶  LeadCaptura backend
+```bash
+npm install
+npm run dev           # http://localhost:3000
+npm run build         # validates types + builds; always run before pushing
+npm run type-check    # tsc --noEmit only
+npm run lint
 ```
 
-Job execution:
+`NEXT_PUBLIC_API_URL` must point at the running backend (defaults to `http://localhost:8000` in `src/lib/api.ts`).
+
+### Extension (`/extension`)
+
+```bash
+# Load locally
+# chrome://extensions → Developer mode → Load unpacked → select extension/
+
+# Syntax-check before commit (no build step, raw JS)
+for f in $(find extension -name '*.js'); do node --check "$f" || break; done
+python3 -c "import json; json.load(open('extension/manifest.json'))"
+
+# Package
+zip -r leadcaptura-extension.zip extension
+```
+
+After editing content scripts, also reload the LinkedIn tab — Chrome only re-injects on tab reload.
+
+## Backend architecture (`/api`)
+
+### Two auth paths share one app
+
+`app/core/deps.py` defines:
+- **`get_workspace_context`** — JWT Bearer for the web app. Workspace is selected via `X-Workspace-Id` header (a user can belong to multiple).
+- **`get_extension_context`** — `X-API-Key` for the Chrome extension. Keys are SHA-256 hashed at rest and prefix-indexed for fast lookup. Generated in **Settings → API Keys** of the web app.
+
+Every endpoint depends on one or the other — never both. `app/api/v1/extension.py` is the only router using the extension auth path.
+
+### CRM data model
+
+All SQLAlchemy models live in **one file**: `app/models/base.py`. This is intentional — relationships are dense (Lead ↔ Stage ↔ Workspace ↔ Enrollment ↔ Playbook ↔ Step ↔ Job) and a single file avoids circular-import gymnastics.
+
+The `Lead.custom` column is **JSONB with a GIN index** so users can add arbitrary fields without migrations. Filters against it use Postgres `@>` containment. Default lead/pipeline schema is seeded by `app/services/bootstrap.py` on workspace creation (7 stages, 14 system fields, 5 saved views).
+
+### Outreach engine
+
+`app/services/outreach.py` enrolls leads into playbooks and produces work items:
+- **Email steps** → `app/services/email_sender.py` sends via Gmail OAuth or SMTP.
+- **LinkedIn steps** (`connect`, `message`) → enqueued as **ExtensionJob** rows. The extension polls `/extension/jobs/next` and reports back via `/extension/jobs/{id}/result`.
+
+Daily quotas (`email_limit`, `linkedin_connect_limit`, `linkedin_message_limit`) live on the workspace and are enforced **server-side** in `outreach.py` — the extension never schedules anything itself. Step scheduling jitter goes through `humanise_run_at()` which respects the workspace's outreach time window ±15 min.
+
+### Celery topology
+
+`app/workers/celery_app.py` defines a beat schedule with a single recurring task: `tick_outreach_scheduler` (every minute). That task is what creates queued jobs from active enrollments. On Render's free tier the workers are skipped — the API still serves all sync endpoints but no outreach fires.
+
+## Frontend architecture (repo root)
+
+Next.js 15 App Router. Route groups:
+
+- `src/app/login`, `src/app/register` — public, unauthenticated.
+- `src/app/(app)/*` — authenticated shell. The `(app)` group's `layout.tsx` enforces a workspace context and renders the sidebar/topbar. Routes here mirror LeadLoft's UX: `prospecting`, `pipeline`, `inbox`, `tasks`, `playbooks/[id]`, and a fully populated `settings/*` tree.
+
+`src/lib/api.ts` is the **only** place that calls the backend. It reads `NEXT_PUBLIC_API_URL`, attaches the JWT from `src/lib/auth.ts`, and adds the `X-Workspace-Id` header. All other code goes through TanStack Query hooks that wrap this client.
+
+The TypeScript build is strict — `src/lib/api.ts:errorMessage` was once written as a chained `&& ||` expression that TypeScript widened to `{}`. If you touch error-handling, use an explicit `if` block and assign to a `let message: string` rather than relying on inference.
+
+## Extension architecture (`/extension`)
 
 ```
-1. main.js setInterval(60s) → automate.tick()
-2. automate.tick() → api.nextJobs(1)
-3. service-worker → GET /extension/jobs/next
-4. backend returns at most one job (connect | message)
-5. automate.executeOne(job) → human-paced DOM interaction
-6. automate → api.submitJobResult(job.id, { status, error? })
+manifest.json                MV3, host: linkedin.com only (backend host requested at runtime)
+background/service-worker.js API proxy for content scripts; routes openOptionsPage
+content/
+  main.js                    SPA-navigation hook, autopilot tick (60s interval)
+  overlay.js                 profile panel + bottom toolbar + per-card Save pills
+  scraper.js                 /in/, /search/, /sales/* DOM scrapers
+  automate.js                human-paced executor for connect/message jobs
+  lib/api.js                 sendMessage wrapper around the service worker
+popup/                       toolbar popup: status, autopilot toggle
+options/                     API key + capture behavior settings
 ```
+
+### Bot-detection avoidance (design rules — do not break)
+
+1. **Never call LinkedIn's internal APIs.** Read only the rendered DOM the user has already loaded.
+2. **Never automate in a hidden tab.** `automate.js` checks `document.visibilityState === "visible"` before each action.
+3. **Human-paced everything.** 45–180s between consequential actions (~18% long-tail to 3 min), 40–140ms per-typed-character, eased scrolls with randomised offsets, 1.2–3.5s "reading" pause after navigation.
+4. **Real DOM events.** Clicks go through `dispatchHumanClick` which fires `pointerover` → `pointerdown` → `pointerup` → `click` with realistic coordinates.
+5. **Abort on challenge.** `detectChallenge()` aborts and reports failure if a captcha/checkpoint surfaces.
+6. **Daily caps live server-side.** The extension only runs what `/extension/jobs/next` hands it.
+
+### Cross-context API surface
+
+`chrome.runtime.openOptionsPage` only works in extension pages (popup/options/service worker) — **not** in content scripts. The content overlay calls `chrome.runtime.sendMessage({ type: "lc:openOptions" })` and the service worker proxies it. Apply the same pattern for any other privileged API.
+
+The manifest only grants host permission to `linkedin.com`. When the user pastes a Backend URL in the Options page, `options.js` calls `chrome.permissions.request({ origins: [origin] })` to request that host at runtime — without this, all fetches fail with the generic `Failed to fetch`.
+
+### Selectors drift
+
+LinkedIn rewrites markup often. Prefer multiple selectors via `first(root, [...])`. Sales Navigator uses `data-anonymize` attributes which are stable-ish — `scrapeSalesNavProfile` / `scrapeSalesNavSearch` rely on those. Tests against the live site would be flaky; instead log every selector attempted on failure.
+
+## Deployment topology
+
+| Component | Host | Key file |
+|---|---|---|
+| Frontend | Vercel (repo root, no rootDir override) | `vercel.json`, `next.config.mjs` |
+| Backend + workers + Redis | Render (Blueprint) | `render.yaml`, `api/Dockerfile` |
+| Postgres | Neon (external) | — |
+
+`DATABASE_URL` **must** use the `postgresql+psycopg://` scheme (not `postgresql://`) — SQLAlchemy picks the driver from the scheme.
+
+`FRONTEND_ORIGINS` (backend) controls CORS allowed origins. CORS also has a regex permitting any `chrome-extension://*` origin so the extension always works regardless of this value.
+
+`render.yaml` defaults to Starter plan ($21/mo for api + 2 workers). For a free-tier deploy, create the API as a single Web Service manually (Docker, rootDir `api`) and skip the workers — the API still serves all sync endpoints, only the outreach scheduler stops.
 
 ## Things to watch for
 
-- **Selectors drift.** LinkedIn rewrites its DOM often. Prefer multiple selectors via `first(root, [...])`. Tests would be flaky against the live site; instead, log failures with the selectors we attempted.
-- **Sales Navigator markup is different.** `scrapeSalesNavProfile` / `scrapeSalesNavSearch` use `data-anonymize` attributes which are stable-ish.
-- **Don't add `web_accessible_resources` you don't reference.** Causes a manifest warning.
-- **Don't grant `<all_urls>`.** Host permissions are limited to `linkedin.com`; optional permissions exist for future server-routed flows.
-- **No external dependencies, no build step.** Keep raw JS, no npm.
-
-## Backend dependency
-
-Requires the LeadCaptura backend (`/api` in this same repo, or deployed via `render.yaml`) reachable at the URL configured in the options page. Generate an API key in `Settings → API Keys` in the web app and paste it into the extension options.
+- **`/api` and `/extension` are excluded from Vercel builds** by `.vercelignore`. If you add another top-level directory that should also be skipped, add it there too.
+- **Don't add `web_accessible_resources` to the manifest you don't reference** — Chrome logs a warning.
+- **Don't grant `<all_urls>` in the manifest.** Host permissions are restricted to linkedin.com plus runtime-granted backend host.
+- **No build step for the extension.** Keep raw JS; do not introduce npm or bundlers.
+- **Models in one file.** Resist the urge to split `app/models/base.py` — the import graph relies on it.
