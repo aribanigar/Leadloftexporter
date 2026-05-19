@@ -487,25 +487,52 @@
   }
 
   function _cardFromLink(link) {
-    // Walk up, prioritising the LI/ARTICLE row root over any inner wrapper.
-    // Returning the inner flex wrapper means our Save row becomes a flex
-    // sibling next to LinkedIn's action buttons — which is the bug we saw.
+    // Walk up to find the row/card root. Different LinkedIn surfaces use
+    // different element types:
+    //   - Regular People Search:  <li>
+    //   - Sales Nav search:       <li> or <article>
+    //   - Sales Nav saved-list:   <tr> or div[role='row']  (table layout)
+    //   - mynetwork:              <li> usually, sometimes <article>
+    // We prefer these structural roots over any inner flex wrapper so our
+    // absolutely-positioned save chip anchors to the full row instead of
+    // becoming a sibling next to LinkedIn's action buttons.
     let node = link.parentElement;
-    let fallback = null;
-    for (let i = 0; i < 12 && node; i++) {
-      if (node.tagName === "LI" || node.tagName === "ARTICLE") return node;
+    let actionFallback = null;
+    let listFallback = null;
+    for (let i = 0; i < 14 && node; i++) {
       if (
-        !fallback &&
+        node.tagName === "LI" ||
+        node.tagName === "ARTICLE" ||
+        node.tagName === "TR" ||
+        node.getAttribute?.("role") === "row" ||
+        node.getAttribute?.("role") === "listitem"
+      ) {
+        return node;
+      }
+      // Primary fallback: container that holds Connect/Message/Follow.
+      if (
+        !actionFallback &&
         node.querySelector("img") &&
         node.querySelector(
           "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
         )
       ) {
-        fallback = node;
+        actionFallback = node;
+      }
+      // Secondary fallback for saved-list / leads-list views: they don't
+      // expose Connect/Message buttons (the user already saved the lead).
+      // Instead they have checkboxes or single profile links per row.
+      if (
+        !listFallback &&
+        node.querySelector("img") &&
+        (node.querySelector("input[type='checkbox']") ||
+          node.querySelector("[role='cell']"))
+      ) {
+        listFallback = node;
       }
       node = node.parentElement;
     }
-    return fallback || link.parentElement;
+    return actionFallback || listFallback || link.parentElement;
   }
 
   function profileFromCard(card, link) {

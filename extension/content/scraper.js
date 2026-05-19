@@ -25,14 +25,15 @@
     const p = location.pathname;
     if (p.startsWith("/in/")) return "profile";
     if (p.startsWith("/sales/lead/")) return "salesnav-profile";
-    // Sales Navigator has many list-type surfaces — match them all.
+    // Sales Navigator has many list-type surfaces. `/sales/lists/*` catches
+    // every saved-list / saved-search / saved-on-linkedin variant
+    // ('Saved on LinkedIn.com' lives at /sales/lists/<id>/ with no
+    // /people/ segment, which the old explicit allowlist missed).
     if (
       p.startsWith("/sales/search") ||
       p.startsWith("/sales/people") ||
       p.startsWith("/sales/connections") ||
-      p.startsWith("/sales/lists/people") ||
-      p.startsWith("/sales/lists/saved-leads") ||
-      p.startsWith("/sales/lists/accounts") ||
+      p.startsWith("/sales/lists") ||
       p.startsWith("/sales/discover")
     ) return "salesnav-search";
     if (p.startsWith("/search/results/people")) return "search-people";
