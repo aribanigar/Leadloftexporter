@@ -282,8 +282,7 @@
     const enriched = { ...profile };
 
     // Step 1: refresh base profile fields (name, title, company, location,
-    // avatar) from the current DOM. This is a PURE read — no clicks, no
-    // navigation, no side effects on the user's tab.
+    // avatar) from the current DOM. Pure read, no clicks, no side effects.
     try {
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
         const fresh = Scraper.scrapeProfile();
@@ -298,27 +297,68 @@
       }
     } catch {}
 
-    // Step 2: read the Contact info modal IF it's already open. This is
-    // also pure-read — we only consume what's visible, never click the
-    // Contact info link (clicking it would navigate the user's tab to
-    // /overlay/contact-info/, which the user perceives as "the page
-    // moved on its own"). If the modal isn't open, we move on.
+    // Step 2: read any Contact info modal the user has already opened.
+    // Pure read; never click the link to OPEN one (that would navigate
+    // the user's tab and break the silent-save promise).
     const visible = _harvestVisibleContact();
     if (visible.email && !enriched.email) enriched.email = visible.email;
     if (visible.phone && !enriched.phone) enriched.phone = visible.phone;
     if (visible.website && !enriched.company_url) enriched.company_url = visible.website;
     if (visible.address) enriched.location = visible.address.slice(0, 200);
 
-    // Step 3: hidden-iframe enrichment when we're still missing contact
-    // fields. The iframe runs in its own context — it loads
-    // /overlay/contact-info/ INSIDE the iframe, which has zero effect on
-    // the user's visible tab URL. Off-screen + opacity 0 + visibility
-    // hidden + pointer-events none ⇒ invisible to the user.
+    // Step 3: fast text-scan on the visible page (no network, no clicks).
+    // Catches "Reach me at john[at]acme[dot]com" patterns in About /
+    // Experience / Featured. Only safe when we're physically on the
+    // person's /in/ profile.
+    if (
+      (!enriched.email || !enriched.phone) &&
+      location.pathname.startsWith("/in/") &&
+      Scraper._scrapeFromProfileText
+    ) {
+      try {
+        const fromText = Scraper._scrapeFromProfileText();
+        if (!enriched.email && fromText.email) enriched.email = fromText.email;
+        if (!enriched.phone && fromText.phone) enriched.phone = fromText.phone;
+      } catch {}
+    }
+
+    // Step 4: SAVE IMMEDIATELY with whatever we have. The row appears in
+    // the pipeline within a few hundred ms. Background enrichment (step 5)
+    // overwrites email/phone/address later when the iframe scrape returns.
+    //
+    // This is the key UX fix: previously we awaited the iframe (up to 18s)
+    // BEFORE saving — if the iframe was slow or hit a rate limit, no row
+    // ever appeared in the pipeline and the user thought the save failed.
+    flashStatus("Saving…");
+    let result;
+    try {
+      result = await Api.syncProfile(enriched);
+      const haveAny = !!(enriched.email || enriched.phone || enriched.location);
+      flashStatus(
+        result.created
+          ? haveAny
+            ? "Saved new lead ✓"
+            : "Saved new lead · enriching…"
+          : haveAny
+            ? "Lead updated ✓"
+            : "Lead updated · enriching…",
+        "ok"
+      );
+      if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
+      maybeAutoEnroll();
+    } catch (e) {
+      flashStatus(`Failed: ${e.message}`, "err");
+      return;
+    }
+
+    // Step 5: background hidden-iframe enrichment when contact still
+    // missing. Runs AFTER the initial save so the user already sees their
+    // lead. When this completes, we sync the updated fields — the backend
+    // upsert overwrites email/phone on re-save.
     const url = enriched.linkedin_url || profile.linkedin_url;
-    const needsContact =
+    const stillNeeds =
       !enriched.email || !enriched.phone || !enriched.location;
-    if (url && url.includes("/in/") && needsContact && Scraper.scrapeContactInfoViaIframe) {
-      flashStatus("Enriching contact info…");
+    if (url && url.includes("/in/") && stillNeeds && Scraper.scrapeContactInfoViaIframe) {
       try {
         const allowed = await new Promise((resolve) => {
           try {
@@ -333,62 +373,28 @@
             resolve(false);
           }
         });
-        if (allowed) {
-          const fromIframe = await Scraper.scrapeContactInfoViaIframe(url);
-          if (fromIframe.email && !enriched.email) enriched.email = fromIframe.email;
-          if (fromIframe.phone && !enriched.phone) enriched.phone = fromIframe.phone;
-          if (fromIframe.website && !enriched.company_url)
-            enriched.company_url = fromIframe.website;
-          if (fromIframe.address)
-            enriched.location = fromIframe.address.slice(0, 200);
-          enriched.raw = {
-            ...(enriched.raw || {}),
-            contact_info_scraped: true,
-            contact_source: visible.email || visible.phone ? "visible_modal" : "iframe",
-          };
+        if (!allowed) return;
+        const fromIframe = await Scraper.scrapeContactInfoViaIframe(url);
+        const merged = { ...enriched };
+        let added = [];
+        if (fromIframe.email && !merged.email) { merged.email = fromIframe.email; added.push("email"); }
+        if (fromIframe.phone && !merged.phone) { merged.phone = fromIframe.phone; added.push("phone"); }
+        if (fromIframe.website && !merged.company_url) { merged.company_url = fromIframe.website; added.push("site"); }
+        if (fromIframe.address && (!merged.location || merged.location.length < 4)) {
+          merged.location = fromIframe.address.slice(0, 200);
+          added.push("address");
+        }
+        if (!added.length) return;
+        merged.raw = { ...(merged.raw || {}), contact_info_scraped: true, contact_source: "iframe" };
+        try {
+          await Api.syncProfile(merged);
+          flashStatus(`Enriched ✓ (${added.join(" + ")})`, "ok");
+        } catch {
+          /* re-save failure is best-effort; the base row is still saved */
         }
       } catch {
         /* enrichment is best-effort */
       }
-    }
-
-    // Step 4: text-scan fallback. Only safe when we're physically on the
-    // person's /in/ profile (otherwise we'd be scanning a stranger's feed).
-    // Picks up emails written in About / Experience / Featured sections,
-    // including obfuscated forms like "john [at] acme [dot] com".
-    if (
-      (!enriched.email || !enriched.phone) &&
-      location.pathname.startsWith("/in/") &&
-      Scraper._scrapeFromProfileText
-    ) {
-      try {
-        const fromText = Scraper._scrapeFromProfileText();
-        if (!enriched.email && fromText.email) enriched.email = fromText.email;
-        if (!enriched.phone && fromText.phone) enriched.phone = fromText.phone;
-      } catch {}
-    }
-
-    flashStatus("Saving…");
-    try {
-      const result = await Api.syncProfile(enriched);
-      const gotEmail = !!(enriched.email && !profile.email);
-      const gotPhone = !!(enriched.phone && !profile.phone);
-      const gotAddress = !!(enriched.location && !profile.location);
-      const gotWebsite = !!(enriched.company_url && !profile.company_url);
-      const extras = [
-        gotEmail && "email",
-        gotPhone && "phone",
-        gotAddress && "address",
-        gotWebsite && "site",
-      ].filter(Boolean).join(" + ");
-      const msg = result.created
-        ? `Saved new lead ✓${extras ? ` (${extras})` : ""}`
-        : `Lead updated ✓${extras ? ` (${extras})` : ""}`;
-      flashStatus(msg, "ok");
-      if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
-      maybeAutoEnroll();
-    } catch (e) {
-      flashStatus(`Failed: ${e.message}`, "err");
     }
   }
 
