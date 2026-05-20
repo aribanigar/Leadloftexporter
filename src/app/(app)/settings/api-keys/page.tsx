@@ -37,6 +37,12 @@ export default function ApiKeysPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
   });
 
+  const wipeAll = useMutation({
+    mutationFn: () =>
+      api<{ deleted: number }>("/workspaces/current/api-keys", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
+  });
+
   return (
     <div className="card max-w-3xl p-6">
       <h2 className="mb-1 text-base font-semibold">API Keys</h2>
@@ -64,13 +70,33 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      <button
-        className="btn-primary mb-4"
-        onClick={() => create.mutate("Chrome Extension")}
-        disabled={create.isPending}
-      >
-        <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
-      </button>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          className="btn-primary"
+          onClick={() => create.mutate("Chrome Extension")}
+          disabled={create.isPending}
+        >
+          <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
+        </button>
+        {keys && keys.length > 0 && (
+          <button
+            className="btn-danger"
+            onClick={() => {
+              if (
+                confirm(
+                  `Delete all ${keys.length} API key${keys.length === 1 ? "" : "s"}? Any extension or integration using these will stop working. This cannot be undone.`
+                )
+              ) {
+                wipeAll.mutate();
+              }
+            }}
+            disabled={wipeAll.isPending}
+          >
+            <Trash2 className="h-4 w-4" />{" "}
+            {wipeAll.isPending ? "Wiping…" : "Wipe all keys"}
+          </button>
+        )}
+      </div>
 
       <table className="w-full text-sm">
         <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
