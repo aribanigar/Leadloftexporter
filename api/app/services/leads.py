@@ -81,7 +81,48 @@ def normalize_linkedin(url: Optional[str]) -> Optional[str]:
     if not url:
         return None
     s = url.split("?")[0].rstrip("/").lower()
-    return s
+    # Cap at the linkedin_url column length (500) so a degenerate input
+    # never trips a Postgres value-too-long crash.
+    return s[:500] if len(s) > 500 else s
+
+
+# Column-length caps from app/models/base.py. Centralised here so a single
+# table-of-truth update covers every code path that may ingest user data.
+# Without this, page-2 LinkedIn search cards routinely produced 500s because
+# the scraped `title` (=entire headline when no " at " separator exists) or
+# the signed avatar JWT URL exceed these tight column bounds.
+_LEAD_FIELD_CAPS = {
+    "first_name": 120,
+    "last_name": 120,
+    "full_name": 240,
+    "title": 240,
+    "email": 255,
+    "phone": 60,
+    "linkedin_url": 500,
+    "location": 200,
+    "avatar_url": 500,
+    "source": 40,
+    # headline is TEXT (unbounded); no cap.
+}
+
+
+def _cap(value, max_len: int):
+    """Trim a string to fit a column; preserve None / non-strings."""
+    if value is None:
+        return None
+    s = str(value)
+    return s[:max_len] if len(s) > max_len else s
+
+
+def _clean_avatar_url(url: Optional[str]) -> Optional[str]:
+    """LinkedIn media CDN URLs include a signed JWT in the query string that
+    the CDN validates on every request. Stripping the query returns a 403
+    placeholder image, so the URL must be stored verbatim. Lead.avatar_url
+    is TEXT (unbounded) — see migration 0002_lead_avatar_text.
+    """
+    if not url:
+        return None
+    return str(url)
 
 
 def ingest_lead(
@@ -107,14 +148,38 @@ def ingest_lead(
     company = upsert_company(
         db,
         workspace_id,
-        name=payload.get("company_name"),
-        domain=payload.get("company_domain"),
-        website=payload.get("company_url"),
+        # Cap company name to its String(200) column; same defensive idea as
+        # the lead-side caps below — long bio-style strings would 500 the
+        # request when the company is created.
+        name=_cap(payload.get("company_name"), 200),
+        domain=_cap(payload.get("company_domain"), 200),
+        website=_cap(payload.get("company_url"), 500),
     )
 
     full_name = payload.get("full_name") or " ".join(
         filter(None, [payload.get("first_name"), payload.get("last_name")])
     ) or None
+
+    # Resolve each scalar to its column-capped value once. Reused below in
+    # both the update-existing-lead and insert-new-lead branches.
+    capped = {
+        "first_name": _cap(payload.get("first_name"), 120),
+        "last_name": _cap(payload.get("last_name"), 120),
+        "full_name": _cap(full_name, 240),
+        # `title` from the extension is split off the headline by " at ";
+        # when no " at " exists, the entire headline is used as the title,
+        # which routinely exceeds 240 chars. Truncate defensively.
+        "title": _cap(
+            payload.get("title") or payload.get("headline"), 240
+        ),
+        "headline": payload.get("headline"),  # TEXT column — no cap
+        "email": _cap(payload.get("email"), 255),
+        "phone": _cap(payload.get("phone"), 60),
+        # LinkedIn avatar URLs append a signed JWT query that often pushes
+        # them well past 500 chars. Strip the query and cap.
+        "avatar_url": _clean_avatar_url(payload.get("avatar_url")),
+        "location": _cap(payload.get("location"), 200),
+    }
 
     now = datetime.now(timezone.utc)
     created = False
@@ -130,13 +195,13 @@ def ingest_lead(
             "avatar_url",
             "phone",
         ):
-            val = payload.get(attr)
+            val = capped.get(attr)
             if val and not getattr(lead, attr):
                 setattr(lead, attr, val)
-        if full_name and not lead.full_name:
-            lead.full_name = full_name
-        if payload.get("email") and not lead.email:
-            lead.email = payload["email"]
+        if capped["full_name"] and not lead.full_name:
+            lead.full_name = capped["full_name"]
+        if capped["email"] and not lead.email:
+            lead.email = capped["email"]
         if company and not lead.company_id:
             lead.company_id = company.id
         merged_custom = dict(lead.custom or {})
@@ -149,17 +214,17 @@ def ingest_lead(
             owner_id=owner_id,
             stage_id=stage.id if stage else None,
             company_id=company.id if company else None,
-            first_name=payload.get("first_name"),
-            last_name=payload.get("last_name"),
-            full_name=full_name,
-            title=payload.get("title") or payload.get("headline"),
-            headline=payload.get("headline"),
-            email=payload.get("email"),
-            phone=payload.get("phone"),
+            first_name=capped["first_name"],
+            last_name=capped["last_name"],
+            full_name=capped["full_name"],
+            title=capped["title"],
+            headline=capped["headline"],
+            email=capped["email"],
+            phone=capped["phone"],
             linkedin_url=linkedin,
-            location=payload.get("location"),
-            avatar_url=payload.get("avatar_url"),
-            source=source,
+            location=capped["location"],
+            avatar_url=capped["avatar_url"],
+            source=_cap(source, 40),
             custom=payload.get("raw") or {},
         )
         db.add(lead)

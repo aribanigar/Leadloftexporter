@@ -25,15 +25,68 @@
     const p = location.pathname;
     if (p.startsWith("/in/")) return "profile";
     if (p.startsWith("/sales/lead/")) return "salesnav-profile";
-    if (p.startsWith("/sales/search")) return "salesnav-search";
-    if (p.startsWith("/sales/people") || p.startsWith("/sales/connections")) return "salesnav-search";
+    // Sales Navigator has many list-type surfaces. `/sales/lists/*` catches
+    // every saved-list / saved-search / saved-on-linkedin variant
+    // ('Saved on LinkedIn.com' lives at /sales/lists/<id>/ with no
+    // /people/ segment, which the old explicit allowlist missed).
+    if (
+      p.startsWith("/sales/search") ||
+      p.startsWith("/sales/people") ||
+      p.startsWith("/sales/connections") ||
+      p.startsWith("/sales/lists") ||
+      p.startsWith("/sales/discover")
+    ) return "salesnav-search";
     if (p.startsWith("/search/results/people")) return "search-people";
+    // Generic /search/results/ may include people too; we'll fall through to
+    // scrapeSearchResults() which simply returns [] if no /in/ links exist.
+    if (p.startsWith("/search/results/")) return "search-people";
+    if (p.startsWith("/mynetwork/invitation-manager") || p.startsWith("/mynetwork/invite-connect/connections")) return "search-people";
     if (p === "/" || p.startsWith("/feed")) return "feed";
     return "unknown";
   }
 
   const _txt = (n) => (n?.textContent || "").replace(/\s+/g, " ").trim() || null;
   const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Strip LinkedIn-rendered noise that gets concatenated into person-name
+  // text by `textContent`: degree badges ("• 1st"/"· 2nd"/"3rd+"), pronouns
+  // ("(He/Him)"), Premium/Influencer trailing labels, the "Status is online"
+  // accessibility text, "Verified" badges, and OpenToWork frame text. Also
+  // truncates at the first such marker so "Mafaz Ahmed • 3rd+Marketing
+  // ProfessionalKuwait City…" (entire-card-as-link fallback) becomes just
+  // "Mafaz Ahmed".
+  function _cleanPersonName(raw) {
+    if (!raw) return null;
+    let s = String(raw).replace(/\s+/g, " ").trim();
+    // Truncate at the first degree badge or visible-bullet separator.
+    const cutMarkers = [
+      /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
+      /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
+      /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
+      /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
+      /\s*\bStatus is (online|offline|reachable)\b.*/i,
+      /\s*\bView\s+\S+(?:’|')s\s+profile\b.*/i,
+      /\s*\bPremium\s*Member\b.*/i,
+      /\s*\bOpenToWork\b.*/i,
+      /\s*\bHiring\b.*/i,
+      /\s*\bVerified\b.*/i,
+    ];
+    for (const re of cutMarkers) s = s.replace(re, "").trim();
+    // Strip trailing punctuation
+    s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
+    return s || null;
+  }
+
+  // Reject headline/location candidates that come from the profile's
+  // activity / posts / recent-feed sections. Those drift in front of the
+  // actual headline when LinkedIn restructures the top card wrapper and
+  // poison the title field with "Feed post" / "Reposted this" / etc.
+  function _isFeedNoise(text) {
+    if (!text) return true;
+    return /^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! )/i.test(
+      text.trim()
+    );
+  }
 
   /* ---------- Profile page (/in/handle) ----------
    *
@@ -53,6 +106,13 @@
       if (card.querySelector("img") && card.querySelector("a[href*='/overlay/']")) break;
       card = card.parentElement;
     }
+    // SAFETY GUARD: if our walk hit <main> or <body> (no proper top card
+    // wrapper found), shrink back to a small slice around h1. Otherwise the
+    // headline/location scan grabs text from the Recent activity, Featured,
+    // and Experience sections — leading to title="Feed post" etc.
+    if (!card || card.tagName === "MAIN" || card.tagName === "BODY") {
+      card = h1.parentElement?.parentElement || h1.parentElement;
+    }
     return { h1, card: card || h1.parentElement };
   }
 
@@ -60,24 +120,39 @@
     // Walk DOM order after the h1 and return the first sibling-ish element
     // that has text > 4 chars and is NOT the name itself. This is the
     // "headline" line LinkedIn renders directly under the name.
-    const seen = new Set();
-    const queue = [h1.parentElement];
+    //
+    // We DELIBERATELY stay within the same parent and one level below,
+    // never recursing up to <main>. Without this bound, the walk reaches
+    // the "Recent activity" / "Featured posts" sections and grabs strings
+    // like "Feed post" as the headline.
+    const start = h1.parentElement;
+    if (!start) return null;
     let foundH1 = false;
-    while (queue.length) {
-      const node = queue.shift();
-      if (!node || seen.has(node)) continue;
-      seen.add(node);
-      for (const child of node.children) {
-        if (child === h1) {
-          foundH1 = true;
-          continue;
+    for (const child of start.children) {
+      if (child === h1) { foundH1 = true; continue; }
+      if (!foundH1) continue;
+      const t = _txt(child);
+      if (
+        t &&
+        t.length > 4 &&
+        t.length < 240 &&
+        !/connect|message|follow|more|premium/i.test(t) &&
+        !_isFeedNoise(t)
+      ) {
+        return t;
+      }
+      // Look one level deeper for the sibling that hosts the headline span
+      for (const grand of child.children || []) {
+        const g = _txt(grand);
+        if (
+          g &&
+          g.length > 4 &&
+          g.length < 240 &&
+          !/connect|message|follow|more|premium/i.test(g) &&
+          !_isFeedNoise(g)
+        ) {
+          return g;
         }
-        if (!foundH1) continue;
-        const t = _txt(child);
-        if (t && t.length > 4 && t.length < 240 && !/connect|message|follow|more/i.test(t)) {
-          return t;
-        }
-        if (child.children?.length) queue.push(child);
       }
     }
     return null;
@@ -97,7 +172,7 @@
 
   function scrapeProfile() {
     const { h1, card } = _findTopCard();
-    const fullName = _txt(h1);
+    const fullName = _cleanPersonName(_txt(h1));
 
     // Headline: the text line directly under the name. Multiple fallbacks
     // because LinkedIn sometimes wraps it in different structures.
@@ -107,7 +182,14 @@
       let n = h1.nextElementSibling;
       while (n && !headline) {
         const t = _txt(n);
-        if (t && t.length > 4) headline = t;
+        if (
+          t &&
+          t.length > 4 &&
+          !_isFeedNoise(t) &&
+          !/connect|message|follow|more|premium/i.test(t)
+        ) {
+          headline = t;
+        }
         n = n.nextElementSibling;
       }
       if (!headline) headline = _firstTextAfter(h1);
@@ -126,7 +208,8 @@
       for (const t of candidates) {
         if (t === fullName || t === headline) continue;
         if (/connect|follower|mutual|message/i.test(t)) continue;
-        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi)\b/i.test(t))) {
+        if (_isFeedNoise(t)) continue;
+        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi|kuwait|bahrain|oman|jordan|lebanon|egypt|france|germany|spain|italy|brazil|mexico|canada|australia|singapore|japan|china|netherlands|belgium|switzerland|austria|norway|sweden|denmark|finland|poland|turkey|greece|portugal|ireland|scotland|wales|england|britain|south africa|nigeria|kenya|argentina|chile|colombia|peru|venezuela|new zealand|philippines|indonesia|malaysia|thailand|vietnam|korea|taiwan|pakistan|bangladesh|sri lanka)\b/i.test(t))) {
           location_ = t;
           break;
         }
@@ -141,28 +224,52 @@
     let companyName = null;
     let title = null;
     if (headline) {
-      const parts = headline.split(/\s+at\s+/i);
+      // Strip pipe-separated specializations before extracting title/company.
+      // "Head of Events at HEC Paris Doha | Executive Education | Aviation"
+      //  → primary = "Head of Events at HEC Paris Doha"
+      //  → title = "Head of Events", company = "HEC Paris Doha"
+      const primary = headline.split("|")[0].trim();
+      const parts = primary.split(/\s+at\s+/i);
       if (parts.length >= 2) {
         title = parts[0].trim();
         companyName = parts.slice(1).join(" at ").trim();
       } else {
-        title = headline;
+        title = primary;
       }
     }
 
     const linkedinUrl = normalizeProfileUrl(location.href);
-    const [first_name, ...rest] = (fullName || "").split(/\s+/);
+    // Final-mile name fallback: if h1 didn't yield a usable name, derive one
+    // from the URL slug (linkedin.com/in/nathalie-richani → Nathalie Richani).
+    // Better a slug-derived guess than blank rows in the pipeline.
+    let resolvedName = fullName;
+    if (!resolvedName && linkedinUrl) {
+      try {
+        const slug = new URL(linkedinUrl).pathname.replace(/^\/in\//, "").replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          resolvedName = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ")
+            .trim() || null;
+        }
+      } catch {}
+    }
+    const [first_name, ...rest] = (resolvedName || "").split(/\s+/);
 
+    // LinkedIn's media CDN requires the signed-JWT query string. Strip it
+    // and the image returns 403. Backend column is TEXT, so we send verbatim.
     return {
       linkedin_url: linkedinUrl,
-      full_name: fullName,
-      first_name: first_name || null,
-      last_name: rest.join(" ") || null,
-      headline,
-      title,
-      location: location_,
+      full_name: resolvedName ? resolvedName.slice(0, 240) : null,
+      first_name: first_name ? first_name.slice(0, 120) : null,
+      last_name: rest.join(" ").slice(0, 120) || null,
+      headline,  // TEXT column on the backend, no cap needed
+      title: title ? title.slice(0, 240) : null,
+      location: location_ ? location_.slice(0, 200) : null,
       avatar_url: avatar,
-      company_name: companyName,
+      company_name: companyName ? companyName.slice(0, 200) : null,
       company_url: null,
       raw: { source_url: location.href, page_type: "profile" },
     };
@@ -186,14 +293,26 @@
   }
 
   function _findContactModal() {
-    // After clicking Contact info, LinkedIn renders an artdeco-modal whose
-    // labelled-by id contains "contact". Multiple selectors as fallback.
+    // After clicking Contact info (or navigating to the overlay URL), LinkedIn
+    // renders an artdeco-modal. Multiple selectors as fallback — LinkedIn
+    // occasionally changes the labelling attributes.
     return (
       document.querySelector("div[role='dialog'][aria-labelledby*='contact' i]") ||
       document.querySelector("div[role='dialog'][aria-label*='Contact' i]") ||
-      // Last-resort: any dialog open right now
       document.querySelector("#artdeco-modal-outlet div[role='dialog']") ||
+      // artdeco-modal is the host element; the inner dialog is what we want
+      document.querySelector("artdeco-modal div[role='dialog']") ||
+      document.querySelector("div.artdeco-modal__content") ||
       document.querySelector("div[role='dialog']")
+    );
+  }
+
+  function _isValidContactModal(modal) {
+    if (!modal) return false;
+    return (
+      modal.querySelector("a[href^='mailto:']") ||
+      modal.querySelector("a[href^='tel:']") ||
+      /contact info/i.test(modal.textContent || "")
     );
   }
 
@@ -251,44 +370,174 @@
     }
   }
 
-  async function scrapeContactInfo({ timeoutMs = 5000 } = {}) {
+  async function scrapeContactInfo({
+    timeoutMs = 9000,
+    settleMs = 1500,
+    allowPushStateFallback = false,
+  } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null };
     }
+
+    const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
+    const isOverlayUrl = location.pathname.includes("/overlay/contact-info");
+    // Track whether the pushState fallback fired so the close-modal branch
+    // can skip dismissing — the modal is bound to the URL we just navigated
+    // to, and dismissing would just bounce the browser back without scrape.
+    let didPushState = false;
+
     let modal = _findContactModal();
+    if (!_isValidContactModal(modal)) modal = null;
+
     if (!modal) {
-      const link = _findContactInfoLink();
-      if (!link) return { email: null, phone: null, website: null };
-      link.click();
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        await _sleep(180);
-        modal = _findContactModal();
-        // Make sure the dialog isn't just any leftover; require either an
-        // email link, phone link, or a heading containing "Contact info".
-        if (modal && (
-          modal.querySelector("a[href^='mailto:']") ||
-          modal.querySelector("a[href^='tel:']") ||
-          /contact info/i.test(modal.textContent || "")
-        )) break;
-        modal = null;
+      if (!isOverlayUrl) {
+        const link = _findContactInfoLink();
+        if (link) {
+          // Synthetic .click() can be no-op'd in background tabs / by React's
+          // event listeners. Use a full pointer event sequence — the same
+          // approach automate.js uses for connect/message — so LinkedIn's
+          // React handlers actually fire.
+          try { link.focus?.(); } catch {}
+          await _sleep(120);
+          try {
+            if (dispatchHumanClick) dispatchHumanClick(link);
+            else link.click();
+          } catch {
+            try { link.click(); } catch {}
+          }
+        }
+      }
+
+      modal = await waitFor(
+        [
+          "div[role='dialog'][aria-labelledby*='contact' i]",
+          "div[role='dialog'][aria-label*='Contact' i]",
+          "#artdeco-modal-outlet div[role='dialog']",
+          "artdeco-modal div[role='dialog']",
+          "div.artdeco-modal__content",
+          "div[role='dialog']",
+        ],
+        { timeout: timeoutMs }
+      );
+      if (!_isValidContactModal(modal)) modal = null;
+
+      // Last-resort backup: navigate the SPA router to /overlay/contact-info/.
+      // GATED behind allowPushStateFallback because pushState mutates the
+      // visible URL. Foreground callers (saveCurrentProfile from the floating
+      // panel, maybeAutoEnrichCurrentProfile on profile-page open) must NOT
+      // pass the flag — otherwise the user's URL bar would get rewritten
+      // mid-browse. Only the background-tab enrichment trigger opts in.
+      if (!modal && !isOverlayUrl && allowPushStateFallback) {
+        try {
+          const overlayPath =
+            location.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
+          history.pushState({}, "", overlayPath + location.search);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+          didPushState = true;
+        } catch {
+          /* pushState fails in some sandboxed contexts */
+        }
+        modal = await waitFor(
+          [
+            "div[role='dialog'][aria-labelledby*='contact' i]",
+            "#artdeco-modal-outlet div[role='dialog']",
+            "div[role='dialog']",
+          ],
+          { timeout: 4000 }
+        );
+        if (!_isValidContactModal(modal)) modal = null;
       }
     }
+
     if (!modal) return { email: null, phone: null, website: null };
-    await _sleep(280);
-    const data = _scrapeFromContactModal(modal);
-    _closeContactModal();
+
+    // Wait for modal contents to fully hydrate. The mailto: anchor is added
+    // by React in a second tick after the dialog mounts — reading too early
+    // returns null email even though the modal is visible.
+    await _sleep(settleMs);
+
+    let data = _scrapeFromContactModal(modal);
+
+    // Retry once if the modal opened but contents weren't rendered yet.
+    if (!data.email && !data.phone) {
+      await _sleep(1500);
+      // Re-query modal in case it remounted
+      modal = _findContactModal() || modal;
+      data = _scrapeFromContactModal(modal);
+    }
+
+    // Skip the dismiss if we navigated via pushState — the close button
+    // would just send us back, not actually clean up.
+    if (!isOverlayUrl && !didPushState) _closeContactModal();
     return data;
+  }
+
+  // Fallback enrichment: scan visible profile text for email / phone patterns.
+  // LinkedIn only shows the Contact info modal email/phone for 1st-degree
+  // connections (and sometimes 2nd) — for everyone else, the modal returns
+  // just the LinkedIn URL. But many users put their email or phone in their
+  // About section, headline, or experience descriptions to invite outreach,
+  // and that text is visible to anyone. We harvest it here.
+  const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  // Conservative phone regex — requires either a leading + or 8+ digits with
+  // separators. Avoids matching dates, post counts, etc.
+  const PHONE_RE = /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/;
+
+  function _scrapeFromProfileText() {
+    // Search the user-content regions of the profile only. Skip the global
+    // <body> scan because LinkedIn's chrome (navbar, ads, "people you may
+    // know") contains noise that would generate false positives.
+    const containers = [
+      document.querySelector("section[data-section='summary']"),
+      document.querySelector("section.pv-about-section"),
+      document.querySelector("section#about"),
+      document.querySelector("div[data-generated-suggestion-target]"),
+      document.querySelector("main"),
+    ].filter(Boolean);
+    let email = null;
+    let phone = null;
+    for (const c of containers) {
+      const text = (c.innerText || c.textContent || "").replace(/\s+/g, " ");
+      if (!email) {
+        const m = text.match(EMAIL_RE);
+        if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) email = m[0];
+      }
+      if (!phone) {
+        const m = text.match(PHONE_RE);
+        if (m) phone = m[0].replace(/\s+/g, " ").trim();
+      }
+      if (email && phone) break;
+    }
+    return { email, phone };
   }
 
   async function scrapeProfileWithContact() {
     const base = scrapeProfile();
     try {
+      // Primary: Contact info modal (works for 1st-degree connections).
       const contact = await scrapeContactInfo();
       if (contact.email && !base.email) base.email = contact.email;
       if (contact.phone && !base.phone) base.phone = contact.phone;
       if (contact.website && !base.company_url) base.company_url = contact.website;
-      base.raw = { ...(base.raw || {}), contact_info_scraped: true };
+
+      // Fallback: scan About / Experience text for any publicly-shared email
+      // or phone. Reaches profiles where the modal hides contact info.
+      if (!base.email || !base.phone) {
+        const fromText = _scrapeFromProfileText();
+        if (!base.email && fromText.email) base.email = fromText.email;
+        if (!base.phone && fromText.phone) base.phone = fromText.phone;
+      }
+
+      base.raw = {
+        ...(base.raw || {}),
+        contact_info_scraped: true,
+        contact_source:
+          base.email || base.phone
+            ? contact.email || contact.phone
+              ? "contact_modal"
+              : "profile_text"
+            : "none",
+      };
     } catch {
       /* enrichment is best-effort */
     }
@@ -336,16 +585,46 @@
 
   function _profileFromCard(card, link) {
     const url = normalizeProfileUrl(link.href);
-    // Name: try aria-hidden span first (LinkedIn duplicates the name there
-    // for screen readers), fallback to link text. Skip cards where the name
-    // is the generic "LinkedIn Member" placeholder — those have no
-    // identifying data we can capture.
-    let name =
-      _txt(link.querySelector("span[aria-hidden='true']")) ||
-      _txt(link);
+    // Name extraction — prefer the most specific source available:
+    //   1. aria-hidden span (LinkedIn duplicates the name for screen readers).
+    //   2. <strong>/<b> child of the link (often wraps the name).
+    //   3. Link text — but ONLY if it looks like a name, not the whole card.
+    //   4. URL slug as last resort (turns "/in/nathalie-richani" into
+    //      "Nathalie Richani"), better than blank.
+    let name = _txt(link.querySelector("span[aria-hidden='true']"));
+    if (!name) name = _txt(link.querySelector("strong, b"));
+    if (!name) {
+      const raw = _txt(link) || "";
+      // LinkedIn sometimes wraps the entire card body in the /in/ anchor.
+      // In that case the link text is "Mafaz Ahmed • 3rd+Marketing
+      // ProfessionalKuwait City…" — we must NOT use it as the name.
+      // Heuristic: split at the first degree badge / bullet separator and
+      // keep only the leading person-name segment.
+      if (raw && raw.length < 80 && !/[•·]\s*(1st|2nd|3rd\+?)/i.test(raw)) {
+        name = raw;
+      } else if (raw) {
+        // Take everything before the first degree marker / bullet.
+        const cut = raw.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+        if (cut && cut.length < 80) name = cut;
+      }
+    }
+    if (!name) {
+      // URL-slug fallback
+      try {
+        const slug = new URL(url, location.origin).pathname
+          .replace(/^\/in\//, "")
+          .replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          name = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ");
+        }
+      } catch {}
+    }
+    name = _cleanPersonName(name);
     if (!name || /linkedin member/i.test(name)) return null;
-    // Strip degree badges that sometimes get concatenated in
-    name = name.replace(/\s*•\s*(1st|2nd|3rd\+?|3rd)\s*$/i, "").trim();
 
     // Headline/subtitle: the next sibling text region of the card after the
     // name link. We approximate by walking siblings of the link's container.
@@ -354,9 +633,18 @@
     const linkBox = link.closest("div") || link.parentElement;
     if (linkBox) {
       const candidates = Array.from(card.querySelectorAll("div, p, span"))
+        // Exclude elements inside or wrapping embedded profile links (mutual
+        // connections / people-also-viewed rendered inside the same card <li>).
+        .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
+        .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
         .map((n) => _txt(n))
         .filter(Boolean)
-        .filter((t) => t !== name && !/connect|message|follow|view profile/i.test(t));
+        .filter(
+          (t) =>
+            t !== name &&
+            !/connect|message|follow|view profile/i.test(t) &&
+            !/•\s*(1st|2nd|3rd\+?)/i.test(t)
+        );
       headline = candidates[0] || null;
       // Location often contains a comma or named country
       location_ =
@@ -370,14 +658,18 @@
     const avatar = card.querySelector("img")?.getAttribute("src") || null;
     const [first_name, ...rest] = name.split(/\s+/);
     const sub = headline || "";
+    // Split on first "|" before splitting on " at " so pipe-separated
+    // specializations ("Head of Events at HEC | Education | Aviation") don't
+    // bleed into the company name field.
+    const primarySub = sub.split("|")[0].trim();
     return {
       linkedin_url: url,
       full_name: name,
       first_name,
       last_name: rest.join(" ") || null,
       headline: sub || null,
-      title: sub.split(/\s+at\s+/i)[0] || null,
-      company_name: sub.split(/\s+at\s+/i)[1] || null,
+      title: primarySub.split(/\s+at\s+/i)[0] || null,
+      company_name: primarySub.split(/\s+at\s+/i).slice(1).join(" at ") || null,
       location: location_,
       avatar_url: avatar,
       raw: { source_url: location.href, page_type: "search-people" },
@@ -444,35 +736,221 @@
   }
 
   function scrapeSalesNavSearch() {
+    // Sales Nav search pages may use either the lead-panel link attribute or
+    // plain /sales/lead/ hrefs. Try both, dedupe by normalised URL.
     const links = document.querySelectorAll(
-      "a[data-control-name='view_lead_panel_via_search_lead_name'], a[href*='/sales/lead/']"
+      "a[data-control-name='view_lead_panel_via_search_lead_name']," +
+      "a[data-control-name='view_lead_panel_via_browse_map_list_lead_name']," +
+      "a[href*='/sales/lead/']"
     );
     const out = [];
     const seen = new Set();
     for (const link of links) {
-      const url = normalizeProfileUrl(link.href);
-      if (!url || seen.has(url)) continue;
-      const card = _profileCardFromLink(link);
-      const name =
-        _txt(card.querySelector("[data-anonymize='person-name']")) || _txt(link);
-      if (!name) continue;
-      const title = _txt(card.querySelector("[data-anonymize='title']"));
-      const company = _txt(card.querySelector("[data-anonymize='company-name']"));
-      const loc = _txt(card.querySelector("[data-anonymize='location']"));
-      const [first_name, ...rest] = name.split(/\s+/);
-      seen.add(url);
-      out.push({
-        linkedin_url: url,
-        full_name: name,
-        first_name,
-        last_name: rest.join(" ") || null,
-        title,
-        company_name: company,
-        location: loc,
-        raw: { source_url: location.href, page_type: "salesnav-search" },
-      });
+      try {
+        const url = normalizeProfileUrl(link.href);
+        if (!url || seen.has(url)) continue;
+        const card = _profileCardFromLink(link);
+        // data-anonymize attributes are stable in Sales Nav
+        const nameEl =
+          card.querySelector("[data-anonymize='person-name']") ||
+          card.querySelector("[data-anonymize='name']") ||
+          link.querySelector("span[aria-hidden='true']") ||
+          link;
+        const name = (_txt(nameEl) || "")
+          .replace(/\s*•\s*(1st|2nd|3rd\+?)\s*$/i, "")
+          .trim();
+        if (!name || /linkedin member/i.test(name)) continue;
+        const titleEl =
+          card.querySelector("[data-anonymize='title']") ||
+          card.querySelector("[data-anonymize='job-title']");
+        const companyEl =
+          card.querySelector("[data-anonymize='company-name']") ||
+          card.querySelector("a[data-anonymize='company-name']");
+        const locEl = card.querySelector("[data-anonymize='location']");
+        const title = _txt(titleEl);
+        const company = _txt(companyEl);
+        const loc = _txt(locEl);
+        // Prefer the /in/ URL over /sales/lead/ if Sales Nav exposes it
+        const liAnchor = card.querySelector("a[href*='/in/']");
+        const canonicalUrl = liAnchor
+          ? normalizeProfileUrl(liAnchor.href)
+          : url;
+        const [first_name, ...rest] = name.split(/\s+/);
+        seen.add(url);
+        out.push({
+          linkedin_url: canonicalUrl || url,
+          full_name: name,
+          first_name,
+          last_name: rest.join(" ") || null,
+          headline: [title, company].filter(Boolean).join(" at ") || null,
+          title,
+          company_name: company,
+          location: loc,
+          raw: { source_url: location.href, page_type: "salesnav-search" },
+        });
+      } catch {
+        /* skip malformed */
+      }
     }
     return out;
+  }
+
+  /* ---------- Iframe-based contact-info enrichment ----------
+   *
+   * Used by the per-card Save chip on search pages. We mount a hidden,
+   * off-screen iframe pointing at /in/<handle>/overlay/contact-info/ —
+   * LinkedIn's SPA auto-opens the Contact info modal on that URL. Because
+   * the iframe is same-origin (linkedin.com → linkedin.com) we can read its
+   * contentDocument directly. This replaces the previous "open a background
+   * tab" approach: no new tab in the user's taskbar, faster turnaround, and
+   * the user doesn't see any visible UI artefact.
+   *
+   * Same bot-avoidance constraints apply: rate-limited via the service
+   * worker, modal-only DOM reads (no LinkedIn internal API calls).
+   */
+  async function scrapeContactInfoViaIframe(
+    profileUrl,
+    { timeoutMs = 18000 } = {}
+  ) {
+    let overlayUrl;
+    try {
+      const u = new URL(profileUrl, location.origin);
+      if (!u.pathname.startsWith("/in/")) {
+        return { email: null, phone: null, website: null };
+      }
+      const path = u.pathname.replace(/\/$/, "");
+      overlayUrl = path.endsWith("/overlay/contact-info")
+        ? u.origin + path + "/"
+        : u.origin + path + "/overlay/contact-info/";
+    } catch {
+      return { email: null, phone: null, website: null };
+    }
+
+    return new Promise((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.setAttribute("title", "");
+      // Off-screen, no opacity, no pointer events — the user never sees it.
+      // We still give it real width/height because LinkedIn's React tree
+      // sometimes refuses to render the modal in a 1x1 frame.
+      iframe.style.cssText = [
+        "position:fixed",
+        "left:-99999px",
+        "top:-99999px",
+        "width:1200px",
+        "height:800px",
+        "border:0",
+        "opacity:0",
+        "pointer-events:none",
+        "visibility:hidden",
+      ].join(";");
+      iframe.src = overlayUrl;
+
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        clearInterval(pollId);
+        clearTimeout(timeoutId);
+        try { iframe.remove(); } catch {}
+        resolve(result);
+      };
+
+      const timeoutId = setTimeout(
+        () => finish({ email: null, phone: null, website: null }),
+        timeoutMs
+      );
+
+      // Poll every 500ms for the modal contents to appear inside the iframe.
+      // Polling beats a load-event handler here because LinkedIn's modal
+      // renders asynchronously several ticks after the iframe's load fires.
+      const startedAt = Date.now();
+      const pollId = setInterval(() => {
+        if (settled) return;
+        let doc;
+        try {
+          doc = iframe.contentDocument;
+        } catch {
+          // Cross-origin error — LinkedIn redirected the iframe to a login
+          // or checkpoint page on a different origin. Nothing to scrape.
+          return finish({ email: null, phone: null, website: null });
+        }
+        if (!doc) return;
+
+        // Look for the dialog AND wait at least 1.5s after first sighting
+        // so React has time to populate mailto:/tel: anchors inside it.
+        const modal = doc.querySelector("div[role='dialog']");
+        const elapsed = Date.now() - startedAt;
+        if (!modal && elapsed < 6000) return;
+
+        const mailto =
+          (modal && modal.querySelector("a[href^='mailto:']")) ||
+          doc.querySelector("a[href^='mailto:']");
+        const tel =
+          (modal && modal.querySelector("a[href^='tel:']")) ||
+          doc.querySelector("a[href^='tel:']");
+
+        // If the modal is present but no contact anchors yet, give React
+        // a couple more polls to hydrate them.
+        if (modal && !mailto && !tel && elapsed < 8000) return;
+
+        const email = mailto
+          ? mailto.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
+          : null;
+        const phone = tel
+          ? tel.getAttribute("href").replace(/^tel:/, "").trim()
+          : null;
+
+        let website = null;
+        if (modal) {
+          const externals = modal.querySelectorAll("a[href^='http']");
+          for (const a of externals) {
+            const href = a.getAttribute("href") || "";
+            if (
+              !href.includes("linkedin.com") &&
+              !href.startsWith("mailto:") &&
+              !href.startsWith("tel:") &&
+              !href.includes("/overlay/")
+            ) {
+              website = href;
+              break;
+            }
+          }
+        }
+
+        // Fallback: scan profile text for public emails/phones the user
+        // wrote into their About / Experience sections. Catches non-1st-
+        // degree connections where the modal stays empty.
+        if (!email || !phone) {
+          const main = doc.querySelector("main");
+          const text = main
+            ? (main.innerText || main.textContent || "").replace(/\s+/g, " ")
+            : "";
+          if (!email) {
+            const m = text.match(
+              /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/
+            );
+            if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) {
+              finish({ email: m[0], phone, website });
+              return;
+            }
+          }
+          if (!phone) {
+            const m = text.match(
+              /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/
+            );
+            if (m) {
+              finish({ email, phone: m[0].replace(/\s+/g, " ").trim(), website });
+              return;
+            }
+          }
+        }
+
+        finish({ email, phone, website });
+      }, 500);
+
+      document.body.appendChild(iframe);
+    });
   }
 
   function scrapeCurrentPage() {
@@ -495,9 +973,11 @@
     scrapeProfile,
     scrapeProfileWithContact,
     scrapeContactInfo,
+    scrapeContactInfoViaIframe,
     scrapeSalesNavProfile,
     scrapeSearchResults,
     scrapeSalesNavSearch,
     scrapeCurrentPage,
+    _scrapeFromProfileText,
   };
 })();

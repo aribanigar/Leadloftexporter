@@ -183,11 +183,31 @@
     try {
       // On /in/ pages we open the Contact info modal and read email/phone the
       // same way a human would — opens the visible modal, scrapes, closes.
+      // If the user has manually opened the Contact info modal already,
+      // scrapeProfileWithContact() will find it and just read it (no extra
+      // click), and `enriched.email` / `enriched.phone` come back populated.
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
         enriched = await Scraper.scrapeProfileWithContact();
       }
     } catch {
       enriched = profile;
+    }
+    // Re-scrape the base profile so a Save click that ran after the h1
+    // finally hydrated picks up the correct name/title even though the
+    // initial panel render saw "Unknown profile". Without this re-scrape,
+    // the click handler would send back the stale empty profile object.
+    if ((!enriched.full_name || !enriched.title) && Scraper.scrapeProfile) {
+      try {
+        const fresh = Scraper.scrapeProfile();
+        if (fresh) {
+          for (const k of [
+            "full_name", "first_name", "last_name", "headline",
+            "title", "company_name", "location", "avatar_url",
+          ]) {
+            if (!enriched[k] && fresh[k]) enriched[k] = fresh[k];
+          }
+        }
+      } catch {}
     }
     flashStatus("Saving…");
     try {
@@ -400,82 +420,230 @@
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
 
-  /* We inject the Save button as a floating chip in the top-right of each
-   * search-result card. Earlier we tried to drop it inside LinkedIn's own
-   * action row next to Connect/Message, but that overlaps the native
-   * buttons because their parent isn't a flex container that grows. The
-   * floating chip is positioned `absolute` against the card itself, so it
-   * never collides regardless of LinkedIn's CSS churn. */
+  /* Global registry of save buttons we've injected, keyed by canonical
+   * LinkedIn URL. Without this, LinkedIn's two anchors per card (photo
+   * link + name link) cause us to inject twice, and pagination/virtual
+   * scroll lets stale buttons linger on recycled <li>s. With it, we
+   * guarantee exactly one Save chip per profile globally. */
+  const injectedSaves = new Map(); // canonical url -> wrap element
+
+  function _gcInjected() {
+    for (const [url, node] of injectedSaves.entries()) {
+      if (!node || !document.body.contains(node)) injectedSaves.delete(url);
+    }
+  }
 
   function injectInlineSave(card, profile) {
-    if (card.querySelector(".lc-inline-save")) return;
+    // Sales Navigator cards often expose BOTH a /sales/lead/ anchor and an
+    // /in/ anchor pointing at the same person. Contact-info scraping only
+    // works on /in/ pages (the modal doesn't exist on Sales Nav lead pages),
+    // so when both are available, swap the profile URL to the /in/ form
+    // before saving. Same canonical URL = same backend lead, no duplicate.
+    if (profile.linkedin_url && profile.linkedin_url.includes("/sales/lead/")) {
+      const cardInLink = card.querySelector("a[href*='/in/']");
+      if (cardInLink) {
+        const inUrl = globalThis.__lcDom.normalizeProfileUrl(cardInLink.href);
+        if (inUrl) profile.linkedin_url = inUrl;
+      }
+    }
+    const url = profile.linkedin_url;
+    if (!url) return;
+    // De-dupe: if we already have a save chip for this URL still in the DOM,
+    // don't add another. If the recorded element was removed (pagination,
+    // SPA re-render), let it through.
+    const existing = injectedSaves.get(url);
+    if (existing && document.body.contains(existing)) return;
+    if (existing) injectedSaves.delete(url);
 
+    const textSpan = el("span", { class: "lc-inline-save-text" }, "Save");
     const btn = el(
       "button",
       {
-        class: "lc-inline-save lc-inline-save-floating",
+        class: "lc-inline-save",
         type: "button",
         title: "Save to LeadCaptura",
       },
-      el("span", { class: "lc-inline-save-text" }, "Save")
+      textSpan
     );
     btn.dataset.state = "ready";
+
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
-      btn.querySelector(".lc-inline-save-text").textContent = "Saving…";
+      textSpan.textContent = "Saving…";
       try {
+        // Step 1 — save the card data (name, title, company, location,
+        // avatar, headline) immediately. The user gets a "Saved ✓" pill
+        // even if the iframe enrichment below times out or yields nothing.
         const result = await Api.syncProfile(profile);
-        btn.dataset.state = "saved";
-        btn.querySelector(".lc-inline-save-text").textContent = "Saved";
         if (result.lead?.id) {
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
         }
-        // Kick off Contact-info enrichment in a background tab. The new tab's
-        // content script will scrape email + phone from the modal and push an
-        // update (deduped by linkedin_url), then close itself.
+        btn.dataset.state = "saved";
+        textSpan.textContent = "Saved ✓";
+
+        // Step 2 — enrich email / phone / company website via a HIDDEN
+        // IFRAME. No new tab, no popup, no visual artefact: we mount an
+        // off-screen iframe at /in/<handle>/overlay/contact-info/ which is
+        // same-origin, so we can read its DOM and pull mailto:/tel:
+        // anchors directly. Only /in/ URLs are eligible — /sales/lead/
+        // pages don't render the Contact info modal, and bouncing them
+        // would create the duplicate-blank-lead problem.
         const settings = await Storage.getSettings();
-        if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
+        if (
+          settings.autoEnrichOnSave === false ||
+          !profile.linkedin_url?.includes("/in/")
+        ) {
+          return;
+        }
+
+        // Rate-limit handshake with the service worker. The SW holds the
+        // 20/hr + 100/day budget shared across all open LinkedIn tabs.
+        const allowed = await new Promise((resolve) => {
           try {
-            chrome.runtime.sendMessage({
-              type: "lc:enrichProfile",
-              url: profile.linkedin_url,
-            });
-            btn.querySelector(".lc-inline-save-text").textContent = "Saved · enriching…";
-          } catch (enrichErr) {
-            console.warn("[LeadCaptura] enrichment dispatch failed", enrichErr);
+            chrome.runtime.sendMessage(
+              { type: "lc:reserveEnrich" },
+              (resp) => {
+                if (chrome.runtime.lastError) return resolve(false);
+                resolve(resp?.ok === true);
+              }
+            );
+          } catch {
+            resolve(false);
           }
+        });
+        if (!allowed) {
+          textSpan.textContent = "Saved (daily limit)";
+          return;
+        }
+
+        textSpan.textContent = "Saved · enriching…";
+        const contact = await Scraper.scrapeContactInfoViaIframe(
+          profile.linkedin_url
+        );
+        if (contact.email || contact.phone || contact.website) {
+          const enriched = { ...profile };
+          if (contact.email) enriched.email = contact.email;
+          if (contact.phone) enriched.phone = contact.phone;
+          if (contact.website) enriched.company_url = contact.website;
+          enriched.raw = {
+            ...(enriched.raw || {}),
+            contact_info_scraped: true,
+          };
+          try {
+            await Api.syncProfile(enriched);
+            const got = [
+              contact.email && "email",
+              contact.phone && "phone",
+            ]
+              .filter(Boolean)
+              .join(" + ");
+            textSpan.textContent = got ? `Saved ✓ (${got})` : "Saved ✓";
+          } catch {
+            textSpan.textContent = "Saved ✓";
+          }
+        } else {
+          textSpan.textContent = "Saved ✓";
         }
       } catch (err) {
         btn.dataset.state = "error";
-        btn.querySelector(".lc-inline-save-text").textContent = "Retry";
+        textSpan.textContent = "Retry";
         console.warn("[LeadCaptura] save failed", err);
       }
     });
 
-    // Always float in the top-right of the card so we never collide with
-    // LinkedIn's native Connect/Message/Follow buttons.
-    const computed = getComputedStyle(card);
-    if (computed.position === "static") card.style.position = "relative";
-    card.appendChild(btn);
+    const wrap = el("div", { class: "lc-save-row" }, btn);
+    wrap.dataset.lcUrl = url;
+
+    // The chip floats absolute at the top-right of the card, just inboard of
+    // LinkedIn's Connect/Pending button. The card needs position:relative
+    // for the absolute child to anchor correctly.
+    try {
+      if (getComputedStyle(card).position === "static") {
+        card.style.position = "relative";
+      }
+    } catch {
+      card.style.position = "relative";
+    }
+    card.appendChild(wrap);
+    injectedSaves.set(url, wrap);
   }
 
   function _cardFromLink(link) {
+    // Walk up to find the row/card root. Different LinkedIn surfaces use
+    // different element types:
+    //   - Regular People Search:  <li>
+    //   - Sales Nav search:       <li> or <article>
+    //   - Sales Nav saved-list:   <tr> or div[role='row']  (table layout)
+    //   - mynetwork:              <li> usually, sometimes <article>
+    // We prefer these structural roots over any inner flex wrapper so our
+    // absolutely-positioned save chip anchors to the full row instead of
+    // becoming a sibling next to LinkedIn's action buttons.
     let node = link.parentElement;
-    for (let i = 0; i < 10 && node; i++) {
+    let actionFallback = null;
+    let listFallback = null;
+    for (let i = 0; i < 14 && node; i++) {
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
-        (node.querySelector("img") &&
-          node.querySelector("button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"))
+        node.tagName === "TR" ||
+        node.getAttribute?.("role") === "row" ||
+        node.getAttribute?.("role") === "listitem"
       ) {
         return node;
       }
+      // Primary fallback: container that holds Connect/Message/Follow.
+      if (
+        !actionFallback &&
+        node.querySelector("img") &&
+        node.querySelector(
+          "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
+        )
+      ) {
+        actionFallback = node;
+      }
+      // Secondary fallback for saved-list / leads-list views: they don't
+      // expose Connect/Message buttons (the user already saved the lead).
+      // Instead they have checkboxes or single profile links per row.
+      if (
+        !listFallback &&
+        node.querySelector("img") &&
+        (node.querySelector("input[type='checkbox']") ||
+          node.querySelector("[role='cell']"))
+      ) {
+        listFallback = node;
+      }
       node = node.parentElement;
     }
-    return link.parentElement;
+    return actionFallback || listFallback || link.parentElement;
+  }
+
+  // Mirror of scraper.js _cleanPersonName — keep behavior identical.
+  // Strips degree badges ("• 1st"/"3rd+"), pronouns, premium/influencer
+  // labels, OpenToWork frame text, and a11y "Status is online" text from
+  // any concatenated person-name string. Truncates at the first such marker
+  // so wrap-the-whole-card link fallbacks don't poison full_name.
+  function _cleanCardName(raw) {
+    if (!raw) return null;
+    let s = String(raw).replace(/\s+/g, " ").trim();
+    const cutMarkers = [
+      /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
+      /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
+      /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
+      /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
+      /\s*\bStatus is (online|offline|reachable)\b.*/i,
+      /\s*\bView\s+\S+(?:'|’)s\s+profile\b.*/i,
+      /\s*\bPremium\s*Member\b.*/i,
+      /\s*\bOpenToWork\b.*/i,
+      /\s*\bHiring\b.*/i,
+      /\s*\bVerified\b.*/i,
+    ];
+    for (const re of cutMarkers) s = s.replace(re, "").trim();
+    s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
+    return s || null;
   }
 
   function profileFromCard(card, link) {
@@ -483,18 +651,59 @@
     if (!linkEl) return null;
     const nameNode =
       linkEl.querySelector("span[aria-hidden='true']") ||
+      linkEl.querySelector("strong, b") ||
       card.querySelector("[data-anonymize='person-name']");
-    const name = (nameNode?.textContent || linkEl.textContent || "").trim();
+    let rawName = nameNode?.textContent;
+    if (!rawName) {
+      // Falling back to the full link text is dangerous because LinkedIn
+      // sometimes wraps the entire card body in the /in/ anchor. Take only
+      // the leading person-name segment by cutting at the first degree
+      // badge / bullet separator.
+      const txt = (linkEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt && txt.length < 80 && !/[•·]\s*(1st|2nd|3rd\+?)/i.test(txt)) {
+        rawName = txt;
+      } else if (txt) {
+        rawName = txt.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+      }
+    }
+    // URL-slug fallback so a stripped/unrendered name never blocks save.
+    if (!rawName) {
+      try {
+        const slug = new URL(linkEl.href, location.origin).pathname
+          .replace(/^\/in\//, "")
+          .replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          rawName = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ");
+        }
+      } catch {}
+    }
+    const name = _cleanCardName(rawName);
     if (!name || /linkedin member/i.test(name)) return null;
     // Headline is typically the first descriptive text region in the card
     // that isn't the name itself or an action label.
     const textCandidates = Array.from(card.querySelectorAll("div, p, span"))
+      // Skip elements that live INSIDE a profile link — those are other
+      // people's names (mutual connections, "people also viewed") embedded
+      // inside the same card <li>, and their text poisons the headline.
+      .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
+      // Skip container elements that WRAP a profile link (same reason).
+      .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
       .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())
       .filter(Boolean)
       .filter(
         (t) =>
           t !== name &&
           !/connect|message|follow|view profile|premium/i.test(t) &&
+          // Drop any text that contains a LinkedIn degree badge ("• 1st",
+          // "• 2nd", "• 3rd+") — those are person references, not headlines.
+          !/•\s*(1st|2nd|3rd\+?)/i.test(t) &&
+          // Drop activity/feed noise ("Feed post", "Reposted this",
+          // "Liked by", "Recent activity") — never headlines.
+          !/^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! |status is )/i.test(t) &&
           t.length > 4 &&
           t.length < 240
       );
@@ -507,17 +716,29 @@
           (t.includes(",") ||
             /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
       ) || null;
+    // LinkedIn's media CDN requires the signed-JWT query string. Storing
+    // the URL without it returns a 403 placeholder. The backend column is
+    // TEXT (unbounded) so we keep the URL verbatim.
     const avatar = card.querySelector("img")?.getAttribute("src") || null;
     const [first_name, ...rest] = name.split(/\s+/);
+    // Many LinkedIn headlines use pipe-separated tags after the primary job:
+    //   "Head of Events at HEC Paris Doha | Executive Education | Aviation"
+    // We split at the first "|" to extract just the primary job segment,
+    // then split that on " at " to separate title from company. Without the
+    // pipe-first step, the company field becomes the entire trailing string.
+    const primarySegment = (headline || "").split("|")[0].trim();
+    const atParts = primarySegment.split(/\s+at\s+/i);
+    const titlePart = atParts[0] || null;
+    const companyPart = atParts.slice(1).join(" at ") || null;
     return {
       linkedin_url: globalThis.__lcDom.normalizeProfileUrl(linkEl.href),
-      full_name: name,
-      first_name,
-      last_name: rest.join(" ") || null,
+      full_name: name.slice(0, 240),
+      first_name: first_name ? first_name.slice(0, 120) : null,
+      last_name: rest.join(" ").slice(0, 120) || null,
       headline,
-      title: (headline || "").split(/\s+at\s+/i)[0] || null,
-      company_name: (headline || "").split(/\s+at\s+/i)[1] || null,
-      location: location_,
+      title: titlePart ? titlePart.slice(0, 240) : null,
+      company_name: companyPart ? companyPart.slice(0, 200) : null,
+      location: location_ ? location_.slice(0, 200) : null,
       avatar_url: avatar,
       raw: { source_url: location.href, page_type: "card-inline" },
     };
@@ -526,32 +747,64 @@
   function decorateSearchCards() {
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
-    // Find unique profile cards by iterating /in/ (and /sales/lead/) anchors.
-    // The same approach as the scraper, kept in sync.
+
+    // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
+    _gcInjected();
+
+    // LinkedIn renders TWO /in/ anchors per card: a PHOTO anchor (no text,
+    // <img> inside) and a NAME anchor (contains <span>Name</span>). DOM
+    // order has the photo first. The naive "first anchor wins" dedup would
+    // call profileFromCard() on the photo anchor → empty name → null
+    // profile → no injection, and then skip the name anchor as a duplicate
+    // URL. Result: ZERO save chips on every card. Fix: group anchors by
+    // canonical URL and pick the one with actual text content per group.
     const links = document.querySelectorAll(
       "a[href*='/in/'], a[href*='/sales/lead/']"
     );
-    const seenCards = new Set();
-    links.forEach((link) => {
-      const card = _cardFromLink(link);
-      if (!card || seenCards.has(card)) return;
-      seenCards.add(card);
+    const byUrl = new Map(); // url -> best anchor (preferring ones with text)
+    for (const link of links) {
       const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
-      // Track decoration by the URL of the link inside the card. LinkedIn
-      // recycles <li> elements on pagination / virtual scroll, so flagging
-      // by element alone misses cards that got re-populated with a different
-      // profile. If the stored URL no longer matches, blow away the old
-      // Save button so we can re-inject for the new profile.
-      if (card.dataset.lcUrl && card.dataset.lcUrl !== url) {
-        card.querySelector(".lc-inline-save")?.remove();
-        delete card.dataset.lcUrl;
+      if (!url) continue;
+      const current = byUrl.get(url);
+      const linkHasText = (link.textContent || "").trim().length > 0;
+      if (!current) {
+        byUrl.set(url, link);
+      } else if (linkHasText && !(current.textContent || "").trim()) {
+        // Upgrade: the new candidate has the name text, the stored one didn't
+        byUrl.set(url, link);
       }
-      if (card.dataset.lcUrl === url) return;
-      const profile = profileFromCard(card, link);
-      if (!profile?.linkedin_url) return;
-      injectInlineSave(card, profile);
-      card.dataset.lcUrl = url;
-    });
+    }
+
+    for (const [url, link] of byUrl.entries()) {
+      try {
+        const existing = injectedSaves.get(url);
+        if (existing && document.body.contains(existing)) continue;
+
+        const card = _cardFromLink(link);
+        if (!card) continue;
+
+        const stray = card.querySelector(".lc-save-row");
+        if (stray) {
+          // Check by identity: if the chip is still tracked in our registry
+          // it's OUR chip for this card — leave it alone. This happens when
+          // a Sales Nav card has both a /sales/lead/ anchor (the byUrl key
+          // here) and a /in/ anchor; injectInlineSave() stores the chip
+          // under the /in/ URL, so it looks like a "stray" but isn't.
+          const trackedNode = injectedSaves.get(stray.dataset.lcUrl);
+          if (trackedNode === stray) continue;
+          // Truly recycled <li>: LinkedIn reused this DOM node for a
+          // different person. Remove the old chip before re-injecting.
+          injectedSaves.delete(stray.dataset.lcUrl);
+          stray.remove();
+        }
+
+        const profile = profileFromCard(card, link);
+        if (!profile?.linkedin_url) continue;
+        injectInlineSave(card, profile);
+      } catch (e) {
+        console.warn("[LeadCaptura] decorate failed", e?.message);
+      }
+    }
   }
 
   globalThis.__lcOverlay = {

@@ -159,6 +159,14 @@
     if (running) return;
     running = true;
     try {
+      // Guard against a stale extension context. After an extension reload,
+      // open LinkedIn tabs still have the OLD content scripts running but
+      // their chrome.storage / chrome.runtime references are dead. Calling
+      // them throws "Cannot read properties of undefined (reading 'get')"
+      // every 60s until the tab is reloaded. Detect and bail silently.
+      if (!chrome?.storage?.local?.get) return;
+      try { if (!chrome.runtime?.id) return; } catch { return; }
+
       const settings = await globalThis.__lcStorage.getSettings();
       if (!settings.enabled || !settings.autopilot) return;
       const jobs = await Api.nextJobs(1).catch(() => []);
