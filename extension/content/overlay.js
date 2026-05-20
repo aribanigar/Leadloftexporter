@@ -183,11 +183,31 @@
     try {
       // On /in/ pages we open the Contact info modal and read email/phone the
       // same way a human would — opens the visible modal, scrapes, closes.
+      // If the user has manually opened the Contact info modal already,
+      // scrapeProfileWithContact() will find it and just read it (no extra
+      // click), and `enriched.email` / `enriched.phone` come back populated.
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
         enriched = await Scraper.scrapeProfileWithContact();
       }
     } catch {
       enriched = profile;
+    }
+    // Re-scrape the base profile so a Save click that ran after the h1
+    // finally hydrated picks up the correct name/title even though the
+    // initial panel render saw "Unknown profile". Without this re-scrape,
+    // the click handler would send back the stale empty profile object.
+    if ((!enriched.full_name || !enriched.title) && Scraper.scrapeProfile) {
+      try {
+        const fresh = Scraper.scrapeProfile();
+        if (fresh) {
+          for (const k of [
+            "full_name", "first_name", "last_name", "headline",
+            "title", "company_name", "location", "avatar_url",
+          ]) {
+            if (!enriched[k] && fresh[k]) enriched[k] = fresh[k];
+          }
+        }
+      } catch {}
     }
     flashStatus("Saving…");
     try {
@@ -601,13 +621,67 @@
     return actionFallback || listFallback || link.parentElement;
   }
 
+  // Mirror of scraper.js _cleanPersonName — keep behavior identical.
+  // Strips degree badges ("• 1st"/"3rd+"), pronouns, premium/influencer
+  // labels, OpenToWork frame text, and a11y "Status is online" text from
+  // any concatenated person-name string. Truncates at the first such marker
+  // so wrap-the-whole-card link fallbacks don't poison full_name.
+  function _cleanCardName(raw) {
+    if (!raw) return null;
+    let s = String(raw).replace(/\s+/g, " ").trim();
+    const cutMarkers = [
+      /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
+      /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
+      /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
+      /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
+      /\s*\bStatus is (online|offline|reachable)\b.*/i,
+      /\s*\bView\s+\S+(?:'|’)s\s+profile\b.*/i,
+      /\s*\bPremium\s*Member\b.*/i,
+      /\s*\bOpenToWork\b.*/i,
+      /\s*\bHiring\b.*/i,
+      /\s*\bVerified\b.*/i,
+    ];
+    for (const re of cutMarkers) s = s.replace(re, "").trim();
+    s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
+    return s || null;
+  }
+
   function profileFromCard(card, link) {
     const linkEl = link || card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
     if (!linkEl) return null;
     const nameNode =
       linkEl.querySelector("span[aria-hidden='true']") ||
+      linkEl.querySelector("strong, b") ||
       card.querySelector("[data-anonymize='person-name']");
-    const name = (nameNode?.textContent || linkEl.textContent || "").trim();
+    let rawName = nameNode?.textContent;
+    if (!rawName) {
+      // Falling back to the full link text is dangerous because LinkedIn
+      // sometimes wraps the entire card body in the /in/ anchor. Take only
+      // the leading person-name segment by cutting at the first degree
+      // badge / bullet separator.
+      const txt = (linkEl.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt && txt.length < 80 && !/[•·]\s*(1st|2nd|3rd\+?)/i.test(txt)) {
+        rawName = txt;
+      } else if (txt) {
+        rawName = txt.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+      }
+    }
+    // URL-slug fallback so a stripped/unrendered name never blocks save.
+    if (!rawName) {
+      try {
+        const slug = new URL(linkEl.href, location.origin).pathname
+          .replace(/^\/in\//, "")
+          .replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          rawName = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ");
+        }
+      } catch {}
+    }
+    const name = _cleanCardName(rawName);
     if (!name || /linkedin member/i.test(name)) return null;
     // Headline is typically the first descriptive text region in the card
     // that isn't the name itself or an action label.
@@ -627,6 +701,9 @@
           // Drop any text that contains a LinkedIn degree badge ("• 1st",
           // "• 2nd", "• 3rd+") — those are person references, not headlines.
           !/•\s*(1st|2nd|3rd\+?)/i.test(t) &&
+          // Drop activity/feed noise ("Feed post", "Reposted this",
+          // "Liked by", "Recent activity") — never headlines.
+          !/^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! |status is )/i.test(t) &&
           t.length > 4 &&
           t.length < 240
       );

@@ -48,6 +48,46 @@
   const _txt = (n) => (n?.textContent || "").replace(/\s+/g, " ").trim() || null;
   const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Strip LinkedIn-rendered noise that gets concatenated into person-name
+  // text by `textContent`: degree badges ("• 1st"/"· 2nd"/"3rd+"), pronouns
+  // ("(He/Him)"), Premium/Influencer trailing labels, the "Status is online"
+  // accessibility text, "Verified" badges, and OpenToWork frame text. Also
+  // truncates at the first such marker so "Mafaz Ahmed • 3rd+Marketing
+  // ProfessionalKuwait City…" (entire-card-as-link fallback) becomes just
+  // "Mafaz Ahmed".
+  function _cleanPersonName(raw) {
+    if (!raw) return null;
+    let s = String(raw).replace(/\s+/g, " ").trim();
+    // Truncate at the first degree badge or visible-bullet separator.
+    const cutMarkers = [
+      /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
+      /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
+      /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
+      /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
+      /\s*\bStatus is (online|offline|reachable)\b.*/i,
+      /\s*\bView\s+\S+(?:’|')s\s+profile\b.*/i,
+      /\s*\bPremium\s*Member\b.*/i,
+      /\s*\bOpenToWork\b.*/i,
+      /\s*\bHiring\b.*/i,
+      /\s*\bVerified\b.*/i,
+    ];
+    for (const re of cutMarkers) s = s.replace(re, "").trim();
+    // Strip trailing punctuation
+    s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
+    return s || null;
+  }
+
+  // Reject headline/location candidates that come from the profile's
+  // activity / posts / recent-feed sections. Those drift in front of the
+  // actual headline when LinkedIn restructures the top card wrapper and
+  // poison the title field with "Feed post" / "Reposted this" / etc.
+  function _isFeedNoise(text) {
+    if (!text) return true;
+    return /^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! )/i.test(
+      text.trim()
+    );
+  }
+
   /* ---------- Profile page (/in/handle) ----------
    *
    * The top card is a <section> (or <div>) inside <main> that contains the
@@ -66,6 +106,13 @@
       if (card.querySelector("img") && card.querySelector("a[href*='/overlay/']")) break;
       card = card.parentElement;
     }
+    // SAFETY GUARD: if our walk hit <main> or <body> (no proper top card
+    // wrapper found), shrink back to a small slice around h1. Otherwise the
+    // headline/location scan grabs text from the Recent activity, Featured,
+    // and Experience sections — leading to title="Feed post" etc.
+    if (!card || card.tagName === "MAIN" || card.tagName === "BODY") {
+      card = h1.parentElement?.parentElement || h1.parentElement;
+    }
     return { h1, card: card || h1.parentElement };
   }
 
@@ -73,24 +120,39 @@
     // Walk DOM order after the h1 and return the first sibling-ish element
     // that has text > 4 chars and is NOT the name itself. This is the
     // "headline" line LinkedIn renders directly under the name.
-    const seen = new Set();
-    const queue = [h1.parentElement];
+    //
+    // We DELIBERATELY stay within the same parent and one level below,
+    // never recursing up to <main>. Without this bound, the walk reaches
+    // the "Recent activity" / "Featured posts" sections and grabs strings
+    // like "Feed post" as the headline.
+    const start = h1.parentElement;
+    if (!start) return null;
     let foundH1 = false;
-    while (queue.length) {
-      const node = queue.shift();
-      if (!node || seen.has(node)) continue;
-      seen.add(node);
-      for (const child of node.children) {
-        if (child === h1) {
-          foundH1 = true;
-          continue;
+    for (const child of start.children) {
+      if (child === h1) { foundH1 = true; continue; }
+      if (!foundH1) continue;
+      const t = _txt(child);
+      if (
+        t &&
+        t.length > 4 &&
+        t.length < 240 &&
+        !/connect|message|follow|more|premium/i.test(t) &&
+        !_isFeedNoise(t)
+      ) {
+        return t;
+      }
+      // Look one level deeper for the sibling that hosts the headline span
+      for (const grand of child.children || []) {
+        const g = _txt(grand);
+        if (
+          g &&
+          g.length > 4 &&
+          g.length < 240 &&
+          !/connect|message|follow|more|premium/i.test(g) &&
+          !_isFeedNoise(g)
+        ) {
+          return g;
         }
-        if (!foundH1) continue;
-        const t = _txt(child);
-        if (t && t.length > 4 && t.length < 240 && !/connect|message|follow|more/i.test(t)) {
-          return t;
-        }
-        if (child.children?.length) queue.push(child);
       }
     }
     return null;
@@ -110,7 +172,7 @@
 
   function scrapeProfile() {
     const { h1, card } = _findTopCard();
-    const fullName = _txt(h1);
+    const fullName = _cleanPersonName(_txt(h1));
 
     // Headline: the text line directly under the name. Multiple fallbacks
     // because LinkedIn sometimes wraps it in different structures.
@@ -120,7 +182,14 @@
       let n = h1.nextElementSibling;
       while (n && !headline) {
         const t = _txt(n);
-        if (t && t.length > 4) headline = t;
+        if (
+          t &&
+          t.length > 4 &&
+          !_isFeedNoise(t) &&
+          !/connect|message|follow|more|premium/i.test(t)
+        ) {
+          headline = t;
+        }
         n = n.nextElementSibling;
       }
       if (!headline) headline = _firstTextAfter(h1);
@@ -139,7 +208,8 @@
       for (const t of candidates) {
         if (t === fullName || t === headline) continue;
         if (/connect|follower|mutual|message/i.test(t)) continue;
-        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi)\b/i.test(t))) {
+        if (_isFeedNoise(t)) continue;
+        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi|kuwait|bahrain|oman|jordan|lebanon|egypt|france|germany|spain|italy|brazil|mexico|canada|australia|singapore|japan|china|netherlands|belgium|switzerland|austria|norway|sweden|denmark|finland|poland|turkey|greece|portugal|ireland|scotland|wales|england|britain|south africa|nigeria|kenya|argentina|chile|colombia|peru|venezuela|new zealand|philippines|indonesia|malaysia|thailand|vietnam|korea|taiwan|pakistan|bangladesh|sri lanka)\b/i.test(t))) {
           location_ = t;
           break;
         }
@@ -169,13 +239,30 @@
     }
 
     const linkedinUrl = normalizeProfileUrl(location.href);
-    const [first_name, ...rest] = (fullName || "").split(/\s+/);
+    // Final-mile name fallback: if h1 didn't yield a usable name, derive one
+    // from the URL slug (linkedin.com/in/nathalie-richani → Nathalie Richani).
+    // Better a slug-derived guess than blank rows in the pipeline.
+    let resolvedName = fullName;
+    if (!resolvedName && linkedinUrl) {
+      try {
+        const slug = new URL(linkedinUrl).pathname.replace(/^\/in\//, "").replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          resolvedName = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ")
+            .trim() || null;
+        }
+      } catch {}
+    }
+    const [first_name, ...rest] = (resolvedName || "").split(/\s+/);
 
     // LinkedIn's media CDN requires the signed-JWT query string. Strip it
     // and the image returns 403. Backend column is TEXT, so we send verbatim.
     return {
       linkedin_url: linkedinUrl,
-      full_name: fullName ? fullName.slice(0, 240) : null,
+      full_name: resolvedName ? resolvedName.slice(0, 240) : null,
       first_name: first_name ? first_name.slice(0, 120) : null,
       last_name: rest.join(" ").slice(0, 120) || null,
       headline,  // TEXT column on the backend, no cap needed
@@ -498,16 +585,46 @@
 
   function _profileFromCard(card, link) {
     const url = normalizeProfileUrl(link.href);
-    // Name: try aria-hidden span first (LinkedIn duplicates the name there
-    // for screen readers), fallback to link text. Skip cards where the name
-    // is the generic "LinkedIn Member" placeholder — those have no
-    // identifying data we can capture.
-    let name =
-      _txt(link.querySelector("span[aria-hidden='true']")) ||
-      _txt(link);
+    // Name extraction — prefer the most specific source available:
+    //   1. aria-hidden span (LinkedIn duplicates the name for screen readers).
+    //   2. <strong>/<b> child of the link (often wraps the name).
+    //   3. Link text — but ONLY if it looks like a name, not the whole card.
+    //   4. URL slug as last resort (turns "/in/nathalie-richani" into
+    //      "Nathalie Richani"), better than blank.
+    let name = _txt(link.querySelector("span[aria-hidden='true']"));
+    if (!name) name = _txt(link.querySelector("strong, b"));
+    if (!name) {
+      const raw = _txt(link) || "";
+      // LinkedIn sometimes wraps the entire card body in the /in/ anchor.
+      // In that case the link text is "Mafaz Ahmed • 3rd+Marketing
+      // ProfessionalKuwait City…" — we must NOT use it as the name.
+      // Heuristic: split at the first degree badge / bullet separator and
+      // keep only the leading person-name segment.
+      if (raw && raw.length < 80 && !/[•·]\s*(1st|2nd|3rd\+?)/i.test(raw)) {
+        name = raw;
+      } else if (raw) {
+        // Take everything before the first degree marker / bullet.
+        const cut = raw.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+        if (cut && cut.length < 80) name = cut;
+      }
+    }
+    if (!name) {
+      // URL-slug fallback
+      try {
+        const slug = new URL(url, location.origin).pathname
+          .replace(/^\/in\//, "")
+          .replace(/\/$/, "");
+        if (slug && !slug.includes("/")) {
+          name = slug
+            .split("-")
+            .filter((p) => !/^\d+$/.test(p))
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" ");
+        }
+      } catch {}
+    }
+    name = _cleanPersonName(name);
     if (!name || /linkedin member/i.test(name)) return null;
-    // Strip degree badges that sometimes get concatenated in
-    name = name.replace(/\s*•\s*(1st|2nd|3rd\+?|3rd)\s*$/i, "").trim();
 
     // Headline/subtitle: the next sibling text region of the card after the
     // name link. We approximate by walking siblings of the link's container.
