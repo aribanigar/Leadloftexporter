@@ -64,7 +64,7 @@
       /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
       /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
       /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
-      /\s*\bStatus is (online|offline|reachable)\b.*/i,
+      /^\s*Status is (online|offline|reachable)\s*/i,
       /\s*\bView\s+\S+(?:’|')s\s+profile\b.*/i,
       /\s*\bPremium\s*Member\b.*/i,
       /\s*\bOpenToWork\b.*/i,
