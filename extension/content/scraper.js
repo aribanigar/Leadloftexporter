@@ -359,47 +359,119 @@
     return /\bcontact info\b/i.test(modal.textContent || "");
   }
 
-  function _scrapeFromContactModal(modal) {
-    if (!modal) return { email: null, phone: null, website: null };
-    const emailAnchor = modal.querySelector("a[href^='mailto:']");
-    const email = emailAnchor
-      ? emailAnchor.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
-      : null;
+  // Parse a labelled section of the Contact info modal by header text.
+  // LinkedIn renders each field as roughly:
+  //   <section>
+  //     <h3>Address</h3>
+  //     <span class="...">Doha- Qatar</span>   (or an <a> for clickable fields)
+  //   </section>
+  // The section/header structure stays the same across LinkedIn's class-name
+  // rotations, so we anchor on the header text not classes. Returns the text
+  // value (without the header itself) or null.
+  function _modalSection(modal, headerPattern) {
+    if (!modal) return null;
+    const headers = modal.querySelectorAll("h3, h4");
+    for (const h of headers) {
+      const ht = (h.textContent || "").trim();
+      if (!headerPattern.test(ht)) continue;
+      // Walk up to the section/li/div that wraps both header and value,
+      // then collect everything inside that ISN'T the header.
+      let wrap = h.parentElement;
+      // Climb until we have a non-header child to read — but at most 3
+      // levels so we don't escape into adjacent sections.
+      for (let i = 0; i < 3 && wrap; i++) {
+        const value = Array.from(wrap.children)
+          .filter((c) => c !== h && !c.contains(h))
+          .map((c) => (c.textContent || "").replace(/\s+/g, " ").trim())
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        if (value) return value;
+        wrap = wrap.parentElement;
+      }
+    }
+    return null;
+  }
 
+  function _scrapeFromContactModal(modal) {
+    if (!modal) return { email: null, phone: null, website: null, address: null };
+
+    // Email: prefer the explicit mailto: anchor, fall back to the section
+    // text under an "Email" header.
+    let email = null;
+    const emailAnchor = modal.querySelector("a[href^='mailto:']");
+    if (emailAnchor) {
+      email = (emailAnchor.getAttribute("href") || "")
+        .replace(/^mailto:/, "")
+        .split("?")[0]
+        .trim();
+    } else {
+      const txt = _modalSection(modal, /^\s*email\s*$/i);
+      if (txt) {
+        const m = txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+        if (m) email = m[0];
+      }
+    }
+
+    // Phone: tel: anchor → "Phone" section text fallback.
     let phone = null;
     const phoneAnchor = modal.querySelector("a[href^='tel:']");
     if (phoneAnchor) {
-      phone = phoneAnchor.getAttribute("href").replace(/^tel:/, "").trim();
+      phone = (phoneAnchor.getAttribute("href") || "")
+        .replace(/^tel:/, "")
+        .trim();
     } else {
-      // Some profiles list the phone as plain text under a "Phone" header.
-      const sections = modal.querySelectorAll("section, li, div");
-      for (const s of sections) {
-        const h = _txt(s.querySelector("h3, h4, span"));
-        if (h && /phone/i.test(h)) {
-          const m = (_txt(s) || "").match(/\+?[\d\s\-().]{7,}/);
-          if (m) {
-            phone = m[0].replace(/\s+/g, " ").trim();
-            break;
+      const txt = _modalSection(modal, /^\s*phone\s*$/i);
+      if (txt) {
+        const m = txt.match(/\+?[\d\s\-().]{7,}/);
+        if (m) phone = m[0].replace(/\s+/g, " ").trim();
+      }
+    }
+
+    // Address: text under an "Address" header. Drop any parenthetical
+    // suffixes LinkedIn appends (e.g. "(Other)").
+    let address = _modalSection(modal, /^\s*address\s*$/i);
+    if (address) {
+      address = address.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
+    }
+
+    // Website: prefer the "Website" labelled section so we capture the
+    // canonical URL even when LinkedIn renders the link text as the
+    // domain. Falls back to the first external http anchor.
+    let website = null;
+    const webHeader = modal.querySelectorAll("h3, h4");
+    for (const h of webHeader) {
+      if (!/^\s*website\s*$/i.test(h.textContent || "")) continue;
+      let wrap = h.parentElement;
+      for (let i = 0; i < 3 && wrap && !website; i++) {
+        const a = wrap.querySelector("a[href^='http']");
+        if (a) {
+          const href = a.getAttribute("href") || "";
+          if (!href.includes("linkedin.com") && !href.includes("/overlay/")) {
+            website = href;
           }
+        }
+        wrap = wrap.parentElement;
+      }
+      if (website) break;
+    }
+    if (!website) {
+      const externals = modal.querySelectorAll("a[href^='http']");
+      for (const a of externals) {
+        const href = a.getAttribute("href") || "";
+        if (
+          !href.includes("linkedin.com") &&
+          !href.startsWith("mailto:") &&
+          !href.startsWith("tel:") &&
+          !href.includes("/overlay/")
+        ) {
+          website = href;
+          break;
         }
       }
     }
 
-    let website = null;
-    const externalAnchors = Array.from(modal.querySelectorAll("a[href^='http']"));
-    for (const a of externalAnchors) {
-      const href = a.getAttribute("href") || "";
-      if (
-        !href.includes("linkedin.com") &&
-        !href.startsWith("mailto:") &&
-        !href.startsWith("tel:") &&
-        !href.includes("/overlay/")
-      ) {
-        website = href;
-        break;
-      }
-    }
-    return { email, phone, website };
+    return { email, phone, website, address };
   }
 
   function _closeContactModal() {
@@ -419,7 +491,7 @@
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
-      return { email: null, phone: null, website: null };
+      return { email: null, phone: null, website: null, address: null };
     }
 
     const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
@@ -492,7 +564,7 @@
       }
     }
 
-    if (!modal) return { email: null, phone: null, website: null };
+    if (!modal) return { email: null, phone: null, website: null, address: null };
 
     // Wait for modal contents to fully hydrate. The mailto: anchor is added
     // by React in a second tick after the dialog mounts — reading too early
@@ -501,12 +573,25 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Retry once if the modal opened but contents weren't rendered yet.
-    if (!data.email && !data.phone) {
+    // Retry up to 3 more times if the modal opened but the contents weren't
+    // rendered yet. Cheap React fiddly markup — the email/phone anchors
+    // can take 1-4 seconds to appear after the dialog mounts. We bail
+    // early once we have something useful (email or phone), capped at
+    // 6s total wait so the user doesn't sit on a hung Save button.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (data.email && data.phone && data.address) break;
       await _sleep(1500);
-      // Re-query modal in case it remounted
       modal = _findContactModal() || modal;
-      data = _scrapeFromContactModal(modal);
+      const next = _scrapeFromContactModal(modal);
+      // Merge — preserve any field we already captured (LinkedIn sometimes
+      // remounts the modal and we lose a field we had a moment ago).
+      data = {
+        email: data.email || next.email,
+        phone: data.phone || next.phone,
+        website: data.website || next.website,
+        address: data.address || next.address,
+      };
+      if (data.email || data.phone) break;
     }
 
     // Skip the dismiss if we navigated via pushState — the close button
@@ -562,6 +647,12 @@
       if (contact.email && !base.email) base.email = contact.email;
       if (contact.phone && !base.phone) base.phone = contact.phone;
       if (contact.website && !base.company_url) base.company_url = contact.website;
+      // Modal "Address" → lead.location. The modal address is usually more
+      // specific than the top-card location ("Doha- Qatar" vs just "Qatar")
+      // so prefer it when present.
+      if (contact.address) {
+        base.location = contact.address.slice(0, 200);
+      }
 
       // Fallback: scan About / Experience text for any publicly-shared email
       // or phone. Reaches profiles where the modal hides contact info.
@@ -580,6 +671,12 @@
               ? "contact_modal"
               : "profile_text"
             : "none",
+        captured_fields: [
+          base.email && "email",
+          base.phone && "phone",
+          base.location && contact.address && "address",
+          base.company_url && "website",
+        ].filter(Boolean),
       };
     } catch {
       /* enrichment is best-effort */
@@ -886,7 +983,7 @@
       };
 
       const timeoutId = setTimeout(
-        () => finish({ email: null, phone: null, website: null }),
+        () => finish({ email: null, phone: null, website: null, address: null }),
         timeoutMs
       );
 
@@ -902,7 +999,7 @@
         } catch {
           // Cross-origin error — LinkedIn redirected the iframe to a login
           // or checkpoint page on a different origin. Nothing to scrape.
-          return finish({ email: null, phone: null, website: null });
+          return finish({ email: null, phone: null, website: null, address: null });
         }
         if (!doc) return;
 
@@ -928,46 +1025,26 @@
         if (!modal) {
           // Give up cleanly rather than scrape doc-wide and risk
           // capturing somebody else's contact info.
-          return finish({ email: null, phone: null, website: null });
+          return finish({ email: null, phone: null, website: null, address: null });
         }
 
-        const mailto = modal.querySelector("a[href^='mailto:']");
-        const tel = modal.querySelector("a[href^='tel:']");
+        // Reuse the same header-based extractor as the foreground modal
+        // scrape so the iframe path also captures Address + label-based
+        // fallbacks consistently. _scrapeFromContactModal lives in this
+        // module (same global, same `doc` shouldn't matter — modal is a
+        // DOM node, the helper only walks .children/.querySelectorAll).
+        const data = _scrapeFromContactModal(modal);
 
-        // If the modal is present but no contact anchors yet, give React
-        // a couple more polls to hydrate them.
-        if (modal && !mailto && !tel && elapsed < 8000) return;
-
-        const email = mailto
-          ? mailto.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
-          : null;
-        const phone = tel
-          ? tel.getAttribute("href").replace(/^tel:/, "").trim()
-          : null;
-
-        let website = null;
-        if (modal) {
-          const externals = modal.querySelectorAll("a[href^='http']");
-          for (const a of externals) {
-            const href = a.getAttribute("href") || "";
-            if (
-              !href.includes("linkedin.com") &&
-              !href.startsWith("mailto:") &&
-              !href.startsWith("tel:") &&
-              !href.includes("/overlay/")
-            ) {
-              website = href;
-              break;
-            }
-          }
-        }
+        // If the modal is present but contents haven't hydrated yet, give
+        // React a couple more polls before giving up.
+        if (!data.email && !data.phone && !data.address && elapsed < 8000) return;
 
         // No <main>-text fallback here on purpose — the iframe loads the
         // /overlay/contact-info/ URL which can drift to a login wall, feed,
         // or unrelated content; a regex scan would pick up some other
         // person's email and attribute it to this lead. We only trust the
         // anchors inside the verified Contact info modal.
-        finish({ email, phone, website });
+        finish(data);
       }, 500);
 
       document.body.appendChild(iframe);

@@ -185,14 +185,12 @@
   // also contains the literal "Contact info" header text — the unambiguous
   // signature of the Contact info modal.
   function _harvestVisibleContact() {
-    const result = { email: null, phone: null, website: null };
+    const result = { email: null, phone: null, website: null, address: null };
     try {
       const dialogs = document.querySelectorAll("div[role='dialog']");
       let modal = null;
       for (const d of dialogs) {
-        // Must be visibly rendered (has layout boxes)
         if (!d.getClientRects().length) continue;
-        // Must be the CONTACT INFO modal — header text fingerprint.
         const text = (d.innerText || d.textContent || "").trim();
         if (/^contact info\b/i.test(text) || /\bcontact info\b/i.test(text.slice(0, 200))) {
           modal = d;
@@ -212,6 +210,24 @@
       if (tel) {
         const p = (tel.getAttribute("href") || "").replace(/^tel:/, "").trim();
         if (p) result.phone = p;
+      }
+      // Address by labelled section — walk the header siblings
+      const headers = modal.querySelectorAll("h3, h4");
+      for (const h of headers) {
+        if (!/^\s*address\s*$/i.test(h.textContent || "")) continue;
+        let wrap = h.parentElement;
+        for (let i = 0; i < 3 && wrap && !result.address; i++) {
+          const value = Array.from(wrap.children)
+            .filter((c) => c !== h && !c.contains(h))
+            .map((c) => (c.textContent || "").replace(/\s+/g, " ").trim())
+            .filter(Boolean)
+            .join(" ")
+            .replace(/\s*\([^)]*\)\s*$/, "")
+            .trim();
+          if (value) result.address = value;
+          wrap = wrap.parentElement;
+        }
+        if (result.address) break;
       }
       const externals = modal.querySelectorAll("a[href^='http']");
       for (const a of externals) {
@@ -271,6 +287,12 @@
       if (!enriched.phone && visible.phone) enriched.phone = visible.phone;
       if (!enriched.company_url && visible.website)
         enriched.company_url = visible.website;
+      // Address from the open modal beats the top-card location string
+      // (more specific — "Doha- Qatar" vs a generic "Qatar"). Only used
+      // when scrapeProfileWithContact didn't already supply it.
+      if (visible.address) {
+        enriched.location = visible.address.slice(0, 200);
+      }
     }
     flashStatus("Saving…");
     try {
@@ -587,11 +609,12 @@
         const contact = await Scraper.scrapeContactInfoViaIframe(
           profile.linkedin_url
         );
-        if (contact.email || contact.phone || contact.website) {
+        if (contact.email || contact.phone || contact.website || contact.address) {
           const enriched = { ...profile };
           if (contact.email) enriched.email = contact.email;
           if (contact.phone) enriched.phone = contact.phone;
           if (contact.website) enriched.company_url = contact.website;
+          if (contact.address) enriched.location = contact.address.slice(0, 200);
           enriched.raw = {
             ...(enriched.raw || {}),
             contact_info_scraped: true,
@@ -601,6 +624,8 @@
             const got = [
               contact.email && "email",
               contact.phone && "phone",
+              contact.address && "address",
+              contact.website && "site",
             ]
               .filter(Boolean)
               .join(" + ");

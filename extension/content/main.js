@@ -49,13 +49,14 @@
       await Human.sleep(base + bonus);
 
       const contact = await Scraper.scrapeContactInfo();
-      if (!contact.email && !contact.phone) return; // Nothing new to add
+      if (!contact.email && !contact.phone && !contact.address) return; // nothing new
 
       const profile = Scraper.scrapeProfile();
       if (!profile?.linkedin_url) return;
       if (contact.email) profile.email = contact.email;
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
+      if (contact.address) profile.location = contact.address.slice(0, 200);
       profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
 
       await globalThis.__lcApi.syncProfile(profile);
@@ -314,6 +315,7 @@
       if (contact.email) profile.email = contact.email;
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
+      if (contact.address) profile.location = contact.address.slice(0, 200);
       // Text-scan fallback for emails/phones the user wrote into their About
       // or Experience. This catches public contact info even when LinkedIn's
       // Contact-Info modal is empty (non-1st-degree connections).
