@@ -12,6 +12,7 @@ from app.api.v1 import (
     settings,
     extension,
     integrations,
+    search_scrapers,
     ai,
 )
 
@@ -27,5 +28,6 @@ api_router.include_router(playbooks.router)
 api_router.include_router(templates.router)
 api_router.include_router(settings.router)
 api_router.include_router(integrations.router)
+api_router.include_router(search_scrapers.router)
 api_router.include_router(extension.router)
 api_router.include_router(ai.router)

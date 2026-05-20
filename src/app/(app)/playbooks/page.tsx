@@ -29,6 +29,7 @@ const DATE_RANGES = [
 export default function PlaybooksPage() {
   const qc = useQueryClient();
   const [days, setDays] = useState(90);
+  const [scraperOpen, setScraperOpen] = useState(false);
 
   const { data: playbooks } = useQuery<Playbook[]>({
     queryKey: ["playbooks"],
@@ -74,11 +75,23 @@ export default function PlaybooksPage() {
               </option>
             ))}
           </select>
-          <button className="btn-primary" onClick={() => create.mutate()}>
+          <button
+            className="btn-primary"
+            onClick={() => setScraperOpen(true)}
+          >
             <Plus className="h-4 w-4" /> New playbook
           </button>
         </div>
       </div>
+      {scraperOpen && (
+        <NewPlaybookScraperModal
+          onClose={() => setScraperOpen(false)}
+          onCreated={() => {
+            setScraperOpen(false);
+            qc.invalidateQueries({ queryKey: ["playbooks"] });
+          }}
+        />
+      )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
@@ -274,5 +287,174 @@ function Sparkline({ series }: { series: { date: string; count: number }[] }) {
         {lastDate}
       </text>
     </svg>
+  );
+}
+
+
+interface NewPlaybookScraperModalProps {
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+function NewPlaybookScraperModal({ onClose, onCreated }: NewPlaybookScraperModalProps) {
+  const [searchUrl, setSearchUrl] = useState("");
+  const [daily, setDaily] = useState(30);
+  const [total, setTotal] = useState(1000);
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const { data: playbooks } = useQuery<Playbook[]>({
+    queryKey: ["playbooks"],
+    queryFn: () => api("/playbooks"),
+  });
+  const [playbookId, setPlaybookId] = useState<string>("");
+
+  async function submit() {
+    setErr(null);
+    if (!searchUrl.trim()) {
+      setErr("Paste a LinkedIn search URL");
+      return;
+    }
+    if (!searchUrl.includes("linkedin.com/")) {
+      setErr("URL must be a LinkedIn search URL");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // 1. Create the playbook (or reuse an existing one)
+      let pb: Playbook;
+      if (playbookId) {
+        pb = await api<Playbook>(`/playbooks/${playbookId}`);
+      } else {
+        pb = await api<Playbook>("/playbooks", {
+          method: "POST",
+          body: {
+            name: name.trim() || "Untitled Playbook",
+            trigger: "manual",
+            is_active: true,
+            steps: [
+              { kind: "automated_email", wait_days: 0, wait_hours: 0, config: { ai: true } },
+            ],
+          },
+        });
+      }
+      // 2. Create the search scraper bound to that playbook
+      await api("/search-scrapers", {
+        method: "POST",
+        body: {
+          name: name.trim() || null,
+          search_url: searchUrl.trim(),
+          daily_save_cap: daily,
+          total_save_cap: total,
+          playbook_id: pb.id,
+        },
+      });
+      onCreated();
+      window.location.href = `/playbooks/${pb.id}`;
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="card w-full max-w-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-1 text-base font-semibold">LinkedIn Scraper Settings</h3>
+        <p className="mb-4 text-xs text-slate-500">
+          Paste a LinkedIn people-search URL. We will save{" "}
+          <strong>{daily}</strong> contacts per day from this search, stopping
+          after <strong>{total}</strong> contacts. Each new lead auto-enrolls
+          into the playbook below.
+        </p>
+
+        <div className="mb-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Save per day</label>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={100}
+              value={daily}
+              onChange={(e) => setDaily(Number(e.target.value) || 1)}
+            />
+          </div>
+          <div>
+            <label className="label">Stop after (total)</label>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={10000}
+              value={total}
+              onChange={(e) => setTotal(Number(e.target.value) || 1)}
+            />
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="label">LinkedIn search URL</label>
+          <input
+            className="input"
+            type="url"
+            value={searchUrl}
+            onChange={(e) => setSearchUrl(e.target.value)}
+            placeholder="https://www.linkedin.com/search/results/people/?keywords=..."
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="label">Playbook</label>
+          <select
+            className="input"
+            value={playbookId}
+            onChange={(e) => setPlaybookId(e.target.value)}
+          >
+            <option value="">Create new playbook</option>
+            {(playbooks || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {!playbookId && (
+          <div className="mb-3">
+            <label className="label">New playbook name</label>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Untitled Playbook"
+            />
+          </div>
+        )}
+
+        {err && (
+          <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {err}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button className="btn-ghost" onClick={onClose} type="button">
+            Go back
+          </button>
+          <button className="btn-primary" onClick={submit} disabled={submitting} type="button">
+            {submitting ? "Creating…" : "Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

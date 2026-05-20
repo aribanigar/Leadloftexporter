@@ -196,6 +196,47 @@ def submit_result(
             sent_at=datetime.now(timezone.utc),
         )
         db.add(rec)
+
+    # search_scrape jobs return a profiles[] array — ingest them and bump
+    # the SearchScraper counters / auto-enroll into the linked playbook.
+    if (
+        job.kind == "scrape_search"
+        and body.status == "done"
+        and (body.result or {}).get("profiles")
+    ):
+        from app.models import SearchScraper, Playbook
+        from app.services.leads import ingest_lead
+        from app.services.outreach import enroll_lead
+
+        scraper_id = (job.payload or {}).get("scraper_id")
+        scraper = (
+            db.query(SearchScraper).filter(SearchScraper.id == scraper_id).first()
+            if scraper_id else None
+        )
+        playbook = (
+            db.query(Playbook).filter(Playbook.id == scraper.playbook_id).first()
+            if scraper and scraper.playbook_id else None
+        )
+        saved = 0
+        for profile in (body.result or {}).get("profiles") or []:
+            try:
+                lead, created = ingest_lead(
+                    db, ctx.workspace_id, ctx.user_id, profile
+                )
+                if created and playbook:
+                    enroll_lead(db, playbook, lead)
+                saved += 1
+            except Exception:
+                continue
+        if scraper:
+            from app.api.v1.search_scrapers import reset_daily_counters_if_new_day
+
+            reset_daily_counters_if_new_day(scraper)
+            scraper.saved_today += saved
+            scraper.saved_total += saved
+            scraper.last_run_at = datetime.now(timezone.utc)
+            if scraper.saved_total >= scraper.total_save_cap:
+                scraper.status = "completed"
     db.commit()
     return {"ok": True}
 

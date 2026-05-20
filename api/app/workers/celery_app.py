@@ -33,6 +33,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.poll_inbound_email",
         "schedule": crontab(minute="*/5"),
     },
+    # Every 15 minutes — find active SearchScrapers whose daily cap
+    # isn't hit yet and queue a scrape_search ExtensionJob if one isn't
+    # already queued/claimed. The extension picks up the job next time
+    # the user has LinkedIn open in a foreground tab.
+    "tick-search-scrapers": {
+        "task": "app.workers.tasks.tick_search_scrapers",
+        "schedule": crontab(minute="*/15"),
+    },
 }
 
 import app.workers.tasks  # noqa: E402,F401

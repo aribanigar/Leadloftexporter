@@ -428,6 +428,52 @@ class ExtensionJob(Base, TimestampMixin):
     error: Mapped[Optional[str]] = mapped_column(Text)
 
 
+class SearchScraper(Base, TimestampMixin):
+    """A standing background scrape of a LinkedIn search URL.
+
+    Same model as LeadLoft's "LinkedIn Scraper Settings" — paste a search
+    URL, set a daily save cap + total cap, and the extension chips away
+    at the search results over time. Each newly-found lead can auto-
+    enroll into a playbook.
+
+    The daily Celery beat tick produces ExtensionJob(kind="scrape_search")
+    rows when current-day saves haven't yet hit the cap. The extension
+    picks the job up when the user has LinkedIn open in a foreground tab.
+    """
+
+    __tablename__ = "search_scrapers"
+    __table_args__ = (
+        Index("ix_search_scrapers_workspace", "workspace_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+
+    name: Mapped[Optional[str]] = mapped_column(String(160))
+    search_url: Mapped[str] = mapped_column(Text, nullable=False)
+
+    daily_save_cap: Mapped[int] = mapped_column(Integer, default=30)
+    total_save_cap: Mapped[int] = mapped_column(Integer, default=1000)
+
+    saved_today: Mapped[int] = mapped_column(Integer, default=0)
+    saved_total: Mapped[int] = mapped_column(Integer, default=0)
+    last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_run_day: Mapped[Optional[str]] = mapped_column(String(10))  # YYYY-MM-DD
+
+    playbook_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("playbooks.id", ondelete="SET NULL")
+    )
+    segment_id: Mapped[Optional[str]] = mapped_column(String(36))  # opt. tag
+
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    # active | paused | completed | exhausted
+
+
 class Integration(Base, TimestampMixin):
     __tablename__ = "integrations"
 
