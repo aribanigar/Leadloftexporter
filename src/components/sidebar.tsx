@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Search,
   Inbox,
@@ -18,7 +19,8 @@ import {
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn, initials } from "@/lib/utils";
-import type { SavedView } from "@/lib/types";
+import type { PipelineStage, SavedView } from "@/lib/types";
+import { CreateLeadModal } from "@/components/create-lead-modal";
 
 const NAV = [
   { href: "/prospecting", label: "Prospecting", icon: Search },
@@ -36,6 +38,12 @@ export function Sidebar() {
     queryFn: () => api("/workspaces/current/views"),
     enabled: !!user,
   });
+  const { data: stages } = useQuery<PipelineStage[]>({
+    queryKey: ["stages"],
+    queryFn: () => api("/pipeline/stages"),
+    enabled: !!user,
+  });
+  const [creatingLead, setCreatingLead] = useState(false);
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-slate-200 bg-white">
@@ -62,12 +70,31 @@ export function Sidebar() {
               <Icon className="h-4 w-4" />
               <span>{label}</span>
               {href === "/pipeline" && (
-                <Plus className="ml-auto h-4 w-4 text-slate-400 hover:text-slate-600" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    // Stop the Link from navigating; just open the modal.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCreatingLead(true);
+                  }}
+                  className="ml-auto rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  title="Add lead"
+                  aria-label="Add lead"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               )}
             </Link>
           );
         })}
       </nav>
+      {creatingLead && (
+        <CreateLeadModal
+          onClose={() => setCreatingLead(false)}
+          stages={stages || []}
+        />
+      )}
 
       <div className="mt-4 px-2">
         <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">

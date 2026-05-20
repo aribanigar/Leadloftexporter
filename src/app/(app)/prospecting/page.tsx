@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3 } from "lucide-react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3, Search } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -133,15 +133,41 @@ export default function ProspectingPage() {
             )}
             {!isLoading && (leads?.items.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={visibleColumns.length + 2} className="p-10 text-center text-slate-500">
-                  <div className="mx-auto max-w-md">
-                    <p className="text-base font-medium text-slate-700">
-                      No leads yet
+                <td colSpan={visibleColumns.length + 2} className="p-10">
+                  <div className="mx-auto flex max-w-md flex-col items-center text-center">
+                    <div className="mb-4 grid h-14 w-14 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                      <Search className="h-7 w-7" />
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-700">
+                      Download the LeadCaptura Chrome extension to get started
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Once installed, visit any LinkedIn profile and click{" "}
+                      <strong>Save Lead</strong> — captured leads (with email,
+                      phone, and address from the Contact info popup) appear
+                      right here in real time.
                     </p>
-                    <p className="mt-1 text-sm">
-                      Install the LeadCaptura Chrome extension and start saving LinkedIn profiles. They&apos;ll
-                      appear here in real time.
-                    </p>
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                      <Link
+                        href="/settings/api-keys"
+                        className="btn-primary"
+                      >
+                        Get my API key
+                      </Link>
+                      <Link
+                        href="/settings/integrations"
+                        className="btn-secondary"
+                      >
+                        Connect LinkedIn
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => setCreating(true)}
+                      >
+                        Add lead manually
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>
