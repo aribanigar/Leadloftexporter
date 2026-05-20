@@ -60,13 +60,22 @@
     try {
       state.options = await Api.options();
       if (state.options?.user) state.selection.userId = state.options.user.id;
-    } catch {
+      state.connectError = null;
+    } catch (e) {
+      console.error("[LeadCaptura] ensureOptions failed", e?.message);
       state.options = null;
+      state.connectError = e?.message || String(e);
     }
     return state.options;
   }
 
   function flashStatus(msg, level = "info") {
+    // Always log so users can grab the message from DevTools even if the
+    // panel auto-clears the visible status.
+    if (level === "err") console.error("[LeadCaptura]", msg);
+    else if (level === "warn") console.warn("[LeadCaptura]", msg);
+    else console.log("[LeadCaptura]", msg);
+
     const root = state.toolbar || state.profilePanel;
     if (!root) return;
     const slot = root.querySelector(".lc-status-slot");
@@ -74,9 +83,13 @@
     slot.textContent = "";
     slot.appendChild(el("span", { class: `lc-status lc-${level}` }, msg));
     clearTimeout(state.statusTimer);
-    state.statusTimer = setTimeout(() => {
-      if (slot.firstChild) slot.removeChild(slot.firstChild);
-    }, 5000);
+    // Errors stay visible — they need user attention. Other statuses
+    // auto-clear after 5s so the panel doesn't stay cluttered.
+    if (level !== "err") {
+      state.statusTimer = setTimeout(() => {
+        if (slot.firstChild) slot.removeChild(slot.firstChild);
+      }, 5000);
+    }
   }
 
   // ---------- Profile panel (compact top-right card on /in/ pages) ----------
@@ -149,6 +162,18 @@
               )
             )
           : el("div", { class: "lc-muted" }, "Open a LinkedIn profile to capture it."),
+        // Persistent banner when the workspace connection is broken. This is
+        // the most common silent-failure cause: user wiped/rotated their
+        // API key in Settings → API Keys but didn't paste the new one into
+        // the extension Options. /extension/options call 401s, options is
+        // null, Save Lead does nothing, the user has no idea why.
+        !connected && state.connectError
+          ? el(
+              "div",
+              { class: "lc-status lc-err", style: "margin:6px 0;padding:6px 8px;border-radius:6px" },
+              `Not connected: ${state.connectError}`
+            )
+          : null,
         el(
           "div",
           { class: "lc-actions" },

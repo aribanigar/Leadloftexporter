@@ -2,27 +2,77 @@
 /* API client that talks to the LeadCaptura backend via the service worker.
  * Content scripts never make cross-origin requests directly — we always
  * proxy through the service worker so the same code path works whether the
- * user clicks Save on a profile or the worker fires a polling job. */
+ * user clicks Save on a profile or the worker fires a polling job.
+ *
+ * Errors are decorated with actionable hints. The user used to see opaque
+ * "HTTP 401" or "Failed to fetch" in the panel's status pill; now they
+ * get "Invalid API key — open the extension Options and paste a fresh key"
+ * so they know what to actually DO. Every call also logs full timing and
+ * outcome to the page console for debugging.
+ */
 (() => {
   if (globalThis.__lcApi) return;
 
+  function _decorate(rawError, action) {
+    const m = String(rawError || "");
+    if (/401|invalid.*api.*key|unauthorized/i.test(m)) {
+      return "Invalid API key — open the LeadCaptura extension Options and paste a fresh key from Settings → API Keys";
+    }
+    if (/api.url.*not.*configured/i.test(m)) {
+      return "Backend URL not set — open the LeadCaptura extension Options";
+    }
+    if (/api.key.*not.*configured/i.test(m)) {
+      return "API key not set — open the LeadCaptura extension Options";
+    }
+    if (/failed to fetch|network|err_connection|cors|err_name_not_resolved/i.test(m)) {
+      return "Cannot reach backend — check internet + Backend URL in extension Options";
+    }
+    if (/extension context invalidated|no response from background/i.test(m)) {
+      return "Extension was just reloaded — refresh this LinkedIn tab and try again";
+    }
+    return `${action} failed: ${m}`;
+  }
+
   async function call(action, payload) {
+    const t0 = Date.now();
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "lc:api", action, payload }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        if (!response) {
-          reject(new Error("No response from background"));
-          return;
-        }
-        if (response.error) {
-          reject(new Error(response.error));
-          return;
-        }
-        resolve(response.data);
-      });
+      let runtimeAlive = false;
+      try { runtimeAlive = !!chrome.runtime?.id; } catch {}
+      if (!runtimeAlive) {
+        const err = new Error(_decorate("Extension context invalidated", action));
+        console.error("[LeadCaptura] api.call no-runtime", { action, err: err.message });
+        reject(err);
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({ type: "lc:api", action, payload }, (response) => {
+          const elapsed = Date.now() - t0;
+          if (chrome.runtime.lastError) {
+            const err = new Error(_decorate(chrome.runtime.lastError.message, action));
+            console.error("[LeadCaptura] api.call lastError", { action, elapsed, raw: chrome.runtime.lastError.message, decorated: err.message });
+            reject(err);
+            return;
+          }
+          if (!response) {
+            const err = new Error(_decorate("No response from background", action));
+            console.error("[LeadCaptura] api.call no-response", { action, elapsed });
+            reject(err);
+            return;
+          }
+          if (response.error) {
+            const err = new Error(_decorate(response.error, action));
+            console.error("[LeadCaptura] api.call backend-error", { action, elapsed, raw: response.error, decorated: err.message });
+            reject(err);
+            return;
+          }
+          console.log("[LeadCaptura] api.call ok", { action, elapsed });
+          resolve(response.data);
+        });
+      } catch (e) {
+        const err = new Error(_decorate(e?.message || String(e), action));
+        console.error("[LeadCaptura] api.call threw", { action, raw: e, decorated: err.message });
+        reject(err);
+      }
     });
   }
 

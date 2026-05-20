@@ -84,15 +84,23 @@ async function fetchJson(path, opts = {}) {
   const { apiUrl, apiKey } = await getSettings();
   if (!apiUrl) throw new Error("API URL not configured.");
   if (!apiKey) throw new Error("API key not configured. Open the extension options.");
-  const res = await fetch(`${apiUrl}/api/v1${path}`, {
-    method: opts.method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": apiKey,
-      Accept: "application/json",
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  const url = `${apiUrl}/api/v1${path}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method: opts.method || "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+        Accept: "application/json",
+      },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (e) {
+    // Network / DNS / CORS failure — fetch throws, never gets to .ok
+    console.error("[LeadCaptura SW] fetch threw", { url, method: opts.method, error: e?.message });
+    throw new Error(`Failed to fetch ${url}: ${e?.message || e}`);
+  }
   const text = await res.text();
   let data = null;
   try {
@@ -101,11 +109,15 @@ async function fetchJson(path, opts = {}) {
     data = text;
   }
   if (!res.ok) {
-    const message =
+    // Surface HTTP status alongside the server's message so the content
+    // script's error decorator can map 401/403 etc. to actionable hints.
+    const detail =
       (data && typeof data === "object" && data.detail) ||
       (typeof data === "string" && data) ||
-      `HTTP ${res.status}`;
-    throw new Error(String(message));
+      "";
+    const message = `HTTP ${res.status}${detail ? ` — ${detail}` : ""}`;
+    console.error("[LeadCaptura SW] fetch !ok", { url, status: res.status, detail });
+    throw new Error(message);
   }
   return data;
 }
