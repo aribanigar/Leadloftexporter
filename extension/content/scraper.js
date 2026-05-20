@@ -335,17 +335,27 @@
     );
   }
 
+  // Find the element that contains the Contact info fields.
+  //
+  // Two render modes to handle:
+  //   A) In-page modal (popup over a regular /in/<handle> URL):
+  //      LinkedIn ships a <div role="dialog"> with the modal contents.
+  //   B) Standalone overlay URL (/in/<handle>/overlay/contact-info/):
+  //      LinkedIn renders the modal AS the page content — NO role="dialog"
+  //      element. The fields live inside a section that contains a heading
+  //      with text "Contact info" and a series of <div componentkey="...">
+  //      blocks, each block holding one label (<p>Email</p>) and one value.
+  //
+  // The previous implementation only handled mode A. On mode B, the
+  // returned modal was null and the scrape came back empty even though
+  // the user could clearly see the email and phone on the page.
   function _findContactModal() {
-    // Iterate ALL visible dialogs and pick the one that's actually the
-    // Contact info popup. The previous first-match approach
-    // (document.querySelector) was silently grabbing whichever dialog
-    // LinkedIn renders first — sometimes the messaging widget, sometimes
-    // a notifications panel — and our scrape came back empty. Then the
-    // text-scan fallback grabbed a stray email from the About section.
+    const onOverlayUrl = location.pathname.includes("/overlay/contact-info");
+
+    // Mode A — search for a visible role="dialog"
     const dialogs = document.querySelectorAll(
       "div[role='dialog'], artdeco-modal, div.artdeco-modal__content"
     );
-    const onOverlayUrl = location.pathname.includes("/overlay/contact-info");
     for (const d of dialogs) {
       try {
         if (!d.getClientRects || !d.getClientRects().length) continue;
@@ -360,14 +370,60 @@
         aria.includes("contact") ||
         labelledBy.includes("contact") ||
         /\bcontact info\b/i.test(text) ||
-        // Also accept a visible dialog that contains a labelled "Email" or
-        // "Phone" line — that's a strong signal it's the contact-info modal
-        // even when LinkedIn ships the header text in a sibling element.
         (/\b(mailto:|tel:)/i.test(d.innerHTML || "") &&
           /\b(email|phone)\b/i.test(text))
       ) {
         return d;
       }
+    }
+
+    // Mode B — on /overlay/contact-info/, find the "Contact info" heading
+    // and walk up to the smallest container that holds both the heading
+    // AND the contact fields. Labels are NOT necessarily <h3>/<h4> — they
+    // can be <p>, <span>, anything — so we search broadly and key on text.
+    if (onOverlayUrl) {
+      // Find every element whose own text (not descendants) is exactly
+      // "Contact info". This rules out container elements that happen to
+      // contain a "Contact info" descendant.
+      const headingNodes = [];
+      const all = document.body.querySelectorAll("h1, h2, h3, h4, h5, h6, p, span, div");
+      for (const el of all) {
+        const ownText = Array.from(el.childNodes)
+          .filter((n) => n.nodeType === 3)
+          .map((n) => (n.textContent || "").trim())
+          .join(" ")
+          .trim();
+        if (/^contact info$/i.test(ownText)) headingNodes.push(el);
+      }
+
+      // For each candidate heading, walk up to find a container that also
+      // includes labelled fields (mailto:/tel: anchors OR text "Email"/"Phone").
+      for (const heading of headingNodes) {
+        let wrap = heading.parentElement;
+        for (let i = 0; i < 10 && wrap; i++) {
+          const hasAnchors = wrap.querySelector(
+            "a[href^='mailto:'], a[href^='tel:']"
+          );
+          let hasLabels = false;
+          // Don't iterate everything — just check if "Email" or "Phone"
+          // text appears anywhere in the wrap's innerText prefix.
+          const t = (wrap.innerText || wrap.textContent || "").slice(0, 2000);
+          if (/\b(email|phone|address|website)\b/i.test(t)) hasLabels = true;
+          if (hasAnchors || hasLabels) {
+            // Sanity: don't return <body> or <html> as the modal — that
+            // would let text-scan grab anything on the page.
+            if (wrap.tagName !== "BODY" && wrap.tagName !== "HTML") {
+              return wrap;
+            }
+          }
+          wrap = wrap.parentElement;
+        }
+      }
+
+      // Last resort: <main>. The label-line extractor will still scope to
+      // text after the "Contact info" header so this is safer than nothing.
+      const main = document.querySelector("main");
+      if (main) return main;
     }
     return null;
   }
@@ -375,16 +431,13 @@
   function _isValidContactModal(modal) {
     if (!modal) return false;
     // URL context: when the user is on /in/<handle>/overlay/contact-info/,
-    // LinkedIn renders the Contact info modal as the page. The URL itself
-    // is unambiguous — skip text/aria fingerprinting and trust the URL.
+    // ANY element we found IS the contact info section — _findContactModal
+    // already filtered to one that contains the contact fields.
     if (location.pathname.includes("/overlay/contact-info")) return true;
-    // aria-label fingerprint — most stable across LinkedIn's redesigns
-    const aria = (modal.getAttribute && modal.getAttribute("aria-label") || "").toLowerCase();
-    const labelledBy = (modal.getAttribute && modal.getAttribute("aria-labelledby") || "").toLowerCase();
+    const aria = ((modal.getAttribute && modal.getAttribute("aria-label")) || "").toLowerCase();
+    const labelledBy = ((modal.getAttribute && modal.getAttribute("aria-labelledby")) || "").toLowerCase();
     if (aria.includes("contact") || labelledBy.includes("contact")) return true;
-    // Text fallback — "Contact info" header text anywhere in the first
-    // 500 chars of the modal body.
-    return /\bcontact info\b/i.test((modal.textContent || "").slice(0, 500));
+    return /\bcontact info\b/i.test((modal.innerText || modal.textContent || "").slice(0, 600));
   }
 
   // Parse a labelled section of the Contact info modal by header text.
@@ -425,6 +478,13 @@
   // appears AFTER a label that matches `labelRe`. innerText preserves the
   // visual reading order LinkedIn shipped to the user — far more robust
   // than walking the DOM, which changes with every class-name rotation.
+  //
+  // When the modal element is a broad container (e.g. <main> on the
+  // /overlay/contact-info/ URL), the text would include the navbar/footer
+  // before the actual contact info — and a stray @-pattern there would
+  // win the "Email" match. We anchor the search at the "Contact info"
+  // heading line (or at the start if no heading found) so labels picked
+  // up are guaranteed to be inside the contact section.
   function _modalFieldAfterLabel(modal, labelRe) {
     if (!modal) return null;
     const text = modal.innerText || modal.textContent || "";
@@ -432,18 +492,31 @@
       .split(/[\r\n]+/)
       .map((l) => l.replace(/\s+/g, " ").trim())
       .filter(Boolean);
-    for (let i = 0; i < lines.length - 1; i++) {
-      if (labelRe.test(lines[i])) {
-        // Walk forward to the first line that's not another label.
-        for (let j = i + 1; j < lines.length; j++) {
-          const v = lines[j];
-          // Skip empty / pure-icon lines, and skip if this is also a label
-          // (e.g. "Email" followed by an immediate "Phone" header — unlikely
-          // but defensive).
-          if (!v) continue;
-          if (/^(email|phone|address|website|birthday|connected since|im|profile)\s*$/i.test(v)) continue;
-          return v;
-        }
+
+    // Find the "Contact info" heading line — anchor for the scan.
+    let start = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^contact info$/i.test(lines[i])) {
+        start = i + 1;
+        break;
+      }
+    }
+
+    const stopLabels = /^(email|phone|address|website|birthday|connected since|im|profile|i ?m|websites|emails|phones|address(es)?)\s*$/i;
+    const sectionLabels = /^(see all activity|about|experience|education|skills|recommendations|posts|interests|languages|courses|honors|publications|projects|volunteering|certifications)\s*$/i;
+
+    for (let i = start; i < lines.length - 1; i++) {
+      if (!labelRe.test(lines[i])) continue;
+      for (let j = i + 1; j < lines.length; j++) {
+        const v = lines[j];
+        if (!v) continue;
+        // Stop if we hit a profile-section header — we've walked out of
+        // the contact-info area and shouldn't keep looking.
+        if (sectionLabels.test(v)) return null;
+        // Skip if this is itself another contact-field label (e.g. Email
+        // immediately followed by another Email row variant).
+        if (stopLabels.test(v)) continue;
+        return v;
       }
     }
     return null;
