@@ -414,6 +414,18 @@
   }
 
   function injectInlineSave(card, profile) {
+    // Sales Navigator cards often expose BOTH a /sales/lead/ anchor and an
+    // /in/ anchor pointing at the same person. Contact-info scraping only
+    // works on /in/ pages (the modal doesn't exist on Sales Nav lead pages),
+    // so when both are available, swap the profile URL to the /in/ form
+    // before saving. Same canonical URL = same backend lead, no duplicate.
+    if (profile.linkedin_url && profile.linkedin_url.includes("/sales/lead/")) {
+      const cardInLink = card.querySelector("a[href*='/in/']");
+      if (cardInLink) {
+        const inUrl = globalThis.__lcDom.normalizeProfileUrl(cardInLink.href);
+        if (inUrl) profile.linkedin_url = inUrl;
+      }
+    }
     const url = profile.linkedin_url;
     if (!url) return;
     // De-dupe: if we already have a save chip for this URL still in the DOM,

@@ -77,6 +77,11 @@
 
     if (type === "unknown" || type === "feed") return;
 
+    // Don't render any overlay UI on the background enrichment tab — it's
+    // about to close itself, and an "Unknown profile" panel rendering before
+    // LinkedIn finished hydrating just confused the user.
+    if (new URLSearchParams(location.search).has("lc_enrich")) return;
+
     // Small settling delay because LinkedIn is a heavy SPA
     setTimeout(() => {
       const isProfile = type === "profile" || type === "salesnav-profile";
@@ -241,29 +246,67 @@
   // is pre-opened by LinkedIn's SPA router for the overlay URL), sync to the
   // backend (deduped by linkedin_url → updates the existing lead), then close.
   async function maybeRunEnrichmentTrigger() {
-    try {
-      const params = new URLSearchParams(location.search);
-      if (!params.has("lc_enrich")) return;
-      // Accept both the direct profile URL and the overlay sub-path
-      if (!location.pathname.startsWith("/in/")) return;
-      if (window.__lcEnrichmentRan) return;
-      window.__lcEnrichmentRan = true;
+    const params = new URLSearchParams(location.search);
+    if (!params.has("lc_enrich")) return;
+    if (window.__lcEnrichmentRan) return;
+    window.__lcEnrichmentRan = true;
 
-      // Human-paced reading pause: 2.5–6s base, 12% long-tail up to 10s. We
-      // intentionally wait longer than the foreground auto-enrich because
-      // Chrome throttles background tabs — LinkedIn's React tree needs more
-      // time to hydrate before the Contact info link will respond.
+    // Always close the tab, no matter what happens below. A blank lingering
+    // background tab is the worst UX — the user sees a stale page they can't
+    // explain. 75s is generous: enough for slow hydration + Contact info open
+    // + sync, but short enough that broken pages disappear quickly.
+    const closeSelf = () => {
+      try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
+      setTimeout(() => { try { window.close(); } catch {} }, 250);
+    };
+    const safetyTimer = setTimeout(closeSelf, 75_000);
+    let redirected = false;
+
+    try {
+      // Sales Navigator lead pages don't expose the Contact info modal —
+      // LinkedIn only renders it on /in/ pages. The Sales Nav saved-list rows
+      // often link to /sales/lead/<id> with no /in/ anchor in the row itself,
+      // so we have to land on the Sales Nav lead page first, then bounce to
+      // the matching /in/ URL via the "View LinkedIn profile" anchor.
+      if (location.pathname.startsWith("/sales/lead/")) {
+        const liLink = await globalThis.__lcDom.waitFor(
+          [
+            "a[data-control-name='visit_linkedin_profile']",
+            "a[data-control-name='profile_lockup_view_full_profile']",
+            "a[href*='/in/']",
+          ],
+          { timeout: 15000 }
+        );
+        if (liLink?.href && liLink.href.includes("/in/")) {
+          const u = new URL(liLink.href, location.origin);
+          u.searchParams.set("lc_enrich", "1");
+          redirected = true;
+          // Same-tab redirect; trigger re-fires on the /in/ page where the
+          // Contact info modal actually exists.
+          location.replace(u.toString());
+          return;
+        }
+        // Sales Nav lead page didn't expose an /in/ link — nothing scrapable.
+        return;
+      }
+
+      if (!location.pathname.startsWith("/in/")) return;
+
+      // Wait for the profile to actually hydrate before doing anything. The
+      // <h1> is the most reliable "profile is ready" signal. Background tabs
+      // are throttled by Chrome — LinkedIn's React often needs 5–15s to
+      // render the h1, much longer than a foreground tab. Without this gate,
+      // scrapeContactInfo runs against an empty page, the pushState fallback
+      // fires on a half-rendered DOM, and the tab looks blank.
+      await globalThis.__lcDom.waitFor(["main h1", "h1"], { timeout: 20000 });
+
+      // Human-paced reading pause AFTER hydration — looks like a real person
+      // landed on the profile, read for a moment, then clicked Contact info.
       const base = Human.rand(2500, 6000);
       const longTail = Math.random() < 0.12 ? Human.rand(2500, 10000) : 0;
       await Human.sleep(base + longTail);
 
-      // scrapeProfileWithContact() handles both the overlay-URL (modal already
-      // open) and the regular-URL (clicks the Contact info link) cases.
-      // 2s settleMs to let LinkedIn's React fully populate the modal's
-      // mailto:/tel: anchors. allowPushStateFallback: true is safe here
-      // because this is a background tab about to be closed — rewriting
-      // history.state won't disturb a user-visible URL.
-      const profile = await Scraper.scrapeProfile();
+      const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
         settleMs: 2000,
         allowPushStateFallback: true,
@@ -271,8 +314,9 @@
       if (contact.email) profile.email = contact.email;
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
-      // Text-scan fallback so we still catch emails/phones the user put in
-      // their About/Experience (works even when the modal click failed).
+      // Text-scan fallback for emails/phones the user wrote into their About
+      // or Experience. This catches public contact info even when LinkedIn's
+      // Contact-Info modal is empty (non-1st-degree connections).
       if ((!profile.email || !profile.phone) && Scraper._scrapeFromProfileText) {
         try {
           const fromText = Scraper._scrapeFromProfileText();
@@ -287,18 +331,14 @@
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
-
       await Human.sleep(Human.rand(300, 800));
-      try {
-        chrome.runtime.sendMessage({ type: "lc:closeMe" });
-      } catch {
-        /* fall through */
-      }
-      setTimeout(() => {
-        try { window.close(); } catch { /* sandboxed — leave tab */ }
-      }, 250);
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
+    } finally {
+      clearTimeout(safetyTimer);
+      // Skip the close on the Sales Nav → /in/ redirect: the in-flight
+      // location.replace() will tear down this page in a moment.
+      if (!redirected) closeSelf();
     }
   }
 
