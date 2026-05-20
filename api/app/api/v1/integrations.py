@@ -67,6 +67,18 @@ PROVIDER_CATALOG = [
         "kind": "crm",
     },
     {
+        "id": "resend",
+        "name": "Resend",
+        "description": "Send transactional + outreach emails over HTTPS (works on Render free tier — no SMTP). Free 3,000/mo, 1-minute signup.",
+        "kind": "email",
+    },
+    {
+        "id": "sendgrid",
+        "name": "SendGrid",
+        "description": "Send emails via SendGrid's HTTPS API (works on Render free tier — no SMTP). Free 100/day forever.",
+        "kind": "email",
+    },
+    {
         "id": "apollo",
         "name": "Apollo.io",
         "description": "Fallback email + phone enrichment for leads our pattern-finder can't resolve (non-1st-degree connections, Gmail/M365 domains).",
@@ -644,5 +656,106 @@ def apollo_connect(
         external_id=None,
         access_token=token,
         config={},
+    )
+    return {"id": acct.id, "status": acct.status, "label": acct.label}
+
+
+# ---------- Resend (HTTPS email send — works on Render free) ---------------
+
+
+@router.post("/resend/connect")
+def resend_connect(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Connect Resend for outbound email. Pure HTTPS — never SMTP — so it
+    works on Render free tier where ports 25/465/587 are blocked.
+
+    User generates an API key at https://resend.com/api-keys and verifies
+    a sender domain (or uses Resend's onboarding@resend.dev for testing).
+    Free tier: 3,000 emails/mo. No card required.
+    """
+    api_key = (body.get("api_key") or "").strip()
+    from_email = (body.get("from_email") or "").strip()
+    if not api_key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "api_key_required")
+    # Verify by calling /domains (lightweight, validates the key)
+    try:
+        with httpx.Client(timeout=12) as client:
+            r = client.get(
+                "https://api.resend.com/domains",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            if r.status_code == 401:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "resend_invalid_key")
+            if not r.is_success:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"resend_verify_failed_http_{r.status_code}",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"resend_verify_failed: {exc}")
+    label = f"Resend ({from_email})" if from_email else "Resend"
+    acct = _upsert_account(
+        db, ctx,
+        provider="resend",
+        label=label,
+        external_id=from_email or None,
+        access_token=api_key,
+        config={"send_endpoint": "https://api.resend.com/emails"},
+    )
+    return {"id": acct.id, "status": acct.status, "label": acct.label}
+
+
+# ---------- SendGrid (HTTPS email send — works on Render free) -------------
+
+
+@router.post("/sendgrid/connect")
+def sendgrid_connect(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Connect SendGrid for outbound email via their HTTPS API. Same
+    rationale as Resend — bypasses Render's SMTP block. Free 100/day.
+
+    User creates an API key in SendGrid → Settings → API Keys (needs
+    "Mail Send" permission). Must also verify a Sender Identity in
+    SendGrid → Settings → Sender Authentication.
+    """
+    api_key = (body.get("api_key") or "").strip()
+    from_email = (body.get("from_email") or "").strip()
+    if not api_key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "api_key_required")
+    if not from_email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "from_email_required")
+    # Verify the key
+    try:
+        with httpx.Client(timeout=12) as client:
+            r = client.get(
+                "https://api.sendgrid.com/v3/scopes",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            if r.status_code == 401:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "sendgrid_invalid_key")
+            if not r.is_success:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"sendgrid_verify_failed_http_{r.status_code}",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"sendgrid_verify_failed: {exc}")
+    acct = _upsert_account(
+        db, ctx,
+        provider="sendgrid",
+        label=f"SendGrid ({from_email})",
+        external_id=from_email,
+        access_token=api_key,
+        config={"send_endpoint": "https://api.sendgrid.com/v3/mail/send"},
     )
     return {"id": acct.id, "status": acct.status, "label": acct.label}

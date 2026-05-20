@@ -1051,34 +1051,53 @@
    */
 
   function _profileCardFromLink(link) {
+    // Walk up to the structural row root. Must match overlay.js _cardFromLink
+    // exactly — if the two diverge, the Save-chip injector and the bulk
+    // "Save All Leads" scraper disagree on what counts as a card and
+    // mutual-connection people leak into the pipeline.
+    //   - Regular People Search:  <li>
+    //   - Sales Nav search:       <li> or <article>
+    //   - Sales Nav saved-list:   <tr> or div[role='row']
+    //   - mynetwork / other:      <li> or [role='listitem']
+    // Mutual-connection /in/ links live inside the SAME outer row as the
+    // main profile link, so resolving to the row root lets the "first link
+    // in DOM order wins" dedup naturally exclude them. Stopping at an
+    // inner (img + /in/) ancestor — the previous behavior — caused the
+    // mutual-connections strip to be treated as its own micro-card and
+    // saved as a separate (wrong) lead.
     let node = link.parentElement;
-    for (let i = 0; i < 10 && node; i++) {
-      // A "card" is an element that has the profile link AND a visible
-      // distinguishing block (image or action button).
+    let actionFallback = null;
+    let listFallback = null;
+    for (let i = 0; i < 14 && node; i++) {
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
-        (node.querySelector("img") && node.querySelector("a[href*='/in/']"))
+        node.tagName === "TR" ||
+        node.getAttribute?.("role") === "row" ||
+        node.getAttribute?.("role") === "listitem"
       ) {
-        // Prefer the highest ancestor whose width spans the search column
-        // (a card is usually a wide row). Walk up while the parent still
-        // looks like the same card.
-        let candidate = node;
-        let p = node.parentElement;
-        while (
-          p &&
-          p.querySelectorAll("a[href*='/in/']").length === 1 &&
-          p.tagName !== "MAIN" &&
-          p.tagName !== "BODY"
-        ) {
-          candidate = p;
-          p = p.parentElement;
-        }
-        return candidate;
+        return node;
+      }
+      if (
+        !actionFallback &&
+        node.querySelector("img") &&
+        node.querySelector(
+          "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i]"
+        )
+      ) {
+        actionFallback = node;
+      }
+      if (
+        !listFallback &&
+        node.querySelector("img") &&
+        (node.querySelector("input[type='checkbox']") ||
+          node.querySelector("[role='cell']"))
+      ) {
+        listFallback = node;
       }
       node = node.parentElement;
     }
-    return link.parentElement;
+    return actionFallback || listFallback || link.parentElement;
   }
 
   function _profileFromCard(card, link) {

@@ -29,6 +29,8 @@ const PROVIDER_TILE: Record<string, { initials: string; bg: string; fg: string }
   smtp: { initials: "✉", bg: "bg-slate-700", fg: "text-white" },
   hubspot: { initials: "Hs", bg: "bg-orange-500", fg: "text-white" },
   salesforce: { initials: "SF", bg: "bg-sky-500", fg: "text-white" },
+  resend: { initials: "R", bg: "bg-black", fg: "text-white" },
+  sendgrid: { initials: "SG", bg: "bg-blue-700", fg: "text-white" },
   apollo: { initials: "A", bg: "bg-indigo-600", fg: "text-white" },
   zapier: { initials: "Z", bg: "bg-orange-600", fg: "text-white" },
 };
@@ -320,6 +322,58 @@ function ConnectModal({
         {field("security_token", "Security token", "")}
       </>
     ),
+    resend: (
+      <>
+        <p className="text-xs text-slate-500">
+          Resend sends email over HTTPS, so it works on our backend
+          (Render) where SMTP is blocked. Sign up at{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://resend.com/signup"
+            target="_blank"
+            rel="noreferrer"
+          >
+            resend.com
+          </a>{" "}
+          (free 3,000 emails/month, no card), create an{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://resend.com/api-keys"
+            target="_blank"
+            rel="noreferrer"
+          >
+            API key
+          </a>
+          , and paste it below. Leave &quot;From email&quot; blank to
+          start sending immediately from <code>onboarding@resend.dev</code>{" "}
+          (no domain verification needed) — switch to your own domain
+          later by verifying it in Resend.
+        </p>
+        {field("api_key", "Resend API key", "re_…", "password")}
+        {field("from_email", "From email (optional)", "you@yourdomain.com")}
+      </>
+    ),
+    sendgrid: (
+      <>
+        <p className="text-xs text-slate-500">
+          SendGrid sends email over HTTPS, bypassing Render&apos;s SMTP
+          block. Free tier: 100 emails/day forever. Sign up at{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://signup.sendgrid.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            sendgrid.com
+          </a>
+          , create an API key with the <code>Mail Send</code> permission,
+          and verify a Sender Identity (Settings → Sender Authentication →
+          Single Sender Verification — takes ~1 minute).
+        </p>
+        {field("api_key", "SendGrid API key", "SG.…", "password")}
+        {field("from_email", "From email (verified sender)", "you@yourdomain.com")}
+      </>
+    ),
     apollo: (
       <>
         <p className="text-xs text-slate-500">
@@ -359,6 +413,8 @@ function ConnectModal({
     gmail: "Connect Gmail",
     hubspot: "Connect HubSpot",
     salesforce: "Connect Salesforce",
+    resend: "Connect Resend",
+    sendgrid: "Connect SendGrid",
     apollo: "Connect Apollo.io",
     zapier: "Enable Zapier",
   };
