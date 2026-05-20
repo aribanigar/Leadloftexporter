@@ -239,3 +239,73 @@ def send_queued_emails() -> dict:
 def poll_inbound_email() -> dict:
     """Poll Gmail/IMAP for replies. Stub for v1 — wire up Gmail Pub/Sub in prod."""
     return {"polled": 0}
+
+
+@celery_app.task
+def tick_search_scrapers() -> dict:
+    """For each active SearchScraper, queue a single scrape_search
+    ExtensionJob if there isn't one queued/claimed already and the daily
+    save cap hasn't been hit. The extension drains the queue when the
+    user has LinkedIn open in a foreground tab.
+
+    Rolls saved_today back to 0 when we cross into a new UTC day.
+    Sets status="completed" when total_save_cap is reached.
+    """
+    from datetime import datetime, timezone
+
+    from app.core.db import SessionLocal
+    from app.models import ExtensionJob, SearchScraper
+
+    queued = 0
+    with SessionLocal() as db:
+        scrapers = (
+            db.query(SearchScraper)
+            .filter(SearchScraper.status == "active")
+            .all()
+        )
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for s in scrapers:
+            # Roll the daily counter when a new day starts
+            if s.last_run_day != today:
+                s.saved_today = 0
+                s.last_run_day = today
+            # Skip when total cap is exhausted
+            if s.saved_total >= s.total_save_cap:
+                s.status = "completed"
+                continue
+            # Skip when daily cap is hit
+            if s.saved_today >= s.daily_save_cap:
+                continue
+            # Skip if there's already a pending job for this scraper
+            existing = (
+                db.query(ExtensionJob)
+                .filter(
+                    ExtensionJob.workspace_id == s.workspace_id,
+                    ExtensionJob.user_id == s.user_id,
+                    ExtensionJob.kind == "scrape_search",
+                    ExtensionJob.status.in_(("queued", "claimed")),
+                )
+                .first()
+            )
+            if existing:
+                continue
+            db.add(
+                ExtensionJob(
+                    workspace_id=s.workspace_id,
+                    user_id=s.user_id,
+                    kind="scrape_search",
+                    payload={
+                        "search_url": s.search_url,
+                        "scraper_id": s.id,
+                        "max_results": min(
+                            s.daily_save_cap - s.saved_today,
+                            s.total_save_cap - s.saved_total,
+                            25,  # one batch per tick; never more than 25 in one go
+                        ),
+                    },
+                    status="queued",
+                )
+            )
+            queued += 1
+        db.commit()
+    return {"queued": queued}

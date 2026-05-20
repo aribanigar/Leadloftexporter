@@ -142,6 +142,7 @@
       let result;
       if (job.kind === "connect") result = await doConnect(job);
       else if (job.kind === "message") result = await doMessage(job);
+      else if (job.kind === "scrape_search") result = await doScrapeSearch(job);
       else result = { status: "skipped", error: "unknown_kind" };
       await Api.submitJobResult(job.id, {
         status: result.status,
@@ -153,6 +154,52 @@
       await Api.submitJobResult(job.id, { status: "failed", error: String(err) });
       return { status: "failed", error: String(err) };
     }
+  }
+
+  /**
+   * SearchScraper job: navigate to the saved LinkedIn people-search URL,
+   * scrape up to N visible results, return them so the backend can ingest
+   * + auto-enroll. Honors the same bot-bypass rules — runs only in a
+   * foreground tab, human-paced.
+   */
+  async function doScrapeSearch(job) {
+    const url = job.payload?.search_url;
+    const maxResults = Math.max(1, Math.min(50, job.payload?.max_results || 25));
+    if (!url || !url.includes("linkedin.com/")) {
+      return { status: "failed", error: "missing_or_invalid_search_url" };
+    }
+    // Navigate the current tab to the search URL — same-tab, no new tab.
+    // We're already in a foreground LinkedIn tab so navigation is safe.
+    const target = new URL(url, "https://www.linkedin.com");
+    if (location.href.split("?")[0] !== target.href.split("?")[0]) {
+      location.href = target.href;
+      // Wait for SPA to settle on the new URL
+      const startAt = Date.now();
+      while (
+        Date.now() - startAt < 20000 &&
+        !location.href.startsWith(target.href.split("?")[0])
+      ) {
+        await sleep(300);
+      }
+      await sleep(readingPause());
+    }
+    if (detectChallenge()) {
+      return { status: "failed", error: "captcha_or_checkpoint" };
+    }
+    // Let the page hydrate (LinkedIn renders search results lazily)
+    await waitFor(["a[href*='/in/']"], { timeout: 12000 });
+    await sleep(1200);
+    // Eased scroll so virtualized results below the fold render
+    for (let i = 0; i < 4; i++) {
+      await scrollLikeHuman(420);
+      await sleep(700 + Math.random() * 800);
+    }
+    const Scraper = globalThis.__lcScraper;
+    const profiles = (Scraper?.scrapeSearchResults?.() || []).slice(0, maxResults);
+    if (!profiles.length) {
+      return { status: "done", result: { profiles: [], reason: "no_results" } };
+    }
+    return { status: "done", result: { profiles } };
   }
 
   async function tick() {

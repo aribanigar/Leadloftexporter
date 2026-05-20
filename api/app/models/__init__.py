@@ -23,6 +23,7 @@ from app.models.base import (
     EnrollmentStepRun,
     ConnectedAccount,
     ExtensionJob,
+    SearchScraper,
     Integration,
     Credit,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "EnrollmentStepRun",
     "ConnectedAccount",
     "ExtensionJob",
+    "SearchScraper",
     "Integration",
     "Credit",
 ]
