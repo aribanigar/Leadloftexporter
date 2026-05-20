@@ -956,26 +956,61 @@
     return s || null;
   }
 
+  // Reject text that's clearly an action-button label, not a person's
+  // name. Without this, /search/results/people/ cards whose first /in/
+  // anchor wraps a "View LinkedIn profile" / "Open in new tab" /
+  // "Connect" button text leak the button text into the saved row's
+  // full_name field. The user sees rows like "View LinkedIn profile" in
+  // the pipeline instead of the actual person's name.
+  const _ACTION_LABEL_RE = /^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|open\s+in\s+new\s+tab|connect|pending|message|follow|following|invite|invited|withdraw|more|premium)$/i;
+  function _isActionLabel(text) {
+    if (!text) return true;
+    return _ACTION_LABEL_RE.test(text.trim());
+  }
+
   function profileFromCard(card, link) {
     const linkEl = link || card.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
     if (!linkEl) return null;
-    const nameNode =
-      linkEl.querySelector("span[aria-hidden='true']") ||
-      linkEl.querySelector("strong, b") ||
-      card.querySelector("[data-anonymize='person-name']");
-    let rawName = nameNode?.textContent;
+
+    // Build a candidate list of name sources in specific-to-generic order.
+    // Reject any candidate that matches _isActionLabel (e.g. "View LinkedIn
+    // profile") and move on to the next. This is what protects the
+    // pipeline from action-button text leaking into full_name.
+    const candidateNodes = [
+      linkEl.querySelector("span[aria-hidden='true']"),
+      linkEl.querySelector("strong, b"),
+      card.querySelector("[data-anonymize='person-name']"),
+      card.querySelector("[data-anonymize='name']"),
+    ].filter(Boolean);
+
+    let rawName = null;
+    for (const node of candidateNodes) {
+      const t = (node.textContent || "").replace(/\s+/g, " ").trim();
+      if (!t) continue;
+      if (_isActionLabel(t)) continue;
+      if (/^linkedin member$/i.test(t)) continue;
+      rawName = t;
+      break;
+    }
+
     if (!rawName) {
-      // Falling back to the full link text is dangerous because LinkedIn
-      // sometimes wraps the entire card body in the /in/ anchor. Take only
-      // the leading person-name segment by cutting at the first degree
-      // badge / bullet separator.
+      // Link textContent fallback — also screened against action labels
+      // and the entire-card-as-link case (long text containing degree
+      // badges).
       const txt = (linkEl.textContent || "").replace(/\s+/g, " ").trim();
-      if (txt && txt.length < 80 && !/[•·]\s*(1st|2nd|3rd\+?)/i.test(txt)) {
+      if (
+        txt &&
+        txt.length < 80 &&
+        !_isActionLabel(txt) &&
+        !/[•·]\s*(1st|2nd|3rd\+?)/i.test(txt)
+      ) {
         rawName = txt;
       } else if (txt) {
-        rawName = txt.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+        const cut = txt.split(/\s*[•·]\s*(1st|2nd|3rd\+?)/i)[0].trim();
+        if (cut && !_isActionLabel(cut)) rawName = cut;
       }
     }
+
     // URL-slug fallback so a stripped/unrendered name never blocks save.
     if (!rawName) {
       try {
@@ -993,7 +1028,10 @@
       } catch {}
     }
     const name = _cleanCardName(rawName);
-    if (!name || /linkedin member/i.test(name)) return null;
+    // Final guard: if even the cleaned name still matches an action label
+    // (couldn't happen given the screening above, but defend anyway),
+    // SKIP the card entirely instead of polluting the pipeline.
+    if (!name || /linkedin member/i.test(name) || _isActionLabel(name)) return null;
     // Headline is typically the first descriptive text region in the card
     // that isn't the name itself or an action label.
     const textCandidates = Array.from(card.querySelectorAll("div, p, span"))
