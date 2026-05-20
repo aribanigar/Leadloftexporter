@@ -189,10 +189,24 @@
     try {
       const dialogs = document.querySelectorAll("div[role='dialog']");
       let modal = null;
+      const onOverlay = location.pathname.includes("/overlay/contact-info");
       for (const d of dialogs) {
         if (!d.getClientRects().length) continue;
-        const text = (d.innerText || d.textContent || "").trim();
-        if (/^contact info\b/i.test(text) || /\bcontact info\b/i.test(text.slice(0, 200))) {
+        // URL context wins: on /overlay/contact-info/, every visible dialog
+        // IS the contact info modal — LinkedIn doesn't open competing
+        // dialogs on that URL. Skip text fingerprinting.
+        if (onOverlay) {
+          modal = d;
+          break;
+        }
+        const aria = (d.getAttribute("aria-label") || "").toLowerCase();
+        const labelledBy = (d.getAttribute("aria-labelledby") || "").toLowerCase();
+        const text = (d.innerText || d.textContent || "").slice(0, 500);
+        if (
+          aria.includes("contact") ||
+          labelledBy.includes("contact") ||
+          /\bcontact info\b/i.test(text)
+        ) {
           modal = d;
           break;
         }
@@ -211,24 +225,42 @@
         const p = (tel.getAttribute("href") || "").replace(/^tel:/, "").trim();
         if (p) result.phone = p;
       }
-      // Address by labelled section — walk the header siblings
-      const headers = modal.querySelectorAll("h3, h4");
-      for (const h of headers) {
-        if (!/^\s*address\s*$/i.test(h.textContent || "")) continue;
-        let wrap = h.parentElement;
-        for (let i = 0; i < 3 && wrap && !result.address; i++) {
-          const value = Array.from(wrap.children)
-            .filter((c) => c !== h && !c.contains(h))
-            .map((c) => (c.textContent || "").replace(/\s+/g, " ").trim())
-            .filter(Boolean)
-            .join(" ")
-            .replace(/\s*\([^)]*\)\s*$/, "")
-            .trim();
-          if (value) result.address = value;
-          wrap = wrap.parentElement;
+      // innerText-based field extraction. Reads the modal's rendered text
+      // and returns the line AFTER a label. Works regardless of LinkedIn's
+      // DOM rotation because innerText preserves the visual reading order.
+      const fullText = modal.innerText || modal.textContent || "";
+      const lines = fullText
+        .split(/[\r\n]+/)
+        .map((l) => l.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+      const labelStops = /^(email|phone|address|website|birthday|connected since|im|profile)\s*$/i;
+      function fieldAfter(labelRe) {
+        for (let i = 0; i < lines.length - 1; i++) {
+          if (!labelRe.test(lines[i])) continue;
+          for (let j = i + 1; j < lines.length; j++) {
+            if (!lines[j] || labelStops.test(lines[j])) continue;
+            return lines[j];
+          }
         }
-        if (result.address) break;
+        return null;
       }
+      if (!result.email) {
+        const v = fieldAfter(/^\s*email\s*$/i);
+        if (v) {
+          const m = v.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+          if (m) result.email = m[0];
+        }
+      }
+      if (!result.phone) {
+        const v = fieldAfter(/^\s*phone\s*$/i);
+        if (v) {
+          const m = v.match(/\+?[\d\s\-().]{7,}/);
+          if (m) result.phone = m[0].replace(/\s+/g, " ").trim();
+        }
+      }
+      const addr = fieldAfter(/^\s*address\s*$/i);
+      if (addr) result.address = addr.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
+
       const externals = modal.querySelectorAll("a[href^='http']");
       for (const a of externals) {
         const href = a.getAttribute("href") || "";

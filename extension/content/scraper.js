@@ -352,11 +352,17 @@
 
   function _isValidContactModal(modal) {
     if (!modal) return false;
-    // Must contain the "Contact info" header text. Without this, any other
-    // dialog that happens to contain a mailto: anchor (e.g. a profile
-    // recommendation form or an inMail compose) would pass and we'd
-    // attribute somebody else's email to the wrong lead.
-    return /\bcontact info\b/i.test(modal.textContent || "");
+    // URL context: when the user is on /in/<handle>/overlay/contact-info/,
+    // LinkedIn renders the Contact info modal as the page. The URL itself
+    // is unambiguous — skip text/aria fingerprinting and trust the URL.
+    if (location.pathname.includes("/overlay/contact-info")) return true;
+    // aria-label fingerprint — most stable across LinkedIn's redesigns
+    const aria = (modal.getAttribute && modal.getAttribute("aria-label") || "").toLowerCase();
+    const labelledBy = (modal.getAttribute && modal.getAttribute("aria-labelledby") || "").toLowerCase();
+    if (aria.includes("contact") || labelledBy.includes("contact")) return true;
+    // Text fallback — "Contact info" header text anywhere in the first
+    // 500 chars of the modal body.
+    return /\bcontact info\b/i.test((modal.textContent || "").slice(0, 500));
   }
 
   // Parse a labelled section of the Contact info modal by header text.
@@ -393,11 +399,38 @@
     return null;
   }
 
+  // Read the modal's rendered text line-by-line and return the line that
+  // appears AFTER a label that matches `labelRe`. innerText preserves the
+  // visual reading order LinkedIn shipped to the user — far more robust
+  // than walking the DOM, which changes with every class-name rotation.
+  function _modalFieldAfterLabel(modal, labelRe) {
+    if (!modal) return null;
+    const text = modal.innerText || modal.textContent || "";
+    const lines = text
+      .split(/[\r\n]+/)
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (labelRe.test(lines[i])) {
+        // Walk forward to the first line that's not another label.
+        for (let j = i + 1; j < lines.length; j++) {
+          const v = lines[j];
+          // Skip empty / pure-icon lines, and skip if this is also a label
+          // (e.g. "Email" followed by an immediate "Phone" header — unlikely
+          // but defensive).
+          if (!v) continue;
+          if (/^(email|phone|address|website|birthday|connected since|im|profile)\s*$/i.test(v)) continue;
+          return v;
+        }
+      }
+    }
+    return null;
+  }
+
   function _scrapeFromContactModal(modal) {
     if (!modal) return { email: null, phone: null, website: null, address: null };
 
-    // Email: prefer the explicit mailto: anchor, fall back to the section
-    // text under an "Email" header.
+    // --- Email ---
     let email = null;
     const emailAnchor = modal.querySelector("a[href^='mailto:']");
     if (emailAnchor) {
@@ -405,55 +438,61 @@
         .replace(/^mailto:/, "")
         .split("?")[0]
         .trim();
-    } else {
-      const txt = _modalSection(modal, /^\s*email\s*$/i);
-      if (txt) {
-        const m = txt.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+    }
+    if (!email) {
+      const v = _modalFieldAfterLabel(modal, /^\s*email\s*$/i);
+      if (v) {
+        const m = v.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
         if (m) email = m[0];
       }
     }
 
-    // Phone: tel: anchor → "Phone" section text fallback.
+    // --- Phone ---
     let phone = null;
     const phoneAnchor = modal.querySelector("a[href^='tel:']");
     if (phoneAnchor) {
       phone = (phoneAnchor.getAttribute("href") || "")
         .replace(/^tel:/, "")
         .trim();
-    } else {
-      const txt = _modalSection(modal, /^\s*phone\s*$/i);
-      if (txt) {
-        const m = txt.match(/\+?[\d\s\-().]{7,}/);
+    }
+    if (!phone) {
+      const v = _modalFieldAfterLabel(modal, /^\s*phone\s*$/i);
+      if (v) {
+        // Keep leading + and digits, strip the "(Mobile)" suffix.
+        const m = v.match(/\+?[\d\s\-().]{7,}/);
         if (m) phone = m[0].replace(/\s+/g, " ").trim();
       }
     }
 
-    // Address: text under an "Address" header. Drop any parenthetical
-    // suffixes LinkedIn appends (e.g. "(Other)").
-    let address = _modalSection(modal, /^\s*address\s*$/i);
+    // --- Address ---
+    let address = _modalFieldAfterLabel(modal, /^\s*address\s*$/i);
     if (address) {
       address = address.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
     }
 
-    // Website: prefer the "Website" labelled section so we capture the
-    // canonical URL even when LinkedIn renders the link text as the
-    // domain. Falls back to the first external http anchor.
+    // --- Website ---
     let website = null;
-    const webHeader = modal.querySelectorAll("h3, h4");
-    for (const h of webHeader) {
-      if (!/^\s*website\s*$/i.test(h.textContent || "")) continue;
-      let wrap = h.parentElement;
-      for (let i = 0; i < 3 && wrap && !website; i++) {
-        const a = wrap.querySelector("a[href^='http']");
-        if (a) {
-          const href = a.getAttribute("href") || "";
-          if (!href.includes("linkedin.com") && !href.includes("/overlay/")) {
-            website = href;
-          }
+    const labelled = _modalFieldAfterLabel(modal, /^\s*website\s*$/i);
+    if (labelled) {
+      // The labelled value can be the URL itself ("example.com (Other)") or
+      // we may need to look for the anchor's href to get the full https://.
+      const anchors = modal.querySelectorAll("a[href^='http']");
+      for (const a of anchors) {
+        const href = a.getAttribute("href") || "";
+        const at = (a.textContent || "").trim();
+        if (
+          !href.includes("linkedin.com") &&
+          !href.includes("/overlay/") &&
+          (labelled.includes(at) || at.includes(labelled.split(" ")[0]))
+        ) {
+          website = href;
+          break;
         }
-        wrap = wrap.parentElement;
       }
-      if (website) break;
+      if (!website) {
+        const m = labelled.match(/https?:\/\/\S+/);
+        if (m) website = m[0];
+      }
     }
     if (!website) {
       const externals = modal.querySelectorAll("a[href^='http']");
