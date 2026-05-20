@@ -9,7 +9,19 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import Activity, CallLog, Company, EmailMessage, Lead, Note, PipelineStage, Task
+from app.models import (
+    Activity,
+    CallLog,
+    Company,
+    EmailMessage,
+    Enrollment,
+    EnrollmentStepRun,
+    ExtensionJob,
+    Lead,
+    Note,
+    PipelineStage,
+    Task,
+)
 from app.schemas import (
     LeadCreate,
     LeadIngest,
@@ -230,6 +242,42 @@ def cleanup_nameless_leads(
         db.delete(lead)
     db.commit()
     return {"deleted": count}
+
+
+@router.delete("/cleanup/wipe-pipeline")
+def wipe_workspace_pipeline_data(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Nuclear reset of pipeline + prospecting + playbook execution data
+    for the current workspace. Deletes every Lead row plus all dependent
+    activity, notes, tasks, calls, emails, playbook enrollments and
+    extension-job records. Pipeline stages, playbook definitions, custom
+    fields, segments, and saved views are preserved — only the *captured*
+    data is wiped, not the workspace configuration.
+
+    Returns per-table counts so the UI can show what was deleted.
+    """
+    ws = ctx.workspace_id
+    counts = {
+        "activities": db.query(Activity).filter(Activity.workspace_id == ws).delete(synchronize_session=False),
+        "notes": db.query(Note).filter(Note.workspace_id == ws).delete(synchronize_session=False),
+        "tasks": db.query(Task).filter(Task.workspace_id == ws).delete(synchronize_session=False),
+        "call_logs": db.query(CallLog).filter(CallLog.workspace_id == ws).delete(synchronize_session=False),
+        "emails": db.query(EmailMessage).filter(EmailMessage.workspace_id == ws).delete(synchronize_session=False),
+        "enrollment_step_runs": (
+            db.query(EnrollmentStepRun)
+            .filter(EnrollmentStepRun.enrollment_id.in_(
+                db.query(Enrollment.id).filter(Enrollment.workspace_id == ws)
+            ))
+            .delete(synchronize_session=False)
+        ),
+        "enrollments": db.query(Enrollment).filter(Enrollment.workspace_id == ws).delete(synchronize_session=False),
+        "extension_jobs": db.query(ExtensionJob).filter(ExtensionJob.workspace_id == ws).delete(synchronize_session=False),
+        "leads": db.query(Lead).filter(Lead.workspace_id == ws).delete(synchronize_session=False),
+    }
+    db.commit()
+    return {"deleted": counts}
 
 
 @router.post("/ingest", response_model=LeadIngestResponse)
