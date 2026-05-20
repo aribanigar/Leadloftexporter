@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3, Search } from "lucide-react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -25,6 +25,8 @@ export default function ProspectingPage() {
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [pickingColumns, setPickingColumns] = useState(false);
+  const [findingEmails, setFindingEmails] = useState(false);
+  const [findResult, setFindResult] = useState<string | null>(null);
 
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
@@ -102,11 +104,58 @@ export default function ProspectingPage() {
           <button className="btn-secondary" onClick={exportCsv}>
             <Download className="h-4 w-4" /> Export
           </button>
+          <button
+            className="btn-secondary"
+            disabled={findingEmails}
+            onClick={async () => {
+              setFindingEmails(true);
+              setFindResult(null);
+              try {
+                const res = await api<{
+                  processed: number;
+                  verified: number;
+                  risky: number;
+                  unknown: number;
+                  not_found: number;
+                  remaining: number;
+                }>("/leads/find-emails-bulk", {
+                  method: "POST",
+                  body: { limit: 25 },
+                });
+                const msg =
+                  res.processed === 0
+                    ? "All leads already have emails."
+                    : `Found ${res.verified} verified${
+                        res.risky ? `, ${res.risky} risky` : ""
+                      } of ${res.processed} probed${
+                        res.remaining ? ` · ${res.remaining} still pending` : ""
+                      }`;
+                setFindResult(msg);
+                // Refresh the leads list so newly-enriched emails appear
+                qc.invalidateQueries({ queryKey: ["leads"] });
+              } catch (e: unknown) {
+                setFindResult(
+                  `Error: ${e instanceof Error ? e.message : String(e)}`
+                );
+              } finally {
+                setFindingEmails(false);
+              }
+            }}
+            title="Run the email finder (pattern cache → SMTP probe → Apollo) on the next 25 leads without an email"
+          >
+            <Sparkles className="h-4 w-4" />
+            {findingEmails ? "Finding…" : "Find emails"}
+          </button>
           <button className="btn-primary" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4" /> Add Lead
           </button>
         </div>
       </div>
+      {findResult && (
+        <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {findResult}
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto">
         <table className="min-w-full">

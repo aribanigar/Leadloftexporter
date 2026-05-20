@@ -442,6 +442,106 @@ def find_lead_email(
     return payload
 
 
+@router.post("/find-emails-bulk")
+def find_emails_bulk(
+    body: dict | None = None,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Run the email-finder waterfall (cache → pattern+SMTP → Apollo)
+    against every lead in the workspace that doesn't have an email yet.
+
+    Hard-capped at 50 leads per call so the request can complete inside
+    Render's HTTP timeout (~30s — SMTP probes are 2-6s each, so 50 leads
+    parallelised should fit). If you have more than 50 nameless leads,
+    just call this endpoint again.
+
+    Body (optional):
+      { "limit": 25, "include_risky": false }
+
+    Returns per-status counters + the IDs of leads we successfully
+    enriched, so the frontend can refresh those rows in-place.
+    """
+    import asyncio
+    from app.services.email_finder import find_email_async
+
+    body = body or {}
+    limit = max(1, min(int(body.get("limit") or 25), 50))
+
+    # Candidates: extension-saved leads with NO email + (URL or company hint).
+    rows = (
+        db.query(Lead)
+        .filter(
+            Lead.workspace_id == ctx.workspace_id,
+            Lead.email.is_(None),
+        )
+        .order_by(Lead.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    if not rows:
+        return {
+            "processed": 0,
+            "verified": 0,
+            "risky": 0,
+            "unknown": 0,
+            "not_found": 0,
+            "enriched_ids": [],
+            "remaining": 0,
+        }
+
+    async def _process_one(lead: Lead) -> tuple[Lead, dict]:
+        company = lead.company
+        result = await find_email_async(
+            first_name=lead.first_name,
+            last_name=lead.last_name,
+            domain=(company.domain if company else None),
+            company_url=(company.website if company else None) or lead.company_url,
+            company_name=(company.name if company else None),
+            linkedin_url=lead.linkedin_url,
+            db=db,
+            workspace_id=ctx.workspace_id,
+        )
+        return lead, result.to_dict()
+
+    async def _run_all() -> list[tuple[Lead, dict]]:
+        # Parallelise — SMTP probes don't conflict, and Apollo API is
+        # naturally concurrent. Bounded by limit (max 50).
+        return await asyncio.gather(*(_process_one(r) for r in rows))
+
+    pairs = asyncio.run(_run_all())
+
+    counts = {"verified": 0, "risky": 0, "unknown": 0, "not_found": 0}
+    enriched_ids: list[str] = []
+    for lead, payload in pairs:
+        status = payload.get("status") or "not_found"
+        counts[status] = counts.get(status, 0) + 1
+        # Persist finder result + write email/phone on the lead row
+        merged_custom = dict(lead.custom or {})
+        merged_custom["email_finder"] = payload
+        lead.custom = merged_custom
+        if payload.get("email") and not lead.email and status in ("verified", "risky"):
+            lead.email = payload["email"]
+            enriched_ids.append(lead.id)
+        if payload.get("phone") and not lead.phone:
+            lead.phone = payload["phone"]
+    db.commit()
+
+    remaining = (
+        db.query(Lead)
+        .filter(Lead.workspace_id == ctx.workspace_id, Lead.email.is_(None))
+        .count()
+    )
+
+    return {
+        "processed": len(pairs),
+        **counts,
+        "enriched_ids": enriched_ids,
+        "remaining": remaining,
+    }
+
+
 @router.get("/{lead_id}/timeline")
 def lead_timeline(
     lead_id: str,
