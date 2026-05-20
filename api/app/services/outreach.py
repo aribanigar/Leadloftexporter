@@ -214,6 +214,54 @@ def enroll_lead(db: Session, playbook: Playbook, lead: Lead) -> Enrollment:
             status="pending",
         )
     )
+
+    # If this lead has a LinkedIn URL but no email/phone, queue an
+    # ExtensionJob so the next time the extension polls (i.e. the next time
+    # the user has LinkedIn open in a tab) it visits the profile, opens
+    # the Contact info modal, and back-fills email/phone/address. This is
+    # what makes "Enroll" double as "Enrich" — playbooks can't send mail
+    # to a leadeven a lead that has no email, and we don't want users to
+    # remember to enrich first.
+    needs_enrichment = (
+        bool(lead.linkedin_url)
+        and (not lead.email or not lead.phone)
+        and "/in/" in (lead.linkedin_url or "")
+    )
+    if needs_enrichment:
+        # Avoid duplicate queued jobs for the same profile
+        already = (
+            db.query(ExtensionJob)
+            .filter(
+                ExtensionJob.workspace_id == playbook.workspace_id,
+                ExtensionJob.lead_id == lead.id,
+                ExtensionJob.kind == "scrape_profile",
+                ExtensionJob.status.in_(("queued", "claimed")),
+            )
+            .first()
+        )
+        if not already:
+            # The lead's owner runs the job if present, otherwise the first
+            # workspace member. user_id is non-null on ExtensionJob — we
+            # can't queue an enrichment job for a workspace that has no
+            # members. (Shouldn't happen in practice but defend anyway.)
+            owner_id = lead.owner_id
+            if not owner_id and playbook.workspace.memberships:
+                owner_id = playbook.workspace.memberships[0].user_id
+            if owner_id:
+                db.add(
+                    ExtensionJob(
+                        workspace_id=playbook.workspace_id,
+                        user_id=owner_id,
+                        lead_id=lead.id,
+                        kind="scrape_profile",
+                        payload={
+                            "linkedin_url": lead.linkedin_url,
+                            "reason": "playbook_enrollment_enrich",
+                            "playbook_id": playbook.id,
+                        },
+                        status="queued",
+                    )
+                )
     return enrollment
 
 

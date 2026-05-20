@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, MessageSquare, Phone, Plus, Send, ShieldCheck, Sparkles, Trash2, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PipelineStage, Playbook, Template } from "@/lib/types";
+import { PlaybookEnrollments } from "@/components/playbook-enrollments";
 
 const STEP_KINDS = [
   { kind: "automated_email", label: "Automated Email", icon: Mail, color: "bg-sky-100 text-sky-700" },
@@ -283,6 +284,8 @@ export default function PlaybookEditorPage({ params }: { params: Promise<{ id: s
             </div>
           );
         })}
+
+        <PlaybookEnrollments playbookId={id} />
       </div>
 
       <aside className="w-80 shrink-0 border-l border-slate-200 bg-white p-4">

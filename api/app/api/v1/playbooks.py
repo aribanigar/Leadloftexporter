@@ -165,14 +165,99 @@ def enroll(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
     lead_ids: list[str] = body.get("lead_ids", [])
     enrolled = []
+    enrichment_queued = 0
     for lid in lead_ids:
         lead = db.query(Lead).filter(Lead.id == lid, Lead.workspace_id == ctx.workspace_id).first()
         if not lead:
             continue
+        before_email = lead.email
+        before_phone = lead.phone
         e = enroll_lead(db, pb, lead)
         enrolled.append(e.id)
+        if (not before_email or not before_phone) and lead.linkedin_url and "/in/" in lead.linkedin_url:
+            enrichment_queued += 1
     db.commit()
-    return {"enrolled": enrolled}
+    return {"enrolled": enrolled, "enrichment_queued": enrichment_queued}
+
+
+@router.get("/{playbook_id}/enrollments")
+def list_enrollments(
+    playbook_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """List every lead enrolled in this playbook with status + enrichment
+    flag. The UI shows this so users can verify their Enroll click worked
+    and see who still needs contact details before email steps fire."""
+    pb = (
+        db.query(Playbook)
+        .filter(Playbook.id == playbook_id, Playbook.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not pb:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    rows = (
+        db.query(Enrollment, Lead)
+        .join(Lead, Lead.id == Enrollment.lead_id)
+        .filter(Enrollment.playbook_id == playbook_id)
+        .order_by(Enrollment.created_at.desc())
+        .all()
+    )
+    out = []
+    for enrollment, lead in rows:
+        needs_enrichment = (
+            bool(lead.linkedin_url)
+            and (not lead.email or not lead.phone)
+            and "/in/" in (lead.linkedin_url or "")
+        )
+        out.append({
+            "id": enrollment.id,
+            "status": enrollment.status,
+            "current_step": enrollment.current_step,
+            "ejected_reason": enrollment.ejected_reason,
+            "completed_at": enrollment.completed_at,
+            "created_at": enrollment.created_at,
+            "needs_enrichment": needs_enrichment,
+            "lead": {
+                "id": lead.id,
+                "full_name": lead.full_name,
+                "first_name": lead.first_name,
+                "last_name": lead.last_name,
+                "email": lead.email,
+                "phone": lead.phone,
+                "title": lead.title,
+                "linkedin_url": lead.linkedin_url,
+                "avatar_url": lead.avatar_url,
+                "location": lead.location,
+            },
+        })
+    return out
+
+
+@router.delete("/{playbook_id}/enrollments/{enrollment_id}")
+def unenroll(
+    playbook_id: str,
+    enrollment_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Remove a lead from a playbook. Cascade-deletes the
+    EnrollmentStepRun rows so any pending step doesn't try to fire after
+    the lead is gone."""
+    e = (
+        db.query(Enrollment)
+        .filter(
+            Enrollment.id == enrollment_id,
+            Enrollment.playbook_id == playbook_id,
+            Enrollment.workspace_id == ctx.workspace_id,
+        )
+        .first()
+    )
+    if not e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    db.delete(e)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/stats/overview")
