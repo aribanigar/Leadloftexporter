@@ -154,12 +154,17 @@
     let companyName = null;
     let title = null;
     if (headline) {
-      const parts = headline.split(/\s+at\s+/i);
+      // Strip pipe-separated specializations before extracting title/company.
+      // "Head of Events at HEC Paris Doha | Executive Education | Aviation"
+      //  → primary = "Head of Events at HEC Paris Doha"
+      //  → title = "Head of Events", company = "HEC Paris Doha"
+      const primary = headline.split("|")[0].trim();
+      const parts = primary.split(/\s+at\s+/i);
       if (parts.length >= 2) {
         title = parts[0].trim();
         companyName = parts.slice(1).join(" at ").trim();
       } else {
-        title = headline;
+        title = primary;
       }
     }
 
@@ -515,9 +520,18 @@
     const linkBox = link.closest("div") || link.parentElement;
     if (linkBox) {
       const candidates = Array.from(card.querySelectorAll("div, p, span"))
+        // Exclude elements inside or wrapping embedded profile links (mutual
+        // connections / people-also-viewed rendered inside the same card <li>).
+        .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
+        .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
         .map((n) => _txt(n))
         .filter(Boolean)
-        .filter((t) => t !== name && !/connect|message|follow|view profile/i.test(t));
+        .filter(
+          (t) =>
+            t !== name &&
+            !/connect|message|follow|view profile/i.test(t) &&
+            !/•\s*(1st|2nd|3rd\+?)/i.test(t)
+        );
       headline = candidates[0] || null;
       // Location often contains a comma or named country
       location_ =
@@ -531,14 +545,18 @@
     const avatar = card.querySelector("img")?.getAttribute("src") || null;
     const [first_name, ...rest] = name.split(/\s+/);
     const sub = headline || "";
+    // Split on first "|" before splitting on " at " so pipe-separated
+    // specializations ("Head of Events at HEC | Education | Aviation") don't
+    // bleed into the company name field.
+    const primarySub = sub.split("|")[0].trim();
     return {
       linkedin_url: url,
       full_name: name,
       first_name,
       last_name: rest.join(" ") || null,
       headline: sub || null,
-      title: sub.split(/\s+at\s+/i)[0] || null,
-      company_name: sub.split(/\s+at\s+/i)[1] || null,
+      title: primarySub.split(/\s+at\s+/i)[0] || null,
+      company_name: primarySub.split(/\s+at\s+/i).slice(1).join(" at ") || null,
       location: location_,
       avatar_url: avatar,
       raw: { source_url: location.href, page_type: "search-people" },

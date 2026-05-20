@@ -558,12 +558,21 @@
     // Headline is typically the first descriptive text region in the card
     // that isn't the name itself or an action label.
     const textCandidates = Array.from(card.querySelectorAll("div, p, span"))
+      // Skip elements that live INSIDE a profile link — those are other
+      // people's names (mutual connections, "people also viewed") embedded
+      // inside the same card <li>, and their text poisons the headline.
+      .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
+      // Skip container elements that WRAP a profile link (same reason).
+      .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
       .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())
       .filter(Boolean)
       .filter(
         (t) =>
           t !== name &&
           !/connect|message|follow|view profile|premium/i.test(t) &&
+          // Drop any text that contains a LinkedIn degree badge ("• 1st",
+          // "• 2nd", "• 3rd+") — those are person references, not headlines.
+          !/•\s*(1st|2nd|3rd\+?)/i.test(t) &&
           t.length > 4 &&
           t.length < 240
       );
@@ -585,11 +594,15 @@
       ? rawAvatar.split("?")[0].split("#")[0].slice(0, 500)
       : null;
     const [first_name, ...rest] = name.split(/\s+/);
-    // When headline has no " at " separator, .split()[0] returns the WHOLE
-    // headline as the title. Cap at the backend's String(240) so degenerate
-    // long bios never trigger the value-too-long Postgres error.
-    const titlePart = (headline || "").split(/\s+at\s+/i)[0] || null;
-    const companyPart = (headline || "").split(/\s+at\s+/i)[1] || null;
+    // Many LinkedIn headlines use pipe-separated tags after the primary job:
+    //   "Head of Events at HEC Paris Doha | Executive Education | Aviation"
+    // We split at the first "|" to extract just the primary job segment,
+    // then split that on " at " to separate title from company. Without the
+    // pipe-first step, the company field becomes the entire trailing string.
+    const primarySegment = (headline || "").split("|")[0].trim();
+    const atParts = primarySegment.split(/\s+at\s+/i);
+    const titlePart = atParts[0] || null;
+    const companyPart = atParts.slice(1).join(" at ") || null;
     return {
       linkedin_url: globalThis.__lcDom.normalizeProfileUrl(linkEl.href),
       full_name: name.slice(0, 240),
