@@ -196,14 +196,34 @@ def _upsert_account(
 
 
 async def _smtp_verify(host: str, port: int, username: str, password: str) -> None:
-    """Open a TLS connection to the SMTP server and authenticate. Raises on
-    failure with a useful message."""
+    """Open a TLS connection to the SMTP server and authenticate.
+
+    Two TLS modes depending on the port:
+      - **465**: implicit TLS — the connection is encrypted from byte 0,
+        DO NOT call STARTTLS. Used by Hostinger, Zoho, many shared hosts.
+      - **587 / 25**: STARTTLS — connect plain, then upgrade. Gmail's
+        recommended port and the most common modern default.
+
+    The old code always called STARTTLS, so port 465 servers (which
+    reject any plain-text traffic) just timed out — that's the
+    "smtp_connect_failed: Timed out connecting to smtp.hostinger.com
+    on port 465" error.
+    """
     import aiosmtplib
 
-    smtp = aiosmtplib.SMTP(hostname=host, port=port, timeout=15)
+    use_implicit_tls = port == 465
+    smtp = aiosmtplib.SMTP(
+        hostname=host,
+        port=port,
+        timeout=15,
+        use_tls=use_implicit_tls,
+        start_tls=False,  # we issue STARTTLS manually below if needed
+    )
     try:
         await smtp.connect()
-        await smtp.starttls()
+        if not use_implicit_tls:
+            # Port 587 / 25 — upgrade plain connection to TLS
+            await smtp.starttls()
         await smtp.login(username, password)
     finally:
         try:
