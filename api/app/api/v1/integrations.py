@@ -248,6 +248,25 @@ def smtp_connect(
     try:
         asyncio.run(_smtp_verify(host, port, username, password))
     except Exception as exc:  # noqa: BLE001
+        # Detect Render's outbound-SMTP block (manifests as a TCP timeout)
+        # and rewrite the error so the user knows it's a hosting limit,
+        # not a config typo. Render's free/starter tier blocks ports 25,
+        # 465, and 587 to prevent customers from spamming. The only way
+        # around it is an HTTP-based mail relay (Gmail OAuth, SendGrid,
+        # Postmark, Mailgun) — or upgrading the Render plan.
+        msg = str(exc)
+        if "timed out" in msg.lower() or "TimeoutError" in msg:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                (
+                    f"smtp_blocked_by_host: connecting to {host}:{port} timed out — "
+                    "your backend host (Render) blocks outbound SMTP ports on its "
+                    "free/starter plan. Use the Gmail connector (App Password — uses "
+                    "Gmail's HTTPS API, not SMTP) or sign up for SendGrid/Postmark/"
+                    "Mailgun and connect via their SMTP relay on port 2525 (which "
+                    "Render allows). Or upgrade your Render plan to unblock 25/465/587."
+                ),
+            )
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"smtp_connect_failed: {exc}")
     acct = _upsert_account(
         db,
