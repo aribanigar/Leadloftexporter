@@ -1063,17 +1063,38 @@
   }
 
   function scrapeSearchResults() {
-    const results = [];
-    const seen = new Set();
-    // Every profile on the search page is reachable via an /in/ href.
-    const links = document.querySelectorAll("a[href*='/in/']");
-    for (const link of links) {
+    // One profile per CARD using the FIRST /in/ link in DOM order as the
+    // owner. Mutual-connection / people-also-viewed links embedded in
+    // someone else's card NEVER appear first in their card's DOM, so
+    // they're naturally excluded without fragile text-matching heuristics.
+    const allLinks = document.querySelectorAll("a[href*='/in/']");
+    const cardOwner = new Map(); // card → { url, link }
+    for (const link of allLinks) {
       try {
         const url = normalizeProfileUrl(link.href);
-        if (!url || seen.has(url)) continue;
-        // Skip anchors that live in side modules (people-also-viewed, etc.)
-        // by requiring a name attached to the link.
+        if (!url) continue;
         const card = _profileCardFromLink(link);
+        if (!card) continue;
+        if (cardOwner.has(card)) {
+          const existing = cardOwner.get(card);
+          if (existing.url !== url) continue;
+          // Upgrade to the anchor with name text (photo anchor is often empty).
+          const newHasText = (link.textContent || "").trim().length > 0;
+          const oldHasText = (existing.link.textContent || "").trim().length > 0;
+          if (newHasText && !oldHasText) cardOwner.set(card, { url, link });
+          continue;
+        }
+        cardOwner.set(card, { url, link });
+      } catch {
+        /* skip malformed */
+      }
+    }
+
+    const results = [];
+    const seen = new Set();
+    for (const [card, { url, link }] of cardOwner.entries()) {
+      try {
+        if (seen.has(url)) continue;
         const p = _profileFromCard(card, link);
         if (!p) continue;
         seen.add(url);
