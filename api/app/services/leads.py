@@ -136,7 +136,40 @@ def ingest_lead(
     """Upsert a lead from a scraped LinkedIn profile blob.
 
     Returns (lead, created_bool).
+
+    Server-side guard: rejects payloads where the scraped `full_name` is
+    actually a LinkedIn action-button label ("View LinkedIn profile",
+    "Open profile", "Connect", "Save Lead", etc.). Even with up-to-date
+    extension code there are layout variants where the per-card scraper
+    can miss; this guard ensures the pipeline never accumulates rows
+    named after buttons regardless of which extension version is
+    installed.
     """
+    # Reject action-label names BEFORE any DB work. This mirrors the
+    # extension's _isActionLabel filter so the server is authoritative.
+    _ACTION_LABEL_RE = re.compile(
+        r"^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|"
+        r"save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|"
+        r"open\s+in\s+new\s+tab|connect|pending|message|follow|following|"
+        r"invite|invited|withdraw|more|premium)$",
+        re.IGNORECASE,
+    )
+    raw_full = (payload.get("full_name") or "").strip()
+    raw_first = (payload.get("first_name") or "").strip()
+    raw_last = (payload.get("last_name") or "").strip()
+    if (
+        (raw_full and _ACTION_LABEL_RE.match(raw_full))
+        or (raw_first and _ACTION_LABEL_RE.match(raw_first))
+    ):
+        # Drop the polluted name fields but keep the rest of the payload.
+        # If the LinkedIn URL is present, we can recover the name from the
+        # URL slug below. If not, the upsert will simply create a nameless
+        # row that the existing /cleanup/nameless endpoint can sweep.
+        payload = dict(payload)
+        payload["full_name"] = None
+        payload["first_name"] = None
+        payload["last_name"] = None
+
     linkedin = normalize_linkedin(payload.get("linkedin_url"))
     existing: Optional[Lead] = None
     if linkedin:
@@ -160,6 +193,32 @@ def ingest_lead(
     full_name = payload.get("full_name") or " ".join(
         filter(None, [payload.get("first_name"), payload.get("last_name")])
     ) or None
+
+    # If name fields were stripped by the action-label guard above (or just
+    # never sent), derive a best-effort name from the LinkedIn URL slug.
+    # Drops alphanumeric user-id segments like "a742831ab" so the result is
+    # "Faisal Alsagoubi", not "Faisal Alsagoubi A742831ab".
+    if not full_name and linkedin and "/in/" in linkedin:
+        try:
+            slug_match = re.search(r"/in/([^/?#]+)", linkedin)
+            if slug_match:
+                slug = slug_match.group(1).rstrip("/")
+                parts = [
+                    p for p in slug.split("-")
+                    if len(p) >= 2
+                    and not p.isdigit()
+                    and not (any(c.isalpha() for c in p) and any(c.isdigit() for c in p))
+                ]
+                derived = " ".join(p[:1].upper() + p[1:] for p in parts).strip()
+                if derived:
+                    full_name = derived
+                    payload = dict(payload)
+                    payload["full_name"] = derived
+                    first, *rest = derived.split(" ", 1)
+                    payload["first_name"] = first
+                    payload["last_name"] = rest[0] if rest else None
+        except Exception:
+            pass
 
     # Resolve each scalar to its column-capped value once. Reused below in
     # both the update-existing-lead and insert-new-lead branches.

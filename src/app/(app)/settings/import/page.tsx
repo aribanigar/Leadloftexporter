@@ -10,6 +10,33 @@ export default function ImportPage() {
   const [cleanResult, setCleanResult] = useState<string | null>(null);
   const [wiping, setWiping] = useState(false);
   const [wipeResult, setWipeResult] = useState<string | null>(null);
+  const [cleaningPolluted, setCleaningPolluted] = useState(false);
+  const [pollutedResult, setPollutedResult] = useState<string | null>(null);
+
+  async function runPollutedCleanup() {
+    if (
+      !confirm(
+        'Delete all leads where the name is actually a LinkedIn button label ("View LinkedIn profile", "Connect", "Message", etc.)? This cannot be undone.'
+      )
+    )
+      return;
+    setCleaningPolluted(true);
+    setPollutedResult(null);
+    try {
+      const res = await api<{ deleted: number; examples: string[] }>(
+        "/leads/cleanup/polluted-names",
+        { method: "DELETE" }
+      );
+      setPollutedResult(
+        `Deleted ${res.deleted} polluted-name lead${res.deleted === 1 ? "" : "s"}` +
+          (res.examples?.length ? `: ${res.examples.slice(0, 5).join(", ")}` : "")
+      );
+    } catch (e: unknown) {
+      setPollutedResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCleaningPolluted(false);
+    }
+  }
 
   async function runCleanup() {
     if (!confirm("Delete all nameless extension leads? This cannot be undone.")) return;
@@ -71,7 +98,7 @@ export default function ImportPage() {
           before it had finished loading, and they appear as &quot;—&quot; rows in your
           pipeline alongside the real named lead for the same person.
         </p>
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             className="btn-danger"
             onClick={runCleanup}
@@ -81,6 +108,24 @@ export default function ImportPage() {
           </button>
           {cleanResult && (
             <span className="text-sm text-slate-600">{cleanResult}</span>
+          )}
+        </div>
+        <p className="mt-4 text-sm text-slate-500">
+          Remove leads where the name is actually a LinkedIn button label
+          like &quot;View LinkedIn profile&quot;, &quot;Connect&quot;, or
+          &quot;Message&quot; — the result of older extension versions
+          scraping the wrong DOM element.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            className="btn-danger"
+            onClick={runPollutedCleanup}
+            disabled={cleaningPolluted}
+          >
+            {cleaningPolluted ? "Cleaning…" : "Delete polluted-name leads"}
+          </button>
+          {pollutedResult && (
+            <span className="text-sm text-slate-600">{pollutedResult}</span>
           )}
         </div>
       </div>
