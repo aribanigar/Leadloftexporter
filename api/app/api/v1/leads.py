@@ -420,8 +420,13 @@ def find_lead_email(
         domain=(company.domain if company else None),
         company_url=(company.website if company else None) or lead.company_url,
         company_name=(company.name if company else None),
+        linkedin_url=lead.linkedin_url,
+        db=db,
+        workspace_id=ctx.workspace_id,
     )
     payload = result.to_dict()
+    if result.phone and not lead.phone:
+        lead.phone = result.phone
 
     # Persist
     merged_custom = dict(lead.custom or {})

@@ -24,6 +24,7 @@ from app.models.base import (
     ConnectedAccount,
     ExtensionJob,
     SearchScraper,
+    CompanyEmailPattern,
     Integration,
     Credit,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "ConnectedAccount",
     "ExtensionJob",
     "SearchScraper",
+    "CompanyEmailPattern",
     "Integration",
     "Credit",
 ]
