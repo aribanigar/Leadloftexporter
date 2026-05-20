@@ -42,11 +42,20 @@
       const settings = await Storage.getSettings();
       if (settings.autoEnrichOnSave === false) return;
 
-      // 3–9s reading delay so it looks like the user is viewing the page.
-      // 15% chance of an extra 5–12s pause ("they got distracted").
-      const base = Human.rand(3000, 9000);
-      const bonus = Math.random() < 0.15 ? Human.rand(5000, 12000) : 0;
-      await Human.sleep(base + bonus);
+      // Two timing modes:
+      //   - On /overlay/contact-info/ URLs the user has EXPLICITLY opened
+      //     the Contact info modal — no need to fake a reading pause,
+      //     scrape and save immediately (just wait briefly for React).
+      //   - On regular /in/<handle> URLs, simulate a 3-9s reading pause
+      //     so background activity doesn't look bot-like.
+      const onContactOverlay = path.includes("/overlay/contact-info");
+      if (onContactOverlay) {
+        await Human.sleep(Human.rand(600, 1400));
+      } else {
+        const base = Human.rand(3000, 9000);
+        const bonus = Math.random() < 0.15 ? Human.rand(5000, 12000) : 0;
+        await Human.sleep(base + bonus);
+      }
 
       const contact = await Scraper.scrapeContactInfo();
       if (!contact.email && !contact.phone && !contact.address) return; // nothing new
@@ -57,7 +66,12 @@
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
       if (contact.address) profile.location = contact.address.slice(0, 200);
-      profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
+      profile.raw = {
+        ...(profile.raw || {}),
+        contact_info_scraped: true,
+        auto_enriched: true,
+        contact_source: onContactOverlay ? "overlay_visit" : "profile_visit",
+      };
 
       await globalThis.__lcApi.syncProfile(profile);
     } catch (e) {

@@ -281,11 +281,9 @@
     flashStatus("Reading contact info…");
     let enriched = profile;
     try {
-      // On /in/ pages we open the Contact info modal and read email/phone the
-      // same way a human would — opens the visible modal, scrapes, closes.
-      // If the user has manually opened the Contact info modal already,
-      // scrapeProfileWithContact() will find it and just read it (no extra
-      // click), and `enriched.email` / `enriched.phone` come back populated.
+      // Path A: we ARE on the person's /in/ profile page. Use the in-page
+      // modal scrape — it's the most reliable and reads any Contact info
+      // popup the user has already opened (no extra clicks, no tabs).
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
         enriched = await Scraper.scrapeProfileWithContact();
       }
@@ -294,8 +292,7 @@
     }
     // Re-scrape the base profile so a Save click that ran after the h1
     // finally hydrated picks up the correct name/title even though the
-    // initial panel render saw "Unknown profile". Without this re-scrape,
-    // the click handler would send back the stale empty profile object.
+    // initial panel render saw "Unknown profile".
     if ((!enriched.full_name || !enriched.title) && Scraper.scrapeProfile) {
       try {
         const fresh = Scraper.scrapeProfile();
@@ -309,29 +306,77 @@
         }
       } catch {}
     }
-    // Last-mile: if scrapeProfileWithContact didn't surface email/phone
-    // (modal selectors drifted, or it timed out), do a document-wide
-    // mailto:/tel: anchor scan. If the user can see the email on screen,
-    // this catches it.
+    // Last-mile: scan the visible Contact info modal if one is open.
     if (!enriched.email || !enriched.phone || !enriched.company_url) {
       const visible = _harvestVisibleContact();
       if (!enriched.email && visible.email) enriched.email = visible.email;
       if (!enriched.phone && visible.phone) enriched.phone = visible.phone;
       if (!enriched.company_url && visible.website)
         enriched.company_url = visible.website;
-      // Address from the open modal beats the top-card location string
-      // (more specific — "Doha- Qatar" vs a generic "Qatar"). Only used
-      // when scrapeProfileWithContact didn't already supply it.
       if (visible.address) {
         enriched.location = visible.address.slice(0, 200);
       }
     }
+
+    // Path B: we are NOT on the person's profile page (feed, post,
+    // search-result side panel, anywhere) but we know their /in/ URL.
+    // Mount a hidden, off-screen, same-origin iframe at /overlay/contact-info/
+    // and read the modal contents from there. No visible tab, no
+    // navigation away from the user's current page. Rate-limited by the
+    // service worker's SAFE_ZONE counters.
+    const url = enriched.linkedin_url || profile.linkedin_url;
+    const onSameProfilePage =
+      url &&
+      location.pathname.startsWith("/in/") &&
+      url.toLowerCase().includes(location.pathname.split("?")[0].toLowerCase().replace(/\/$/, ""));
+    const needsContact =
+      !enriched.email || !enriched.phone || !enriched.location;
+    if (url && url.includes("/in/") && !onSameProfilePage && needsContact) {
+      flashStatus("Enriching contact info…");
+      try {
+        const allowed = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage(
+              { type: "lc:reserveEnrich" },
+              (resp) => {
+                if (chrome.runtime.lastError) return resolve(false);
+                resolve(resp?.ok === true);
+              }
+            );
+          } catch {
+            resolve(false);
+          }
+        });
+        if (allowed && Scraper.scrapeContactInfoViaIframe) {
+          const fromIframe = await Scraper.scrapeContactInfoViaIframe(url);
+          if (fromIframe.email && !enriched.email) enriched.email = fromIframe.email;
+          if (fromIframe.phone && !enriched.phone) enriched.phone = fromIframe.phone;
+          if (fromIframe.website && !enriched.company_url)
+            enriched.company_url = fromIframe.website;
+          if (fromIframe.address && (!enriched.location || enriched.location.length < 4))
+            enriched.location = fromIframe.address.slice(0, 200);
+          enriched.raw = {
+            ...(enriched.raw || {}),
+            contact_info_scraped: true,
+            contact_source: "iframe",
+          };
+        }
+      } catch {
+        /* enrichment is best-effort */
+      }
+    }
+
     flashStatus("Saving…");
     try {
       const result = await Api.syncProfile(enriched);
       const gotEmail = !!(enriched.email && !profile.email);
       const gotPhone = !!(enriched.phone && !profile.phone);
-      const extras = [gotEmail && "email", gotPhone && "phone"].filter(Boolean).join(" + ");
+      const gotAddress = !!(enriched.location && !profile.location);
+      const extras = [
+        gotEmail && "email",
+        gotPhone && "phone",
+        gotAddress && "address",
+      ].filter(Boolean).join(" + ");
       const msg = result.created
         ? `Saved new lead ✓${extras ? ` (${extras})` : ""}`
         : `Lead updated ✓${extras ? ` (${extras})` : ""}`;
