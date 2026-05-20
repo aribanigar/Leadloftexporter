@@ -678,6 +678,164 @@
     return out;
   }
 
+  /* ---------- Iframe-based contact-info enrichment ----------
+   *
+   * Used by the per-card Save chip on search pages. We mount a hidden,
+   * off-screen iframe pointing at /in/<handle>/overlay/contact-info/ —
+   * LinkedIn's SPA auto-opens the Contact info modal on that URL. Because
+   * the iframe is same-origin (linkedin.com → linkedin.com) we can read its
+   * contentDocument directly. This replaces the previous "open a background
+   * tab" approach: no new tab in the user's taskbar, faster turnaround, and
+   * the user doesn't see any visible UI artefact.
+   *
+   * Same bot-avoidance constraints apply: rate-limited via the service
+   * worker, modal-only DOM reads (no LinkedIn internal API calls).
+   */
+  async function scrapeContactInfoViaIframe(
+    profileUrl,
+    { timeoutMs = 18000 } = {}
+  ) {
+    let overlayUrl;
+    try {
+      const u = new URL(profileUrl, location.origin);
+      if (!u.pathname.startsWith("/in/")) {
+        return { email: null, phone: null, website: null };
+      }
+      const path = u.pathname.replace(/\/$/, "");
+      overlayUrl = path.endsWith("/overlay/contact-info")
+        ? u.origin + path + "/"
+        : u.origin + path + "/overlay/contact-info/";
+    } catch {
+      return { email: null, phone: null, website: null };
+    }
+
+    return new Promise((resolve) => {
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.setAttribute("title", "");
+      // Off-screen, no opacity, no pointer events — the user never sees it.
+      // We still give it real width/height because LinkedIn's React tree
+      // sometimes refuses to render the modal in a 1x1 frame.
+      iframe.style.cssText = [
+        "position:fixed",
+        "left:-99999px",
+        "top:-99999px",
+        "width:1200px",
+        "height:800px",
+        "border:0",
+        "opacity:0",
+        "pointer-events:none",
+        "visibility:hidden",
+      ].join(";");
+      iframe.src = overlayUrl;
+
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        clearInterval(pollId);
+        clearTimeout(timeoutId);
+        try { iframe.remove(); } catch {}
+        resolve(result);
+      };
+
+      const timeoutId = setTimeout(
+        () => finish({ email: null, phone: null, website: null }),
+        timeoutMs
+      );
+
+      // Poll every 500ms for the modal contents to appear inside the iframe.
+      // Polling beats a load-event handler here because LinkedIn's modal
+      // renders asynchronously several ticks after the iframe's load fires.
+      const startedAt = Date.now();
+      const pollId = setInterval(() => {
+        if (settled) return;
+        let doc;
+        try {
+          doc = iframe.contentDocument;
+        } catch {
+          // Cross-origin error — LinkedIn redirected the iframe to a login
+          // or checkpoint page on a different origin. Nothing to scrape.
+          return finish({ email: null, phone: null, website: null });
+        }
+        if (!doc) return;
+
+        // Look for the dialog AND wait at least 1.5s after first sighting
+        // so React has time to populate mailto:/tel: anchors inside it.
+        const modal = doc.querySelector("div[role='dialog']");
+        const elapsed = Date.now() - startedAt;
+        if (!modal && elapsed < 6000) return;
+
+        const mailto =
+          (modal && modal.querySelector("a[href^='mailto:']")) ||
+          doc.querySelector("a[href^='mailto:']");
+        const tel =
+          (modal && modal.querySelector("a[href^='tel:']")) ||
+          doc.querySelector("a[href^='tel:']");
+
+        // If the modal is present but no contact anchors yet, give React
+        // a couple more polls to hydrate them.
+        if (modal && !mailto && !tel && elapsed < 8000) return;
+
+        const email = mailto
+          ? mailto.getAttribute("href").replace(/^mailto:/, "").split("?")[0].trim()
+          : null;
+        const phone = tel
+          ? tel.getAttribute("href").replace(/^tel:/, "").trim()
+          : null;
+
+        let website = null;
+        if (modal) {
+          const externals = modal.querySelectorAll("a[href^='http']");
+          for (const a of externals) {
+            const href = a.getAttribute("href") || "";
+            if (
+              !href.includes("linkedin.com") &&
+              !href.startsWith("mailto:") &&
+              !href.startsWith("tel:") &&
+              !href.includes("/overlay/")
+            ) {
+              website = href;
+              break;
+            }
+          }
+        }
+
+        // Fallback: scan profile text for public emails/phones the user
+        // wrote into their About / Experience sections. Catches non-1st-
+        // degree connections where the modal stays empty.
+        if (!email || !phone) {
+          const main = doc.querySelector("main");
+          const text = main
+            ? (main.innerText || main.textContent || "").replace(/\s+/g, " ")
+            : "";
+          if (!email) {
+            const m = text.match(
+              /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/
+            );
+            if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) {
+              finish({ email: m[0], phone, website });
+              return;
+            }
+          }
+          if (!phone) {
+            const m = text.match(
+              /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/
+            );
+            if (m) {
+              finish({ email, phone: m[0].replace(/\s+/g, " ").trim(), website });
+              return;
+            }
+          }
+        }
+
+        finish({ email, phone, website });
+      }, 500);
+
+      document.body.appendChild(iframe);
+    });
+  }
+
   function scrapeCurrentPage() {
     switch (pageType()) {
       case "profile":
@@ -698,6 +856,7 @@
     scrapeProfile,
     scrapeProfileWithContact,
     scrapeContactInfo,
+    scrapeContactInfoViaIframe,
     scrapeSalesNavProfile,
     scrapeSearchResults,
     scrapeSalesNavSearch,

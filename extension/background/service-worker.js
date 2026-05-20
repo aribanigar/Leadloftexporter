@@ -176,6 +176,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+  // Hidden-iframe enrichment (no new tab) checks the rate limit through us.
+  // We hold the counters in the service worker so all tabs share one budget;
+  // the content script can't safely keep its own counter (different tabs
+  // would each have their own). On allow, we reserve the slot synchronously
+  // so concurrent clicks across tabs can't all sneak past the daily cap.
+  if (msg?.type === "lc:reserveEnrich") {
+    (async () => {
+      try {
+        const allowed = await canEnrich();
+        if (!allowed) {
+          sendResponse({ ok: false, error: "safe_zone_limit_reached" });
+          return;
+        }
+        reserveEnrich();
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
   // The enrichment-trigger content script asks us to close its own tab.
   if (msg?.type === "lc:closeMe") {
     const tabId = _sender?.tab?.id;

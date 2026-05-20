@@ -454,34 +454,79 @@
       btn.dataset.state = "saving";
       textSpan.textContent = "Saving…";
       try {
+        // Step 1 — save the card data (name, title, company, location,
+        // avatar, headline) immediately. The user gets a "Saved ✓" pill
+        // even if the iframe enrichment below times out or yields nothing.
         const result = await Api.syncProfile(profile);
-        btn.dataset.state = "saved";
-        textSpan.textContent = "Saved ✓";
         if (result.lead?.id) {
           state.lastSavedLeadIds = [result.lead.id];
           maybeAutoEnroll();
         }
+        btn.dataset.state = "saved";
+        textSpan.textContent = "Saved ✓";
+
+        // Step 2 — enrich email / phone / company website via a HIDDEN
+        // IFRAME. No new tab, no popup, no visual artefact: we mount an
+        // off-screen iframe at /in/<handle>/overlay/contact-info/ which is
+        // same-origin, so we can read its DOM and pull mailto:/tel:
+        // anchors directly. Only /in/ URLs are eligible — /sales/lead/
+        // pages don't render the Contact info modal, and bouncing them
+        // would create the duplicate-blank-lead problem.
         const settings = await Storage.getSettings();
-        // Only enrich /in/ URLs. If the card didn't expose an /in/ anchor,
-        // profile.linkedin_url is still /sales/lead/X. The enrichment tab
-        // would redirect to /in/Y and create a lead with a DIFFERENT URL —
-        // a duplicate that would show up as a blank-named record. Skipping
-        // enrichment for /sales/lead/ URLs prevents that. The user can still
-        // enrich by visiting the full profile page directly.
         if (
-          settings.autoEnrichOnSave !== false &&
-          profile.linkedin_url?.includes("/in/")
+          settings.autoEnrichOnSave === false ||
+          !profile.linkedin_url?.includes("/in/")
         ) {
-          chrome.runtime.sendMessage(
-            { type: "lc:enrichProfile", url: profile.linkedin_url },
-            (resp) => {
-              if (resp?.ok) {
-                textSpan.textContent = "Saved · enriching…";
-              } else if (resp?.error === "safe_zone_limit_reached") {
-                textSpan.textContent = "Saved (daily limit)";
+          return;
+        }
+
+        // Rate-limit handshake with the service worker. The SW holds the
+        // 20/hr + 100/day budget shared across all open LinkedIn tabs.
+        const allowed = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage(
+              { type: "lc:reserveEnrich" },
+              (resp) => {
+                if (chrome.runtime.lastError) return resolve(false);
+                resolve(resp?.ok === true);
               }
-            }
-          );
+            );
+          } catch {
+            resolve(false);
+          }
+        });
+        if (!allowed) {
+          textSpan.textContent = "Saved (daily limit)";
+          return;
+        }
+
+        textSpan.textContent = "Saved · enriching…";
+        const contact = await Scraper.scrapeContactInfoViaIframe(
+          profile.linkedin_url
+        );
+        if (contact.email || contact.phone || contact.website) {
+          const enriched = { ...profile };
+          if (contact.email) enriched.email = contact.email;
+          if (contact.phone) enriched.phone = contact.phone;
+          if (contact.website) enriched.company_url = contact.website;
+          enriched.raw = {
+            ...(enriched.raw || {}),
+            contact_info_scraped: true,
+          };
+          try {
+            await Api.syncProfile(enriched);
+            const got = [
+              contact.email && "email",
+              contact.phone && "phone",
+            ]
+              .filter(Boolean)
+              .join(" + ");
+            textSpan.textContent = got ? `Saved ✓ (${got})` : "Saved ✓";
+          } catch {
+            textSpan.textContent = "Saved ✓";
+          }
+        } else {
+          textSpan.textContent = "Saved ✓";
         }
       } catch (err) {
         btn.dataset.state = "error";
