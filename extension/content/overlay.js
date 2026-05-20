@@ -462,7 +462,16 @@
           maybeAutoEnroll();
         }
         const settings = await Storage.getSettings();
-        if (settings.autoEnrichOnSave !== false && profile.linkedin_url) {
+        // Only enrich /in/ URLs. If the card didn't expose an /in/ anchor,
+        // profile.linkedin_url is still /sales/lead/X. The enrichment tab
+        // would redirect to /in/Y and create a lead with a DIFFERENT URL —
+        // a duplicate that would show up as a blank-named record. Skipping
+        // enrichment for /sales/lead/ URLs prevents that. The user can still
+        // enrich by visiting the full profile page directly.
+        if (
+          settings.autoEnrichOnSave !== false &&
+          profile.linkedin_url?.includes("/in/")
+        ) {
           chrome.runtime.sendMessage(
             { type: "lc:enrichProfile", url: profile.linkedin_url },
             (resp) => {
@@ -651,10 +660,18 @@
 
         const card = _cardFromLink(link);
         if (!card) continue;
-        // Defensive: if THIS card already has a save chip pointing at a
-        // different URL (recycled <li>), remove it.
+
         const stray = card.querySelector(".lc-save-row");
-        if (stray && stray.dataset.lcUrl !== url) {
+        if (stray) {
+          // Check by identity: if the chip is still tracked in our registry
+          // it's OUR chip for this card — leave it alone. This happens when
+          // a Sales Nav card has both a /sales/lead/ anchor (the byUrl key
+          // here) and a /in/ anchor; injectInlineSave() stores the chip
+          // under the /in/ URL, so it looks like a "stray" but isn't.
+          const trackedNode = injectedSaves.get(stray.dataset.lcUrl);
+          if (trackedNode === stray) continue;
+          // Truly recycled <li>: LinkedIn reused this DOM node for a
+          // different person. Remove the old chip before re-injecting.
           injectedSaves.delete(stray.dataset.lcUrl);
           stray.remove();
         }

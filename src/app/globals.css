@@ -43,6 +43,9 @@ body {
   .btn-ghost {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50;
+  }
   .card {
     @apply rounded-lg border border-slate-200 bg-white shadow-card;
   }
