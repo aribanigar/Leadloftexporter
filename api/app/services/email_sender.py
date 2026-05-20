@@ -27,6 +27,21 @@ class SendResult:
 
 
 def _pick_account(db: Session, workspace_id: str, user_id: str) -> Optional[ConnectedAccount]:
+    # Prefer HTTPS providers (resend, sendgrid, gmail) over SMTP. Render
+    # blocks outbound SMTP on ports 25/465/587, so a stale "active" SMTP
+    # account from earlier troubleshooting would otherwise outrank a
+    # freshly-connected Resend account if it happened to be updated more
+    # recently. The CASE expression sorts HTTPS first; updated_at desc
+    # is the tiebreaker.
+    from sqlalchemy import case
+
+    provider_rank = case(
+        (ConnectedAccount.provider == "resend", 0),
+        (ConnectedAccount.provider == "sendgrid", 1),
+        (ConnectedAccount.provider == "gmail", 2),
+        (ConnectedAccount.provider == "smtp", 3),
+        else_=9,
+    )
     return (
         db.query(ConnectedAccount)
         .filter(
@@ -35,7 +50,7 @@ def _pick_account(db: Session, workspace_id: str, user_id: str) -> Optional[Conn
             ConnectedAccount.provider.in_(("gmail", "smtp", "resend", "sendgrid")),
             ConnectedAccount.status == "active",
         )
-        .order_by(ConnectedAccount.updated_at.desc())
+        .order_by(provider_rank.asc(), ConnectedAccount.updated_at.desc())
         .first()
     )
 
