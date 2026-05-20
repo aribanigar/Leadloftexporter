@@ -522,6 +522,73 @@
     return null;
   }
 
+  // Scan the modal's innerText between the "Contact info" heading and the
+  // next page-section header for any phone-shaped digit run. Used when both
+  // tel: anchor and labelled-line lookup miss — happens when LinkedIn ships
+  // the phone as a bare <p>+97...</p> without anchor and the label appears
+  // glued to the value in a single span. Strict scope so an unrelated phone
+  // somewhere else on the page can't leak in.
+  function _scanModalForPhone(modal) {
+    if (!modal) return null;
+    const text = modal.innerText || modal.textContent || "";
+    const lines = text
+      .split(/[\r\n]+/)
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    let start = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^contact info$/i.test(lines[i])) { start = i + 1; break; }
+    }
+    const sectionLabels = /^(see all activity|about|experience|education|skills|recommendations|posts|interests|languages|courses|honors|publications|projects|volunteering|certifications|more profiles for you|promoted)\s*$/i;
+    for (let i = start; i < lines.length; i++) {
+      if (sectionLabels.test(lines[i])) break;
+      // Skip URL-bearing lines — they contain digit runs that look like
+      // phones (e.g. linkedin.com/in/khalid-basha-32604830 ends in 8 digits).
+      if (
+        /https?:\/\//i.test(lines[i]) ||
+        /\blinkedin\.com\//i.test(lines[i]) ||
+        /\.com\/\S/i.test(lines[i]) ||
+        /\.net\/\S/i.test(lines[i]) ||
+        /\.org\/\S/i.test(lines[i])
+      ) continue;
+      // Phone-shaped: must START with + or digit (not a dash from URLs).
+      const m = lines[i].match(/(?:^|\s|\()(\+\d[\d\s\-().]{6,}|\d[\d\s\-().]{6,})/);
+      if (!m) continue;
+      // Trim trailing dangling punctuation ("+97...035 (" → "+97...035")
+      // — happens when the regex stops mid-"(Mobile)" because "M" isn't
+      // in its char class.
+      const candidate = m[1].replace(/[\s\-().]+$/g, "").trim();
+      const digits = candidate.replace(/\D/g, "");
+      if (digits.length < 7 || digits.length > 15) continue;
+      if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(candidate)) continue;
+      if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(candidate)) continue;
+      return candidate.replace(/\s+/g, " ").trim();
+    }
+    return null;
+  }
+
+  // Same scan for email — last-resort when both mailto: anchor and labelled
+  // lookup miss. Scopes to the contact-info section only.
+  function _scanModalForEmail(modal) {
+    if (!modal) return null;
+    const text = modal.innerText || modal.textContent || "";
+    const lines = text
+      .split(/[\r\n]+/)
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    let start = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^contact info$/i.test(lines[i])) { start = i + 1; break; }
+    }
+    const sectionLabels = /^(see all activity|about|experience|education|skills|recommendations|posts|interests|languages|courses|honors|publications|projects|volunteering|certifications|more profiles for you|promoted)\s*$/i;
+    for (let i = start; i < lines.length; i++) {
+      if (sectionLabels.test(lines[i])) break;
+      const m = lines[i].match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+      if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) return m[0];
+    }
+    return null;
+  }
+
   function _scrapeFromContactModal(modal) {
     if (!modal) return { email: null, phone: null, website: null, address: null };
 
@@ -535,14 +602,23 @@
         .trim();
     }
     if (!email) {
-      const v = _modalFieldAfterLabel(modal, /^\s*email\s*$/i);
+      const v = _modalFieldAfterLabel(
+        modal,
+        /^\s*(email|email\s+address|e-?mail|emails)\s*$/i
+      );
       if (v) {
         const m = v.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
         if (m) email = m[0];
       }
     }
+    if (!email) email = _scanModalForEmail(modal);
 
     // --- Phone ---
+    // LinkedIn's modal sometimes ships the phone as a plain <p>+97...</p>
+    // with NO tel: anchor (visible in the Khalid Basha DevTools screenshot).
+    // We try the anchor first, then the labelled-line lookup with several
+    // alias headers (Phone, Phone numbers, Mobile, Tel, Telephone), then a
+    // last-resort scoped scan of the modal text for any phone-shaped run.
     let phone = null;
     const phoneAnchor = modal.querySelector("a[href^='tel:']");
     if (phoneAnchor) {
@@ -551,20 +627,29 @@
         .trim();
     }
     if (!phone) {
-      const v = _modalFieldAfterLabel(modal, /^\s*phone\s*$/i);
+      const v = _modalFieldAfterLabel(
+        modal,
+        /^\s*(phone|phone\s+number|phone\s+numbers|mobile|tel|telephone|cell)\s*$/i
+      );
       if (v) {
-        // Take any digits-and-separators run that contains 7+ digits.
-        // Covers +XX XX XXX, plain 8-digit Gulf numbers (30082757), and
-        // US-style XXX-XXX-XXXX.
         const m = v.match(/\+?[\d\s\-().]{7,}/);
         if (m) {
           phone = m[0].replace(/\s+/g, " ").trim();
         }
       }
     }
+    if (!phone) {
+      // Last-resort: scan the modal text between "Contact info" and the
+      // next page-section header for any phone-shaped digit run. This
+      // catches markup variants where the label isn't on its own line.
+      phone = _scanModalForPhone(modal);
+    }
 
     // --- Address ---
-    let address = _modalFieldAfterLabel(modal, /^\s*address\s*$/i);
+    let address = _modalFieldAfterLabel(
+      modal,
+      /^\s*(address|location|home\s+address|work\s+address)\s*$/i
+    );
     if (address) {
       address = address.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
     }
