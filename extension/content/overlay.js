@@ -982,28 +982,48 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // LinkedIn renders TWO /in/ anchors per card: a PHOTO anchor (no text,
-    // <img> inside) and a NAME anchor (contains <span>Name</span>). DOM
-    // order has the photo first. The naive "first anchor wins" dedup would
-    // call profileFromCard() on the photo anchor → empty name → null
-    // profile → no injection, and then skip the name anchor as a duplicate
-    // URL. Result: ZERO save chips on every card. Fix: group anchors by
-    // canonical URL and pick the one with actual text content per group.
-    const links = document.querySelectorAll(
+    // KEY INVARIANT: one Save chip per CARD, using the FIRST /in/ link
+    // inside that card as the canonical profile owner.
+    //
+    // LinkedIn embeds mutual-connection people's profile links INSIDE the
+    // card of the person being viewed (e.g. Mohamad's card contains links
+    // to Joann Deeb and Lulwa Al Qadi as "mutual connections"). The old
+    // "group all /in/ anchors on the page by URL, inject one chip per
+    // URL" approach injected chips for Joann and Lulwa as separate "cards"
+    // — saving the wrong person when the user clicked. Now we walk cards
+    // and only consider the FIRST /in/ link per card. Mutual-connection
+    // links never become canonical because they're never first in DOM
+    // order within their containing card.
+    const allLinks = document.querySelectorAll(
       "a[href*='/in/'], a[href*='/sales/lead/']"
     );
-    const byUrl = new Map(); // url -> best anchor (preferring ones with text)
-    for (const link of links) {
+    const cardOwner = new Map(); // card element -> { url, link }
+    for (const link of allLinks) {
       const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
       if (!url) continue;
-      const current = byUrl.get(url);
-      const linkHasText = (link.textContent || "").trim().length > 0;
-      if (!current) {
-        byUrl.set(url, link);
-      } else if (linkHasText && !(current.textContent || "").trim()) {
-        // Upgrade: the new candidate has the name text, the stored one didn't
-        byUrl.set(url, link);
+      const card = _cardFromLink(link);
+      if (!card) continue;
+      if (cardOwner.has(card)) {
+        // We already have the owner link for this card; if the existing
+        // record has no text but the new candidate does AND points to the
+        // same URL, upgrade (so we use the name anchor over the photo
+        // anchor for downstream name extraction). DIFFERENT URLs are
+        // mutual-connection links — never overwrite the owner.
+        const existing = cardOwner.get(card);
+        if (existing.url !== url) continue;
+        const newHasText = (link.textContent || "").trim().length > 0;
+        const oldHasText = (existing.link.textContent || "").trim().length > 0;
+        if (newHasText && !oldHasText) {
+          cardOwner.set(card, { url, link });
+        }
+        continue;
       }
+      cardOwner.set(card, { url, link });
+    }
+    // Surface as the same byUrl shape the rest of the function expects.
+    const byUrl = new Map();
+    for (const [, { url, link }] of cardOwner) {
+      byUrl.set(url, link);
     }
 
     for (const [url, link] of byUrl.entries()) {
