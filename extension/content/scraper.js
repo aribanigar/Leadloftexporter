@@ -866,28 +866,120 @@
   // don't match dates / post counts / IDs by accident.
   const PHONE_RE = /\+\d[\d\s().-]{6,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b|\b\d{8,12}\b/;
 
+  // De-obfuscate the most common email-hiding patterns LinkedIn users
+  // employ to evade LinkedIn's auto-link detection (which would convert
+  // a real email into a clickable link and trip spam filters):
+  //   john [at] company [dot] com
+  //   john(at)company.com
+  //   john AT company DOT com
+  //   john[at]company[dot]com
+  // We're conservative with lowercase " at " / " dot " — they're too
+  // common in normal prose to substitute blindly.
+  function _deobfuscateContact(text) {
+    if (!text) return "";
+    let s = String(text);
+    // Bracketed and parenthesized forms — case-insensitive, safe to apply
+    s = s.replace(/\s*[\[(]\s*at\s*[\])]\s*/gi, "@");
+    s = s.replace(/\s*[\[(]\s*dot\s*[\])]\s*/gi, ".");
+    // Uppercase AT / DOT with surrounding spaces — "john AT acme DOT com"
+    s = s.replace(/\s+AT\s+/g, "@");
+    s = s.replace(/\s+DOT\s+/g, ".");
+    // Less common but real: " plus " for + in phone numbers
+    s = s.replace(/\s*[\[(]\s*plus\s*[\])]\s*/gi, "+");
+    return s;
+  }
+
+  // Click "see more" buttons inside the profile's content sections so the
+  // full About / Experience / Featured text becomes part of innerText.
+  // LinkedIn truncates About at ~200 chars by default; the lines we care
+  // about ("Reach me at ___") often live below that fold.
+  async function _expandProfileSections() {
+    if (!location.pathname.startsWith("/in/")) return;
+    const buttons = Array.from(document.querySelectorAll("button"));
+    let clicked = 0;
+    for (const b of buttons) {
+      const text = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      // Match common LinkedIn truncation buttons. Skip "show all" buttons
+      // that navigate to another page; we only want in-place expanders.
+      if (!/^(\.{3}\s*more|see more|show more|…\s*more|\.{3}more)$/i.test(text)) continue;
+      // Only click if button is in main profile content (skip
+      // Recommendations footer / comments / unrelated dialogs).
+      const inMain = b.closest("main, section, article");
+      if (!inMain) continue;
+      try {
+        b.click();
+        clicked++;
+        if (clicked >= 10) break; // safety cap — never click more than 10
+      } catch {
+        /* swallow — some buttons throw if disabled */
+      }
+    }
+    if (clicked) await _sleep(400); // let LinkedIn re-render expanded sections
+  }
+
   function _scrapeFromProfileText() {
-    // Search the user-content regions of the profile only. Skip the global
-    // <body> scan because LinkedIn's chrome (navbar, ads, "people you may
-    // know") contains noise that would generate false positives.
-    const containers = [
+    // Search the user-content regions of the profile. Broader than before:
+    // we now include About, Experience, Featured, current-job description,
+    // and the first few recent-activity posts. Each section is checked
+    // independently so a stray match in one doesn't pre-empt the others.
+    const candidates = [
+      // About / summary
       document.querySelector("section[data-section='summary']"),
       document.querySelector("section.pv-about-section"),
       document.querySelector("section#about"),
       document.querySelector("div[data-generated-suggestion-target]"),
-      document.querySelector("main"),
+      // Featured (pinned posts often have "DM me at ___")
+      document.querySelector("section#featured"),
+      document.querySelector("section[aria-labelledby*='featured' i]"),
+      document.querySelector("div[aria-labelledby*='featured' i]"),
+      // Experience (current + past job descriptions sometimes hold contact)
+      document.querySelector("section#experience"),
+      document.querySelector("section[aria-labelledby*='experience' i]"),
+      // Recent activity / posts pinned to the profile
+      document.querySelector("section#content_collections"),
+      document.querySelector("section[aria-labelledby*='content_collections' i]"),
+      document.querySelector("section[aria-labelledby*='posts' i]"),
     ].filter(Boolean);
+
+    // Dedupe — the same section can match multiple selectors (id + aria).
+    const containers = [];
+    const seen = new Set();
+    for (const c of candidates) {
+      if (seen.has(c)) continue;
+      seen.add(c);
+      containers.push(c);
+    }
+    // Final fallback: scan <main>, but only if nothing more specific matched.
+    if (!containers.length) {
+      const main = document.querySelector("main");
+      if (main) containers.push(main);
+    }
+
     let email = null;
     let phone = null;
     for (const c of containers) {
-      const text = (c.innerText || c.textContent || "").replace(/\s+/g, " ");
+      const rawText = (c.innerText || c.textContent || "").replace(/\s+/g, " ");
+      // De-obfuscate BEFORE pattern matching so "john [at] acme [dot] com"
+      // becomes a normal email and matches EMAIL_RE.
+      const text = _deobfuscateContact(rawText);
       if (!email) {
         const m = text.match(EMAIL_RE);
-        if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) email = m[0];
+        if (
+          m &&
+          !/@(linkedin|2x|licdn|gstatic)\.com$/i.test(m[0]) &&
+          !/example\.(com|org)$/i.test(m[0])
+        ) {
+          email = m[0];
+        }
       }
       if (!phone) {
         const m = text.match(PHONE_RE);
-        if (m) phone = m[0].replace(/\s+/g, " ").trim();
+        if (m) {
+          const digits = m[0].replace(/\D/g, "");
+          if (digits.length >= 7 && digits.length <= 15) {
+            phone = m[0].replace(/\s+/g, " ").trim();
+          }
+        }
       }
       if (email && phone) break;
     }
@@ -895,6 +987,12 @@
   }
 
   async function scrapeProfileWithContact() {
+    // Click any visible "...more" / "see more" buttons in the profile's
+    // content sections BEFORE the base scrape so About/Experience text
+    // is fully expanded when _scrapeFromProfileText runs. Best-effort —
+    // failure just means we get the truncated text, same as before.
+    try { await _expandProfileSections(); } catch {}
+
     const base = scrapeProfile();
     try {
       // Step 1: is the Contact info popup currently open and visible?
