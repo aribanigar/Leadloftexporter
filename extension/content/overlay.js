@@ -209,97 +209,32 @@
   // current lead. We restrict to elements inside `div[role='dialog']` that
   // also contains the literal "Contact info" header text — the unambiguous
   // signature of the Contact info modal.
+  // Delegate to scraper.js's robust _findContactModal + _scrapeFromContactModal,
+  // which together handle:
+  //   - div[role='dialog'] popups (the modal opened on a /in/ page)
+  //   - /in/<handle>/overlay/contact-info/ pages where the modal IS the
+  //     page content (no role='dialog' element at all)
+  //   - aria-label / aria-labelledby fingerprints
+  //   - <h2>Contact info</h2> DOM-walk fallback for layouts where neither
+  //     aria nor role attributes are set
+  //
+  // Previously this function only checked div[role='dialog'] and missed
+  // modal variants — most recently visible in Syed Ali Naveed's screenshot
+  // where the Contact info popup was visibly open but our harvester
+  // returned empty.
   function _harvestVisibleContact() {
-    const result = { email: null, phone: null, website: null, address: null };
+    const empty = { email: null, phone: null, website: null, address: null };
     try {
-      const dialogs = document.querySelectorAll("div[role='dialog']");
-      let modal = null;
-      const onOverlay = location.pathname.includes("/overlay/contact-info");
-      for (const d of dialogs) {
-        if (!d.getClientRects().length) continue;
-        // URL context wins: on /overlay/contact-info/, every visible dialog
-        // IS the contact info modal — LinkedIn doesn't open competing
-        // dialogs on that URL. Skip text fingerprinting.
-        if (onOverlay) {
-          modal = d;
-          break;
-        }
-        const aria = (d.getAttribute("aria-label") || "").toLowerCase();
-        const labelledBy = (d.getAttribute("aria-labelledby") || "").toLowerCase();
-        const text = (d.innerText || d.textContent || "").slice(0, 500);
-        if (
-          aria.includes("contact") ||
-          labelledBy.includes("contact") ||
-          /\bcontact info\b/i.test(text)
-        ) {
-          modal = d;
-          break;
-        }
-      }
-      if (!modal) return result;
-      const mailto = modal.querySelector("a[href^='mailto:']");
-      if (mailto) {
-        const e = (mailto.getAttribute("href") || "")
-          .replace(/^mailto:/, "")
-          .split("?")[0]
-          .trim();
-        if (e && /@/.test(e)) result.email = e;
-      }
-      const tel = modal.querySelector("a[href^='tel:']");
-      if (tel) {
-        const p = (tel.getAttribute("href") || "").replace(/^tel:/, "").trim();
-        if (p) result.phone = p;
-      }
-      // innerText-based field extraction. Reads the modal's rendered text
-      // and returns the line AFTER a label. Works regardless of LinkedIn's
-      // DOM rotation because innerText preserves the visual reading order.
-      const fullText = modal.innerText || modal.textContent || "";
-      const lines = fullText
-        .split(/[\r\n]+/)
-        .map((l) => l.replace(/\s+/g, " ").trim())
-        .filter(Boolean);
-      const labelStops = /^(email|phone|address|website|birthday|connected since|im|profile)\s*$/i;
-      function fieldAfter(labelRe) {
-        for (let i = 0; i < lines.length - 1; i++) {
-          if (!labelRe.test(lines[i])) continue;
-          for (let j = i + 1; j < lines.length; j++) {
-            if (!lines[j] || labelStops.test(lines[j])) continue;
-            return lines[j];
-          }
-        }
-        return null;
-      }
-      if (!result.email) {
-        const v = fieldAfter(/^\s*email\s*$/i);
-        if (v) {
-          const m = v.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
-          if (m) result.email = m[0];
-        }
-      }
-      if (!result.phone) {
-        const v = fieldAfter(/^\s*phone\s*$/i);
-        if (v) {
-          const m = v.match(/\+?[\d\s\-().]{7,}/);
-          if (m) result.phone = m[0].replace(/\s+/g, " ").trim();
-        }
-      }
-      const addr = fieldAfter(/^\s*address\s*$/i);
-      if (addr) result.address = addr.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
-
-      const externals = modal.querySelectorAll("a[href^='http']");
-      for (const a of externals) {
-        const href = a.getAttribute("href") || "";
-        if (
-          !href.includes("linkedin.com") &&
-          !href.includes("/overlay/") &&
-          !href.includes("/feed/")
-        ) {
-          result.website = href;
-          break;
-        }
-      }
-    } catch {}
-    return result;
+      const findModal = Scraper?._findContactModal;
+      const readModal = Scraper?._scrapeFromContactModal;
+      if (!findModal || !readModal) return empty;
+      const modal = findModal();
+      if (!modal) return empty;
+      return readModal(modal) || empty;
+    } catch (e) {
+      console.warn("[LeadCaptura] _harvestVisibleContact threw", e);
+      return empty;
+    }
   }
 
   async function saveCurrentProfile(profile) {
@@ -330,6 +265,17 @@
     if (visible.phone && !enriched.phone) enriched.phone = visible.phone;
     if (visible.website && !enriched.company_url) enriched.company_url = visible.website;
     if (visible.address) enriched.location = visible.address.slice(0, 200);
+    // Loud DevTools breadcrumb so the user can see what we actually
+    // pulled out of the visible modal. Filter `LeadCaptura` in the
+    // console to find this line on every Save click.
+    console.log("[LeadCaptura] visible-modal harvest:", {
+      url: location.href,
+      found: !!(visible.email || visible.phone || visible.address || visible.website),
+      email: visible.email,
+      phone: visible.phone,
+      address: visible.address,
+      website: visible.website,
+    });
 
     // Step 3: fast text-scan on the visible page (no network, no clicks).
     // Catches "Reach me at john[at]acme[dot]com" patterns in About /

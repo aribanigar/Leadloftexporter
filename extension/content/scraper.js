@@ -1492,5 +1492,10 @@
     scrapeSalesNavSearch,
     scrapeCurrentPage,
     _scrapeFromProfileText,
+    // Exposed so overlay.js's _harvestVisibleContact can reuse the same
+    // modal-detection logic (which has more fallbacks than the
+    // div[role='dialog']-only check it had before).
+    _findContactModal,
+    _scrapeFromContactModal,
   };
 })();
