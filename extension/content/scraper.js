@@ -77,6 +77,10 @@
       /\bInfluencer\b/gi,
       /\bStatus is (online|offline|reachable)\b/gi,
       /\bView\s+\S+(?:’|')s\s+profile\b/gi,
+      // Sales Nav presence indicator: "<Name> is reachable" / "is online" /
+      // "is offline" / "is unreachable" / "is available" / "is away" —
+      // LinkedIn appends this to the name in sr-only text for accessibility.
+      /\bis\s+(reachable|online|offline|unreachable|available|away)\b.*/gi,
     ];
     for (const re of stripLabels) s = s.replace(re, " ");
     // Edge: glued sr-only labels without word boundary (e.g.
@@ -100,7 +104,31 @@
 
     // Strip trailing punctuation / separators
     s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
+
+    // Stage 3 — collapse exact duplicate halves. LinkedIn Sales Nav
+    // sometimes renders the name twice: once visually, once for screen
+    // readers. textContent yields "Andrea Miliccia Andrea Miliccia".
+    // If the string can be split into two identical halves, keep one.
+    if (s) {
+      const words = s.split(/\s+/);
+      if (words.length >= 2 && words.length % 2 === 0) {
+        const half = words.length / 2;
+        const left = words.slice(0, half).join(" ");
+        const right = words.slice(half).join(" ");
+        if (left.toLowerCase() === right.toLowerCase()) s = left;
+      }
+    }
+
     return s || null;
+  }
+
+  // Reject text that's clearly an action button label, not a person's
+  // name. Sales Nav cards expose "View LinkedIn profile" / "Open profile"
+  // anchors whose text would otherwise leak into the saved name field.
+  const _ACTION_LABEL_RE = /^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|open\s+in\s+new\s+tab|connect|pending|message|follow|following|invite|invited|withdraw|more|premium)$/i;
+  function _isActionLabel(text) {
+    if (!text) return true;
+    return _ACTION_LABEL_RE.test(text.trim());
   }
 
   // Derive a person's name from a LinkedIn profile URL when h1 scraping
@@ -1108,16 +1136,47 @@
         const url = normalizeProfileUrl(link.href);
         if (!url || seen.has(url)) continue;
         const card = _profileCardFromLink(link);
-        // data-anonymize attributes are stable in Sales Nav
-        const nameEl =
-          card.querySelector("[data-anonymize='person-name']") ||
-          card.querySelector("[data-anonymize='name']") ||
-          link.querySelector("span[aria-hidden='true']") ||
-          link;
-        const name = (_txt(nameEl) || "")
-          .replace(/\s*•\s*(1st|2nd|3rd\+?)\s*$/i, "")
-          .trim();
-        if (!name || /linkedin member/i.test(name)) continue;
+
+        // --- Name extraction (specific → generic) ---
+        // Try the data-anonymize attributes first; LinkedIn keeps these
+        // stable across redesigns because their own product code depends
+        // on them. Then a few fallbacks. Reject action-label text outright
+        // ("View LinkedIn profile", "Connect", etc.) so we don't save a
+        // button label as the person's name.
+        const candidates = [
+          card.querySelector("[data-anonymize='person-name']"),
+          card.querySelector("[data-anonymize='name']"),
+          card.querySelector("a[data-control-name='view_lead_panel_via_search_lead_name'] [aria-hidden='true']"),
+          card.querySelector("a[data-control-name='view_lead_panel_via_search_lead_name']"),
+          link.querySelector("span[aria-hidden='true']"),
+          link.querySelector("strong, b"),
+        ].filter(Boolean);
+
+        let name = null;
+        for (const el of candidates) {
+          const raw = (el.textContent || "").replace(/\s+/g, " ").trim();
+          const cleaned = _cleanPersonName(raw);
+          if (!cleaned) continue;
+          if (_isActionLabel(cleaned)) continue;
+          if (/^linkedin member$/i.test(cleaned)) continue;
+          name = cleaned;
+          break;
+        }
+
+        // URL-slug fallback. Sales Nav cards often also expose the /in/
+        // anchor — use it. Otherwise derive from /sales/lead/<id> isn't
+        // useful (it's a numeric id, not a slug).
+        const liAnchor = card.querySelector("a[href*='/in/']");
+        if (!name && liAnchor) {
+          name = _nameFromSlug(liAnchor.href);
+        }
+
+        // No usable name → skip. This is what protects the pipeline from
+        // "View LinkedIn profile" rows. Far better to drop a card than
+        // pollute the table.
+        if (!name) continue;
+
+        // --- Title / company / location ---
         const titleEl =
           card.querySelector("[data-anonymize='title']") ||
           card.querySelector("[data-anonymize='job-title']");
@@ -1125,11 +1184,16 @@
           card.querySelector("[data-anonymize='company-name']") ||
           card.querySelector("a[data-anonymize='company-name']");
         const locEl = card.querySelector("[data-anonymize='location']");
-        const title = _txt(titleEl);
-        const company = _txt(companyEl);
-        const loc = _txt(locEl);
+        const cleanText = (el) => {
+          const t = el ? (el.textContent || "").replace(/\s+/g, " ").trim() : null;
+          if (!t || _isActionLabel(t)) return null;
+          return t;
+        };
+        const title = cleanText(titleEl);
+        const company = cleanText(companyEl);
+        const loc = cleanText(locEl);
+
         // Prefer the /in/ URL over /sales/lead/ if Sales Nav exposes it
-        const liAnchor = card.querySelector("a[href*='/in/']");
         const canonicalUrl = liAnchor
           ? normalizeProfileUrl(liAnchor.href)
           : url;
