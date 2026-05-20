@@ -177,39 +177,52 @@
     );
   }
 
-  // Last-mile email/phone harvester: when the Contact info modal is already
-  // open (or when LinkedIn ships any visible mailto:/tel: anchor), grab the
-  // first one regardless of modal-finder selectors. Guards against selector
-  // drift in `_findContactModal` — if the user can SEE the email, we can
-  // capture it.
+  // Last-mile email/phone harvester: ONLY scans inside an open Contact info
+  // modal. NEVER scans the wider /in/ page — LinkedIn renders mailto:/tel:
+  // anchors all over (Recent activity, recommendations, People you may know)
+  // and grabbing those would attribute another person's contact info to the
+  // current lead. We restrict to elements inside `div[role='dialog']` that
+  // also contains the literal "Contact info" header text — the unambiguous
+  // signature of the Contact info modal.
   function _harvestVisibleContact() {
     const result = { email: null, phone: null, website: null };
     try {
-      // Limit to anchors that are actually rendered (have a box). This skips
-      // template/hidden dropdown items.
-      const anchors = document.querySelectorAll(
-        "a[href^='mailto:'], a[href^='tel:'], a[href^='http']"
-      );
-      for (const a of anchors) {
-        if (!a.getClientRects().length) continue;
+      const dialogs = document.querySelectorAll("div[role='dialog']");
+      let modal = null;
+      for (const d of dialogs) {
+        // Must be visibly rendered (has layout boxes)
+        if (!d.getClientRects().length) continue;
+        // Must be the CONTACT INFO modal — header text fingerprint.
+        const text = (d.innerText || d.textContent || "").trim();
+        if (/^contact info\b/i.test(text) || /\bcontact info\b/i.test(text.slice(0, 200))) {
+          modal = d;
+          break;
+        }
+      }
+      if (!modal) return result;
+      const mailto = modal.querySelector("a[href^='mailto:']");
+      if (mailto) {
+        const e = (mailto.getAttribute("href") || "")
+          .replace(/^mailto:/, "")
+          .split("?")[0]
+          .trim();
+        if (e && /@/.test(e)) result.email = e;
+      }
+      const tel = modal.querySelector("a[href^='tel:']");
+      if (tel) {
+        const p = (tel.getAttribute("href") || "").replace(/^tel:/, "").trim();
+        if (p) result.phone = p;
+      }
+      const externals = modal.querySelectorAll("a[href^='http']");
+      for (const a of externals) {
         const href = a.getAttribute("href") || "";
-        if (!result.email && href.startsWith("mailto:")) {
-          const e = href.replace(/^mailto:/, "").split("?")[0].trim();
-          if (e && /@/.test(e)) result.email = e;
-        }
-        if (!result.phone && href.startsWith("tel:")) {
-          const p = href.replace(/^tel:/, "").trim();
-          if (p) result.phone = p;
-        }
         if (
-          !result.website &&
-          href.startsWith("http") &&
           !href.includes("linkedin.com") &&
           !href.includes("/overlay/") &&
-          !href.includes("/feed/") &&
-          a.closest("div[role='dialog']")
+          !href.includes("/feed/")
         ) {
           result.website = href;
+          break;
         }
       }
     } catch {}
