@@ -177,6 +177,45 @@
     );
   }
 
+  // Last-mile email/phone harvester: when the Contact info modal is already
+  // open (or when LinkedIn ships any visible mailto:/tel: anchor), grab the
+  // first one regardless of modal-finder selectors. Guards against selector
+  // drift in `_findContactModal` — if the user can SEE the email, we can
+  // capture it.
+  function _harvestVisibleContact() {
+    const result = { email: null, phone: null, website: null };
+    try {
+      // Limit to anchors that are actually rendered (have a box). This skips
+      // template/hidden dropdown items.
+      const anchors = document.querySelectorAll(
+        "a[href^='mailto:'], a[href^='tel:'], a[href^='http']"
+      );
+      for (const a of anchors) {
+        if (!a.getClientRects().length) continue;
+        const href = a.getAttribute("href") || "";
+        if (!result.email && href.startsWith("mailto:")) {
+          const e = href.replace(/^mailto:/, "").split("?")[0].trim();
+          if (e && /@/.test(e)) result.email = e;
+        }
+        if (!result.phone && href.startsWith("tel:")) {
+          const p = href.replace(/^tel:/, "").trim();
+          if (p) result.phone = p;
+        }
+        if (
+          !result.website &&
+          href.startsWith("http") &&
+          !href.includes("linkedin.com") &&
+          !href.includes("/overlay/") &&
+          !href.includes("/feed/") &&
+          a.closest("div[role='dialog']")
+        ) {
+          result.website = href;
+        }
+      }
+    } catch {}
+    return result;
+  }
+
   async function saveCurrentProfile(profile) {
     flashStatus("Reading contact info…");
     let enriched = profile;
@@ -208,6 +247,17 @@
           }
         }
       } catch {}
+    }
+    // Last-mile: if scrapeProfileWithContact didn't surface email/phone
+    // (modal selectors drifted, or it timed out), do a document-wide
+    // mailto:/tel: anchor scan. If the user can see the email on screen,
+    // this catches it.
+    if (!enriched.email || !enriched.phone || !enriched.company_url) {
+      const visible = _harvestVisibleContact();
+      if (!enriched.email && visible.email) enriched.email = visible.email;
+      if (!enriched.phone && visible.phone) enriched.phone = visible.phone;
+      if (!enriched.company_url && visible.website)
+        enriched.company_url = visible.website;
     }
     flashStatus("Saving…");
     try {
@@ -622,24 +672,32 @@
   }
 
   // Mirror of scraper.js _cleanPersonName — keep behavior identical.
-  // Strips degree badges ("• 1st"/"3rd+"), pronouns, premium/influencer
-  // labels, OpenToWork frame text, and a11y "Status is online" text from
-  // any concatenated person-name string. Truncates at the first such marker
-  // so wrap-the-whole-card link fallbacks don't poison full_name.
+  // Two-stage strategy: (1) strip a11y / status / badge labels in-place
+  // without consuming everything after them (those often appear as LEADING
+  // sr-only spans inside the link/h1), (2) truncate at first degree marker.
   function _cleanCardName(raw) {
     if (!raw) return null;
     let s = String(raw).replace(/\s+/g, " ").trim();
+    const stripLabels = [
+      /\bVerified\b/gi,
+      /\bPremium\s*Member\b/gi,
+      /\bOpenToWork\b/gi,
+      /\bHiring\b/gi,
+      /\bInfluencer\b/gi,
+      /\bStatus is (online|offline|reachable)\b/gi,
+      /\bView\s+\S+(?:'|’)s\s+profile\b/gi,
+    ];
+    for (const re of stripLabels) s = s.replace(re, " ");
+    s = s.replace(/^(Status is (?:online|offline|reachable))/i, "$1 ")
+         .replace(/^(Verified|Premium Member|OpenToWork|Hiring|Influencer)/i, "$1 ");
+    s = s.replace(/\s+/g, " ").trim();
+    for (const re of stripLabels) s = s.replace(re, " ");
+    s = s.replace(/\s+/g, " ").trim();
     const cutMarkers = [
       /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
       /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
       /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
       /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
-      /^\s*Status is (online|offline|reachable)\s*/i,
-      /\s*\bView\s+\S+(?:'|’)s\s+profile\b.*/i,
-      /\s*\bPremium\s*Member\b.*/i,
-      /\s*\bOpenToWork\b.*/i,
-      /\s*\bHiring\b.*/i,
-      /\s*\bVerified\b.*/i,
     ];
     for (const re of cutMarkers) s = s.replace(re, "").trim();
     s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
@@ -669,13 +727,14 @@
     // URL-slug fallback so a stripped/unrendered name never blocks save.
     if (!rawName) {
       try {
-        const slug = new URL(linkEl.href, location.origin).pathname
-          .replace(/^\/in\//, "")
-          .replace(/\/$/, "");
+        const u = new URL(linkEl.href, location.origin);
+        const slug = u.pathname.replace(/^\/in\//, "").replace(/\/$/, "");
         if (slug && !slug.includes("/")) {
           rawName = slug
             .split("-")
+            .filter((p) => p.length >= 2)
             .filter((p) => !/^\d+$/.test(p))
+            .filter((p) => !(/[a-z]/i.test(p) && /\d/.test(p)))
             .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
             .join(" ");
         }

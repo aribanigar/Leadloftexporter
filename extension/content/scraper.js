@@ -55,26 +55,79 @@
   // truncates at the first such marker so "Mafaz Ahmed • 3rd+Marketing
   // ProfessionalKuwait City…" (entire-card-as-link fallback) becomes just
   // "Mafaz Ahmed".
+  //
+  // Two-stage strategy:
+  //   1. STRIP a11y / status labels WITHOUT consuming everything after them
+  //      (they often appear as LEADING sr-only spans inside h1, e.g.
+  //      "<span>Verified</span>Faisal AlSagoubi" → "VerifiedFaisal
+  //      AlSagoubi" — we must NOT drop the name).
+  //   2. TRUNCATE at the first degree marker / pronoun parenthetical —
+  //      everything after these is guaranteed to be non-name noise.
   function _cleanPersonName(raw) {
     if (!raw) return null;
     let s = String(raw).replace(/\s+/g, " ").trim();
-    // Truncate at the first degree badge or visible-bullet separator.
+    // Stage 1 — remove a11y / status / badge labels in-place. We insert a
+    // single space at the boundary so a glued sr-only prefix
+    // ("VerifiedFaisal") doesn't collapse into one word.
+    const stripLabels = [
+      /\bVerified\b/gi,
+      /\bPremium\s*Member\b/gi,
+      /\bOpenToWork\b/gi,
+      /\bHiring\b/gi,
+      /\bInfluencer\b/gi,
+      /\bStatus is (online|offline|reachable)\b/gi,
+      /\bView\s+\S+(?:’|')s\s+profile\b/gi,
+    ];
+    for (const re of stripLabels) s = s.replace(re, " ");
+    // Edge: glued sr-only labels without word boundary (e.g.
+    // "Status is reachableArya" → "Status is reachable Arya" after gap;
+    // also "VerifiedFaisal" via case-camel split).
+    s = s.replace(/^(Status is (?:online|offline|reachable))/i, "$1 ")
+         .replace(/^(Verified|Premium Member|OpenToWork|Hiring|Influencer)/i, "$1 ");
+    s = s.replace(/\s+/g, " ").trim();
+    // Re-run strips after the gap-insertion so the labels actually drop.
+    for (const re of stripLabels) s = s.replace(re, " ");
+    s = s.replace(/\s+/g, " ").trim();
+
+    // Stage 2 — truncate at the first degree / pronoun marker.
     const cutMarkers = [
       /\s*[•·]\s*(1st|2nd|3rd\+?)\b.*/i,
       /\s*\b(1st|2nd|3rd\+?)\s+degree\b.*/i,
       /\s*[•·]\s*(He\/Him|She\/Her|They\/Them)\b.*/i,
       /\s*\(\s*(He|She|They)\/(Him|Her|Them)\s*\).*/i,
-      /^\s*Status is (online|offline|reachable)\s*/i,
-      /\s*\bView\s+\S+(?:’|')s\s+profile\b.*/i,
-      /\s*\bPremium\s*Member\b.*/i,
-      /\s*\bOpenToWork\b.*/i,
-      /\s*\bHiring\b.*/i,
-      /\s*\bVerified\b.*/i,
     ];
     for (const re of cutMarkers) s = s.replace(re, "").trim();
-    // Strip trailing punctuation
+
+    // Strip trailing punctuation / separators
     s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
     return s || null;
+  }
+
+  // Derive a person's name from a LinkedIn profile URL when h1 scraping
+  // fails. LinkedIn slug format: "<firstname>-<lastname>[-<userid-hex>]"
+  // where the optional trailing token is a stable user-id like "a742831ab"
+  // or a numeric "9b" — alphanumeric, usually >=4 chars, mix of letters
+  // and digits. Without dropping it, the fallback yields names like
+  // "Faisal Alsagoubi A742831ab" in the pipeline. Heuristic: drop any
+  // slug part that contains BOTH a letter AND a digit, OR is a pure
+  // digit run, OR is shorter than 2 chars.
+  function _nameFromSlug(linkedinUrl) {
+    if (!linkedinUrl) return null;
+    try {
+      const u = new URL(linkedinUrl, location.origin);
+      const slug = u.pathname.replace(/^\/in\//, "").replace(/\/$/, "");
+      if (!slug || slug.includes("/")) return null;
+      const parts = slug
+        .split("-")
+        .filter((p) => p.length >= 2)
+        .filter((p) => !/^\d+$/.test(p))
+        .filter((p) => !(/[a-z]/i.test(p) && /\d/.test(p))) // mixed alphanum = user-id
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1));
+      const out = parts.join(" ").trim();
+      return out || null;
+    } catch {
+      return null;
+    }
   }
 
   // Reject headline/location candidates that come from the profile's
@@ -244,17 +297,7 @@
     // Better a slug-derived guess than blank rows in the pipeline.
     let resolvedName = fullName;
     if (!resolvedName && linkedinUrl) {
-      try {
-        const slug = new URL(linkedinUrl).pathname.replace(/^\/in\//, "").replace(/\/$/, "");
-        if (slug && !slug.includes("/")) {
-          resolvedName = slug
-            .split("-")
-            .filter((p) => !/^\d+$/.test(p))
-            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-            .join(" ")
-            .trim() || null;
-        }
-      } catch {}
+      resolvedName = _nameFromSlug(linkedinUrl);
     }
     const [first_name, ...rest] = (resolvedName || "").split(/\s+/);
 
@@ -608,21 +651,7 @@
         if (cut && cut.length < 80) name = cut;
       }
     }
-    if (!name) {
-      // URL-slug fallback
-      try {
-        const slug = new URL(url, location.origin).pathname
-          .replace(/^\/in\//, "")
-          .replace(/\/$/, "");
-        if (slug && !slug.includes("/")) {
-          name = slug
-            .split("-")
-            .filter((p) => !/^\d+$/.test(p))
-            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-            .join(" ");
-        }
-      } catch {}
-    }
+    if (!name) name = _nameFromSlug(url);
     name = _cleanPersonName(name);
     if (!name || /linkedin member/i.test(name)) return null;
 
