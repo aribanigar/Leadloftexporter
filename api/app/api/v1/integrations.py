@@ -67,6 +67,12 @@ PROVIDER_CATALOG = [
         "kind": "crm",
     },
     {
+        "id": "apollo",
+        "name": "Apollo.io",
+        "description": "Fallback email + phone enrichment for leads our pattern-finder can't resolve (non-1st-degree connections, Gmail/M365 domains).",
+        "kind": "enrichment",
+    },
+    {
         "id": "zapier",
         "name": "Zapier",
         "description": "Trigger any Zap from LeadCaptura — use the workspace API key.",
@@ -535,5 +541,55 @@ def zapier_connect(
             "webhook_base": "https://api.leadcaptura.com/api/v1",
             "auth_header": "X-API-Key",
         },
+    )
+    return {"id": acct.id, "status": acct.status, "label": acct.label}
+
+
+# ---------- Apollo (fallback email + phone enrichment) ---------------------
+
+
+@router.post("/apollo/connect")
+def apollo_connect(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Connect Apollo.io as the enrichment fallback. User generates an
+    API key in Apollo → Settings → Integrations → API. The /v1/people/match
+    endpoint takes a LinkedIn URL and returns email + phone, even for
+    non-1st-degree connections — this is what closes the gap with
+    LeadLoft's "you don't need to be connected" claim.
+
+    Free tier: 50 matches/month. Paid: from $49/mo with 5,000 matches.
+    """
+    token = (body.get("api_key") or body.get("access_token") or "").strip()
+    if not token:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "api_key_required")
+    # Verify by calling /v1/auth/health
+    try:
+        with httpx.Client(timeout=12) as client:
+            r = client.get(
+                "https://api.apollo.io/v1/auth/health",
+                headers={"X-Api-Key": token, "Cache-Control": "no-cache"},
+            )
+            if r.status_code == 401:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "apollo_invalid_key")
+            if not r.is_success:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"apollo_verify_failed_http_{r.status_code}",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"apollo_verify_failed: {exc}")
+    acct = _upsert_account(
+        db,
+        ctx,
+        provider="apollo",
+        label="Apollo.io",
+        external_id=None,
+        access_token=token,
+        config={},
     )
     return {"id": acct.id, "status": acct.status, "label": acct.label}

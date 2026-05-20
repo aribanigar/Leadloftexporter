@@ -474,6 +474,38 @@ class SearchScraper(Base, TimestampMixin):
     # active | paused | completed | exhausted
 
 
+class CompanyEmailPattern(Base, TimestampMixin):
+    """Cache of the winning email-pattern per company domain.
+
+    LeadLoft's pattern-inference moat: once a domain has been verified
+    to use first.last@, every subsequent lead at that domain skips the
+    SMTP probe and reuses the pattern instantly. With enough volume the
+    cache approaches the accuracy of a paid B2B database — for free.
+
+    Global across workspaces (not workspace-scoped): a pattern verified
+    by user A applies to user B's leads at the same company. The
+    `verified_count` field lets us preferentially trust patterns that
+    have been confirmed multiple times.
+
+    Pattern stored as a template string with {first} and {last} tokens:
+      "{first}.{last}"  →  john.smith@domain
+      "{f}{last}"       →  jsmith@domain
+      "{first}"         →  john@domain
+    """
+
+    __tablename__ = "company_email_patterns"
+    __table_args__ = (
+        UniqueConstraint("domain", "pattern", name="uq_domain_pattern"),
+        Index("ix_company_email_patterns_domain", "domain"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    domain: Mapped[str] = mapped_column(String(200), nullable=False)
+    pattern: Mapped[str] = mapped_column(String(60), nullable=False)
+    verified_count: Mapped[int] = mapped_column(Integer, default=1)
+    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class Integration(Base, TimestampMixin):
     __tablename__ = "integrations"
 

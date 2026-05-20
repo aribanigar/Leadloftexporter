@@ -29,6 +29,7 @@ const PROVIDER_TILE: Record<string, { initials: string; bg: string; fg: string }
   smtp: { initials: "✉", bg: "bg-slate-700", fg: "text-white" },
   hubspot: { initials: "Hs", bg: "bg-orange-500", fg: "text-white" },
   salesforce: { initials: "SF", bg: "bg-sky-500", fg: "text-white" },
+  apollo: { initials: "A", bg: "bg-indigo-600", fg: "text-white" },
   zapier: { initials: "Z", bg: "bg-orange-600", fg: "text-white" },
 };
 
@@ -295,6 +296,27 @@ function ConnectModal({
         {field("security_token", "Security token", "")}
       </>
     ),
+    apollo: (
+      <>
+        <p className="text-xs text-slate-500">
+          Apollo is the fallback when our pattern-finder can&apos;t resolve a
+          lead&apos;s email — typically 3rd-degree LinkedIn connections, or
+          Gmail/M365 domains that block SMTP probes. Apollo&apos;s
+          /v1/people/match returns email + phone from a LinkedIn URL.
+          Generate an API key at{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://app.apollo.io/#/settings/integrations/api"
+            target="_blank"
+            rel="noreferrer"
+          >
+            apollo.io → Settings → Integrations → API
+          </a>
+          .
+        </p>
+        {field("api_key", "Apollo API key", "Generate one in Apollo settings", "password")}
+      </>
+    ),
     zapier: (
       <p className="text-sm text-slate-600">
         Zapier connects via your workspace API key. Generate one in{" "}
@@ -313,6 +335,7 @@ function ConnectModal({
     gmail: "Connect Gmail",
     hubspot: "Connect HubSpot",
     salesforce: "Connect Salesforce",
+    apollo: "Connect Apollo.io",
     zapier: "Enable Zapier",
   };
 
