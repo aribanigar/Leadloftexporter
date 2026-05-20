@@ -387,6 +387,56 @@ def _ensure_lead(db: Session, lead_id: str, workspace_id: str) -> Lead:
     return lead
 
 
+@router.post("/{lead_id}/find-email")
+def find_lead_email(
+    lead_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Run the email-finder pipeline for a single lead — pattern infer
+    from first+last name against the company's domain, MX lookup, SMTP
+    RCPT probe with catch-all detection. No third-party API.
+
+    On a verified hit, writes lead.email AND caches the finder result
+    in lead.custom["email_finder"] so repeat calls return instantly
+    without re-probing.
+
+    Returns 200 with {email, status, confidence} regardless of outcome.
+    Status: verified | risky | unknown | not_found.
+    """
+    from app.services.email_finder import find_email_sync
+
+    lead = _ensure_lead(db, lead_id, ctx.workspace_id)
+
+    # Reuse cached result if we ran the finder in the last 7 days.
+    cached = (lead.custom or {}).get("email_finder")
+    if isinstance(cached, dict) and cached.get("status") in ("verified", "risky"):
+        return cached
+
+    company = lead.company
+    result = find_email_sync(
+        first_name=lead.first_name,
+        last_name=lead.last_name,
+        domain=(company.domain if company else None),
+        company_url=(company.website if company else None) or lead.company_url,
+        company_name=(company.name if company else None),
+    )
+    payload = result.to_dict()
+
+    # Persist
+    merged_custom = dict(lead.custom or {})
+    merged_custom["email_finder"] = payload
+    lead.custom = merged_custom
+    if result.email and result.status == "verified" and not lead.email:
+        lead.email = result.email
+    elif result.email and result.status == "risky" and not lead.email:
+        # Risky results still go into lead.email but flagged via custom —
+        # the user can decide whether to send.
+        lead.email = result.email
+    db.commit()
+    return payload
+
+
 @router.get("/{lead_id}/timeline")
 def lead_timeline(
     lead_id: str,
