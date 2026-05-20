@@ -132,11 +132,15 @@ def create_api_key(
 
 
 @router.delete("/current/api-keys/{key_id}")
-def revoke_api_key(
+def delete_api_key(
     key_id: str,
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    """Hard-delete a single API key. Replaces the previous soft-revoke
+    behavior — soft-revoked keys cluttered the dashboard, and the
+    auth path already enforces `revoked_at IS NULL` so the user still
+    cannot use the deleted token even with the row removed."""
     k = (
         db.query(ApiKey)
         .filter(ApiKey.id == key_id, ApiKey.workspace_id == ctx.workspace_id)
@@ -144,6 +148,23 @@ def revoke_api_key(
     )
     if not k:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
-    k.revoked_at = datetime.now(timezone.utc)
+    db.delete(k)
     db.commit()
     return {"ok": True}
+
+
+@router.delete("/current/api-keys")
+def wipe_api_keys(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Bulk hard-delete every API key for this workspace+user. Used by
+    the API Keys page's "Wipe all" action so the user can start over
+    with a clean dashboard."""
+    deleted = (
+        db.query(ApiKey)
+        .filter(ApiKey.workspace_id == ctx.workspace_id, ApiKey.user_id == ctx.user_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted": deleted}
