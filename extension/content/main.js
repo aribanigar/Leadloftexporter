@@ -57,11 +57,23 @@
         await Human.sleep(base + bonus);
       }
 
-      const contact = await Scraper.scrapeContactInfo();
-      if (!contact.email && !contact.phone && !contact.address) return; // nothing new
-
       const profile = Scraper.scrapeProfile();
       if (!profile?.linkedin_url) return;
+
+      // Pick the scrape path that DOESN'T navigate the user's tab:
+      //   - on the /overlay/contact-info/ URL, the modal is already
+      //     visible right here — read it from this page (no clicks).
+      //   - on a regular /in/<handle> URL, use the hidden iframe so we
+      //     never click the Contact info link (which would change the
+      //     user's URL and feel like "the page moved on its own").
+      let contact = { email: null, phone: null, website: null, address: null };
+      if (onContactOverlay) {
+        contact = await Scraper.scrapeContactInfo();
+      } else if (Scraper.scrapeContactInfoViaIframe) {
+        contact = await Scraper.scrapeContactInfoViaIframe(profile.linkedin_url);
+      }
+      if (!contact.email && !contact.phone && !contact.address) return;
+
       if (contact.email) profile.email = contact.email;
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
@@ -70,7 +82,7 @@
         ...(profile.raw || {}),
         contact_info_scraped: true,
         auto_enriched: true,
-        contact_source: onContactOverlay ? "overlay_visit" : "profile_visit",
+        contact_source: onContactOverlay ? "overlay_visit" : "iframe",
       };
 
       await globalThis.__lcApi.syncProfile(profile);
