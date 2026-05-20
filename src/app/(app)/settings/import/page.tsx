@@ -38,7 +38,7 @@ export default function ImportPage() {
         <p className="mt-2 text-sm text-slate-500">
           Remove blank leads — records that have a LinkedIn URL but no name.
           These are created when the extension enrichment tab scraped a profile
-          before it had finished loading, and they appear as "—" rows in your
+          before it had finished loading, and they appear as &quot;—&quot; rows in your
           pipeline alongside the real named lead for the same person.
         </p>
         <div className="mt-4 flex items-center gap-3">
