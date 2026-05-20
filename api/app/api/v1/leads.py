@@ -244,6 +244,42 @@ def cleanup_nameless_leads(
     return {"deleted": count}
 
 
+@router.delete("/cleanup/polluted-names")
+def cleanup_polluted_name_leads(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Delete extension-sourced leads whose `full_name` is actually a
+    LinkedIn action-button label ("View LinkedIn profile", "Open profile",
+    "Connect", etc.). The current extension blocks these at scrape time,
+    but historical rows captured before that fix still pollute pipelines.
+    """
+    import re as _re
+
+    pattern = _re.compile(
+        r"^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|"
+        r"save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|"
+        r"open\s+in\s+new\s+tab|connect|pending|message|follow|following|"
+        r"invite|invited|withdraw|more|premium)$",
+        _re.IGNORECASE,
+    )
+    rows = (
+        db.query(Lead)
+        .filter(Lead.workspace_id == ctx.workspace_id, Lead.source == "extension")
+        .all()
+    )
+    deleted: list[str] = []
+    for lead in rows:
+        candidate = (lead.full_name or lead.first_name or "").strip()
+        if not candidate:
+            continue
+        if pattern.match(candidate):
+            deleted.append(candidate)
+            db.delete(lead)
+    db.commit()
+    return {"deleted": len(deleted), "examples": deleted[:10]}
+
+
 @router.delete("/cleanup/wipe-pipeline")
 def wipe_workspace_pipeline_data(
     ctx: AuthContext = Depends(get_workspace_context),

@@ -852,8 +852,12 @@
         }
       } catch (err) {
         btn.dataset.state = "error";
-        textSpan.textContent = "Retry";
-        console.warn("[LeadCaptura] save failed", err);
+        // Show the decorated error in the chip text AND keep it visible
+        // until the user clicks again — never silently fail.
+        const msg = err?.message || String(err);
+        textSpan.textContent = msg.length > 40 ? "Failed — see console" : `Failed: ${msg}`;
+        btn.title = msg;
+        console.error("[LeadCaptura] inline save failed", err);
       }
     });
 
