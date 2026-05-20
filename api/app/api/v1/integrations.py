@@ -300,6 +300,20 @@ def gmail_connect(
     try:
         asyncio.run(_smtp_verify("smtp.gmail.com", 587, email, app_password))
     except Exception as exc:  # noqa: BLE001
+        msg = str(exc)
+        if "timed out" in msg.lower() or "TimeoutError" in msg:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                (
+                    "smtp_blocked_by_host: connecting to smtp.gmail.com:587 timed "
+                    "out — your backend host (Render) blocks outbound SMTP ports "
+                    "on its free/starter plan. This affects Gmail too because "
+                    "Gmail's App-Password connector uses SMTP. Fix: sign up for "
+                    "SendGrid (free 100/day), Postmark, or Mailgun and connect "
+                    "via their SMTP relay on port 2525 (Render allows 2525). "
+                    "Alternatively upgrade your Render plan to unblock 25/465/587."
+                ),
+            )
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"gmail_login_failed: {exc} (Generate an App Password at https://myaccount.google.com/apppasswords)",

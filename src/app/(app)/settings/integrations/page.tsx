@@ -244,13 +244,37 @@ function ConnectModal({
   const fields: Record<string, React.ReactNode> = {
     smtp: (
       <>
-        {field("host", "SMTP Host", "smtp.example.com")}
+        <p className="text-xs text-slate-500">
+          <strong>Important:</strong> our backend host (Render) blocks
+          direct outbound SMTP on ports 25/465/587. Use a relay provider
+          that supports port <strong>2525</strong> — recommended:{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://signup.sendgrid.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            SendGrid
+          </a>{" "}
+          (free 100 emails/day),{" "}
+          <a
+            className="text-brand-600 hover:underline"
+            href="https://www.mailgun.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Mailgun
+          </a>
+          , or Postmark. Sign up, get their SMTP credentials, paste
+          below with port 2525.
+        </p>
+        {field("host", "SMTP Host", "smtp.sendgrid.net")}
         <div className="grid grid-cols-2 gap-3">
-          {field("port", "Port", "587", "number")}
-          {field("from_email", "From email", "you@example.com")}
+          {field("port", "Port", "2525", "number")}
+          {field("from_email", "From email", "you@yourdomain.com")}
         </div>
-        {field("username", "Username", "you@example.com")}
-        {field("password", "Password / App password", "", "password")}
+        {field("username", "Username", "apikey (for SendGrid)")}
+        {field("password", "Password / API key", "", "password")}
       </>
     ),
     gmail: (
