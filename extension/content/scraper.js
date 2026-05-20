@@ -336,18 +336,40 @@
   }
 
   function _findContactModal() {
-    // After clicking Contact info (or navigating to the overlay URL), LinkedIn
-    // renders an artdeco-modal. Multiple selectors as fallback — LinkedIn
-    // occasionally changes the labelling attributes.
-    return (
-      document.querySelector("div[role='dialog'][aria-labelledby*='contact' i]") ||
-      document.querySelector("div[role='dialog'][aria-label*='Contact' i]") ||
-      document.querySelector("#artdeco-modal-outlet div[role='dialog']") ||
-      // artdeco-modal is the host element; the inner dialog is what we want
-      document.querySelector("artdeco-modal div[role='dialog']") ||
-      document.querySelector("div.artdeco-modal__content") ||
-      document.querySelector("div[role='dialog']")
+    // Iterate ALL visible dialogs and pick the one that's actually the
+    // Contact info popup. The previous first-match approach
+    // (document.querySelector) was silently grabbing whichever dialog
+    // LinkedIn renders first — sometimes the messaging widget, sometimes
+    // a notifications panel — and our scrape came back empty. Then the
+    // text-scan fallback grabbed a stray email from the About section.
+    const dialogs = document.querySelectorAll(
+      "div[role='dialog'], artdeco-modal, div.artdeco-modal__content"
     );
+    const onOverlayUrl = location.pathname.includes("/overlay/contact-info");
+    for (const d of dialogs) {
+      try {
+        if (!d.getClientRects || !d.getClientRects().length) continue;
+      } catch {
+        continue;
+      }
+      if (onOverlayUrl) return d;
+      const aria = (d.getAttribute("aria-label") || "").toLowerCase();
+      const labelledBy = (d.getAttribute("aria-labelledby") || "").toLowerCase();
+      const text = (d.innerText || d.textContent || "").slice(0, 600);
+      if (
+        aria.includes("contact") ||
+        labelledBy.includes("contact") ||
+        /\bcontact info\b/i.test(text) ||
+        // Also accept a visible dialog that contains a labelled "Email" or
+        // "Phone" line — that's a strong signal it's the contact-info modal
+        // even when LinkedIn ships the header text in a sibling element.
+        (/\b(mailto:|tel:)/i.test(d.innerHTML || "") &&
+          /\b(email|phone)\b/i.test(text))
+      ) {
+        return d;
+      }
+    }
+    return null;
   }
 
   function _isValidContactModal(modal) {
@@ -458,9 +480,13 @@
     if (!phone) {
       const v = _modalFieldAfterLabel(modal, /^\s*phone\s*$/i);
       if (v) {
-        // Keep leading + and digits, strip the "(Mobile)" suffix.
+        // Take any digits-and-separators run that contains 7+ digits.
+        // Covers +XX XX XXX, plain 8-digit Gulf numbers (30082757), and
+        // US-style XXX-XXX-XXXX.
         const m = v.match(/\+?[\d\s\-().]{7,}/);
-        if (m) phone = m[0].replace(/\s+/g, " ").trim();
+        if (m) {
+          phone = m[0].replace(/\s+/g, " ").trim();
+        }
       }
     }
 
@@ -646,9 +672,13 @@
   // About section, headline, or experience descriptions to invite outreach,
   // and that text is visible to anyone. We harvest it here.
   const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
-  // Conservative phone regex — requires either a leading + or 8+ digits with
-  // separators. Avoids matching dates, post counts, etc.
-  const PHONE_RE = /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/;
+  // Phone regex covers:
+  //   +XX XX XXX XXXX  international with separators
+  //   XXXXXXXX         Gulf-style 8-digit (Qatar 30082757, Kuwait 5XXXXXXX)
+  //   XXX-XXX-XXXX     US-style with dashes
+  // We DO require 7+ consecutive digits when there's no leading + so we
+  // don't match dates / post counts / IDs by accident.
+  const PHONE_RE = /\+\d[\d\s().-]{6,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b|\b\d{8,12}\b/;
 
   function _scrapeFromProfileText() {
     // Search the user-content regions of the profile only. Skip the global
@@ -681,21 +711,26 @@
   async function scrapeProfileWithContact() {
     const base = scrapeProfile();
     try {
-      // Primary: Contact info modal (works for 1st-degree connections).
-      const contact = await scrapeContactInfo();
-      if (contact.email && !base.email) base.email = contact.email;
-      if (contact.phone && !base.phone) base.phone = contact.phone;
-      if (contact.website && !base.company_url) base.company_url = contact.website;
-      // Modal "Address" → lead.location. The modal address is usually more
-      // specific than the top-card location ("Doha- Qatar" vs just "Qatar")
-      // so prefer it when present.
-      if (contact.address) {
-        base.location = contact.address.slice(0, 200);
-      }
+      // Step 1: is the Contact info popup currently open and visible?
+      // If yes, trust ONLY the popup — do not fall through to text-scan,
+      // because Adam Dhorajiwala's bug showed text-scan grabbing the
+      // company email "adam@tadgulf.com" from About when the popup
+      // clearly displayed his personal "adamkdhorajiwala@gmail.com".
+      const visibleModal = _findContactModal();
+      const modalWasVisible = !!visibleModal;
 
-      // Fallback: scan About / Experience text for any publicly-shared email
-      // or phone. Reaches profiles where the modal hides contact info.
-      if (!base.email || !base.phone) {
+      // Step 2: regular modal scrape (also opens the modal if not open).
+      const contact = await scrapeContactInfo();
+      if (contact.email) base.email = contact.email;
+      if (contact.phone) base.phone = contact.phone;
+      if (contact.website && !base.company_url) base.company_url = contact.website;
+      if (contact.address) base.location = contact.address.slice(0, 200);
+
+      // Step 3: ONLY if the modal was NOT visible at start, allow the
+      // About / Experience text scan. When the user has the popup open,
+      // its contents are the ground truth — never override with random
+      // text on the page.
+      if (!modalWasVisible && (!base.email || !base.phone)) {
         const fromText = _scrapeFromProfileText();
         if (!base.email && fromText.email) base.email = fromText.email;
         if (!base.phone && fromText.phone) base.phone = fromText.phone;
