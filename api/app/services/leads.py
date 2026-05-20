@@ -115,14 +115,14 @@ def _cap(value, max_len: int):
 
 
 def _clean_avatar_url(url: Optional[str]) -> Optional[str]:
-    """LinkedIn avatar URLs append long signed JWTs in the query string —
-    enough to blow past String(500). The image is identical without them
-    (LinkedIn re-signs on demand), so we strip the query before storing.
+    """LinkedIn media CDN URLs include a signed JWT in the query string that
+    the CDN validates on every request. Stripping the query returns a 403
+    placeholder image, so the URL must be stored verbatim. Lead.avatar_url
+    is TEXT (unbounded) — see migration 0002_lead_avatar_text.
     """
     if not url:
         return None
-    s = str(url).split("?")[0].split("#")[0]
-    return s[:500] if len(s) > 500 else s
+    return str(url)
 
 
 def ingest_lead(

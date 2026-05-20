@@ -171,12 +171,8 @@
     const linkedinUrl = normalizeProfileUrl(location.href);
     const [first_name, ...rest] = (fullName || "").split(/\s+/);
 
-    // Strip the signed query string from LinkedIn's avatar CDN URL so it
-    // fits the backend's String(500) column — otherwise ingest crashes.
-    const cleanAvatar = avatar
-      ? String(avatar).split("?")[0].split("#")[0].slice(0, 500)
-      : null;
-
+    // LinkedIn's media CDN requires the signed-JWT query string. Strip it
+    // and the image returns 403. Backend column is TEXT, so we send verbatim.
     return {
       linkedin_url: linkedinUrl,
       full_name: fullName ? fullName.slice(0, 240) : null,
@@ -185,7 +181,7 @@
       headline,  // TEXT column on the backend, no cap needed
       title: title ? title.slice(0, 240) : null,
       location: location_ ? location_.slice(0, 200) : null,
-      avatar_url: cleanAvatar,
+      avatar_url: avatar,
       company_name: companyName ? companyName.slice(0, 200) : null,
       company_url: null,
       raw: { source_url: location.href, page_type: "profile" },

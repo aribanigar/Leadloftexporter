@@ -188,7 +188,11 @@ class Lead(Base, TimestampMixin):
     linkedin_url: Mapped[Optional[str]] = mapped_column(String(500), index=True)
     location: Mapped[Optional[str]] = mapped_column(String(200))
     headline: Mapped[Optional[str]] = mapped_column(Text)
-    avatar_url: Mapped[Optional[str]] = mapped_column(String(500))
+    # TEXT (unbounded) — LinkedIn's media CDN URLs include a signed JWT in
+    # the query string that the CDN validates on every request. Stripping
+    # the query returns a 403 placeholder image, so we must store the URL
+    # verbatim, and the signature pushes the URL past String(500).
+    avatar_url: Mapped[Optional[str]] = mapped_column(Text)
 
     estimated_value: Mapped[Optional[int]] = mapped_column(Integer)  # cents
     close_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

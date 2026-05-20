@@ -585,14 +585,10 @@
           (t.includes(",") ||
             /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
       ) || null;
-    // Strip signed query / hash from LinkedIn's avatar URLs. The image is
-    // identical without them and the JWT they append routinely pushes the
-    // full URL past the backend's String(500) column — which used to crash
-    // ingest with a 500 on page-2 search cards.
-    const rawAvatar = card.querySelector("img")?.getAttribute("src") || null;
-    const avatar = rawAvatar
-      ? rawAvatar.split("?")[0].split("#")[0].slice(0, 500)
-      : null;
+    // LinkedIn's media CDN requires the signed-JWT query string. Storing
+    // the URL without it returns a 403 placeholder. The backend column is
+    // TEXT (unbounded) so we keep the URL verbatim.
+    const avatar = card.querySelector("img")?.getAttribute("src") || null;
     const [first_name, ...rest] = name.split(/\s+/);
     // Many LinkedIn headlines use pipe-separated tags after the primary job:
     //   "Head of Events at HEC Paris Doha | Executive Education | Aviation"
