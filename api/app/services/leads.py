@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -185,7 +186,8 @@ def ingest_lead(
     created = False
     if existing:
         lead = existing
-        # Merge non-empty fields
+        # Merge non-empty fields. Fill-only (don't clobber) for descriptive
+        # fields the user may have edited manually in the UI.
         for attr in (
             "first_name",
             "last_name",
@@ -193,15 +195,35 @@ def ingest_lead(
             "headline",
             "location",
             "avatar_url",
-            "phone",
         ):
             val = capped.get(attr)
             if val and not getattr(lead, attr):
                 setattr(lead, attr, val)
-        if capped["full_name"] and not lead.full_name:
-            lead.full_name = capped["full_name"]
-        if capped["email"] and not lead.email:
+        # full_name: overwrite if the new scrape is non-empty and the old
+        # value looks polluted (contains a degree badge or a LinkedIn
+        # user-id hex suffix from an earlier slug-fallback). Otherwise
+        # fill-only so user-edited names aren't clobbered.
+        if capped["full_name"]:
+            old = lead.full_name or ""
+            polluted = (
+                not old
+                or "·" in old
+                or "•" in old
+                or bool(re.search(r"\b[A-Z][0-9A-F]{6,}\b", old, re.IGNORECASE))
+            )
+            if polluted:
+                lead.full_name = capped["full_name"]
+        # Contact info — OVERWRITE when the extension provides a non-null
+        # value. The extension only sends what it actually scraped from the
+        # live profile, so the latest scrape is the most accurate. Fixes
+        # the case where a stray mailto: anchor from elsewhere on the page
+        # was previously attributed to the wrong lead — opening Contact
+        # info on that profile and re-saving now corrects the email/phone
+        # instead of silently keeping the wrong value.
+        if capped["email"]:
             lead.email = capped["email"]
+        if capped.get("phone"):
+            lead.phone = capped["phone"]
         if company and not lead.company_id:
             lead.company_id = company.id
         merged_custom = dict(lead.custom or {})

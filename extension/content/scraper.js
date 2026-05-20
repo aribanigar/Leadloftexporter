@@ -352,11 +352,11 @@
 
   function _isValidContactModal(modal) {
     if (!modal) return false;
-    return (
-      modal.querySelector("a[href^='mailto:']") ||
-      modal.querySelector("a[href^='tel:']") ||
-      /contact info/i.test(modal.textContent || "")
-    );
+    // Must contain the "Contact info" header text. Without this, any other
+    // dialog that happens to contain a mailto: anchor (e.g. a profile
+    // recommendation form or an inMail compose) would pass and we'd
+    // attribute somebody else's email to the wrong lead.
+    return /\bcontact info\b/i.test(modal.textContent || "");
   }
 
   function _scrapeFromContactModal(modal) {
@@ -908,16 +908,31 @@
 
         // Look for the dialog AND wait at least 1.5s after first sighting
         // so React has time to populate mailto:/tel: anchors inside it.
-        const modal = doc.querySelector("div[role='dialog']");
+        //
+        // We require the dialog to be the Contact-info modal specifically
+        // (header text contains "Contact info"). Without this, a login
+        // wall or feed redirect inside the iframe — both also expose
+        // div[role='dialog'] — would let us grab a stray mailto: anchor
+        // from somewhere on the page and attribute it to this lead.
+        let modal = null;
+        const dialogs = doc.querySelectorAll("div[role='dialog']");
+        for (const d of dialogs) {
+          const t = (d.innerText || d.textContent || "").slice(0, 200);
+          if (/contact info/i.test(t)) {
+            modal = d;
+            break;
+          }
+        }
         const elapsed = Date.now() - startedAt;
         if (!modal && elapsed < 6000) return;
+        if (!modal) {
+          // Give up cleanly rather than scrape doc-wide and risk
+          // capturing somebody else's contact info.
+          return finish({ email: null, phone: null, website: null });
+        }
 
-        const mailto =
-          (modal && modal.querySelector("a[href^='mailto:']")) ||
-          doc.querySelector("a[href^='mailto:']");
-        const tel =
-          (modal && modal.querySelector("a[href^='tel:']")) ||
-          doc.querySelector("a[href^='tel:']");
+        const mailto = modal.querySelector("a[href^='mailto:']");
+        const tel = modal.querySelector("a[href^='tel:']");
 
         // If the modal is present but no contact anchors yet, give React
         // a couple more polls to hydrate them.
@@ -947,34 +962,11 @@
           }
         }
 
-        // Fallback: scan profile text for public emails/phones the user
-        // wrote into their About / Experience sections. Catches non-1st-
-        // degree connections where the modal stays empty.
-        if (!email || !phone) {
-          const main = doc.querySelector("main");
-          const text = main
-            ? (main.innerText || main.textContent || "").replace(/\s+/g, " ")
-            : "";
-          if (!email) {
-            const m = text.match(
-              /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/
-            );
-            if (m && !/@(linkedin|2x)\.com$/i.test(m[0])) {
-              finish({ email: m[0], phone, website });
-              return;
-            }
-          }
-          if (!phone) {
-            const m = text.match(
-              /\+\d[\d\s().-]{7,}\d|\b\d{3}[\s.-]\d{3}[\s.-]\d{3,4}\b/
-            );
-            if (m) {
-              finish({ email, phone: m[0].replace(/\s+/g, " ").trim(), website });
-              return;
-            }
-          }
-        }
-
+        // No <main>-text fallback here on purpose — the iframe loads the
+        // /overlay/contact-info/ URL which can drift to a login wall, feed,
+        // or unrelated content; a regex scan would pick up some other
+        // person's email and attribute it to this lead. We only trust the
+        // anchors inside the verified Contact info modal.
         finish({ email, phone, website });
       }, 500);
 
