@@ -278,60 +278,46 @@
   }
 
   async function saveCurrentProfile(profile) {
-    flashStatus("Reading contact info…");
-    let enriched = profile;
+    flashStatus("Reading profile…");
+    const enriched = { ...profile };
+
+    // Step 1: refresh base profile fields (name, title, company, location,
+    // avatar) from the current DOM. This is a PURE read — no clicks, no
+    // navigation, no side effects on the user's tab.
     try {
-      // Path A: we ARE on the person's /in/ profile page. Use the in-page
-      // modal scrape — it's the most reliable and reads any Contact info
-      // popup the user has already opened (no extra clicks, no tabs).
-      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfileWithContact) {
-        enriched = await Scraper.scrapeProfileWithContact();
-      }
-    } catch {
-      enriched = profile;
-    }
-    // Re-scrape the base profile so a Save click that ran after the h1
-    // finally hydrated picks up the correct name/title even though the
-    // initial panel render saw "Unknown profile".
-    if ((!enriched.full_name || !enriched.title) && Scraper.scrapeProfile) {
-      try {
+      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
         const fresh = Scraper.scrapeProfile();
         if (fresh) {
           for (const k of [
-            "full_name", "first_name", "last_name", "headline",
-            "title", "company_name", "location", "avatar_url",
+            "linkedin_url", "full_name", "first_name", "last_name",
+            "headline", "title", "company_name", "location", "avatar_url",
           ]) {
-            if (!enriched[k] && fresh[k]) enriched[k] = fresh[k];
+            if (fresh[k] && !enriched[k]) enriched[k] = fresh[k];
           }
         }
-      } catch {}
-    }
-    // Last-mile: scan the visible Contact info modal if one is open.
-    if (!enriched.email || !enriched.phone || !enriched.company_url) {
-      const visible = _harvestVisibleContact();
-      if (!enriched.email && visible.email) enriched.email = visible.email;
-      if (!enriched.phone && visible.phone) enriched.phone = visible.phone;
-      if (!enriched.company_url && visible.website)
-        enriched.company_url = visible.website;
-      if (visible.address) {
-        enriched.location = visible.address.slice(0, 200);
       }
-    }
+    } catch {}
 
-    // Path B: we are NOT on the person's profile page (feed, post,
-    // search-result side panel, anywhere) but we know their /in/ URL.
-    // Mount a hidden, off-screen, same-origin iframe at /overlay/contact-info/
-    // and read the modal contents from there. No visible tab, no
-    // navigation away from the user's current page. Rate-limited by the
-    // service worker's SAFE_ZONE counters.
+    // Step 2: read the Contact info modal IF it's already open. This is
+    // also pure-read — we only consume what's visible, never click the
+    // Contact info link (clicking it would navigate the user's tab to
+    // /overlay/contact-info/, which the user perceives as "the page
+    // moved on its own"). If the modal isn't open, we move on.
+    const visible = _harvestVisibleContact();
+    if (visible.email && !enriched.email) enriched.email = visible.email;
+    if (visible.phone && !enriched.phone) enriched.phone = visible.phone;
+    if (visible.website && !enriched.company_url) enriched.company_url = visible.website;
+    if (visible.address) enriched.location = visible.address.slice(0, 200);
+
+    // Step 3: hidden-iframe enrichment when we're still missing contact
+    // fields. The iframe runs in its own context — it loads
+    // /overlay/contact-info/ INSIDE the iframe, which has zero effect on
+    // the user's visible tab URL. Off-screen + opacity 0 + visibility
+    // hidden + pointer-events none ⇒ invisible to the user.
     const url = enriched.linkedin_url || profile.linkedin_url;
-    const onSameProfilePage =
-      url &&
-      location.pathname.startsWith("/in/") &&
-      url.toLowerCase().includes(location.pathname.split("?")[0].toLowerCase().replace(/\/$/, ""));
     const needsContact =
       !enriched.email || !enriched.phone || !enriched.location;
-    if (url && url.includes("/in/") && !onSameProfilePage && needsContact) {
+    if (url && url.includes("/in/") && needsContact && Scraper.scrapeContactInfoViaIframe) {
       flashStatus("Enriching contact info…");
       try {
         const allowed = await new Promise((resolve) => {
@@ -347,23 +333,39 @@
             resolve(false);
           }
         });
-        if (allowed && Scraper.scrapeContactInfoViaIframe) {
+        if (allowed) {
           const fromIframe = await Scraper.scrapeContactInfoViaIframe(url);
           if (fromIframe.email && !enriched.email) enriched.email = fromIframe.email;
           if (fromIframe.phone && !enriched.phone) enriched.phone = fromIframe.phone;
           if (fromIframe.website && !enriched.company_url)
             enriched.company_url = fromIframe.website;
-          if (fromIframe.address && (!enriched.location || enriched.location.length < 4))
+          if (fromIframe.address)
             enriched.location = fromIframe.address.slice(0, 200);
           enriched.raw = {
             ...(enriched.raw || {}),
             contact_info_scraped: true,
-            contact_source: "iframe",
+            contact_source: visible.email || visible.phone ? "visible_modal" : "iframe",
           };
         }
       } catch {
         /* enrichment is best-effort */
       }
+    }
+
+    // Step 4: text-scan fallback. Only safe when we're physically on the
+    // person's /in/ profile (otherwise we'd be scanning a stranger's feed).
+    // Picks up emails written in About / Experience / Featured sections,
+    // including obfuscated forms like "john [at] acme [dot] com".
+    if (
+      (!enriched.email || !enriched.phone) &&
+      location.pathname.startsWith("/in/") &&
+      Scraper._scrapeFromProfileText
+    ) {
+      try {
+        const fromText = Scraper._scrapeFromProfileText();
+        if (!enriched.email && fromText.email) enriched.email = fromText.email;
+        if (!enriched.phone && fromText.phone) enriched.phone = fromText.phone;
+      } catch {}
     }
 
     flashStatus("Saving…");
@@ -372,10 +374,12 @@
       const gotEmail = !!(enriched.email && !profile.email);
       const gotPhone = !!(enriched.phone && !profile.phone);
       const gotAddress = !!(enriched.location && !profile.location);
+      const gotWebsite = !!(enriched.company_url && !profile.company_url);
       const extras = [
         gotEmail && "email",
         gotPhone && "phone",
         gotAddress && "address",
+        gotWebsite && "site",
       ].filter(Boolean).join(" + ");
       const msg = result.created
         ? `Saved new lead ✓${extras ? ` (${extras})` : ""}`
