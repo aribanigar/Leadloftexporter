@@ -519,20 +519,122 @@
       flashStatus("No profiles found on this page.", "warn");
       return;
     }
+
+    // Step 1: bulk-save all card data in one shot. Fast (single API call,
+    // no LinkedIn fetches) — name/title/company/location go in immediately
+    // so the user sees the leads in the pipeline within seconds.
     flashStatus(`Saving ${profiles.length}…`);
+    let bulkRes;
     try {
-      const res = await Api.syncSearch({
+      bulkRes = await Api.syncSearch({
         page_url: location.href,
         captured_at: new Date().toISOString(),
         profiles,
       });
-      state.lastSavedLeadIds = res.lead_ids || [];
-      flashStatus(`+${res.created} new, ${res.updated} updated`, "ok");
-      decorateSearchCards();
-      maybeAutoEnroll();
+      state.lastSavedLeadIds = bulkRes.lead_ids || [];
     } catch (e) {
       flashStatus(`Failed: ${e.message}`, "err");
+      return;
     }
+    flashStatus(`Saved ${bulkRes.created} new, ${bulkRes.updated} updated. Enriching…`);
+    decorateSearchCards();
+    maybeAutoEnroll();
+
+    // Step 2: enrich each /in/ profile via the hidden iframe. We process
+    // sequentially with 2-5s human-paced jitter between leads so we don't
+    // hammer LinkedIn — same risk class as the per-card single Save. The
+    // 20/hour + 100/day SAFE_ZONE rate limit is enforced by the service
+    // worker via lc:reserveEnrich; when it returns not-allowed we stop
+    // enriching but keep the bulk-saved data.
+    const enrichable = profiles.filter(
+      (p) => p && p.linkedin_url && p.linkedin_url.includes("/in/")
+    );
+    if (!enrichable.length) {
+      flashStatus(
+        `Done: ${bulkRes.created} new, ${bulkRes.updated} updated`,
+        "ok"
+      );
+      return;
+    }
+
+    const settings = await Storage.getSettings();
+    if (settings.autoEnrichOnSave === false) {
+      flashStatus(
+        `Done: ${bulkRes.created} new, ${bulkRes.updated} updated (auto-enrich off)`,
+        "ok"
+      );
+      return;
+    }
+
+    let enriched = 0;
+    let rateLimited = false;
+    for (let i = 0; i < enrichable.length; i++) {
+      const profile = enrichable[i];
+      flashStatus(
+        `Enriching ${i + 1} of ${enrichable.length}: ${profile.full_name || ""}…`
+      );
+
+      // Reserve a rate-limit slot with the service worker
+      const allowed = await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: "lc:reserveEnrich" },
+            (resp) => {
+              if (chrome.runtime.lastError) return resolve(false);
+              resolve(resp?.ok === true);
+            }
+          );
+        } catch {
+          resolve(false);
+        }
+      });
+      if (!allowed) {
+        rateLimited = true;
+        break;
+      }
+
+      try {
+        const contact = await Scraper.scrapeContactInfoViaIframe(
+          profile.linkedin_url
+        );
+        if (
+          contact &&
+          (contact.email || contact.phone || contact.address || contact.website)
+        ) {
+          const merged = { ...profile };
+          if (contact.email) merged.email = contact.email;
+          if (contact.phone) merged.phone = contact.phone;
+          if (contact.address)
+            merged.location = contact.address.slice(0, 200);
+          if (contact.website) merged.company_url = contact.website;
+          merged.raw = { ...(merged.raw || {}), contact_info_scraped: true };
+          try {
+            await Api.syncProfile(merged);
+            enriched++;
+          } catch {
+            /* per-lead save failures shouldn't abort the batch */
+          }
+        }
+      } catch {
+        /* enrichment is best-effort */
+      }
+
+      // Human-paced delay between enrichments (2–5s, with 15% chance of
+      // a 6–12s "distracted user" pause) so we don't open 25 iframes in
+      // rapid succession — same UX as a person clicking save on each card.
+      if (i < enrichable.length - 1) {
+        const base = 2000 + Math.random() * 3000;
+        const longTail =
+          Math.random() < 0.15 ? 6000 + Math.random() * 6000 : 0;
+        await new Promise((r) => setTimeout(r, base + longTail));
+      }
+    }
+
+    const summary = rateLimited
+      ? `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched (daily limit hit)`
+      : `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+    flashStatus(summary, rateLimited ? "warn" : "ok");
+    decorateSearchCards();
   }
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
