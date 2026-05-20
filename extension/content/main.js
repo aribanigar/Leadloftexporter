@@ -14,6 +14,49 @@
   }
   window.__leadCapturaMounted = true;
 
+  // Periodic stale-runtime detector. After the extension is reloaded
+  // (chrome://extensions → 🔄), OPEN LinkedIn tabs keep the old content
+  // scripts running, but chrome.runtime.id flips to undefined. Every API
+  // call we attempt fails with chrome-extension://invalid/ — Save chips
+  // do nothing, the user has no idea why. This adds a SCREAMING red
+  // banner at the top of the page that tells them exactly what to do.
+  let _staleBanner = null;
+  function _checkRuntime() {
+    let alive = false;
+    try { alive = !!chrome.runtime?.id; } catch { alive = false; }
+    if (alive) {
+      if (_staleBanner) {
+        _staleBanner.remove();
+        _staleBanner = null;
+      }
+      return;
+    }
+    if (_staleBanner && document.documentElement.contains(_staleBanner)) return;
+    _staleBanner = document.createElement("div");
+    _staleBanner.id = "lc-stale-banner";
+    _staleBanner.style.cssText = [
+      "position:fixed",
+      "top:0",
+      "left:0",
+      "right:0",
+      "z-index:2147483647",
+      "background:#dc2626",
+      "color:white",
+      "padding:10px 16px",
+      "font:600 14px/1.4 -apple-system, system-ui, sans-serif",
+      "text-align:center",
+      "box-shadow:0 2px 8px rgba(0,0,0,0.2)",
+    ].join(";");
+    _staleBanner.textContent =
+      "LeadCaptura disconnected — please REFRESH this LinkedIn tab (Ctrl+Shift+R) to fix. The extension was reloaded and this tab is still on the old version.";
+    try {
+      document.documentElement.appendChild(_staleBanner);
+    } catch {}
+  }
+  setInterval(_checkRuntime, 3000);
+  // Also check right away in case the runtime was already dead at mount
+  setTimeout(_checkRuntime, 500);
+
   const Overlay = globalThis.__lcOverlay;
   const Automate = globalThis.__lcAutomate;
   const Scraper = globalThis.__lcScraper;
