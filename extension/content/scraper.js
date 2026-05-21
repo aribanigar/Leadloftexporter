@@ -1099,28 +1099,21 @@
   }
 
   function _profileCardFromLink(link) {
-    // Find the OUTERMOST structural row ancestor — walk all the way up to
-    // MAIN/BODY and remember the *highest* LI/ARTICLE/TR/role=row/listitem
-    // encountered. Critical because LinkedIn's mutual-connections strip and
-    // people-also-viewed sections sometimes wrap each mutual in its OWN
-    // nested <li>; stopping at the first <li> would treat every mutual as
-    // its own card and the dedup-by-card filter would never collapse them
-    // onto the main person's outer card.
+    // Walk up to the FIRST structural row root. Mutual-connection links
+    // are filtered out earlier by _isInsightLink, so the structural walk
+    // here only needs to find each profile's own card; it does NOT need
+    // to be smart about nested mutual <li>s anymore.
     //
-    //   - Regular People Search:  outer <li class="reusable-search__result-container">
+    //   - Regular People Search:  <li class="reusable-search__result-container">
     //   - Sales Nav search:       <li> or <article>
     //   - Sales Nav saved-list:   <tr> or div[role='row']
     //   - mynetwork / other:      <li> or [role='listitem']
     //
-    // Must match overlay.js _cardFromLink — if the two diverge, the Save
-    // chip injector and the bulk scraper disagree on what a card is and
-    // mutual-connection people leak back in.
+    // Must stay in lock-step with overlay.js _cardFromLink.
     let node = link.parentElement;
-    let outerRow = null;
     let actionFallback = null;
     let listFallback = null;
-    for (let i = 0; i < 16 && node; i++) {
-      if (node.tagName === "MAIN" || node.tagName === "BODY") break;
+    for (let i = 0; i < 14 && node; i++) {
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
@@ -1128,7 +1121,7 @@
         node.getAttribute?.("role") === "row" ||
         node.getAttribute?.("role") === "listitem"
       ) {
-        outerRow = node;
+        return node;
       }
       if (
         !actionFallback &&
@@ -1149,7 +1142,7 @@
       }
       node = node.parentElement;
     }
-    return outerRow || actionFallback || listFallback || link.parentElement;
+    return actionFallback || listFallback || link.parentElement;
   }
 
   function _profileFromCard(card, link) {

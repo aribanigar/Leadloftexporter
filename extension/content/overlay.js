@@ -867,25 +867,22 @@
   }
 
   function _cardFromLink(link) {
-    // Find the OUTERMOST structural row ancestor. Climbs all the way to
-    // MAIN/BODY and remembers the *highest* LI/ARTICLE/TR/role=row/listitem
-    // encountered. Critical: LinkedIn's mutual-connections strip can wrap
-    // each mutual link in its own nested <li>, so stopping at the first
-    // <li> would assign mutuals their own card and the dedup-by-card
-    // filter would never collapse them onto the main person's row.
+    // Walk up to the FIRST structural row root. Mutual-connection links
+    // are dropped earlier by _isInsightLink (insight-container selectors
+    // + text-pattern fallback), so the structural walk here only has to
+    // find each profile's own row — no need to climb past nested mutual
+    // <li>s.
     //
-    //   - Regular People Search:  outer <li class="reusable-search__result-container">
+    //   - Regular People Search:  <li class="reusable-search__result-container">
     //   - Sales Nav search:       <li> or <article>
     //   - Sales Nav saved-list:   <tr> or div[role='row']  (table layout)
     //   - mynetwork:              <li> or [role='listitem']
     //
     // Must stay in lock-step with scraper.js _profileCardFromLink.
     let node = link.parentElement;
-    let outerRow = null;
     let actionFallback = null;
     let listFallback = null;
-    for (let i = 0; i < 16 && node; i++) {
-      if (node.tagName === "MAIN" || node.tagName === "BODY") break;
+    for (let i = 0; i < 14 && node; i++) {
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
@@ -893,7 +890,7 @@
         node.getAttribute?.("role") === "row" ||
         node.getAttribute?.("role") === "listitem"
       ) {
-        outerRow = node;
+        return node;
       }
       if (
         !actionFallback &&
@@ -914,7 +911,7 @@
       }
       node = node.parentElement;
     }
-    return outerRow || actionFallback || listFallback || link.parentElement;
+    return actionFallback || listFallback || link.parentElement;
   }
 
   // Mirror of scraper.js _cleanPersonName — keep behavior identical.
