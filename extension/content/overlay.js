@@ -824,6 +824,48 @@
     injectedSaves.set(url, wrap);
   }
 
+  // Mirror of scraper.js _isInsightLink — must stay in lock-step. Both the
+  // bulk-save scraper AND the per-card chip injector must reject the same
+  // set of links or the two paths disagree and mutual-connection chips
+  // start re-appearing on insight rows.
+  const _INSIGHT_ANCESTOR_SEL = [
+    ".reusable-search-simple-insight",
+    ".reusable-search__simple-insight",
+    ".entity-result__simple-insight",
+    ".entity-result__insights",
+    ".discover-entity-type-card",
+    ".search-results__cluster",
+    ".search-result__social-actions",
+    ".search-marvel-srp",
+    ".pv-browsemap-section",
+    ".pv-recent-activity-section",
+    "[data-test-people-also-viewed]",
+    "[data-view-name='profile-card-mutual-connections']",
+    "[data-view-name='profile-card-browsemap']",
+  ].join(",");
+
+  function _isInsightLink(link) {
+    try {
+      if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
+      let n = link.parentElement;
+      for (let i = 0; i < 6 && n; i++) {
+        const t = (n.textContent || "").slice(0, 400);
+        if (
+          /mutual connection|people also viewed|people you may know|followed by/i.test(
+            t
+          )
+        ) {
+          const txt = (link.textContent || "").replace(/\s+/g, " ").trim();
+          if (!txt || txt.length < 3) return true;
+        }
+        n = n.parentElement;
+      }
+    } catch {
+      /* defensive */
+    }
+    return false;
+  }
+
   function _cardFromLink(link) {
     // Walk up to find the row/card root. Different LinkedIn surfaces use
     // different element types:
@@ -1062,9 +1104,9 @@
     // and only consider the FIRST /in/ link per card. Mutual-connection
     // links never become canonical because they're never first in DOM
     // order within their containing card.
-    const allLinks = document.querySelectorAll(
-      "a[href*='/in/'], a[href*='/sales/lead/']"
-    );
+    const allLinks = Array.from(
+      document.querySelectorAll("a[href*='/in/'], a[href*='/sales/lead/']")
+    ).filter((link) => !_isInsightLink(link));
     const cardOwner = new Map(); // card element -> { url, link }
     for (const link of allLinks) {
       const url = globalThis.__lcDom.normalizeProfileUrl(link.href);

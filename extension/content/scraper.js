@@ -1050,6 +1050,58 @@
    * ancestor is the card.
    */
 
+  // Belt-and-suspenders defence against mutual-connection leak: any /in/
+  // link inside a known "insight" / "mutual" / "people-also-viewed" /
+  // "follow recommendations" container is REJECTED before card-owner
+  // dedup even runs. LinkedIn frequently nests these inside the outer
+  // search-result <li>, and depending on DOM-order quirks an insight
+  // link can otherwise out-race the main profile link to claim the
+  // card. Selector list covers reusable-search, voyager, and Sales Nav.
+  const _INSIGHT_ANCESTOR_SEL = [
+    ".reusable-search-simple-insight",
+    ".reusable-search__simple-insight",
+    ".entity-result__simple-insight",
+    ".entity-result__insights",
+    ".discover-entity-type-card",
+    ".search-results__cluster",
+    ".search-result__social-actions",
+    ".search-marvel-srp",
+    ".pv-browsemap-section",
+    ".pv-recent-activity-section",
+    "[data-test-people-also-viewed]",
+    "[data-view-name='profile-card-mutual-connections']",
+    "[data-view-name='profile-card-browsemap']",
+    "section.artdeco-card.pv-profile-card",
+  ].join(",");
+
+  function _isInsightLink(link) {
+    try {
+      if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
+      // Text-based fallback: if any ancestor span/div within 4 levels
+      // contains the exact phrase "mutual connection" or "People also
+      // viewed" / "People you may know", treat as insight.
+      let n = link.parentElement;
+      for (let i = 0; i < 6 && n; i++) {
+        const t = (n.textContent || "").slice(0, 400);
+        if (
+          /mutual connection|people also viewed|people you may know|followed by/i.test(
+            t
+          )
+        ) {
+          // Only reject if the link itself isn't the card's title link.
+          // Title links typically carry the person's name as text (>= 3
+          // chars). Insight links wrap small avatars or short fragments.
+          const txt = (link.textContent || "").replace(/\s+/g, " ").trim();
+          if (!txt || txt.length < 3) return true;
+        }
+        n = n.parentElement;
+      }
+    } catch {
+      /* defensive */
+    }
+    return false;
+  }
+
   function _profileCardFromLink(link) {
     // Walk up to the structural row root. Must match overlay.js _cardFromLink
     // exactly — if the two diverge, the Save-chip injector and the bulk
@@ -1184,7 +1236,9 @@
     // owner. Mutual-connection / people-also-viewed links embedded in
     // someone else's card NEVER appear first in their card's DOM, so
     // they're naturally excluded without fragile text-matching heuristics.
-    const allLinks = document.querySelectorAll("a[href*='/in/']");
+    const allLinks = Array.from(
+      document.querySelectorAll("a[href*='/in/']")
+    ).filter((link) => !_isInsightLink(link));
     const cardOwner = new Map(); // card → { url, link }
     for (const link of allLinks) {
       try {
