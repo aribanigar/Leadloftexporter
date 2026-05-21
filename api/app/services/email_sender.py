@@ -1,8 +1,7 @@
-"""Send queued EmailMessage rows via Gmail OAuth or generic SMTP.
-
-This is intentionally small — production should add per-account warmup,
-DKIM checks, and bounce handling, but the core dispatch and quota model lives
-here so the playbook engine can call it.
+"""Send queued EmailMessage rows via Gmail OAuth, SMTP, or HTTPS API
+providers (Resend / SendGrid). HTTPS providers are the only path that
+works on Render's free/starter plan because Render blocks outbound
+SMTP (25/465/587). All HTTPS providers use port 443 → never blocked.
 """
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ from email.message import EmailMessage as PyEmail
 from typing import Optional
 
 import aiosmtplib
+import httpx
 from sqlalchemy.orm import Session
 
 from app.models import ConnectedAccount, EmailMessage, Workspace
@@ -27,15 +27,30 @@ class SendResult:
 
 
 def _pick_account(db: Session, workspace_id: str, user_id: str) -> Optional[ConnectedAccount]:
+    # Prefer HTTPS providers (resend, sendgrid, gmail) over SMTP. Render
+    # blocks outbound SMTP on ports 25/465/587, so a stale "active" SMTP
+    # account from earlier troubleshooting would otherwise outrank a
+    # freshly-connected Resend account if it happened to be updated more
+    # recently. The CASE expression sorts HTTPS first; updated_at desc
+    # is the tiebreaker.
+    from sqlalchemy import case
+
+    provider_rank = case(
+        (ConnectedAccount.provider == "resend", 0),
+        (ConnectedAccount.provider == "sendgrid", 1),
+        (ConnectedAccount.provider == "gmail", 2),
+        (ConnectedAccount.provider == "smtp", 3),
+        else_=9,
+    )
     return (
         db.query(ConnectedAccount)
         .filter(
             ConnectedAccount.workspace_id == workspace_id,
             ConnectedAccount.user_id == user_id,
-            ConnectedAccount.provider.in_(("gmail", "smtp")),
+            ConnectedAccount.provider.in_(("gmail", "smtp", "resend", "sendgrid")),
             ConnectedAccount.status == "active",
         )
-        .order_by(ConnectedAccount.updated_at.desc())
+        .order_by(provider_rank.asc(), ConnectedAccount.updated_at.desc())
         .first()
     )
 
@@ -45,13 +60,14 @@ async def _smtp_send(account: ConnectedAccount, msg: PyEmail) -> SendResult:
     host = cfg.get("host", "smtp.gmail.com")
     port = int(cfg.get("port", 587))
     username = account.external_id or cfg.get("username")
-    password = account.access_token  # stored encrypted in real prod
+    password = account.access_token
     try:
         await aiosmtplib.send(
             msg,
             hostname=host,
             port=port,
-            start_tls=True,
+            start_tls=(port != 465),
+            use_tls=(port == 465),
             username=username,
             password=password,
             timeout=20,
@@ -75,6 +91,75 @@ def _gmail_send(account: ConnectedAccount, msg: PyEmail) -> SendResult:
         return SendResult(False, error=str(exc))
 
 
+def _resend_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str]) -> SendResult:
+    """POST to Resend's /emails endpoint. Pure HTTPS — never blocked.
+    https://resend.com/docs/api-reference/emails/send-email
+    """
+    try:
+        api_key = account.access_token or ""
+        from_addr = account.external_id or "onboarding@resend.dev"
+        payload = {"from": from_addr, "to": [to], "subject": subject}
+        if body_html:
+            payload["html"] = body_html
+        if body_text:
+            payload["text"] = body_text
+        with httpx.Client(timeout=20) as client:
+            r = client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            if r.status_code >= 400:
+                return SendResult(False, error=f"resend_http_{r.status_code}: {r.text[:300]}")
+            data = r.json() or {}
+            return SendResult(True, provider_message_id=str(data.get("id") or ""))
+    except Exception as exc:  # noqa: BLE001
+        return SendResult(False, error=f"resend_request_failed: {exc}")
+
+
+def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str]) -> SendResult:
+    """POST to SendGrid's /v3/mail/send. Pure HTTPS — never blocked.
+    https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
+    """
+    try:
+        api_key = account.access_token or ""
+        from_addr = account.external_id or ""
+        if not from_addr:
+            return SendResult(False, error="sendgrid_no_from_address")
+        content = []
+        if body_text:
+            content.append({"type": "text/plain", "value": body_text})
+        if body_html:
+            content.append({"type": "text/html", "value": body_html})
+        if not content:
+            content = [{"type": "text/plain", "value": "(empty)"}]
+        payload = {
+            "personalizations": [{"to": [{"email": to}]}],
+            "from": {"email": from_addr},
+            "subject": subject,
+            "content": content,
+        }
+        with httpx.Client(timeout=20) as client:
+            r = client.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            if r.status_code >= 400:
+                return SendResult(False, error=f"sendgrid_http_{r.status_code}: {r.text[:300]}")
+            # SendGrid returns 202 with X-Message-Id header
+            msg_id = r.headers.get("X-Message-Id") or ""
+            return SendResult(True, provider_message_id=msg_id)
+    except Exception as exc:  # noqa: BLE001
+        return SendResult(False, error=f"sendgrid_request_failed: {exc}")
+
+
 def send_email_message(
     db: Session, message: EmailMessage, workspace: Workspace, user_id: Optional[str] = None
 ) -> SendResult:
@@ -84,7 +169,6 @@ def send_email_message(
     if emails_sent_today(db, workspace.id) >= settings["email_limit_per_day"]:
         return SendResult(False, error="daily_limit_reached")
 
-    # If user_id not given, find via the lead's owner or workspace's first member.
     if not user_id:
         from app.models import Lead, Membership
 
@@ -100,17 +184,40 @@ def send_email_message(
         message.error = "no_email_account_connected"
         return SendResult(False, error=message.error)
 
-    py = PyEmail()
-    py["From"] = account.external_id or "no-reply@example.com"
-    py["To"] = message.to_address
-    py["Subject"] = message.subject or "(no subject)"
-    py.set_content(message.body_text or "")
-    if message.body_html:
-        py.add_alternative(message.body_html, subtype="html")
-
-    if account.provider == "gmail":
+    # HTTPS API providers — work on Render free tier
+    if account.provider == "resend":
+        result = _resend_send(
+            account, message.to_address,
+            message.subject or "(no subject)",
+            message.body_text or "",
+            message.body_html,
+        )
+    elif account.provider == "sendgrid":
+        result = _sendgrid_send(
+            account, message.to_address,
+            message.subject or "(no subject)",
+            message.body_text or "",
+            message.body_html,
+        )
+    elif account.provider == "gmail":
+        # Build py-email and send via Gmail HTTPS API
+        py = PyEmail()
+        py["From"] = account.external_id or "no-reply@example.com"
+        py["To"] = message.to_address
+        py["Subject"] = message.subject or "(no subject)"
+        py.set_content(message.body_text or "")
+        if message.body_html:
+            py.add_alternative(message.body_html, subtype="html")
         result = _gmail_send(account, py)
     else:
+        # SMTP fallback — won't work on Render free, surfaces clear error
+        py = PyEmail()
+        py["From"] = account.external_id or "no-reply@example.com"
+        py["To"] = message.to_address
+        py["Subject"] = message.subject or "(no subject)"
+        py.set_content(message.body_text or "")
+        if message.body_html:
+            py.add_alternative(message.body_html, subtype="html")
         result = asyncio.run(_smtp_send(account, py))
 
     message.from_address = account.external_id or ""
