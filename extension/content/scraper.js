@@ -1103,24 +1103,28 @@
   }
 
   function _profileCardFromLink(link) {
-    // Walk up to the structural row root. Must match overlay.js _cardFromLink
-    // exactly — if the two diverge, the Save-chip injector and the bulk
-    // "Save All Leads" scraper disagree on what counts as a card and
-    // mutual-connection people leak into the pipeline.
-    //   - Regular People Search:  <li>
+    // Find the OUTERMOST structural row ancestor — walk all the way up to
+    // MAIN/BODY and remember the *highest* LI/ARTICLE/TR/role=row/listitem
+    // encountered. Critical because LinkedIn's mutual-connections strip and
+    // people-also-viewed sections sometimes wrap each mutual in its OWN
+    // nested <li>; stopping at the first <li> would treat every mutual as
+    // its own card and the dedup-by-card filter would never collapse them
+    // onto the main person's outer card.
+    //
+    //   - Regular People Search:  outer <li class="reusable-search__result-container">
     //   - Sales Nav search:       <li> or <article>
     //   - Sales Nav saved-list:   <tr> or div[role='row']
     //   - mynetwork / other:      <li> or [role='listitem']
-    // Mutual-connection /in/ links live inside the SAME outer row as the
-    // main profile link, so resolving to the row root lets the "first link
-    // in DOM order wins" dedup naturally exclude them. Stopping at an
-    // inner (img + /in/) ancestor — the previous behavior — caused the
-    // mutual-connections strip to be treated as its own micro-card and
-    // saved as a separate (wrong) lead.
+    //
+    // Must match overlay.js _cardFromLink — if the two diverge, the Save
+    // chip injector and the bulk scraper disagree on what a card is and
+    // mutual-connection people leak back in.
     let node = link.parentElement;
+    let outerRow = null;
     let actionFallback = null;
     let listFallback = null;
-    for (let i = 0; i < 14 && node; i++) {
+    for (let i = 0; i < 16 && node; i++) {
+      if (node.tagName === "MAIN" || node.tagName === "BODY") break;
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
@@ -1128,7 +1132,7 @@
         node.getAttribute?.("role") === "row" ||
         node.getAttribute?.("role") === "listitem"
       ) {
-        return node;
+        outerRow = node;
       }
       if (
         !actionFallback &&
@@ -1149,7 +1153,7 @@
       }
       node = node.parentElement;
     }
-    return actionFallback || listFallback || link.parentElement;
+    return outerRow || actionFallback || listFallback || link.parentElement;
   }
 
   function _profileFromCard(card, link) {

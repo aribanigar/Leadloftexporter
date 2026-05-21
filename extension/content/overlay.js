@@ -867,19 +867,25 @@
   }
 
   function _cardFromLink(link) {
-    // Walk up to find the row/card root. Different LinkedIn surfaces use
-    // different element types:
-    //   - Regular People Search:  <li>
+    // Find the OUTERMOST structural row ancestor. Climbs all the way to
+    // MAIN/BODY and remembers the *highest* LI/ARTICLE/TR/role=row/listitem
+    // encountered. Critical: LinkedIn's mutual-connections strip can wrap
+    // each mutual link in its own nested <li>, so stopping at the first
+    // <li> would assign mutuals their own card and the dedup-by-card
+    // filter would never collapse them onto the main person's row.
+    //
+    //   - Regular People Search:  outer <li class="reusable-search__result-container">
     //   - Sales Nav search:       <li> or <article>
     //   - Sales Nav saved-list:   <tr> or div[role='row']  (table layout)
-    //   - mynetwork:              <li> usually, sometimes <article>
-    // We prefer these structural roots over any inner flex wrapper so our
-    // absolutely-positioned save chip anchors to the full row instead of
-    // becoming a sibling next to LinkedIn's action buttons.
+    //   - mynetwork:              <li> or [role='listitem']
+    //
+    // Must stay in lock-step with scraper.js _profileCardFromLink.
     let node = link.parentElement;
+    let outerRow = null;
     let actionFallback = null;
     let listFallback = null;
-    for (let i = 0; i < 14 && node; i++) {
+    for (let i = 0; i < 16 && node; i++) {
+      if (node.tagName === "MAIN" || node.tagName === "BODY") break;
       if (
         node.tagName === "LI" ||
         node.tagName === "ARTICLE" ||
@@ -887,9 +893,8 @@
         node.getAttribute?.("role") === "row" ||
         node.getAttribute?.("role") === "listitem"
       ) {
-        return node;
+        outerRow = node;
       }
-      // Primary fallback: container that holds Connect/Message/Follow.
       if (
         !actionFallback &&
         node.querySelector("img") &&
@@ -899,9 +904,6 @@
       ) {
         actionFallback = node;
       }
-      // Secondary fallback for saved-list / leads-list views: they don't
-      // expose Connect/Message buttons (the user already saved the lead).
-      // Instead they have checkboxes or single profile links per row.
       if (
         !listFallback &&
         node.querySelector("img") &&
@@ -912,7 +914,7 @@
       }
       node = node.parentElement;
     }
-    return actionFallback || listFallback || link.parentElement;
+    return outerRow || actionFallback || listFallback || link.parentElement;
   }
 
   // Mirror of scraper.js _cleanPersonName — keep behavior identical.
