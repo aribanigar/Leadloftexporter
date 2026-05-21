@@ -42,18 +42,12 @@ PROVIDER_CATALOG = [
         "description": "Pair the Chrome extension to enable LinkedIn capture & outreach.",
         "kind": "extension",
     },
-    {
-        "id": "gmail",
-        "name": "Gmail",
-        "description": "Send and receive emails from your Gmail inbox.",
-        "kind": "email",
-    },
-    {
-        "id": "smtp",
-        "name": "SMTP",
-        "description": "Connect any SMTP/IMAP mailbox.",
-        "kind": "email",
-    },
+    # Gmail (App Password) and generic SMTP are intentionally not exposed in
+    # the catalog. They go through ports 25/465/587 which our backend host
+    # blocks, so every connect attempt times out. Resend / SendGrid send
+    # over HTTPS and work on every plan — that's what users get steered
+    # towards. The connect endpoints below are still mounted for legacy
+    # accounts and for self-hosted deployments where SMTP isn't blocked.
     {
         "id": "hubspot",
         "name": "HubSpot",
