@@ -17,10 +17,32 @@
   // Periodic stale-runtime detector. After the extension is reloaded
   // (chrome://extensions → 🔄), OPEN LinkedIn tabs keep the old content
   // scripts running, but chrome.runtime.id flips to undefined. Every API
-  // call we attempt fails with chrome-extension://invalid/ — Save chips
-  // do nothing, the user has no idea why. This adds a SCREAMING red
-  // banner at the top of the page that tells them exactly what to do.
+  // call we attempt fails with chrome-extension://invalid/ — but worse,
+  // the old chips' click handlers are still bound to PROFILE OBJECTS
+  // captured at chip-injection time using whatever buggy card-detection
+  // logic shipped in that old version. User clicks Save on Mohamed's
+  // card, the old click handler fires with Dania's profile data.
+  //
+  // Defense: when staleness is detected, RIP OUT every chip and our
+  // overlay from the page (so the user physically can't click them),
+  // show a red modal that blocks LinkedIn's own action buttons too,
+  // then force-reload the tab after a short visible delay. The next
+  // load injects the fresh content scripts and the bug is gone.
   let _staleBanner = null;
+  let _staleReloadQueued = false;
+  function _killStaleUi() {
+    try {
+      document
+        .querySelectorAll(
+          ".lc-save-row, .lc-inline-save, .lc-overlay-root, #lc-overlay-root, .lc-floating-panel"
+        )
+        .forEach((n) => {
+          try {
+            n.remove();
+          } catch {}
+        });
+    } catch {}
+  }
   function _checkRuntime() {
     let alive = false;
     try { alive = !!chrome.runtime?.id; } catch { alive = false; }
@@ -32,6 +54,19 @@
       return;
     }
     if (_staleBanner && document.documentElement.contains(_staleBanner)) return;
+
+    // 1. Strip every LeadCaptura UI element from the page so the user
+    //    can't click a stale chip. This is the critical step — banner
+    //    alone wasn't enough; users kept clicking Save chips and saving
+    //    mutual-connection people because the chip handlers were already
+    //    bound to wrong profile data.
+    _killStaleUi();
+    // Re-strip every 200ms in case LinkedIn's React re-injects stale
+    // chips before the reload fires.
+    const stripper = setInterval(_killStaleUi, 200);
+
+    // 2. Show a non-dismissable full-width banner so the user knows
+    //    what's about to happen.
     _staleBanner = document.createElement("div");
     _staleBanner.id = "lc-stale-banner";
     _staleBanner.style.cssText = [
@@ -42,16 +77,31 @@
       "z-index:2147483647",
       "background:#dc2626",
       "color:white",
-      "padding:10px 16px",
-      "font:600 14px/1.4 -apple-system, system-ui, sans-serif",
+      "padding:14px 20px",
+      "font:600 15px/1.5 -apple-system, system-ui, sans-serif",
       "text-align:center",
-      "box-shadow:0 2px 8px rgba(0,0,0,0.2)",
+      "box-shadow:0 4px 16px rgba(0,0,0,0.3)",
     ].join(";");
     _staleBanner.textContent =
-      "LeadCaptura disconnected — please REFRESH this LinkedIn tab (Ctrl+Shift+R) to fix. The extension was reloaded and this tab is still on the old version.";
+      "LeadCaptura updated — refreshing this LinkedIn tab in 2 seconds to load the new version. Save chips are disabled until reload.";
     try {
       document.documentElement.appendChild(_staleBanner);
     } catch {}
+
+    // 3. Hard-reload the tab. Window-level reload still works even when
+    //    the extension context is gone — it's a window API, not a
+    //    chrome.* API.
+    if (!_staleReloadQueued) {
+      _staleReloadQueued = true;
+      setTimeout(() => {
+        clearInterval(stripper);
+        try {
+          location.reload();
+        } catch {
+          /* if reload is blocked we still removed the chips so no bad save */
+        }
+      }, 2000);
+    }
   }
   setInterval(_checkRuntime, 3000);
   // Also check right away in case the runtime was already dead at mount
