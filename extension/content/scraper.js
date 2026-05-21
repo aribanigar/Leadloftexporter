@@ -1073,22 +1073,27 @@
   function _isInsightLink(link) {
     try {
       if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
-      // Text-based fallback: if any ancestor span/div within 4 levels
-      // contains the exact phrase "mutual connection" or "People also
-      // viewed" / "People you may know", treat as insight.
+      // Text fallback: walk up looking for a SMALL ancestor that contains
+      // mutual-connection / people-also-viewed phrasing AND has NO card-
+      // level action button (Message / Connect / Pending / Follow). The
+      // mutuals strip is just text + tiny avatars; the outer search-result
+      // card always has an action button. This distinguishes "the link is
+      // INSIDE a mutuals strip" from "the link is the main profile link of
+      // a card that happens to display mutuals further down". Without
+      // this, mutual anchors like <a>Naoum Al-Rami</a> sail past because
+      // their own text is a real name.
       let n = link.parentElement;
       for (let i = 0; i < 6 && n; i++) {
-        const t = (n.textContent || "").slice(0, 400);
+        const t = (n.textContent || "").replace(/\s+/g, " ").slice(0, 400);
         if (
-          /mutual connection|people also viewed|people you may know|followed by/i.test(
+          /(?:\d+\s+)?(?:other\s+)?mutual connection|people also viewed|people you may know|followed by/i.test(
             t
           )
         ) {
-          // Only reject if the link itself isn't the card's title link.
-          // Title links typically carry the person's name as text (>= 3
-          // chars). Insight links wrap small avatars or short fragments.
-          const txt = (link.textContent || "").replace(/\s+/g, " ").trim();
-          if (!txt || txt.length < 3) return true;
+          const hasAction = n.querySelector(
+            "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i], button[aria-label*='Pending' i], button[aria-label*='Invited' i]"
+          );
+          if (!hasAction) return true;
         }
         n = n.parentElement;
       }

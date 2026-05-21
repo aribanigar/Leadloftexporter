@@ -847,16 +847,21 @@
   function _isInsightLink(link) {
     try {
       if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
+      // Mirror of scraper.js _isInsightLink. Distinguishes the mutuals
+      // strip (small text+avatar block, no action button) from the outer
+      // card (always has Message/Connect/Pending button).
       let n = link.parentElement;
       for (let i = 0; i < 6 && n; i++) {
-        const t = (n.textContent || "").slice(0, 400);
+        const t = (n.textContent || "").replace(/\s+/g, " ").slice(0, 400);
         if (
-          /mutual connection|people also viewed|people you may know|followed by/i.test(
+          /(?:\d+\s+)?(?:other\s+)?mutual connection|people also viewed|people you may know|followed by/i.test(
             t
           )
         ) {
-          const txt = (link.textContent || "").replace(/\s+/g, " ").trim();
-          if (!txt || txt.length < 3) return true;
+          const hasAction = n.querySelector(
+            "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i], button[aria-label*='Pending' i], button[aria-label*='Invited' i]"
+          );
+          if (!hasAction) return true;
         }
         n = n.parentElement;
       }
