@@ -718,6 +718,11 @@
       if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
       textSpan.textContent = "Saving…";
+      console.log(
+        "[LeadCaptura] chip clicked — saving:",
+        profile.full_name,
+        profile.linkedin_url
+      );
       try {
         // Step 1 — save the card data (name, title, company, location,
         // avatar, headline) immediately. The user gets a "Saved ✓" pill
@@ -847,24 +852,16 @@
   function _isInsightLink(link) {
     try {
       if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
-      // Mirror of scraper.js _isInsightLink. Distinguishes the mutuals
-      // strip (small text+avatar block, no action button) from the outer
-      // card (always has Message/Connect/Pending button).
-      let n = link.parentElement;
-      for (let i = 0; i < 6 && n; i++) {
-        const t = (n.textContent || "").replace(/\s+/g, " ").slice(0, 400);
-        if (
-          /(?:\d+\s+)?(?:other\s+)?mutual connection|people also viewed|people you may know|followed by/i.test(
-            t
-          )
-        ) {
-          const hasAction = n.querySelector(
-            "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i], button[aria-label*='Pending' i], button[aria-label*='Invited' i]"
-          );
-          if (!hasAction) return true;
-        }
-        n = n.parentElement;
-      }
+      // Mirror of scraper.js _isInsightLink. Only LinkedIn's two real
+      // card-link shapes pass: (a) title link with <span aria-hidden=
+      // "true">Name</span> child (LinkedIn's accessibility pattern), or
+      // (b) photo-only anchor with no text. Everything else is rejected
+      // — that includes every mutual-strip <a>Name</a>.
+      const hasAriaName = !!link.querySelector("span[aria-hidden='true']");
+      const isPhotoAnchor =
+        !!link.querySelector(":scope > img, :scope > div img, :scope > picture img") &&
+        !(link.textContent || "").trim();
+      if (!hasAriaName && !isPhotoAnchor) return true;
     } catch {
       /* defensive */
     }

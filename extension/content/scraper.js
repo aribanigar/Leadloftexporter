@@ -1073,30 +1073,18 @@
   function _isInsightLink(link) {
     try {
       if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
-      // Text fallback: walk up looking for a SMALL ancestor that contains
-      // mutual-connection / people-also-viewed phrasing AND has NO card-
-      // level action button (Message / Connect / Pending / Follow). The
-      // mutuals strip is just text + tiny avatars; the outer search-result
-      // card always has an action button. This distinguishes "the link is
-      // INSIDE a mutuals strip" from "the link is the main profile link of
-      // a card that happens to display mutuals further down". Without
-      // this, mutual anchors like <a>Naoum Al-Rami</a> sail past because
-      // their own text is a real name.
-      let n = link.parentElement;
-      for (let i = 0; i < 6 && n; i++) {
-        const t = (n.textContent || "").replace(/\s+/g, " ").slice(0, 400);
-        if (
-          /(?:\d+\s+)?(?:other\s+)?mutual connection|people also viewed|people you may know|followed by/i.test(
-            t
-          )
-        ) {
-          const hasAction = n.querySelector(
-            "button[aria-label*='Message' i], button[aria-label*='Connect' i], button[aria-label*='Follow' i], button[aria-label*='Pending' i], button[aria-label*='Invited' i]"
-          );
-          if (!hasAction) return true;
-        }
-        n = n.parentElement;
-      }
+      // PRIMARY signal — LinkedIn's accessibility pattern for profile
+      // TITLE links: <a><span aria-hidden="true">Name</span><span
+      // class="visually-hidden">View Name's profile</span></a>. This
+      // wrapper exists for screen readers and LinkedIn ships it on every
+      // real card title link. Mutual-strip text anchors are plain
+      // <a>Name</a> without it. Also accept the profile-PHOTO anchor
+      // (image-only with no text — has a direct <img> descendant).
+      const hasAriaName = !!link.querySelector("span[aria-hidden='true']");
+      const isPhotoAnchor =
+        !!link.querySelector(":scope > img, :scope > div img, :scope > picture img") &&
+        !(link.textContent || "").trim();
+      if (!hasAriaName && !isPhotoAnchor) return true;
     } catch {
       /* defensive */
     }
