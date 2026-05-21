@@ -828,15 +828,15 @@
   // bulk-save scraper AND the per-card chip injector must reject the same
   // set of links or the two paths disagree and mutual-connection chips
   // start re-appearing on insight rows.
+  // Selectors here must be NARROW — anything matching the outer search
+  // container would reject every link including main profile links,
+  // giving "No profiles found".
   const _INSIGHT_ANCESTOR_SEL = [
     ".reusable-search-simple-insight",
     ".reusable-search__simple-insight",
     ".entity-result__simple-insight",
     ".entity-result__insights",
     ".discover-entity-type-card",
-    ".search-results__cluster",
-    ".search-result__social-actions",
-    ".search-marvel-srp",
     ".pv-browsemap-section",
     ".pv-recent-activity-section",
     "[data-test-people-also-viewed]",

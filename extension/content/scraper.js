@@ -1053,25 +1053,21 @@
   // Belt-and-suspenders defence against mutual-connection leak: any /in/
   // link inside a known "insight" / "mutual" / "people-also-viewed" /
   // "follow recommendations" container is REJECTED before card-owner
-  // dedup even runs. LinkedIn frequently nests these inside the outer
-  // search-result <li>, and depending on DOM-order quirks an insight
-  // link can otherwise out-race the main profile link to claim the
-  // card. Selector list covers reusable-search, voyager, and Sales Nav.
+  // dedup even runs. Selectors here must be NARROW — anything matching
+  // the outer search container (.search-results__cluster, .search-marvel-srp,
+  // section.artdeco-card.pv-profile-card) would reject every link on the
+  // page including main profile links, giving "No profiles found".
   const _INSIGHT_ANCESTOR_SEL = [
     ".reusable-search-simple-insight",
     ".reusable-search__simple-insight",
     ".entity-result__simple-insight",
     ".entity-result__insights",
     ".discover-entity-type-card",
-    ".search-results__cluster",
-    ".search-result__social-actions",
-    ".search-marvel-srp",
     ".pv-browsemap-section",
     ".pv-recent-activity-section",
     "[data-test-people-also-viewed]",
     "[data-view-name='profile-card-mutual-connections']",
     "[data-view-name='profile-card-browsemap']",
-    "section.artdeco-card.pv-profile-card",
   ].join(",");
 
   function _isInsightLink(link) {
