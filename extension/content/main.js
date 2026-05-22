@@ -320,7 +320,7 @@
       try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
       setTimeout(() => { try { window.close(); } catch {} }, 250);
     };
-    const safetyTimer = setTimeout(closeSelf, 12_000);
+    const safetyTimer = setTimeout(closeSelf, 18_000);
     let redirected = false;
 
     try {

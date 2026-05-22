@@ -274,11 +274,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           chrome.tabs.onRemoved.addListener(onRemoved);
           const safetyTimer = setTimeout(() => {
             // If the tab is still open, force-close it so we don't pile up.
-            // 15s ceiling keeps the bulk loop moving — a single stuck profile
-            // can't burn 90s of the user's run.
+            // 22s ceiling: enough headroom for the worst-case pipeline
+            // (8s h1 + 1s read + 8.5s contact-info polling + 4s margin) so
+            // genuinely slow profiles don't report "Timed out", but short
+            // enough that a single stuck profile can't stall the bulk run.
             try { chrome.tabs.remove(tabId); } catch {}
             finish({ timedOut: true });
-          }, 15_000);
+          }, 22_000);
         });
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });
