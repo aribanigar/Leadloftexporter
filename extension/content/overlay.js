@@ -36,6 +36,8 @@
     lastSavedLeadIds: [],
     statusTimer: null,
     me: null,
+    bulkActive: false,
+    bulkCancel: false,
   };
 
   function el(tag, attrs = {}, ...children) {
@@ -637,11 +639,23 @@
         ),
         el("span", { class: "lc-flex" }),
         el("div", { class: "lc-status-slot" }),
-        el(
-          "button",
-          { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
-          "Save All Leads"
-        ),
+        state.bulkActive
+          ? el(
+              "button",
+              {
+                class: "lc-btn lc-btn-primary",
+                onclick: () => {
+                  state.bulkCancel = true;
+                  flashStatus("Stopping after current profile…");
+                },
+              },
+              "Stop"
+            )
+          : el(
+              "button",
+              { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
+              "Save All Leads"
+            ),
         el(
           "button",
           {
@@ -747,73 +761,80 @@
       return;
     }
 
+    // Step 2: SEQUENTIAL background-tab enrichment. For each profile we open
+    // /in/<handle>/?lc_enrich=1 in a hidden tab; the content script there runs
+    // maybeRunEnrichmentTrigger() which scrapes Contact info (email + phone +
+    // location + website) and self-closes via lc:closeMe. The service worker
+    // resolves our message ONLY when the tab actually closes — so the next
+    // iteration of this loop can't start until the previous profile is fully
+    // done. Result: one tab open at a time, human-paced, never bursts.
+    state.bulkActive = true;
+    state.bulkCancel = false;
+    renderToolbar();
     let enriched = 0;
     let rateLimited = false;
+    let cancelled = false;
     for (let i = 0; i < enrichable.length; i++) {
+      if (state.bulkCancel) {
+        cancelled = true;
+        break;
+      }
       const profile = enrichable[i];
       flashStatus(
         `Enriching ${i + 1} of ${enrichable.length}: ${profile.full_name || ""}…`
       );
 
-      // Reserve a rate-limit slot with the service worker
-      const allowed = await new Promise((resolve) => {
+      const resp = await new Promise((resolve) => {
         try {
           chrome.runtime.sendMessage(
-            { type: "lc:reserveEnrich" },
-            (resp) => {
-              if (chrome.runtime.lastError) return resolve(false);
-              resolve(resp?.ok === true);
+            {
+              type: "lc:openProfileTab",
+              url: profile.linkedin_url,
+              active: false,        // background tab — silent automation
+              awaitClose: true,     // resolve only when the tab self-closes
+              enrichFlag: true,     // adds ?lc_enrich=1 → triggers enrichment
+            },
+            (r) => {
+              if (chrome.runtime.lastError) {
+                return resolve({ ok: false, error: chrome.runtime.lastError.message });
+              }
+              resolve(r || { ok: false });
             }
           );
-        } catch {
-          resolve(false);
+        } catch (e) {
+          resolve({ ok: false, error: String(e) });
         }
       });
-      if (!allowed) {
+
+      if (!resp.ok && resp.error === "safe_zone_limit_reached") {
         rateLimited = true;
         break;
       }
+      if (resp.ok && !resp.timedOut) enriched++;
 
-      try {
-        const contact = await Scraper.scrapeContactInfoViaIframe(
-          profile.linkedin_url
-        );
-        if (
-          contact &&
-          (contact.email || contact.phone || contact.address || contact.website)
-        ) {
-          const merged = { ...profile };
-          if (contact.email) merged.email = contact.email;
-          if (contact.phone) merged.phone = contact.phone;
-          if (contact.address)
-            merged.location = contact.address.slice(0, 200);
-          if (contact.website) merged.company_url = contact.website;
-          merged.raw = { ...(merged.raw || {}), contact_info_scraped: true };
-          try {
-            await Api.syncProfile(merged);
-            enriched++;
-          } catch {
-            /* per-lead save failures shouldn't abort the batch */
-          }
-        }
-      } catch {
-        /* enrichment is best-effort */
-      }
-
-      // Human-paced delay between enrichments (2–5s, with 15% chance of
-      // a 6–12s "distracted user" pause) so we don't open 25 iframes in
-      // rapid succession — same UX as a person clicking save on each card.
-      if (i < enrichable.length - 1) {
-        const base = 2000 + Math.random() * 3000;
+      // Human-paced gap between sequential profile opens. 5–12s base with a
+      // 15% chance of a 12–25s "distracted user" pause. The previous tab has
+      // already closed by now (we awaited the close above), so this is purely
+      // breathing room before launching the next /in/ tab — mimics a real
+      // person reviewing one profile, then moving on.
+      if (i < enrichable.length - 1 && !state.bulkCancel) {
+        const base = 5000 + Math.random() * 7000;
         const longTail =
-          Math.random() < 0.15 ? 6000 + Math.random() * 6000 : 0;
+          Math.random() < 0.15 ? 12000 + Math.random() * 13000 : 0;
         await new Promise((r) => setTimeout(r, base + longTail));
       }
     }
+    state.bulkActive = false;
+    renderToolbar();
 
-    const summary = rateLimited
-      ? `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched (daily limit hit)`
-      : `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+    let summary;
+    if (cancelled) {
+      summary = `Stopped: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+    } else if (rateLimited) {
+      summary = `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched (daily limit hit)`;
+    } else {
+      summary = `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+    }
     flashStatus(summary, rateLimited ? "warn" : "ok");
     decorateSearchCards();
   }
@@ -872,98 +893,72 @@
       e.stopPropagation();
       if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
-      textSpan.textContent = "Saving…";
+      textSpan.textContent = "Opening…";
       console.log(
-        "[LeadCaptura] chip clicked — saving:",
+        "[LeadCaptura] chip clicked — opening profile:",
         profile.full_name,
         profile.linkedin_url
       );
       try {
-        // Step 1 — save the card data (name, title, company, location,
-        // avatar, headline) immediately. The user gets a "Saved ✓" pill
-        // even if the iframe enrichment below times out or yields nothing.
-        const result = await Api.syncProfile(profile);
-        if (result.lead?.id) {
-          state.lastSavedLeadIds = [result.lead.id];
-          maybeAutoEnroll();
-        }
-        btn.dataset.state = "saved";
-        textSpan.textContent = "Saved ✓";
+        // Step 1 — fire-and-forget save the card data so a row exists in
+        // the pipeline immediately, even if the user closes the profile
+        // tab before enrichment completes. syncProfile is idempotent
+        // (deduped by linkedin_url) so the profile page's auto-save will
+        // just update the same row with email/phone/location.
+        Api.syncProfile(profile)
+          .then((result) => {
+            if (result?.lead?.id) {
+              state.lastSavedLeadIds = [result.lead.id];
+              maybeAutoEnroll();
+            }
+          })
+          .catch((e) =>
+            console.warn("[LeadCaptura] base card save failed", e?.message)
+          );
 
-        // Step 2 — enrich email / phone / company website via a HIDDEN
-        // IFRAME. No new tab, no popup, no visual artefact: we mount an
-        // off-screen iframe at /in/<handle>/overlay/contact-info/ which is
-        // same-origin, so we can read its DOM and pull mailto:/tel:
-        // anchors directly. Only /in/ URLs are eligible — /sales/lead/
-        // pages don't render the Contact info modal, and bouncing them
-        // would create the duplicate-blank-lead problem.
-        const settings = await Storage.getSettings();
-        if (
-          settings.autoEnrichOnSave === false ||
-          !profile.linkedin_url?.includes("/in/")
-        ) {
+        // Step 2 — open the LinkedIn profile in a FOREGROUND tab. The
+        // profile page's triggerAutoSave() (in overlay.js) auto-opens
+        // Contact info, scrapes email + phone + location, and updates
+        // the same lead row. No iframe, no ?lc_enrich flag — the tab
+        // stays open so the user can see what happened.
+        if (!profile.linkedin_url?.includes("/in/")) {
+          btn.dataset.state = "saved";
+          textSpan.textContent = "Saved ✓";
           return;
         }
-
-        // Rate-limit handshake with the service worker. The SW holds the
-        // 20/hr + 100/day budget shared across all open LinkedIn tabs.
-        const allowed = await new Promise((resolve) => {
+        await new Promise((resolve) => {
           try {
             chrome.runtime.sendMessage(
-              { type: "lc:reserveEnrich" },
+              {
+                type: "lc:openProfileTab",
+                url: profile.linkedin_url,
+                active: true,
+                awaitClose: false,
+                enrichFlag: false,
+              },
               (resp) => {
-                if (chrome.runtime.lastError) return resolve(false);
-                resolve(resp?.ok === true);
+                if (chrome.runtime.lastError || !resp?.ok) {
+                  console.warn(
+                    "[LeadCaptura] openProfileTab failed",
+                    chrome.runtime.lastError?.message || resp?.error
+                  );
+                }
+                resolve();
               }
             );
-          } catch {
-            resolve(false);
+          } catch (err) {
+            console.warn("[LeadCaptura] openProfileTab threw", err?.message);
+            resolve();
           }
         });
-        if (!allowed) {
-          textSpan.textContent = "Saved (daily limit)";
-          return;
-        }
-
-        textSpan.textContent = "Saved · enriching…";
-        const contact = await Scraper.scrapeContactInfoViaIframe(
-          profile.linkedin_url
-        );
-        if (contact.email || contact.phone || contact.website || contact.address) {
-          const enriched = { ...profile };
-          if (contact.email) enriched.email = contact.email;
-          if (contact.phone) enriched.phone = contact.phone;
-          if (contact.website) enriched.company_url = contact.website;
-          if (contact.address) enriched.location = contact.address.slice(0, 200);
-          enriched.raw = {
-            ...(enriched.raw || {}),
-            contact_info_scraped: true,
-          };
-          try {
-            await Api.syncProfile(enriched);
-            const got = [
-              contact.email && "email",
-              contact.phone && "phone",
-              contact.address && "address",
-              contact.website && "site",
-            ]
-              .filter(Boolean)
-              .join(" + ");
-            textSpan.textContent = got ? `Saved ✓ (${got})` : "Saved ✓";
-          } catch {
-            textSpan.textContent = "Saved ✓";
-          }
-        } else {
-          textSpan.textContent = "Saved ✓";
-        }
+        btn.dataset.state = "saved";
+        textSpan.textContent = "Opened ✓";
       } catch (err) {
         btn.dataset.state = "error";
-        // Show the decorated error in the chip text AND keep it visible
-        // until the user clicks again — never silently fail.
         const msg = err?.message || String(err);
         textSpan.textContent = msg.length > 40 ? "Failed — see console" : `Failed: ${msg}`;
         btn.title = msg;
-        console.error("[LeadCaptura] inline save failed", err);
+        console.error("[LeadCaptura] per-card open failed", err);
       }
     });
 

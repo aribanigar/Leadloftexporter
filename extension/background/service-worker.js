@@ -209,6 +209,82 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+  // Open a LinkedIn profile in a tab and (optionally) wait for it to close.
+  // Used by the per-card Save chip (foreground, fire-and-forget) and by the
+  // "Save All Leads" bulk loop (background, awaits each tab's close so the
+  // next profile only opens AFTER the current one finished enriching).
+  //
+  // Options:
+  //   url           — required, the LinkedIn /in/ URL
+  //   active        — true: foreground tab (user clicked one card)
+  //                   false: background tab (silent bulk sequencer)
+  //   awaitClose    — if true, sendResponse fires when the tab is removed
+  //                   (the enrichment-trigger calls lc:closeMe on success)
+  //   enrichFlag    — if true, append ?lc_enrich=1 so the content script
+  //                   runs maybeRunEnrichmentTrigger() and self-closes
+  if (msg?.type === "lc:openProfileTab") {
+    const target = String(msg.url || "");
+    if (!target) {
+      sendResponse({ ok: false, error: "url_required" });
+      return true;
+    }
+    const active = msg.active !== false;
+    const awaitClose = !!msg.awaitClose;
+    const includeEnrichFlag = !!msg.enrichFlag;
+    (async () => {
+      try {
+        const allowed = await canEnrich();
+        if (!allowed) {
+          sendResponse({ ok: false, error: "safe_zone_limit_reached" });
+          return;
+        }
+        reserveEnrich();
+        // Small jittered open delay so 50 cards can't all spawn tabs in the
+        // exact same millisecond — looks human-paced even when the user
+        // clicks rapidly.
+        await sleep(jitter(400, 1800));
+        let openUrl = target;
+        if (includeEnrichFlag) {
+          try {
+            const u = new URL(target);
+            u.searchParams.set("lc_enrich", "1");
+            openUrl = u.toString();
+          } catch {
+            openUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
+          }
+        }
+        chrome.tabs.create({ url: openUrl, active }, (tab) => {
+          const tabId = tab?.id;
+          if (!awaitClose) {
+            sendResponse({ ok: true, tabId });
+            return;
+          }
+          // Resolve when the tab closes (signals enrichment completed) OR
+          // when the safety timeout fires (90s — generous for slow profiles).
+          let resolved = false;
+          const finish = (extra = {}) => {
+            if (resolved) return;
+            resolved = true;
+            chrome.tabs.onRemoved.removeListener(onRemoved);
+            clearTimeout(safetyTimer);
+            sendResponse({ ok: true, tabId, ...extra });
+          };
+          const onRemoved = (closedId) => {
+            if (closedId === tabId) finish();
+          };
+          chrome.tabs.onRemoved.addListener(onRemoved);
+          const safetyTimer = setTimeout(() => {
+            // If the tab is still open, force-close it so we don't pile up.
+            try { chrome.tabs.remove(tabId); } catch {}
+            finish({ timedOut: true });
+          }, 90_000);
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
   // The enrichment-trigger content script asks us to close its own tab.
   if (msg?.type === "lc:closeMe") {
     const tabId = _sender?.tab?.id;
