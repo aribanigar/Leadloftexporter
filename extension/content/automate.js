@@ -69,19 +69,19 @@
       // Try the "More" menu and click the Connect item.
       const more = first(document, ["main button[aria-label*='More actions' i]", "button[aria-label*='More' i]"]);
       if (more) {
-        dispatchHumanClick(more);
+        await dispatchHumanClick(more);
         await sleep(800);
         btn = await waitFor(["div[role='menu'] [aria-label*='Connect' i]", "div.artdeco-dropdown__content [aria-label*='Connect' i]"], { timeout: 3000 });
       }
     }
     if (!btn) return { status: "failed", error: "connect_button_not_found" };
-    dispatchHumanClick(btn);
+    await dispatchHumanClick(btn);
 
     // Optionally add a note.
     if (note) {
       const addNote = await waitFor(["button[aria-label*='Add a note' i]", "button[aria-label*='add a free note' i]"], { timeout: 3000 });
       if (addNote) {
-        dispatchHumanClick(addNote);
+        await dispatchHumanClick(addNote);
         const noteInput = await waitFor(["textarea[name='message']", "textarea#custom-message"], { timeout: 2000 });
         if (noteInput) {
           await typeIntoEditable(noteInput, note);
@@ -91,7 +91,7 @@
     }
     const send = await waitFor(["button[aria-label*='Send' i]", "button[aria-label*='Send invitation' i]"], { timeout: 3000 });
     if (!send) return { status: "failed", error: "send_button_not_found" };
-    dispatchHumanClick(send);
+    await dispatchHumanClick(send);
     await sleep(1200);
     return { status: "done", result: { url, with_note: !!note } };
   }
@@ -112,7 +112,7 @@
       "main button.message-anywhere-button",
     ]);
     if (!msgBtn) return { status: "failed", error: "message_button_not_found" };
-    dispatchHumanClick(msgBtn);
+    await dispatchHumanClick(msgBtn);
 
     const editor = await waitFor(
       [
@@ -131,7 +131,7 @@
       "button[aria-label*='Send' i]",
     ]);
     if (!send || send.disabled) return { status: "failed", error: "send_disabled" };
-    dispatchHumanClick(send);
+    await dispatchHumanClick(send);
     await sleep(1200);
     return { status: "done", result: { url } };
   }

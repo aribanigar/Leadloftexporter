@@ -71,8 +71,23 @@
     }
   }
 
-  function dispatchHumanClick(el) {
+  // Move cursor to the element along a realistic curved path, then click.
+  // Async so callers can await the full sequence (cursor travel + dwell + click).
+  // Callers that don't await still get the click — it just fires asynchronously
+  // after the cursor movement completes, which is fine because downstream
+  // waitFor() calls have generous timeouts.
+  async function dispatchHumanClick(el) {
     if (!el) return false;
+    // Simulate cursor moving toward the element before pressing. Bot-detection
+    // systems (PerimeterX, HUMAN, Cloudflare) track whether mousemove events
+    // lead up to each click — without this the cursor "teleports" to each
+    // button, which is a strong automation signal.
+    if (globalThis.__lcHuman?.simulateCursorMove) {
+      await globalThis.__lcHuman.simulateCursorMove(el);
+    }
+    // Dwell pause: real users pause briefly after hovering before pressing.
+    // 60–160 ms matches typical human reaction-time variance.
+    await new Promise((r) => setTimeout(r, 60 + Math.random() * 100));
     const rect = el.getBoundingClientRect();
     const x = rect.left + rect.width / 2 + (Math.random() - 0.5) * Math.min(8, rect.width / 4);
     const y = rect.top + rect.height / 2 + (Math.random() - 0.5) * Math.min(8, rect.height / 4);

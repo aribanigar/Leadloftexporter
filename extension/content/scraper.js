@@ -874,8 +874,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 8100,
-    settleMs = 1350,
+    timeoutMs = 7200,
+    settleMs = 1200,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -903,7 +903,7 @@
           try { link.focus?.(); } catch {}
           await _sleep(120);
           try {
-            if (dispatchHumanClick) dispatchHumanClick(link);
+            if (dispatchHumanClick) await dispatchHumanClick(link);
             else link.click();
           } catch {
             try { link.click(); } catch {}
@@ -971,7 +971,7 @@
     // 6s total wait so the user doesn't sit on a hung Save button.
     for (let attempt = 0; attempt < 3; attempt++) {
       if (data.email && data.phone && data.address) break;
-      await _sleep(1350);
+      await _sleep(1200);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes

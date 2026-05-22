@@ -166,7 +166,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // The persist to chrome.storage is fire-and-forget inside reserve.
         reserveEnrich();
         // Jittered delay before opening to avoid time-pattern detection
-        await sleep(jitter(720, 3600));
+        await sleep(jitter(640, 3200));
         // Navigate to the plain profile URL (NOT the /overlay/contact-info
         // sub-path) so the about/experience sections render normally — that
         // way the content script can both click Contact info AND scan the
@@ -241,8 +241,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         reserveEnrich();
         // Small jittered open delay so 50 cards can't all spawn tabs in the
         // exact same millisecond — looks human-paced even when the user
-        // clicks rapidly. (v1.0.20 trimmed 10% off the previous 400–1800ms.)
-        await sleep(jitter(360, 1620));
+        // clicks rapidly. (v1.0.21: 20% faster than v1.0.19 baseline of 400–1800ms.)
+        await sleep(jitter(320, 1440));
         let openUrl = target;
         if (includeEnrichFlag) {
           try {

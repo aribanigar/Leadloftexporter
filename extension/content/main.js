@@ -361,15 +361,14 @@
 
       // Human-paced reading pause AFTER hydration — looks like a real person
       // landed on the profile, read for a moment, then clicked Contact info.
-      // v1.0.20 trimmed 10% off the original 2.5–6s / 2.5–10s windows for
-      // the speed bump.
-      const base = Human.rand(2250, 5400);
-      const longTail = Math.random() < 0.12 ? Human.rand(2250, 9000) : 0;
+      // v1.0.21: 20% faster than v1.0.19 baseline (2.0–4.8s / 2.0–8.0s).
+      const base = Human.rand(2000, 4800);
+      const longTail = Math.random() < 0.12 ? Human.rand(2000, 8000) : 0;
       await Human.sleep(base + longTail);
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 1800,
+        settleMs: 1600,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
@@ -393,7 +392,7 @@
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
-      await Human.sleep(Human.rand(300, 800));
+      await Human.sleep(Human.rand(240, 640));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {

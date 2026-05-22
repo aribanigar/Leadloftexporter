@@ -354,8 +354,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 8100,
-          settleMs: 1620,
+          timeoutMs: 7200,
+          settleMs: 1440,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -521,11 +521,11 @@
       const opts = await ensureOptions();
       if (!opts) return; // Not connected to workspace
 
-      // Human-paced delay: wait 2.7–7.2s for LinkedIn's React to fully
-      // hydrate the profile page. 15% chance of a longer 4.5–12.6s "reading"
-      // pause. (v1.0.20 trimmed 10% off the previous 3–8s / 5–14s window.)
-      const base = 2700 + Math.floor(Math.random() * 4500);
-      const bonus = Math.random() < 0.15 ? 4500 + Math.floor(Math.random() * 8100) : 0;
+      // Human-paced delay: wait 2.4–6.4s for LinkedIn's React to fully
+      // hydrate the profile page. 15% chance of a longer 4.0–11.2s "reading"
+      // pause. (v1.0.21 trimmed 20% off the v1.0.19 baseline of 3–8s / 5–14s.)
+      const base = 2400 + Math.floor(Math.random() * 4000);
+      const bonus = Math.random() < 0.15 ? 4000 + Math.floor(Math.random() * 7200) : 0;
       await new Promise((r) => setTimeout(r, base + bonus));
 
       // Re-scrape after the hydration delay so we get the fully-rendered name,
@@ -879,13 +879,13 @@
       }
       if (resp.ok && !resp.timedOut) enriched++;
 
-      // Human-paced gap between sequential opens. v1.0.20 shaved 10% off
-      // every delay for the speed bump the user asked for: 4.5–10.8s base
-      // with a 15% chance of a 10.8–22.5s "distracted user" pause.
+      // Human-paced gap between sequential opens. v1.0.21 trims to 20% faster
+      // than the v1.0.19 baseline: 4.0–9.6s base with a 15% chance of a
+      // 9.6–20.0s "distracted user" pause.
       if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const base = 4500 + Math.random() * 6300;
+        const base = 4000 + Math.random() * 5600;
         const longTail =
-          Math.random() < 0.15 ? 10800 + Math.random() * 11700 : 0;
+          Math.random() < 0.15 ? 9600 + Math.random() * 10400 : 0;
         await new Promise((r) => setTimeout(r, base + longTail));
       }
     }
