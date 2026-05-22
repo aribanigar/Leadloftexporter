@@ -166,7 +166,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // The persist to chrome.storage is fire-and-forget inside reserve.
         reserveEnrich();
         // Jittered delay before opening to avoid time-pattern detection
-        await sleep(jitter(450, 2240));
+        await sleep(jitter(100, 400));
         // Navigate to the plain profile URL (NOT the /overlay/contact-info
         // sub-path) so the about/experience sections render normally — that
         // way the content script can both click Contact info AND scan the
@@ -240,9 +240,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         reserveEnrich();
         // Small jittered open delay so 50 cards can't all spawn tabs in the
-        // exact same millisecond — looks human-paced even when the user
-        // clicks rapidly. (v1.0.22: another 30% off → 220–1010ms.)
-        await sleep(jitter(220, 1010));
+        // exact same millisecond. v1.0.23 aggressive cut → 80–300ms.
+        await sleep(jitter(80, 300));
         let openUrl = target;
         if (includeEnrichFlag) {
           try {
@@ -275,9 +274,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           chrome.tabs.onRemoved.addListener(onRemoved);
           const safetyTimer = setTimeout(() => {
             // If the tab is still open, force-close it so we don't pile up.
+            // 15s ceiling keeps the bulk loop moving — a single stuck profile
+            // can't burn 90s of the user's run.
             try { chrome.tabs.remove(tabId); } catch {}
             finish({ timedOut: true });
-          }, 90_000);
+          }, 15_000);
         });
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });

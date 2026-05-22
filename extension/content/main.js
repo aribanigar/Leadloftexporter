@@ -320,7 +320,7 @@
       try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
       setTimeout(() => { try { window.close(); } catch {} }, 250);
     };
-    const safetyTimer = setTimeout(closeSelf, 75_000);
+    const safetyTimer = setTimeout(closeSelf, 12_000);
     let redirected = false;
 
     try {
@@ -353,24 +353,19 @@
 
       if (!location.pathname.startsWith("/in/")) return;
 
-      // Wait for the profile to actually hydrate before doing anything. The
-      // <h1> is the most reliable "profile is ready" signal. Background tabs
-      // are throttled by Chrome — LinkedIn's React often needs 5–15s to
-      // render the h1, much longer than a foreground tab. Without this gate,
-      // scrapeContactInfo runs against an empty page, the pushState fallback
-      // fires on a half-rendered DOM, and the tab looks blank.
-      await globalThis.__lcDom.waitFor(["main h1", "h1"], { timeout: 20000 });
+      // Wait for the profile to hydrate. Cut the ceiling so a profile that
+      // refuses to render doesn't burn ~20s of bulk-run time.
+      await globalThis.__lcDom.waitFor(["main h1", "h1"], { timeout: 8000 });
 
-      // Human-paced reading pause AFTER hydration — looks like a real person
-      // landed on the profile, read for a moment, then clicked Contact info.
-      // v1.0.22: another 30% off — 1.4–3.4s base, 1.4–5.6s long-tail.
-      const base = Human.rand(1400, 3360);
-      const longTail = Math.random() < 0.12 ? Human.rand(1400, 5600) : 0;
+      // v1.0.23 aggressive cut: 0.3–0.9s base, 8% chance of 0.6–1.5s
+      // long-tail. Target avg per-tab time ≤5s end-to-end.
+      const base = Human.rand(300, 900);
+      const longTail = Math.random() < 0.08 ? Human.rand(600, 1500) : 0;
       await Human.sleep(base + longTail);
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 1120,
+        settleMs: 400,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
@@ -394,7 +389,7 @@
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
-      await Human.sleep(Human.rand(170, 450));
+      await Human.sleep(Human.rand(80, 200));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {

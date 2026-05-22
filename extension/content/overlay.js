@@ -354,8 +354,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 5040,
-          settleMs: 1008,
+          timeoutMs: 3000,
+          settleMs: 400,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -521,12 +521,10 @@
       const opts = await ensureOptions();
       if (!opts) return; // Not connected to workspace
 
-      // Human-paced delay: wait 1.7–4.5s for LinkedIn's React to fully
-      // hydrate the profile page. 15% chance of a longer 2.8–7.8s "reading"
-      // pause. (v1.0.22 trimmed another 30% for the speed bump the user
-      // asked for; ~44% faster than the v1.0.19 baseline of 3–8s / 5–14s.)
-      const base = 1680 + Math.floor(Math.random() * 2800);
-      const bonus = Math.random() < 0.15 ? 2800 + Math.floor(Math.random() * 5040) : 0;
+      // v1.0.23 aggressive cut: 0.4–1.2s base, 8% chance of 0.8–2.0s
+      // long-tail. Target avg per-profile time ≤5s end-to-end.
+      const base = 400 + Math.floor(Math.random() * 800);
+      const bonus = Math.random() < 0.08 ? 800 + Math.floor(Math.random() * 1200) : 0;
       await new Promise((r) => setTimeout(r, base + bonus));
 
       // Re-scrape after the hydration delay so we get the fully-rendered name,
@@ -880,7 +878,7 @@
     // next iteration can't start until the previous profile is fully done.
     state.bulkActive = true;
     state.bulkCancel = false;
-    state.bulkProgress = { current: 0, total: enrichable.length, name: "" };
+    state.bulkProgress = { current: 0, total: enrichable.length, name: "", url: "" };
     // Hide the top Select-All pill during a run — it can't be used while
     // enrichment is in progress and would just clutter the screen.
     unmountSelectAllHeader();
@@ -894,15 +892,17 @@
         break;
       }
       const profile = enrichable[i];
-      // Card-level name is just a label for the progress display — never
-      // persisted. If it picked up a mutual-connection name, that's a
-      // cosmetic issue in the status row, not a data-integrity bug.
       const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
       state.bulkProgress = {
         current: i + 1,
         total: enrichable.length,
         name: label,
+        url: profile.linkedin_url,
       };
+      // Drive the per-card chip into "Enriching…" state so the user sees
+      // live progress on the exact card being processed — no more guessing
+      // which lead the toolbar status refers to.
+      _setChipState(profile.linkedin_url, "saving", "Enriching…");
       renderToolbar();
 
       const resp = await new Promise((resolve) => {
@@ -928,18 +928,23 @@
       });
 
       if (!resp.ok && resp.error === "safe_zone_limit_reached") {
+        _setChipState(profile.linkedin_url, "error", "Rate limited");
         rateLimited = true;
         break;
       }
-      if (resp.ok && !resp.timedOut) enriched++;
+      if (resp.ok && !resp.timedOut) {
+        _setChipState(profile.linkedin_url, "saved", "Saved ✓");
+        enriched++;
+      } else {
+        _setChipState(profile.linkedin_url, "error", resp.timedOut ? "Timed out" : "Failed");
+      }
 
-      // Human-paced gap between sequential opens. v1.0.22 cuts another 30%:
-      // 2.8–6.7s base with a 15% chance of a 6.7–14.0s "distracted user"
-      // pause. Cumulative ~44% faster than the v1.0.19 baseline.
+      // Aggressive gap: 0.6–1.5s base with 8% chance of 1.5–3.0s pause.
+      // Target end-to-end ≤5s/profile including the tab work itself.
       if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const base = 2800 + Math.random() * 3920;
+        const base = 600 + Math.random() * 900;
         const longTail =
-          Math.random() < 0.15 ? 6720 + Math.random() * 7280 : 0;
+          Math.random() < 0.08 ? 1500 + Math.random() * 1500 : 0;
         await new Promise((r) => setTimeout(r, base + longTail));
       }
     }
@@ -974,6 +979,20 @@
     for (const [url, node] of injectedSaves.entries()) {
       if (!node || !document.body.contains(node)) injectedSaves.delete(url);
     }
+  }
+
+  // Drive a per-card chip into a specific state from external code (the
+  // bulk Save loop). Looks the chip up by URL in the global registry; if
+  // the card has scrolled out of view and the chip is gone, this is a
+  // no-op (no error).
+  function _setChipState(url, lcState, text) {
+    if (!url) return;
+    const wrap = injectedSaves.get(url);
+    if (!wrap || !document.body.contains(wrap)) return;
+    const btn = wrap.querySelector(".lc-inline-save");
+    const span = wrap.querySelector(".lc-inline-save-text");
+    if (btn) btn.dataset.state = lcState;
+    if (span) span.textContent = text;
   }
 
   function injectInlineSave(card, profile) {
@@ -1138,6 +1157,63 @@
       /* defensive */
     }
     return false;
+  }
+
+  // Text-pattern fallback for mutual-connection rows when LinkedIn rotates
+  // class names. Mirrors scraper.js _isMutualConnectionContext — keep in
+  // lock-step or the two paths disagree.
+  function _isMutualConnectionContext(link) {
+    try {
+      let node = link.parentElement;
+      for (let i = 0; i < 4 && node; i++) {
+        const txt = (node.textContent || "").toLowerCase();
+        if (txt.length < 240) {
+          if (/mutual connection|shared connection|people also (view|follow)|\band\s+\d+\s+other\b/.test(txt)) {
+            return true;
+          }
+        }
+        node = node.parentElement;
+      }
+    } catch {
+      /* defensive */
+    }
+    return false;
+  }
+
+  function _imgArea(img) {
+    try {
+      const r = img.getBoundingClientRect();
+      return Math.max(0, r.width) * Math.max(0, r.height);
+    } catch {
+      return 0;
+    }
+  }
+
+  // Mirror of scraper.js _findAvatarLink — keep in lock-step.
+  function _findAvatarLink(card) {
+    const imgs = Array.from(card.querySelectorAll("img"));
+    if (!imgs.length) return null;
+    let bestImg = null;
+    let bestArea = 0;
+    for (const img of imgs) {
+      const a = _imgArea(img);
+      if (a > bestArea) {
+        bestArea = a;
+        bestImg = img;
+      }
+    }
+    if (!bestImg || bestArea < 100) return null;
+    let node = bestImg.parentElement;
+    for (let i = 0; i < 6 && node; i++) {
+      if (
+        node.tagName === "A" &&
+        /\/in\//.test(node.getAttribute("href") || "")
+      ) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
   }
 
   // Tiebreaker for card-owner dedup: does this link use LinkedIn's
@@ -1393,7 +1469,7 @@
     // order within their containing card.
     const allLinks = Array.from(
       document.querySelectorAll("a[href*='/in/'], a[href*='/sales/lead/']")
-    ).filter((link) => !_isInsightLink(link));
+    ).filter((link) => !_isInsightLink(link) && !_isMutualConnectionContext(link));
     const cardOwner = new Map(); // card element -> { url, link }
     for (const link of allLinks) {
       const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
@@ -1421,6 +1497,20 @@
         continue;
       }
       cardOwner.set(card, { url, link });
+    }
+    // SECOND PASS — avatar-link override. The /in/ link wrapping the largest
+    // img in the card is the canonical owner. Catches the "Ellen Landes
+    // hijacks Zeina Gammoh's card" bug when LinkedIn rotates class names
+    // and a mutual-connection anchor with aria-hidden span sneaks in before
+    // the title link in DOM order.
+    for (const [card, current] of cardOwner.entries()) {
+      const avatarLink = _findAvatarLink(card);
+      if (!avatarLink) continue;
+      if (_isInsightLink(avatarLink) || _isMutualConnectionContext(avatarLink)) continue;
+      const avatarUrl = globalThis.__lcDom.normalizeProfileUrl(avatarLink.href);
+      if (avatarUrl && avatarUrl !== current.url) {
+        cardOwner.set(card, { url: avatarUrl, link: avatarLink });
+      }
     }
     // Surface as the same byUrl shape the rest of the function expects.
     const byUrl = new Map();

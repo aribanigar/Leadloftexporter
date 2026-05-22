@@ -874,8 +874,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 5040,
-    settleMs = 840,
+    timeoutMs = 3000,
+    settleMs = 400,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -971,7 +971,7 @@
     // 6s total wait so the user doesn't sit on a hung Save button.
     for (let attempt = 0; attempt < 3; attempt++) {
       if (data.email && data.phone && data.address) break;
-      await _sleep(840);
+      await _sleep(350);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes
@@ -1220,6 +1220,74 @@
     return false;
   }
 
+  // Text-pattern fallback for mutual-connection / social-proof rows when
+  // LinkedIn rotates class names. Walks 3 levels up from the link and rejects
+  // it if the ancestor text reads like a mutual-connection blurb.
+  // The patterns must NOT match the card-owner headline (e.g. "and 12 other
+  // mutual connections" appears under mutual rows but not card titles).
+  function _isMutualConnectionContext(link) {
+    try {
+      let node = link.parentElement;
+      for (let i = 0; i < 4 && node; i++) {
+        const txt = (node.textContent || "").toLowerCase();
+        // Constrain to short ancestor text so we don't reject the whole card
+        // for a single mutual-connection row inside it. The mutual row text
+        // is typically under 200 chars; the full card text is much longer.
+        if (txt.length < 240) {
+          if (/mutual connection|shared connection|people also (view|follow)|\band\s+\d+\s+other\b/.test(txt)) {
+            return true;
+          }
+        }
+        node = node.parentElement;
+      }
+    } catch {
+      /* defensive */
+    }
+    return false;
+  }
+
+  // Area of an <img>'s bounding rect — a rough proxy for "is this the card
+  // owner's avatar?". Mutual-connection avatars are tiny (24–32px) compared
+  // to the main avatar (56–80px).
+  function _imgArea(img) {
+    try {
+      const r = img.getBoundingClientRect();
+      return Math.max(0, r.width) * Math.max(0, r.height);
+    } catch {
+      return 0;
+    }
+  }
+
+  // Find the /in/ link that wraps the LARGEST visible <img> in a card. This
+  // is the card owner's avatar+title; mutual-connection rows stack many
+  // small avatars together, but the main avatar is always larger.
+  // Returns null if no image is wrapped in an /in/ link.
+  function _findAvatarLink(card) {
+    const imgs = Array.from(card.querySelectorAll("img"));
+    if (!imgs.length) return null;
+    let bestImg = null;
+    let bestArea = 0;
+    for (const img of imgs) {
+      const a = _imgArea(img);
+      if (a > bestArea) {
+        bestArea = a;
+        bestImg = img;
+      }
+    }
+    if (!bestImg || bestArea < 100) return null; // tiny img → ignore
+    let node = bestImg.parentElement;
+    for (let i = 0; i < 6 && node; i++) {
+      if (
+        node.tagName === "A" &&
+        /\/in\//.test(node.getAttribute("href") || "")
+      ) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
   // Does this link look like LinkedIn's accessible profile-title pattern
   // (<a><span aria-hidden="true">Name</span>…</a>)? Used as a TIEBREAKER
   // when multiple /in/ links resolve to the same card — mutual-strip
@@ -1362,13 +1430,14 @@
   }
 
   function scrapeSearchResults() {
-    // One profile per CARD using the FIRST /in/ link in DOM order as the
-    // owner. Mutual-connection / people-also-viewed links embedded in
-    // someone else's card NEVER appear first in their card's DOM, so
-    // they're naturally excluded without fragile text-matching heuristics.
+    // One profile per CARD. The card owner is determined by AVATAR PROXIMITY:
+    // the /in/ link wrapping the largest <img> in the card is the canonical
+    // profile, because mutual-connection rows always use a stack of tiny
+    // avatars while the card owner's photo is much larger. Falls back to
+    // first-link-in-DOM-order if no avatar wrapper can be identified.
     const allLinks = Array.from(
       document.querySelectorAll("a[href*='/in/']")
-    ).filter((link) => !_isInsightLink(link));
+    ).filter((link) => !_isInsightLink(link) && !_isMutualConnectionContext(link));
     const cardOwner = new Map(); // card → { url, link }
     for (const link of allLinks) {
       try {
@@ -1396,6 +1465,21 @@
         cardOwner.set(card, { url, link });
       } catch {
         /* skip malformed */
+      }
+    }
+    // SECOND PASS — avatar-link override. If a card's largest image is
+    // wrapped in an /in/ link, that's the canonical card owner. This
+    // catches the bug where LinkedIn rotates class names and a mutual-
+    // connection anchor (with aria-hidden span) sneaks in before the
+    // title link in DOM order — Ellen Landes hijacking Zeina Gammoh's
+    // card was exactly this scenario.
+    for (const [card, current] of cardOwner.entries()) {
+      const avatarLink = _findAvatarLink(card);
+      if (!avatarLink) continue;
+      if (_isInsightLink(avatarLink) || _isMutualConnectionContext(avatarLink)) continue;
+      const avatarUrl = normalizeProfileUrl(avatarLink.href);
+      if (avatarUrl && avatarUrl !== current.url) {
+        cardOwner.set(card, { url: avatarUrl, link: avatarLink });
       }
     }
 
