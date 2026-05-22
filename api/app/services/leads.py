@@ -245,11 +245,80 @@ def ingest_lead(
     created = False
     if existing:
         lead = existing
-        # Merge non-empty fields. Fill-only (don't clobber) for descriptive
-        # fields the user may have edited manually in the UI.
+
+        # Tokens from the LinkedIn URL slug — the ground-truth identifier
+        # for the person this row represents. For /in/fouad-chehade-59407431
+        # we get {"fouad", "chehade"} after filtering out numeric and
+        # alphanumeric user-id fragments.
+        slug_tokens: set[str] = set()
+        if linkedin and "/in/" in linkedin:
+            try:
+                slug = linkedin.split("/in/", 1)[1].split("?", 1)[0].rstrip("/")
+                slug = slug.split("/", 1)[0]
+                for tok in slug.split("-"):
+                    tok = tok.strip().lower()
+                    if len(tok) < 3:
+                        continue
+                    if tok.isdigit():
+                        continue
+                    # Drop alphanumeric user-id fragments like "a742831ab"
+                    if re.search(r"\d", tok) and re.search(r"[a-z]", tok):
+                        continue
+                    slug_tokens.add(tok)
+            except (IndexError, AttributeError):
+                pass
+
+        def _name_tokens(name: str) -> set[str]:
+            return {
+                tok.lower()
+                for tok in re.findall(r"[A-Za-z]+", name or "")
+                if len(tok) >= 2
+            }
+
+        # full_name: overwrite when the existing value is clearly wrong —
+        # either polluted by old scraper noise, OR a stale mis-attribution
+        # from the historical mutual-connection bug (existing name shares
+        # NO tokens with the URL slug, while the new scrape DOES). The slug
+        # is the unique identifier we trust most; any name disagreeing with
+        # it AND with a fresher in-agreement scrape is wrong.
+        if capped["full_name"]:
+            old = lead.full_name or ""
+            old_tokens = _name_tokens(old)
+            new_tokens = _name_tokens(capped["full_name"])
+            mismatched_attribution = bool(
+                slug_tokens
+                and old_tokens
+                and not (old_tokens & slug_tokens)
+                and (new_tokens & slug_tokens)
+            )
+            polluted = (
+                not old
+                or "·" in old
+                or "•" in old
+                or bool(re.search(r"\b[A-Z][0-9A-F]{6,}\b", old, re.IGNORECASE))
+                or mismatched_attribution
+            )
+            if polluted:
+                lead.full_name = capped["full_name"]
+                # Realign first/last/avatar when we correct a mis-attributed
+                # name so the whole row reflects the right person, not a
+                # half-rewritten Frankenstein with Joann's name and Fouad's
+                # avatar (the exact bug surfaced by the user).
+                if capped.get("first_name"):
+                    lead.first_name = capped["first_name"]
+                if capped.get("last_name"):
+                    lead.last_name = capped["last_name"]
+                if mismatched_attribution and capped.get("avatar_url"):
+                    lead.avatar_url = capped["avatar_url"]
+                if mismatched_attribution and capped.get("headline"):
+                    lead.headline = capped["headline"]
+                if mismatched_attribution and capped.get("title"):
+                    lead.title = capped["title"]
+
+        # Merge other descriptive fields fill-only so user-edited values
+        # aren't clobbered. first_name / last_name are excluded here because
+        # the block above already handles them in lock-step with full_name.
         for attr in (
-            "first_name",
-            "last_name",
             "title",
             "headline",
             "location",
@@ -258,20 +327,12 @@ def ingest_lead(
             val = capped.get(attr)
             if val and not getattr(lead, attr):
                 setattr(lead, attr, val)
-        # full_name: overwrite if the new scrape is non-empty and the old
-        # value looks polluted (contains a degree badge or a LinkedIn
-        # user-id hex suffix from an earlier slug-fallback). Otherwise
-        # fill-only so user-edited names aren't clobbered.
-        if capped["full_name"]:
-            old = lead.full_name or ""
-            polluted = (
-                not old
-                or "·" in old
-                or "•" in old
-                or bool(re.search(r"\b[A-Z][0-9A-F]{6,}\b", old, re.IGNORECASE))
-            )
-            if polluted:
-                lead.full_name = capped["full_name"]
+        # Fill-only first/last for the case where full_name was already
+        # correct and only the individual name parts were missing.
+        for attr in ("first_name", "last_name"):
+            val = capped.get(attr)
+            if val and not getattr(lead, attr):
+                setattr(lead, attr, val)
         # Contact info — OVERWRITE when the extension provides a non-null
         # value. The extension only sends what it actually scraped from the
         # live profile, so the latest scrape is the most accurate. Fixes
