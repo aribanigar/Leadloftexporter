@@ -500,10 +500,14 @@
     // AND the contact fields. Labels are NOT necessarily <h3>/<h4> — they
     // can be <p>, <span>, anything — so we search broadly and key on text.
     if (onOverlayUrl) {
-      // Find every element whose own text (not descendants) is exactly
-      // "Contact info". This rules out container elements that happen to
-      // contain a "Contact info" descendant.
+      // Find every element whose text is exactly "Contact info". Two checks:
+      //   1. Direct text-node children only — avoids matching parent containers
+      //      that merely contain a "Contact info" descendant somewhere inside.
+      //   2. Full textContent for heading-like elements — LinkedIn's React often
+      //      wraps heading text in a <span> child (no direct text node), e.g.
+      //      <h2><span>Contact info</span></h2>. Check (1) misses those.
       const headingNodes = [];
+      const _seenHeadings = new Set();
       const all = document.body.querySelectorAll("h1, h2, h3, h4, h5, h6, p, span, div");
       for (const el of all) {
         const ownText = Array.from(el.childNodes)
@@ -511,7 +515,18 @@
           .map((n) => (n.textContent || "").trim())
           .join(" ")
           .trim();
-        if (/^contact info$/i.test(ownText)) headingNodes.push(el);
+        if (/^contact info$/i.test(ownText)) {
+          if (!_seenHeadings.has(el)) { _seenHeadings.add(el); headingNodes.push(el); }
+          continue;
+        }
+        const tag = el.tagName;
+        if (["H1","H2","H3","H4","H5","H6","P","SPAN"].includes(tag)) {
+          const fullText = (el.textContent || "").replace(/\s+/g, " ").trim();
+          if (/^contact info$/i.test(fullText) && !_seenHeadings.has(el)) {
+            _seenHeadings.add(el);
+            headingNodes.push(el);
+          }
+        }
       }
 
       // For each candidate heading, walk up to find a container that also
@@ -574,7 +589,9 @@
     const aria = ((modal.getAttribute && modal.getAttribute("aria-label")) || "").toLowerCase();
     const labelledBy = ((modal.getAttribute && modal.getAttribute("aria-labelledby")) || "").toLowerCase();
     if (aria.includes("contact") || labelledBy.includes("contact")) return true;
-    return /\bcontact info\b/i.test((modal.innerText || modal.textContent || "").slice(0, 600));
+    // A mailto: or tel: link is a definitive signal this IS the contact section.
+    if (modal.querySelector?.("a[href^='mailto:'], a[href^='tel:']")) return true;
+    return /\bcontact info\b/i.test((modal.innerText || modal.textContent || "").slice(0, 1500));
   }
 
   // Parse a labelled section of the Contact info modal by header text.
@@ -943,15 +960,15 @@
         } catch {
           /* pushState fails in some sandboxed contexts */
         }
-        modal = await waitFor(
-          [
-            "div[role='dialog'][aria-labelledby*='contact' i]",
-            "#artdeco-modal-outlet div[role='dialog']",
-            "div[role='dialog']",
-          ],
-          { timeout: 4000 }
-        );
-        if (!_isValidContactModal(modal)) modal = null;
+        // On the overlay URL LinkedIn renders contact fields INLINE — there is
+        // no role="dialog" element. waitFor(dialogSelectors) always times out.
+        // Poll _findContactModal() instead — it handles Mode A (dialog) AND
+        // Mode B (inline overlay page heading-walk + main fallback).
+        for (let poll = 0; poll < 8; poll++) {
+          await _sleep(500);
+          const candidate = _findContactModal();
+          if (_isValidContactModal(candidate)) { modal = candidate; break; }
+        }
       }
     }
 
@@ -1722,12 +1739,29 @@
         // div[role='dialog'] — would let us grab a stray mailto: anchor
         // from somewhere on the page and attribute it to this lead.
         let modal = null;
+        // Mode A — explicit role="dialog" that says "contact info"
         const dialogs = doc.querySelectorAll("div[role='dialog']");
         for (const d of dialogs) {
           const t = (d.innerText || d.textContent || "").slice(0, 200);
-          if (/contact info/i.test(t)) {
-            modal = d;
-            break;
+          if (/contact info/i.test(t)) { modal = d; break; }
+        }
+        // Mode B — on the overlay URL LinkedIn renders fields INLINE with no
+        // dialog element. If a mailto:/tel: anchor exists AND the document
+        // contains "Contact info" text, walk up from the anchor to the
+        // tightest container that holds contact-field labels. This fires only
+        // when Mode A found nothing to avoid reading the wrong content.
+        if (!modal) {
+          const anchor = doc.querySelector("a[href^='mailto:'], a[href^='tel:']");
+          if (anchor) {
+            const bodyText = (doc.body?.innerText || doc.body?.textContent || "");
+            if (/contact info/i.test(bodyText)) {
+              let wrap = anchor.parentElement;
+              for (let i = 0; i < 8 && wrap && wrap.tagName !== "BODY" && wrap.tagName !== "HTML"; i++) {
+                const t = (wrap.innerText || wrap.textContent || "").slice(0, 2000);
+                if (/\b(email|phone)\b/i.test(t)) { modal = wrap; break; }
+                wrap = wrap.parentElement;
+              }
+            }
           }
         }
         const elapsed = Date.now() - startedAt;

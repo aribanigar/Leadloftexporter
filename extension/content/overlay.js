@@ -950,6 +950,9 @@
     }
     state.bulkActive = false;
     state.bulkProgress = null;
+    // Clear selections so the toolbar resets to "Save All Leads" and the top
+    // pill resets to "☐ Select All" — ready for the next batch immediately.
+    state.selectedUrls.clear();
     // Bring the top pill back so the user can run another batch immediately.
     mountSelectAllHeader();
     renderToolbar();
