@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap } from "lucide-react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap, Wrench } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -27,6 +27,7 @@ export default function ProspectingPage() {
   const [pickingColumns, setPickingColumns] = useState(false);
   const [findingEmails, setFindingEmails] = useState(false);
   const [findResult, setFindResult] = useState<string | null>(null);
+  const [repairing, setRepairing] = useState(false);
 
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
@@ -145,6 +146,47 @@ export default function ProspectingPage() {
           >
             <Sparkles className="h-4 w-4" />
             {findingEmails ? "Finding…" : "Find emails"}
+          </button>
+          <button
+            className="btn-secondary"
+            disabled={repairing}
+            onClick={async () => {
+              if (!confirm(
+                "Scan all leads in this workspace and repair rows polluted by previous extension versions?\n\n" +
+                "This fixes in place: corrupted LinkedIn URLs (/overlay/contact-info/ paths), names saved as \"LinkedIn\"/\"Save\"/\"Connect\", " +
+                "headline/title fields containing UI-button text, and name+headline mashed strings.\n\n" +
+                "Nothing is deleted — only fixed in place. Safe to run repeatedly."
+              )) return;
+              setRepairing(true);
+              setFindResult(null);
+              try {
+                const res = await api<{
+                  scanned: number;
+                  urls_fixed: number;
+                  names_fixed: number;
+                  name_mash_fixed: number;
+                  headlines_fixed: number;
+                  titles_fixed: number;
+                  total_rows_changed: number;
+                }>("/leads/cleanup/repair-corrupted", { method: "POST" });
+                setFindResult(
+                  res.total_rows_changed === 0
+                    ? `Scanned ${res.scanned} leads — no corruption found.`
+                    : `Repaired ${res.total_rows_changed} rows of ${res.scanned} scanned · ` +
+                      `${res.urls_fixed} URLs · ${res.names_fixed} names · ` +
+                      `${res.name_mash_fixed} name-mash · ${res.headlines_fixed} headlines · ${res.titles_fixed} titles`
+                );
+                qc.invalidateQueries({ queryKey: ["leads"] });
+              } catch (e: unknown) {
+                setFindResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+              } finally {
+                setRepairing(false);
+              }
+            }}
+            title="Repair leads polluted by previous extension versions (corrupted URLs, name='LinkedIn', UI-noise headlines, name/headline mashing)"
+          >
+            <Wrench className="h-4 w-4" />
+            {repairing ? "Repairing…" : "Repair leads"}
           </button>
           <button className="btn-primary" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4" /> Add Lead

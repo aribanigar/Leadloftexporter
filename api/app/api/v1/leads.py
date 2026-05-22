@@ -316,6 +316,204 @@ def wipe_workspace_pipeline_data(
     return {"deleted": counts}
 
 
+@router.post("/cleanup/repair-corrupted")
+def repair_corrupted_leads(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Repair in place (do NOT delete) leads polluted by previous extension
+    versions. Detects and fixes four corruption patterns:
+
+      1. linkedin_url contains a sub-route like /overlay/contact-info/ —
+         strip back to canonical /in/<handle>/. Catches the v1.0.11
+         pushState bug that wrote URLs ending in
+         /overlay/contact-info/overlay/contact-info/.
+
+      2. full_name is an action-button label or page-chrome placeholder
+         ("LinkedIn", "Save", "Connect", "View LinkedIn profile", etc.)
+         — null it, then re-derive from the URL slug.
+
+      3. headline / title match the UI-noise regex ("Save", "Saving…",
+         "Saved ✓", a11y "Profile details loaded for…", Sales-Nav
+         "Select <name>", presence "Status is online", etc.) — null
+         the field so the next scrape can repopulate it cleanly.
+
+      4. full_name shows the camelCase mashing bug (e.g. "Safnaz
+         SaleemData-Driven Digital Marketing & ... | Doha") — cut at the
+         lower→Upper boundary when the tail looks like a headline.
+
+    Safe to run repeatedly: each rule is a no-op when its precondition
+    is already false. Returns a per-rule counter so the UI can show what
+    was fixed.
+    """
+    import re as _re
+
+    ws = ctx.workspace_id
+
+    # ---------- Detection regexes ----------
+    URL_SUBROUTE_RE = _re.compile(r"^(/in/[^/]+)/")
+    NAME_NOISE_RE = _re.compile(
+        r"^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|"
+        r"save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|"
+        r"open\s+in\s+new\s+tab|connect|pending|message|follow|following|"
+        r"invite|invited|withdraw|more|premium|"
+        r"linked\s*in|linked\s*in\s+member)$",
+        _re.IGNORECASE,
+    )
+    HEADLINE_NOISE_RE = _re.compile(
+        r"^(save(\s+lead)?|saving…?|saved\s*✓?|save\s+in\s+sales\s+navigator|"
+        r"add\s+to\s+pipeline|connect|message|follow|following|pending|more|"
+        r"premium|"
+        # Sales-Nav / a11y debug strings that leaked into title/headline
+        r"profile details loaded for\s+.+|select\s+\S+\s+\S+|"
+        r"view\s+\S+(?:'|’)s\s+profile|status is\s+(online|offline|reachable)|"
+        r"open\s+\S+(?:'|’)s\s+profile)$",
+        _re.IGNORECASE,
+    )
+    ROLE_KEYWORDS_RE = _re.compile(
+        r"[|()/]|\s+at\s+|—|–|"
+        r"\bmarketing\b|\bmanager\b|\bdirector\b|\bengineer\b|\bdeveloper\b|"
+        r"\bspecialist\b|\bconsultant\b|\bstrategist\b",
+        _re.IGNORECASE,
+    )
+    CAMEL_BOUNDARY_RE = _re.compile(r"^(.+?[a-z])([A-Z][a-z].*)$")
+    SLUG_RE = _re.compile(r"/in/([^/?#]+)")
+
+    def _derive_name_from_url(url: str | None):
+        if not url:
+            return None
+        m = SLUG_RE.search(url)
+        if not m:
+            return None
+        slug = m.group(1).rstrip("/")
+        parts = [
+            p for p in slug.split("-")
+            if len(p) >= 2
+            and not p.isdigit()
+            and not (any(c.isalpha() for c in p) and any(c.isdigit() for c in p))
+        ]
+        derived = " ".join(p[:1].upper() + p[1:] for p in parts).strip()
+        return derived or None
+
+    def _cut_mashed_name(name: str) -> str | None:
+        """Mirror of scraper.js Stage 2b. Returns repaired name or None."""
+        if not name or len(name) <= 30:
+            return None
+        # No-space CamelCase
+        if " " not in name:
+            m = _re.match(r"^([A-Z][a-z]+)([A-Z].+)$", name)
+            if m:
+                return m.group(1)
+            return None
+        # Has spaces but mashed somewhere internally
+        m = CAMEL_BOUNDARY_RE.match(name)
+        if not m:
+            return None
+        before, after = m.group(1), m.group(2)
+        if len(after) > 12 and ROLE_KEYWORDS_RE.search(after):
+            return before.strip() or None
+        return None
+
+    leads = db.query(Lead).filter(Lead.workspace_id == ws).all()
+    urls_fixed = 0
+    names_fixed = 0
+    headlines_fixed = 0
+    titles_fixed = 0
+    mash_fixed = 0
+    examples: list[dict] = []
+
+    for lead in leads:
+        changed = False
+        before_snapshot = {
+            "id": lead.id,
+            "full_name": lead.full_name,
+            "linkedin_url": lead.linkedin_url,
+            "headline": lead.headline,
+            "title": lead.title,
+        }
+
+        # 1. URL sub-route strip
+        if lead.linkedin_url:
+            url = lead.linkedin_url
+            if "/overlay/" in url or "/contact-info" in url:
+                # Find /in/<handle>/ canonical prefix and truncate to it.
+                try:
+                    from urllib.parse import urlparse, urlunparse
+                    p = urlparse(url)
+                    m = URL_SUBROUTE_RE.match(p.path)
+                    if m:
+                        new_path = m.group(1) + "/"
+                        if new_path != p.path:
+                            lead.linkedin_url = urlunparse(
+                                (p.scheme, p.netloc, new_path, "", "", "")
+                            )
+                            urls_fixed += 1
+                            changed = True
+                except Exception:
+                    pass
+
+        # 2. Action-label / page-chrome name
+        if lead.full_name and NAME_NOISE_RE.match(lead.full_name.strip()):
+            derived = _derive_name_from_url(lead.linkedin_url)
+            lead.full_name = derived
+            if derived:
+                first, *rest = derived.split(" ", 1)
+                lead.first_name = first
+                lead.last_name = rest[0] if rest else None
+            else:
+                lead.first_name = None
+                lead.last_name = None
+            names_fixed += 1
+            changed = True
+
+        # 3. CamelCase mash repair (only if name didn't already get nulled)
+        if lead.full_name:
+            cut = _cut_mashed_name(lead.full_name)
+            if cut and cut != lead.full_name:
+                lead.full_name = cut
+                first, *rest = cut.split(" ", 1)
+                lead.first_name = first
+                lead.last_name = rest[0] if rest else None
+                mash_fixed += 1
+                changed = True
+
+        # 4. Headline noise
+        if lead.headline and HEADLINE_NOISE_RE.match(lead.headline.strip()):
+            lead.headline = None
+            headlines_fixed += 1
+            changed = True
+
+        # 5. Title noise
+        if lead.title and HEADLINE_NOISE_RE.match(lead.title.strip()):
+            lead.title = None
+            titles_fixed += 1
+            changed = True
+
+        if changed and len(examples) < 20:
+            examples.append({
+                "id": lead.id,
+                "before": before_snapshot,
+                "after": {
+                    "full_name": lead.full_name,
+                    "linkedin_url": lead.linkedin_url,
+                    "headline": lead.headline,
+                    "title": lead.title,
+                },
+            })
+
+    db.commit()
+    return {
+        "scanned": len(leads),
+        "urls_fixed": urls_fixed,
+        "names_fixed": names_fixed,
+        "name_mash_fixed": mash_fixed,
+        "headlines_fixed": headlines_fixed,
+        "titles_fixed": titles_fixed,
+        "total_rows_changed": urls_fixed + names_fixed + mash_fixed + headlines_fixed + titles_fixed,
+        "examples": examples,
+    }
+
+
 @router.post("/ingest", response_model=LeadIngestResponse)
 def ingest(
     body: LeadIngest,
