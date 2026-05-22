@@ -225,12 +225,50 @@
   function _harvestVisibleContact() {
     const empty = { email: null, phone: null, website: null, address: null };
     try {
-      const findModal = Scraper?._findContactModal;
       const readModal = Scraper?._scrapeFromContactModal;
-      if (!findModal || !readModal) return empty;
-      const modal = findModal();
-      if (!modal) return empty;
-      return readModal(modal) || empty;
+      if (!readModal) return empty;
+
+      // Primary path: scraper's modal finder (uses CSS-based visibility check).
+      let modal = Scraper?._findContactModal?.();
+
+      // Fallback: the user explicitly clicked Save while the Contact info modal
+      // was open, so we trust it's present. Scan the modal outlet and body for
+      // any dialog that contains "Contact info" text or mailto:/tel: links,
+      // without a visibility gate that might miss custom elements.
+      if (!modal) {
+        const candidates = document.querySelectorAll(
+          "#artdeco-modal-outlet div[role='dialog']," +
+          "div[role='dialog']," +
+          "div.artdeco-modal__content," +
+          "artdeco-modal"
+        );
+        for (const d of candidates) {
+          const html = d.innerHTML || "";
+          const text = (d.innerText || d.textContent || "").slice(0, 800);
+          if (
+            /contact info/i.test(text) ||
+            /href=["']mailto:/i.test(html) ||
+            /href=["']tel:/i.test(html)
+          ) {
+            modal = d;
+            break;
+          }
+        }
+      }
+
+      if (!modal) {
+        console.log("[LeadCaptura] _harvestVisibleContact: no open Contact info modal detected");
+        return empty;
+      }
+
+      const result = readModal(modal) || empty;
+      console.log("[LeadCaptura] _harvestVisibleContact scraped:", {
+        email: result.email,
+        phone: result.phone,
+        address: result.address,
+        website: result.website,
+      });
+      return result;
     } catch (e) {
       console.warn("[LeadCaptura] _harvestVisibleContact threw", e);
       return empty;

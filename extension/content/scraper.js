@@ -385,11 +385,16 @@
       "div[role='dialog'], artdeco-modal, div.artdeco-modal__content"
     );
     for (const d of dialogs) {
+      // Skip explicitly hidden elements. We intentionally avoid getClientRects()
+      // because artdeco-modal custom elements report zero rects even when their
+      // content is fully rendered and visible — that check was silently dropping
+      // every Contact info modal on profile pages.
       try {
-        if (!d.getClientRects || !d.getClientRects().length) continue;
-      } catch {
-        continue;
-      }
+        if (d.hasAttribute("hidden")) continue;
+        if (d.getAttribute("aria-hidden") === "true") continue;
+        const cs = window.getComputedStyle(d);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+      } catch { /* assume visible */ }
       if (onOverlayUrl) return d;
       const aria = (d.getAttribute("aria-label") || "").toLowerCase();
       const labelledBy = (d.getAttribute("aria-labelledby") || "").toLowerCase();
