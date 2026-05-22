@@ -999,12 +999,13 @@
     let s = String(raw).replace(/\s+/g, " ").trim();
     const stripLabels = [
       /\bVerified\b/gi,
+      /[✓✔☑✅☒✗✘]\s*/g,
       /\bPremium\s*Member\b/gi,
       /\bOpenToWork\b/gi,
       /\bHiring\b/gi,
       /\bInfluencer\b/gi,
       /\bStatus is (online|offline|reachable)\b/gi,
-      /\bView\s+\S+(?:'|’)s\s+profile\b/gi,
+      /\bView\s+\S+(?:’|’)s\s+profile\b/gi,
     ];
     for (const re of stripLabels) s = s.replace(re, " ");
     s = s.replace(/^(Status is (?:online|offline|reachable))/i, "$1 ")

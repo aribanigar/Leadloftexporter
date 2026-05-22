@@ -71,12 +71,15 @@
     // ("VerifiedFaisal") doesn't collapse into one word.
     const stripLabels = [
       /\bVerified\b/gi,
+      // LinkedIn’s verified badge renders as a Unicode checkmark in textContent.
+      // Strip all common checkmark codepoints so "Diala Ghazzawi ✓" → "Diala Ghazzawi".
+      /[✓✔☑✅☒✗✘]\s*/g,
       /\bPremium\s*Member\b/gi,
       /\bOpenToWork\b/gi,
       /\bHiring\b/gi,
       /\bInfluencer\b/gi,
       /\bStatus is (online|offline|reachable)\b/gi,
-      /\bView\s+\S+(?:’|')s\s+profile\b/gi,
+      /\bView\s+\S+(?:’|’)s\s+profile\b/gi,
       // Sales Nav presence indicator: "<Name> is reachable" / "is online" /
       // "is offline" / "is unreachable" / "is available" / "is away" —
       // LinkedIn appends this to the name in sr-only text for accessibility.
@@ -647,35 +650,63 @@
     if (!email) email = _scanModalForEmail(modal);
 
     // --- Phone ---
-    // LinkedIn's modal sometimes ships the phone as a plain <p>+97...</p>
-    // with NO tel: anchor (visible in the Khalid Basha DevTools screenshot).
-    // We try the anchor first, then the labelled-line lookup with several
-    // alias headers (Phone, Phone numbers, Mobile, Tel, Telephone), then a
-    // last-resort scoped scan of the modal text for any phone-shaped run.
+    // LinkedIn renders phone in one of three ways:
+    //   A) <a href="tel:+97466186772">  — cleanest, just read the href
+    //   B) Plain text <p>00974 66186772 (Mobile)</p> — label-based lookup
+    //   C) Glued to label in a single span — last-resort text scan
+    //
+    // The critical bug in approach B: the regex [\d\s\-().]{7,} includes "("
+    // in its character class, so "00974 66186772 (Mobile)" matches as
+    // "00974 66186772 (" — stopping at "M". The trailing "(" makes `phone`
+    // truthy (non-null) so _scanModalForPhone is skipped, and we save garbage.
+    // Fix: strip LinkedIn's "(Mobile)"/"(Home)"/"(Work)" type labels from the
+    // raw field value BEFORE running the digit regex, and apply a final
+    // cleanup pass after every extraction path.
     let phone = null;
+
+    // Path A — tel: anchor
     const phoneAnchor = modal.querySelector("a[href^='tel:']");
     if (phoneAnchor) {
       phone = (phoneAnchor.getAttribute("href") || "")
         .replace(/^tel:/, "")
         .trim();
     }
+
+    // Path B — labelled field ("Phone", "Mobile", "Tel", ...)
     if (!phone) {
       const v = _modalFieldAfterLabel(
         modal,
         /^\s*(phone|phone\s+number|phone\s+numbers|mobile|tel|telephone|cell)\s*$/i
       );
       if (v) {
-        const m = v.match(/\+?[\d\s\-().]{7,}/);
+        // Strip trailing type annotations such as (Mobile), (Home), (Work),
+        // (Office), (Cell), (Direct) BEFORE running the digit regex so the
+        // trailing "(" of an unfinished parenthetical doesn't bleed in.
+        const bare = v.replace(
+          /\s*\((?:mobile|home|work|cell|office|other|main|business|personal|direct|primary|secondary)\b[^)]*\)\s*/gi,
+          " "
+        ).trim();
+        const m = (bare || v).match(/[\+\d][\d\s\-().]{5,}\d/);
         if (m) {
           phone = m[0].replace(/\s+/g, " ").trim();
         }
       }
     }
+
+    // Path C — scoped text scan for any phone-shaped digit run
     if (!phone) {
-      // Last-resort: scan the modal text between "Contact info" and the
-      // next page-section header for any phone-shaped digit run. This
-      // catches markup variants where the label isn't on its own line.
       phone = _scanModalForPhone(modal);
+    }
+
+    // Final normalisation — runs regardless of which path succeeded.
+    // Removes trailing type labels "(Mobile)" etc. and stray punctuation
+    // that may survive from any extraction path.
+    if (phone) {
+      phone = phone
+        .replace(/\s*\([A-Za-z ]+\)\s*$/, "")  // "(Mobile)", "(Home)" …
+        .replace(/[\s\-().]+$/, "")              // stray trailing punct
+        .replace(/\s+/g, " ")
+        .trim() || null;
     }
 
     // --- Address ---
