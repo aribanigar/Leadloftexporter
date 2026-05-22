@@ -935,7 +935,10 @@
           const overlayPath =
             location.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
           history.pushState({}, "", overlayPath + location.search);
-          window.dispatchEvent(new PopStateEvent("popstate"));
+          // Do NOT dispatch popstate here — LinkedIn's SPA router already reacts
+          // to the pushState via its own history listener. A synthetic popstate
+          // immediately after confuses the router into double-navigating, which
+          // produces the "Error - We could not process this request" page.
           didPushState = true;
         } catch {
           /* pushState fails in some sandboxed contexts */
@@ -982,9 +985,10 @@
       if (data.email || data.phone) break;
     }
 
-    // Skip the dismiss if we navigated via pushState — the close button
-    // would just send us back, not actually clean up.
-    if (!isOverlayUrl && !didPushState) _closeContactModal();
+    // Always close the modal when not on the overlay URL directly.
+    // When didPushState is true, clicking × triggers LinkedIn's SPA router to
+    // navigate back to /in/<handle> — that's the cleanest URL restore path.
+    if (!isOverlayUrl) _closeContactModal();
     return data;
   }
 

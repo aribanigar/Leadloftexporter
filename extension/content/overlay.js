@@ -387,18 +387,18 @@
     if (snapshot.first_name) enriched.first_name = snapshot.first_name;
     if (snapshot.last_name) enriched.last_name = snapshot.last_name;
 
-    // Step 6: RESTORE the URL bar. If scrapeContactInfo's pushState fallback
-    // fired, location.href is now /in/<handle>/overlay/contact-info/.
-    // replaceState back to the originally-loaded URL so the user's tab
-    // looks untouched. dispatching popstate lets LinkedIn's SPA router
-    // re-render the profile body.
+    // Step 6: SAFETY URL RESTORE. If _closeContactModal() in scrapeContactInfo
+    // clicked the dismiss button, LinkedIn's router will navigate back on its
+    // own. This replaceState is a fallback for cases where the dismiss click
+    // didn't fire (modal already gone, etc.). We intentionally do NOT dispatch
+    // a synthetic popstate — that was causing LinkedIn's router to double-
+    // navigate and show the "Error - We could not process this request" page.
     try {
       if (
         location.href !== snapshot.originalHref &&
         location.pathname.includes("/overlay/contact-info")
       ) {
         history.replaceState({}, "", snapshot.originalHref);
-        window.dispatchEvent(new PopStateEvent("popstate"));
       }
     } catch (e) {
       console.warn("[LeadCaptura] URL restore failed", e?.message || e);
@@ -473,6 +473,54 @@
       } catch {
         /* enrichment is best-effort */
       }
+    }
+  }
+
+  // ---------- Auto-save on profile open ----------
+
+  // Tracks paths that have already been auto-saved this page session so
+  // SPA back-navigation to the same profile doesn't re-trigger the save.
+  const _autoSavedPaths = new Set();
+
+  // Called by main.js after renderProfilePanel() settles.
+  // Waits for LinkedIn to hydrate, then runs the full save+enrich flow
+  // (name + title + company + location from DOM, email + phone from Contact
+  // info modal) without any user interaction.
+  async function triggerAutoSave() {
+    // Guard: skip background enrichment tabs and overlay sub-routes.
+    if (new URLSearchParams(location.search).has("lc_enrich")) return;
+    if (location.pathname.includes("/overlay/")) return;
+
+    const path = location.pathname;
+    if (_autoSavedPaths.has(path)) return;
+    _autoSavedPaths.add(path);
+
+    try {
+      const settings = await Storage.getSettings();
+      if (settings.autoSaveOnOpen === false) return;
+
+      const opts = await ensureOptions();
+      if (!opts) return; // Not connected to workspace
+
+      // Human-paced delay: wait 3–8s for LinkedIn's React to fully hydrate
+      // the profile page. 15% chance of a longer 5–14s "reading" pause.
+      const base = 3000 + Math.floor(Math.random() * 5000);
+      const bonus = Math.random() < 0.15 ? 5000 + Math.floor(Math.random() * 9000) : 0;
+      await new Promise((r) => setTimeout(r, base + bonus));
+
+      // Re-scrape after the hydration delay so we get the fully-rendered name,
+      // title, company, location, and avatar.
+      const profile = Scraper.scrapeProfile?.();
+      if (!profile?.linkedin_url) {
+        _autoSavedPaths.delete(path); // Not scraped yet — allow retry on next nav
+        return;
+      }
+
+      // Run the full save+enrich pipeline (same as clicking "Save Lead").
+      await saveCurrentProfile(profile);
+    } catch (e) {
+      _autoSavedPaths.delete(path); // Allow retry if we hit an unexpected error
+      console.warn("[LeadCaptura] triggerAutoSave failed:", e?.message);
     }
   }
 
@@ -1292,5 +1340,6 @@
     unmountProfilePanel,
     unmountToolbar,
     flashStatus,
+    triggerAutoSave,
   };
 })();

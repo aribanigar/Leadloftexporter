@@ -7,6 +7,7 @@ const DEFAULTS = {
   enabled: true,
   autopilot: false,
   showOverlay: true,
+  autoSaveOnOpen: true,
   autoEnrichOnSave: true,
 };
 
@@ -76,6 +77,7 @@ async function onSave() {
     enabled: $("#enabled").checked,
     autopilot: $("#autopilot").checked,
     showOverlay: $("#showOverlay").checked,
+    autoSaveOnOpen: $("#autoSaveOnOpen").checked,
     autoEnrichOnSave: $("#autoEnrichOnSave").checked,
   });
   await testConnection();
@@ -88,6 +90,7 @@ async function init() {
   $("#enabled").checked = settings.enabled;
   $("#autopilot").checked = settings.autopilot;
   $("#showOverlay").checked = settings.showOverlay;
+  $("#autoSaveOnOpen").checked = settings.autoSaveOnOpen !== false;
   $("#autoEnrichOnSave").checked = settings.autoEnrichOnSave !== false;
   $("#docs-link").href = `${settings.apiUrl.replace(/:8000$/, ":3000") || "http://localhost:3000"}/settings/api-keys`;
 

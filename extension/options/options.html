@@ -51,10 +51,16 @@
           Autopilot runs at a human pace (~45–180s between actions), pauses when the tab is hidden, and aborts on captchas. Daily caps are enforced server-side from your workspace outreach settings.
         </p>
         <label class="row checkbox">
-          <input type="checkbox" id="autoEnrichOnSave" /> <span>Auto-enrich emails &amp; phones when saving a lead</span>
+          <input type="checkbox" id="autoSaveOnOpen" /> <span>Auto-save &amp; enrich when opening a profile</span>
         </label>
         <p class="muted small">
-          When you save a lead from a search result, opens the profile in a background tab, reads the &ldquo;Contact info&rdquo; overlay (the same modal you'd open by hand), and updates the lead with whatever email and phone the person shared. The tab closes itself when done.
+          When you open any LinkedIn profile, LeadCaptura automatically saves the lead and enriches their name, title, company, location, email, and phone &mdash; no clicking required.
+        </p>
+        <label class="row checkbox">
+          <input type="checkbox" id="autoEnrichOnSave" /> <span>Auto-enrich emails &amp; phones when saving from search results</span>
+        </label>
+        <p class="muted small">
+          When you save a lead from a search result, opens the profile in a background tab, reads the &ldquo;Contact info&rdquo; overlay, and updates the lead. The tab closes itself when done.
         </p>
       </section>
 

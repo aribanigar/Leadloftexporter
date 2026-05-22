@@ -116,76 +116,13 @@
   let lastPath = null;
   let autopilotInterval = null;
 
-  // Track which profile URLs we've already auto-enriched in this page session
-  // to avoid re-running on every SPA nav back to the same profile.
-  const autoEnrichedUrls = new Set();
-
-  // Auto-enrich the current profile page: after a human-paced delay, open
-  // the Contact info modal and push email/phone to the backend. This runs
-  // silently in the background — the user just sees the profile page.
-  async function maybeAutoEnrichCurrentProfile() {
-    try {
-      if (Scraper.pageType() !== "profile") return;
-      const params = new URLSearchParams(location.search);
-      if (params.has("lc_enrich")) return; // Already in enrichment mode
-      const path = location.pathname;
-      if (autoEnrichedUrls.has(path)) return;
-      autoEnrichedUrls.add(path);
-
-      const settings = await Storage.getSettings();
-      if (settings.autoEnrichOnSave === false) return;
-
-      // Two timing modes:
-      //   - On /overlay/contact-info/ URLs the user has EXPLICITLY opened
-      //     the Contact info modal — no need to fake a reading pause,
-      //     scrape and save immediately (just wait briefly for React).
-      //   - On regular /in/<handle> URLs, simulate a 3-9s reading pause
-      //     so background activity doesn't look bot-like.
-      const onContactOverlay = path.includes("/overlay/contact-info");
-      if (onContactOverlay) {
-        await Human.sleep(Human.rand(600, 1400));
-      } else {
-        const base = Human.rand(3000, 9000);
-        const bonus = Math.random() < 0.15 ? Human.rand(5000, 12000) : 0;
-        await Human.sleep(base + bonus);
-      }
-
-      const profile = Scraper.scrapeProfile();
-      if (!profile?.linkedin_url) return;
-
-      // Pick the scrape path that DOESN'T navigate the user's tab:
-      //   - on the /overlay/contact-info/ URL, the modal is already
-      //     visible right here — read it from this page (no clicks).
-      //   - on a regular /in/<handle> URL, use the hidden iframe so we
-      //     never click the Contact info link (which would change the
-      //     user's URL and feel like "the page moved on its own").
-      let contact = { email: null, phone: null, website: null, address: null };
-      if (onContactOverlay) {
-        contact = await Scraper.scrapeContactInfo();
-      } else if (Scraper.scrapeContactInfoViaIframe) {
-        contact = await Scraper.scrapeContactInfoViaIframe(profile.linkedin_url);
-      }
-      if (!contact.email && !contact.phone && !contact.address) return;
-
-      if (contact.email) profile.email = contact.email;
-      if (contact.phone) profile.phone = contact.phone;
-      if (contact.website) profile.company_url = contact.website;
-      if (contact.address) profile.location = contact.address.slice(0, 200);
-      profile.raw = {
-        ...(profile.raw || {}),
-        contact_info_scraped: true,
-        auto_enriched: true,
-        contact_source: onContactOverlay ? "overlay_visit" : "iframe",
-      };
-
-      await globalThis.__lcApi.syncProfile(profile);
-    } catch (e) {
-      // Silently fail — enrichment is always best-effort
-      console.warn("[LeadCaptura] auto-enrich failed:", e?.message);
-    }
-  }
-
   function onPathChange() {
+    // Skip the /overlay/contact-info/ sub-route that scrapeContactInfo
+    // navigates to temporarily via pushState. We don't want to unmount
+    // and remount the profile panel mid-scrape, and we don't want to
+    // update lastPath either (so the restore replaceState is also a no-op).
+    if (location.pathname.includes("/overlay/contact-info")) return;
+
     if (location.pathname === lastPath) return;
     lastPath = location.pathname;
     const type = Scraper.pageType();
@@ -208,7 +145,9 @@
       const isList = type === "search-people" || type === "salesnav-search";
       if (isProfile) {
         Overlay.renderProfilePanel();
-        maybeAutoEnrichCurrentProfile();
+        // Auto-save + auto-enrich (name+title+email+phone+location) without
+        // any user interaction. Dedup is handled inside triggerAutoSave.
+        Overlay.triggerAutoSave?.();
       }
       if (isList) {
         Overlay.renderToolbar();
