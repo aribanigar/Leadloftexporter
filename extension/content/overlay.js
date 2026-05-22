@@ -296,16 +296,12 @@
     } catch {}
 
     // Step 2: read any Contact info modal the user has already opened.
-    // Pure read; never click the link to OPEN one (that would navigate
-    // the user's tab and break the silent-save promise).
+    // If they did, we use that data immediately — no need to re-open.
     const visible = _harvestVisibleContact();
     if (visible.email && !enriched.email) enriched.email = visible.email;
     if (visible.phone && !enriched.phone) enriched.phone = visible.phone;
     if (visible.website && !enriched.company_url) enriched.company_url = visible.website;
     if (visible.address) enriched.location = visible.address.slice(0, 200);
-    // Loud DevTools breadcrumb so the user can see what we actually
-    // pulled out of the visible modal. Filter `LeadCaptura` in the
-    // console to find this line on every Save click.
     console.log("[LeadCaptura] visible-modal harvest:", {
       url: location.href,
       found: !!(visible.email || visible.phone || visible.address || visible.website),
@@ -315,7 +311,48 @@
       website: visible.website,
     });
 
-    // Step 3: fast text-scan on the visible page (no network, no clicks).
+    // Step 3: AUTO-OPEN the Contact info modal if we still don't have email
+    // or phone and we're on a /in/ profile page. This is the synchronous
+    // foreground enrichment the user demanded: one click → modal opens →
+    // email + phone scraped → modal closes → save.
+    //
+    // scrapeContactInfo() does the human-paced click on the Contact info
+    // link, waits for the modal to render, reads mailto:/tel: anchors + the
+    // labelled "Email"/"Phone" lines, then dismisses the modal. The user
+    // briefly SEES the modal flash open — that's the visible feedback that
+    // the system is working and what differentiates it from the previous
+    // "click Save then nothing seems to happen" UX.
+    const needsContact =
+      (!enriched.email || !enriched.phone) &&
+      location.pathname.startsWith("/in/") &&
+      Scraper.scrapeContactInfo;
+    if (needsContact) {
+      flashStatus("Opening Contact info…");
+      try {
+        const contact = await Scraper.scrapeContactInfo({
+          timeoutMs: 9000,
+          settleMs: 1500,
+          // We intentionally allow the pushState fallback so that when the
+          // Contact info link isn't found (or click is swallowed by React),
+          // the SPA router navigates to /overlay/contact-info/ and the modal
+          // renders as the page content. URL bar changes briefly, but the
+          // alternative is no email scraped — the user explicitly chose
+          // this trade-off.
+          allowPushStateFallback: true,
+        });
+        console.log("[LeadCaptura] auto-opened modal scraped:", contact);
+        if (contact.email && !enriched.email) enriched.email = contact.email;
+        if (contact.phone && !enriched.phone) enriched.phone = contact.phone;
+        if (contact.website && !enriched.company_url) enriched.company_url = contact.website;
+        if (contact.address && (!enriched.location || enriched.location.length < 4)) {
+          enriched.location = contact.address.slice(0, 200);
+        }
+      } catch (e) {
+        console.warn("[LeadCaptura] auto-open Contact info failed", e?.message || e);
+      }
+    }
+
+    // Step 4: fast text-scan on the visible page (no network, no clicks).
     // Catches "Reach me at john[at]acme[dot]com" patterns in About /
     // Experience / Featured. Only safe when we're physically on the
     // person's /in/ profile.
@@ -331,26 +368,21 @@
       } catch {}
     }
 
-    // Step 4: SAVE IMMEDIATELY with whatever we have. The row appears in
-    // the pipeline within a few hundred ms. Background enrichment (step 5)
-    // overwrites email/phone/address later when the iframe scrape returns.
-    //
-    // This is the key UX fix: previously we awaited the iframe (up to 18s)
-    // BEFORE saving — if the iframe was slow or hit a rate limit, no row
-    // ever appeared in the pipeline and the user thought the save failed.
+    // Step 5: SAVE with everything we have. Email/phone are already in
+    // `enriched` from the auto-opened modal above — the saved row appears
+    // in the pipeline already populated, no second-pass re-save needed.
     flashStatus("Saving…");
     let result;
     try {
       result = await Api.syncProfile(enriched);
-      const haveAny = !!(enriched.email || enriched.phone || enriched.location);
+      const fields = [
+        enriched.email && "email",
+        enriched.phone && "phone",
+        enriched.location && "location",
+      ].filter(Boolean);
+      const fieldsLabel = fields.length ? ` (${fields.join(" + ")})` : "";
       flashStatus(
-        result.created
-          ? haveAny
-            ? "Saved new lead ✓"
-            : "Saved new lead · enriching…"
-          : haveAny
-            ? "Lead updated ✓"
-            : "Lead updated · enriching…",
+        (result.created ? "Saved new lead ✓" : "Lead updated ✓") + fieldsLabel,
         "ok"
       );
       if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
@@ -360,10 +392,11 @@
       return;
     }
 
-    // Step 5: background hidden-iframe enrichment when contact still
-    // missing. Runs AFTER the initial save so the user already sees their
-    // lead. When this completes, we sync the updated fields — the backend
-    // upsert overwrites email/phone on re-save.
+    // Step 6: LAST-RESORT background iframe enrichment. Only fires when
+    // the foreground modal click in Step 3 yielded nothing — typically a
+    // 2nd/3rd-degree profile where LinkedIn hides the Contact info link
+    // entirely. The iframe loads /in/<handle>/overlay/contact-info/
+    // directly which sometimes renders fields even without the link.
     const url = enriched.linkedin_url || profile.linkedin_url;
     const stillNeeds =
       !enriched.email || !enriched.phone || !enriched.location;
