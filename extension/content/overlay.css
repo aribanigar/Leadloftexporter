@@ -228,8 +228,66 @@
   padding: 0 !important;
   width: auto !important;
   height: auto !important;
-  display: block !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
   pointer-events: auto !important;
+}
+
+.lc-inline-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #d4d4d8 !important;
+  color: #71717a !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: border-color 0.12s, background 0.12s, color 0.12s !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+.lc-inline-check:hover {
+  border-color: #0a66c2 !important;
+  color: #0a66c2 !important;
+}
+.lc-inline-check.lc-inline-check-on {
+  background: #0a66c2 !important;
+  border-color: #0a66c2 !important;
+  color: #ffffff !important;
+}
+
+.lc-bulk-progress {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 10px !important;
+  background: #eaf3fb !important;
+  border: 1px solid #0a66c2 !important;
+  border-radius: 999px !important;
+  color: #084d92 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  max-width: 480px !important;
+  overflow: hidden !important;
+}
+.lc-bulk-progress-text {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif !important;
+}
+.lc-bulk-spinner {
+  display: inline-block !important;
+  animation: lc-spin 1.2s linear infinite !important;
+}
+@keyframes lc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .lc-inline-save {

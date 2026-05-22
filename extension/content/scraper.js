@@ -874,8 +874,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 9000,
-    settleMs = 1500,
+    timeoutMs = 8100,
+    settleMs = 1350,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -971,7 +971,7 @@
     // 6s total wait so the user doesn't sit on a hung Save button.
     for (let attempt = 0; attempt < 3; attempt++) {
       if (data.email && data.phone && data.address) break;
-      await _sleep(1500);
+      await _sleep(1350);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes

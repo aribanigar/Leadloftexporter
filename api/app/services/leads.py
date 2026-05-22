@@ -303,6 +303,16 @@ def ingest_lead(
         # NO tokens with the URL slug, while the new scrape DOES). The slug
         # is the unique identifier we trust most; any name disagreeing with
         # it AND with a fresher in-agreement scrape is wrong.
+        # Extension v1.0.20+ tags scrapes from /in/<handle>'s <h1> with
+        # raw.name_authority="profile_page". That tag means: this name came
+        # from the canonical, unambiguous source on the page, NOT a search-
+        # card scrape that could have picked up a mutual-connection name
+        # embedded in the same <li>. Honor it unconditionally so stale wrong-
+        # name rows get auto-corrected on the next profile visit, even when
+        # the slug-token heuristic can't tell (e.g. numeric vanity URLs).
+        raw_payload = payload.get("raw") or {}
+        canonical_name = raw_payload.get("name_authority") == "profile_page"
+
         if capped["full_name"]:
             old = lead.full_name or ""
             old_tokens = _name_tokens(old)
@@ -319,6 +329,7 @@ def ingest_lead(
                 or "•" in old
                 or bool(re.search(r"\b[A-Z][0-9A-F]{6,}\b", old, re.IGNORECASE))
                 or mismatched_attribution
+                or (canonical_name and old.strip().lower() != capped["full_name"].strip().lower())
             )
             if polluted:
                 lead.full_name = capped["full_name"]
@@ -330,11 +341,12 @@ def ingest_lead(
                     lead.first_name = capped["first_name"]
                 if capped.get("last_name"):
                     lead.last_name = capped["last_name"]
-                if mismatched_attribution and capped.get("avatar_url"):
+                overwrite_related = mismatched_attribution or canonical_name
+                if overwrite_related and capped.get("avatar_url"):
                     lead.avatar_url = capped["avatar_url"]
-                if mismatched_attribution and capped.get("headline"):
+                if overwrite_related and capped.get("headline"):
                     lead.headline = capped["headline"]
-                if mismatched_attribution and capped.get("title"):
+                if overwrite_related and capped.get("title"):
                     lead.title = capped["title"]
 
         # Merge other descriptive fields. For title/headline we ALSO overwrite

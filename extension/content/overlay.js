@@ -38,6 +38,12 @@
     me: null,
     bulkActive: false,
     bulkCancel: false,
+    // URLs that the user has explicitly ticked for bulk processing. When
+    // non-empty, Save All Leads ONLY processes these; when empty, it falls
+    // back to every visible /in/ card so the legacy one-click bulk still
+    // works for users who don't care about selection.
+    selectedUrls: new Set(),
+    bulkProgress: null, // { current, total, name } during a bulk run
   };
 
   function el(tag, attrs = {}, ...children) {
@@ -348,8 +354,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 9000,
-          settleMs: 1800,
+          timeoutMs: 8100,
+          settleMs: 1620,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -409,6 +415,17 @@
     // Step 7: SAVE with everything we have. Email/phone are already in
     // `enriched` from the auto-opened modal above — the saved row appears
     // in the pipeline already populated, no second-pass re-save needed.
+    //
+    // Tag the payload with name_authority="profile_page": this scrape came
+    // from the canonical /in/<handle> <h1>, which is unambiguous. If the
+    // backend has a stale row with a mutual-connection name from an earlier
+    // card-level save, this flag signals it to overwrite without needing
+    // the slug-token heuristic to second-guess us.
+    enriched.raw = {
+      ...(enriched.raw || {}),
+      name_authority: "profile_page",
+      scraped_from: "h1",
+    };
     flashStatus("Saving…");
     let result;
     try {
@@ -504,10 +521,11 @@
       const opts = await ensureOptions();
       if (!opts) return; // Not connected to workspace
 
-      // Human-paced delay: wait 3–8s for LinkedIn's React to fully hydrate
-      // the profile page. 15% chance of a longer 5–14s "reading" pause.
-      const base = 3000 + Math.floor(Math.random() * 5000);
-      const bonus = Math.random() < 0.15 ? 5000 + Math.floor(Math.random() * 9000) : 0;
+      // Human-paced delay: wait 2.7–7.2s for LinkedIn's React to fully
+      // hydrate the profile page. 15% chance of a longer 4.5–12.6s "reading"
+      // pause. (v1.0.20 trimmed 10% off the previous 3–8s / 5–14s window.)
+      const base = 2700 + Math.floor(Math.random() * 4500);
+      const bonus = Math.random() < 0.15 ? 4500 + Math.floor(Math.random() * 8100) : 0;
       await new Promise((r) => setTimeout(r, base + bonus));
 
       // Re-scrape after the hydration delay so we get the fully-rendered name,
@@ -637,8 +655,67 @@
           },
           { includeNone: false }
         ),
+        // Select-all toggle: when no cards are selected, click ticks every
+        // visible /in/ card; when ANY are selected, click clears the set.
+        // The label flips so the user always sees the action that'll happen
+        // on the next click.
+        state.bulkActive
+          ? null
+          : el(
+              "button",
+              {
+                class: "lc-btn lc-btn-ghost",
+                onclick: () => {
+                  if (state.selectedUrls.size > 0) {
+                    state.selectedUrls.clear();
+                  } else {
+                    try {
+                      const { profiles } = Scraper.scrapeCurrentPage();
+                      for (const p of profiles || []) {
+                        if (p?.linkedin_url && p.linkedin_url.includes("/in/")) {
+                          state.selectedUrls.add(p.linkedin_url);
+                        }
+                      }
+                    } catch {}
+                  }
+                  // Re-render BOTH the toolbar (counter) and the cards (chip
+                  // checkboxes) so the visual state stays in lock-step.
+                  decorateSearchCards();
+                  for (const wrap of injectedSaves.values()) {
+                    const url = wrap?.dataset?.lcUrl;
+                    const check = wrap?.querySelector(".lc-inline-check");
+                    if (!url || !check) continue;
+                    const on = state.selectedUrls.has(url);
+                    check.textContent = on ? "☑" : "☐";
+                    check.classList.toggle("lc-inline-check-on", on);
+                  }
+                  renderToolbar();
+                },
+                title: "Tick every visible /in/ card so Save All processes them",
+              },
+              state.selectedUrls.size > 0
+                ? `Clear (${state.selectedUrls.size})`
+                : "Select All"
+            ),
         el("span", { class: "lc-flex" }),
-        el("div", { class: "lc-status-slot" }),
+        // Realtime bulk progress: shown only during a Save-All run. Always
+        // names the profile currently being scraped so the user can verify
+        // automation is alive and on-track. The hidden .lc-status-slot child
+        // keeps flashStatus() working (e.g. "Stopping after current profile…"
+        // when the user clicks Stop mid-run).
+        state.bulkActive && state.bulkProgress
+          ? el(
+              "div",
+              { class: "lc-bulk-progress" },
+              el("span", { class: "lc-bulk-spinner" }, "⏳"),
+              el(
+                "span",
+                { class: "lc-bulk-progress-text" },
+                `Enriching ${state.bulkProgress.current} of ${state.bulkProgress.total}: ${state.bulkProgress.name}…`
+              ),
+              el("span", { class: "lc-status-slot lc-status-slot-inline" })
+            )
+          : el("div", { class: "lc-status-slot" }),
         state.bulkActive
           ? el(
               "button",
@@ -654,7 +731,9 @@
           : el(
               "button",
               { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
-              "Save All Leads"
+              state.selectedUrls.size > 0
+                ? `Save ${state.selectedUrls.size} Selected`
+                : "Save All Leads"
             ),
         el(
           "button",
@@ -709,67 +788,48 @@
   }
 
   async function saveAllVisible() {
-    const { profiles } = Scraper.scrapeCurrentPage();
+    // Pick the working set:
+    //   - If the user has explicitly ticked checkboxes, process EXACTLY those.
+    //   - Else process every visible /in/ card (legacy one-click bulk).
+    let { profiles } = Scraper.scrapeCurrentPage();
     if (!profiles?.length) {
       flashStatus("No profiles found on this page.", "warn");
       return;
     }
-
-    // Step 1: bulk-save all card data in one shot. Fast (single API call,
-    // no LinkedIn fetches) — name/title/company/location go in immediately
-    // so the user sees the leads in the pipeline within seconds.
-    flashStatus(`Saving ${profiles.length}…`);
-    let bulkRes;
-    try {
-      bulkRes = await Api.syncSearch({
-        page_url: location.href,
-        captured_at: new Date().toISOString(),
-        profiles,
-      });
-      state.lastSavedLeadIds = bulkRes.lead_ids || [];
-    } catch (e) {
-      flashStatus(`Failed: ${e.message}`, "err");
-      return;
+    if (state.selectedUrls.size > 0) {
+      profiles = profiles.filter(
+        (p) => p?.linkedin_url && state.selectedUrls.has(p.linkedin_url)
+      );
+      if (!profiles.length) {
+        flashStatus("Selected URLs are not visible — scroll or reselect.", "warn");
+        return;
+      }
     }
-    flashStatus(`Saved ${bulkRes.created} new, ${bulkRes.updated} updated. Enriching…`);
-    decorateSearchCards();
-    maybeAutoEnroll();
 
-    // Step 2: enrich each /in/ profile via the hidden iframe. We process
-    // sequentially with 2-5s human-paced jitter between leads so we don't
-    // hammer LinkedIn — same risk class as the per-card single Save. The
-    // 20/hour + 100/day SAFE_ZONE rate limit is enforced by the service
-    // worker via lc:reserveEnrich; when it returns not-allowed we stop
-    // enriching but keep the bulk-saved data.
+    // INTENTIONAL: no syncSearch pre-save. Card-level scrapes can pick up
+    // mutual-connection names embedded in the same <li> ("Suhaib" instead of
+    // "Hady"). We only trust profile-page scrapes for persistence — the
+    // background-tab enrichment below saves the canonical name+title+
+    // company+email+phone+location pulled from the unambiguous /in/<handle>
+    // DOM.
     const enrichable = profiles.filter(
-      (p) => p && p.linkedin_url && p.linkedin_url.includes("/in/")
+      (p) => p?.linkedin_url && p.linkedin_url.includes("/in/")
     );
     if (!enrichable.length) {
-      flashStatus(
-        `Done: ${bulkRes.created} new, ${bulkRes.updated} updated`,
-        "ok"
-      );
+      flashStatus("No /in/ profiles to enrich.", "warn");
       return;
     }
 
-    const settings = await Storage.getSettings();
-    if (settings.autoEnrichOnSave === false) {
-      flashStatus(
-        `Done: ${bulkRes.created} new, ${bulkRes.updated} updated (auto-enrich off)`,
-        "ok"
-      );
-      return;
-    }
-
-    // Step 2: SEQUENTIAL background-tab enrichment. For each profile we open
-    // /in/<handle>/?lc_enrich=1 in a hidden tab; the content script there runs
-    // maybeRunEnrichmentTrigger() which scrapes Contact info (email + phone +
-    // location + website) and self-closes via lc:closeMe. The service worker
-    // resolves our message ONLY when the tab actually closes — so the next
-    // iteration of this loop can't start until the previous profile is fully
-    // done. Result: one tab open at a time, human-paced, never bursts.
+    // SEQUENTIAL background-tab enrichment. For each profile we open
+    // /in/<handle>/?lc_enrich=1 in a hidden tab; the content script there
+    // runs maybeRunEnrichmentTrigger() which scrapes name+title+company+
+    // location from DOM and email+phone+website from the Contact info modal,
+    // syncs the canonical row, then self-closes via lc:closeMe. The service
+    // worker resolves our message ONLY when the tab actually closes — so the
+    // next iteration can't start until the previous profile is fully done.
     state.bulkActive = true;
     state.bulkCancel = false;
+    state.bulkProgress = { current: 0, total: enrichable.length, name: "" };
     renderToolbar();
     let enriched = 0;
     let rateLimited = false;
@@ -780,9 +840,16 @@
         break;
       }
       const profile = enrichable[i];
-      flashStatus(
-        `Enriching ${i + 1} of ${enrichable.length}: ${profile.full_name || ""}…`
-      );
+      // Card-level name is just a label for the progress display — never
+      // persisted. If it picked up a mutual-connection name, that's a
+      // cosmetic issue in the status row, not a data-integrity bug.
+      const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
+      state.bulkProgress = {
+        current: i + 1,
+        total: enrichable.length,
+        name: label,
+      };
+      renderToolbar();
 
       const resp = await new Promise((resolve) => {
         try {
@@ -812,28 +879,27 @@
       }
       if (resp.ok && !resp.timedOut) enriched++;
 
-      // Human-paced gap between sequential profile opens. 5–12s base with a
-      // 15% chance of a 12–25s "distracted user" pause. The previous tab has
-      // already closed by now (we awaited the close above), so this is purely
-      // breathing room before launching the next /in/ tab — mimics a real
-      // person reviewing one profile, then moving on.
+      // Human-paced gap between sequential opens. v1.0.20 shaved 10% off
+      // every delay for the speed bump the user asked for: 4.5–10.8s base
+      // with a 15% chance of a 10.8–22.5s "distracted user" pause.
       if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const base = 5000 + Math.random() * 7000;
+        const base = 4500 + Math.random() * 6300;
         const longTail =
-          Math.random() < 0.15 ? 12000 + Math.random() * 13000 : 0;
+          Math.random() < 0.15 ? 10800 + Math.random() * 11700 : 0;
         await new Promise((r) => setTimeout(r, base + longTail));
       }
     }
     state.bulkActive = false;
+    state.bulkProgress = null;
     renderToolbar();
 
     let summary;
     if (cancelled) {
-      summary = `Stopped: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+      summary = `Stopped: ${enriched} of ${enrichable.length} enriched`;
     } else if (rateLimited) {
-      summary = `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched (daily limit hit)`;
+      summary = `Hit daily limit: ${enriched} of ${enrichable.length} enriched`;
     } else {
-      summary = `Done: ${bulkRes.created} new, ${bulkRes.updated} updated, ${enriched} enriched`;
+      summary = `Done: ${enriched} of ${enrichable.length} enriched ✓`;
     }
     flashStatus(summary, rateLimited ? "warn" : "ok");
     decorateSearchCards();
@@ -876,13 +942,38 @@
     if (existing && document.body.contains(existing)) return;
     if (existing) injectedSaves.delete(url);
 
+    // Selection checkbox — toggles inclusion of this URL in the bulk
+    // selection set. Clicking it never opens a tab; it's a pure selection
+    // primitive. The Save chip next to it does the open-and-enrich action.
+    const checkSpan = el(
+      "span",
+      { class: "lc-inline-check", title: "Select for bulk save" },
+      state.selectedUrls.has(url) ? "☑" : "☐"
+    );
+    if (state.selectedUrls.has(url)) checkSpan.classList.add("lc-inline-check-on");
+    checkSpan.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (state.selectedUrls.has(url)) {
+        state.selectedUrls.delete(url);
+        checkSpan.textContent = "☐";
+        checkSpan.classList.remove("lc-inline-check-on");
+      } else {
+        state.selectedUrls.add(url);
+        checkSpan.textContent = "☑";
+        checkSpan.classList.add("lc-inline-check-on");
+      }
+      // Re-render toolbar so the "Save N Selected" counter updates live.
+      renderToolbar();
+    });
+
     const textSpan = el("span", { class: "lc-inline-save-text" }, "Save");
     const btn = el(
       "button",
       {
         class: "lc-inline-save",
         type: "button",
-        title: "Save to LeadCaptura",
+        title: "Open this profile and auto-enrich",
       },
       textSpan
     );
@@ -894,36 +985,19 @@
       if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
       textSpan.textContent = "Opening…";
+      // INTENTIONAL: no card-level pre-save. The card-level scrape can
+      // pick up mutual-connection names embedded in the same <li> (the
+      // "Suhaib instead of Hady" bug); we don't trust it for persistence
+      // anymore. The profile page's triggerAutoSave() scrapes the
+      // unambiguous <h1> on /in/<handle> and saves the canonical row.
       console.log(
         "[LeadCaptura] chip clicked — opening profile:",
-        profile.full_name,
         profile.linkedin_url
       );
       try {
-        // Step 1 — fire-and-forget save the card data so a row exists in
-        // the pipeline immediately, even if the user closes the profile
-        // tab before enrichment completes. syncProfile is idempotent
-        // (deduped by linkedin_url) so the profile page's auto-save will
-        // just update the same row with email/phone/location.
-        Api.syncProfile(profile)
-          .then((result) => {
-            if (result?.lead?.id) {
-              state.lastSavedLeadIds = [result.lead.id];
-              maybeAutoEnroll();
-            }
-          })
-          .catch((e) =>
-            console.warn("[LeadCaptura] base card save failed", e?.message)
-          );
-
-        // Step 2 — open the LinkedIn profile in a FOREGROUND tab. The
-        // profile page's triggerAutoSave() (in overlay.js) auto-opens
-        // Contact info, scrapes email + phone + location, and updates
-        // the same lead row. No iframe, no ?lc_enrich flag — the tab
-        // stays open so the user can see what happened.
         if (!profile.linkedin_url?.includes("/in/")) {
-          btn.dataset.state = "saved";
-          textSpan.textContent = "Saved ✓";
+          btn.dataset.state = "error";
+          textSpan.textContent = "Need /in/ URL";
           return;
         }
         await new Promise((resolve) => {
@@ -962,7 +1036,7 @@
       }
     });
 
-    const wrap = el("div", { class: "lc-save-row" }, btn);
+    const wrap = el("div", { class: "lc-save-row" }, checkSpan, btn);
     wrap.dataset.lcUrl = url;
 
     // The chip floats absolute at the top-right of the card, just inboard of

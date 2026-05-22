@@ -361,13 +361,15 @@
 
       // Human-paced reading pause AFTER hydration — looks like a real person
       // landed on the profile, read for a moment, then clicked Contact info.
-      const base = Human.rand(2500, 6000);
-      const longTail = Math.random() < 0.12 ? Human.rand(2500, 10000) : 0;
+      // v1.0.20 trimmed 10% off the original 2.5–6s / 2.5–10s windows for
+      // the speed bump.
+      const base = Human.rand(2250, 5400);
+      const longTail = Math.random() < 0.12 ? Human.rand(2250, 9000) : 0;
       await Human.sleep(base + longTail);
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 2000,
+        settleMs: 1800,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
