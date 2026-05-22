@@ -1109,12 +1109,16 @@
       .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
       // Skip container elements that WRAP a profile link (same reason).
       .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
+      // Skip LeadCaptura's own injected UI (Save chip, status text). Without
+      // this, "Save" / "Saving…" / "Saved ✓" can be scraped as the headline
+      // and persist on the lead row.
+      .filter((n) => !n.closest(".lc-save-row, .lc-inline-save, [class^='lc-']"))
       .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())
       .filter(Boolean)
       .filter(
         (t) =>
           t !== name &&
-          !/connect|message|follow|view profile|premium/i.test(t) &&
+          !/^(save(\s+lead)?|saving…?|saved\s*✓?|save\s+in\s+sales\s+navigator|connect|message|follow|view\s+profile|pending|more|premium)$/i.test(t) &&
           // Drop any text that contains a LinkedIn degree badge ("• 1st",
           // "• 2nd", "• 3rd+") — those are person references, not headlines.
           !/•\s*(1st|2nd|3rd\+?)/i.test(t) &&

@@ -220,6 +220,22 @@ def ingest_lead(
         except Exception:
             pass
 
+    # Reject UI-button text that historically leaked into the headline/title
+    # fields when the extension's overlay chips were picked up by the page
+    # scraper. Without this guard the pipeline shows rows like
+    # "Waleed Khan / Save" because "Save" was stored as the headline.
+    def _strip_ui_noise(v):
+        if not v:
+            return v
+        s = str(v).strip()
+        if re.fullmatch(
+            r"(save(\s+lead)?|save\s+in\s+sales\s+navigator|add\s+to\s+pipeline|connect|message|follow|following|pending|more|premium)",
+            s,
+            re.IGNORECASE,
+        ):
+            return None
+        return v
+
     # Resolve each scalar to its column-capped value once. Reused below in
     # both the update-existing-lead and insert-new-lead branches.
     capped = {
@@ -230,9 +246,10 @@ def ingest_lead(
         # when no " at " exists, the entire headline is used as the title,
         # which routinely exceeds 240 chars. Truncate defensively.
         "title": _cap(
-            payload.get("title") or payload.get("headline"), 240
+            _strip_ui_noise(payload.get("title") or payload.get("headline")),
+            240,
         ),
-        "headline": payload.get("headline"),  # TEXT column — no cap
+        "headline": _strip_ui_noise(payload.get("headline")),  # TEXT — no cap
         "email": _cap(payload.get("email"), 255),
         "phone": _cap(payload.get("phone"), 60),
         # LinkedIn avatar URLs append a signed JWT query that often pushes

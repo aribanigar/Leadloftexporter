@@ -1217,12 +1217,15 @@
         // connections / people-also-viewed rendered inside the same card <li>).
         .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
         .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
+        // Exclude LeadCaptura's own injected chip ("Save", "Saving…", "Saved ✓")
+        // so our own UI text never leaks into the scraped headline field.
+        .filter((n) => !n.closest(".lc-save-row, .lc-inline-save, [class^='lc-']"))
         .map((n) => _txt(n))
         .filter(Boolean)
         .filter(
           (t) =>
             t !== name &&
-            !/connect|message|follow|view profile/i.test(t) &&
+            !/^(save(\s+lead)?|saving…?|saved\s*✓?|save\s+in\s+sales\s+navigator|connect|message|follow|view\s+profile|pending|more|premium)$/i.test(t) &&
             !/•\s*(1st|2nd|3rd\+?)/i.test(t)
         );
       headline = candidates[0] || null;

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles } from "lucide-react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -221,27 +221,42 @@ export default function ProspectingPage() {
                 </td>
               </tr>
             )}
-            {leads?.items.map((lead) => (
-              <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="w-10 px-3 py-2">
-                  <input type="checkbox" />
-                </td>
-                {visibleColumns.map((c) => (
-                  <td key={c} className="whitespace-nowrap px-3 py-2 text-sm">
-                    {renderCell(c, lead, stageById)}
+            {leads?.items.map((lead) => {
+              const needsEnrichment =
+                !!lead.linkedin_url && (!lead.email || !lead.phone);
+              return (
+                <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="w-10 px-3 py-2">
+                    <input type="checkbox" />
                   </td>
-                ))}
-                <td className="w-10 px-2">
-                  <button
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    onClick={() => removeLead.mutate(lead.id)}
-                    title="Delete"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  {visibleColumns.map((c) => (
+                    <td key={c} className="whitespace-nowrap px-3 py-2 text-sm">
+                      {renderCell(c, lead, stageById)}
+                    </td>
+                  ))}
+                  <td className="w-24 px-2">
+                    <div className="flex items-center justify-end gap-1">
+                      {needsEnrichment && (
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                          onClick={() => enrichLead(lead, qc)}
+                          title="Open LinkedIn profile and auto-scrape email, phone, and name from Contact info"
+                        >
+                          <Zap className="h-3 w-3" /> Enrich
+                        </button>
+                      )}
+                      <button
+                        className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        onClick={() => removeLead.mutate(lead.id)}
+                        title="Delete"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -282,9 +297,35 @@ export default function ProspectingPage() {
   );
 }
 
+// Trigger the extension's contact-info enrichment workflow on an existing
+// lead. Opens the lead's LinkedIn URL in a new tab with ?lc_enrich=1; the
+// extension's content script (main.js → maybeRunEnrichmentTrigger) detects
+// the flag, auto-clicks Contact info, scrapes email/phone/name, syncs back
+// to the matching lead (by linkedin_url), then closes the tab. We refresh
+// the leads query after a short delay so the row picks up the new fields.
+function enrichLead(lead: Lead, qc: ReturnType<typeof useQueryClient>) {
+  if (!lead.linkedin_url) return;
+  const sep = lead.linkedin_url.includes("?") ? "&" : "?";
+  const url = `${lead.linkedin_url}${sep}lc_enrich=1`;
+  // open in a new tab; the extension closes it itself once enrichment finishes
+  window.open(url, "_blank", "noopener");
+  // refresh after enrichment is expected to complete
+  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 12000);
+  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 25000);
+}
+
+// Headlines like "Save" / "Save Lead" / "Save in Sales Navigator" come from
+// historical extension bugs where the scraper picked up its own injected
+// "Save" chip text. We hide them on display so the pipeline rows look clean
+// even before the backend strips them out on the next sync.
+const NOISY_HEADLINE_RE =
+  /^\s*(save(\s+lead)?|save\s+in\s+sales\s+navigator|add\s+to\s+pipeline)\s*$/i;
+
 function renderCell(col: string, lead: Lead, stageById: Map<string, PipelineStage>): React.ReactNode {
   switch (col) {
-    case "full_name":
+    case "full_name": {
+      const showHeadline =
+        lead.headline && !NOISY_HEADLINE_RE.test(lead.headline);
       return (
         <Link
           href={`/leads/${lead.id}`}
@@ -295,10 +336,11 @@ function renderCell(col: string, lead: Lead, stageById: Map<string, PipelineStag
           </div>
           <div className="flex flex-col leading-tight">
             <span className="font-medium text-slate-800 hover:text-brand-700 hover:underline">{lead.full_name || "—"}</span>
-            {lead.headline && <span className="text-xs text-slate-500">{lead.headline}</span>}
+            {showHeadline && <span className="text-xs text-slate-500">{lead.headline}</span>}
           </div>
         </Link>
       );
+    }
     case "title":
       return <span className="text-slate-700">{lead.title || "—"}</span>;
     case "email":
