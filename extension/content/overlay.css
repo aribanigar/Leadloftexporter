@@ -328,5 +328,47 @@
   cursor: progress !important;
 }
 
+/* ------------ Top floating Select-All pill ------------
+ *
+ * Anchored top-right of the viewport on list pages so the user can select
+ * every visible /in/ card with one click without scrolling to the bottom
+ * toolbar. Uses `all: initial` reset so LinkedIn's global styles can't bleed
+ * into our button typography.
+ */
+#lc-select-all-top {
+  all: initial !important;
+  position: fixed !important;
+  top: 88px !important;
+  right: 24px !important;
+  z-index: 2147483645 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 9px 16px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #0a66c2 !important;
+  border-radius: 999px !important;
+  color: #0a66c2 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12) !important;
+  transition: background 0.12s, transform 0.12s !important;
+  white-space: nowrap !important;
+}
+#lc-select-all-top:hover {
+  background: #eaf3fb !important;
+  transform: translateY(-1px) !important;
+}
+#lc-select-all-top.lc-active {
+  background: #0a66c2 !important;
+  color: #ffffff !important;
+}
+#lc-select-all-top.lc-active:hover {
+  background: #084d92 !important;
+}
+
 /* Make room for the bottom bar on the underlying page */
 body.lc-toolbar-mounted { padding-bottom: 64px !important; }

@@ -130,6 +130,7 @@
     // Always tear down everything before deciding what to render.
     Overlay.unmountProfilePanel();
     Overlay.unmountToolbar();
+    Overlay.unmountSelectAllHeader?.();
     document.body.classList.remove("lc-toolbar-mounted");
 
     if (type === "unknown" || type === "feed") return;
@@ -151,6 +152,7 @@
       }
       if (isList) {
         Overlay.renderToolbar();
+        Overlay.mountSelectAllHeader?.();
         document.body.classList.add("lc-toolbar-mounted");
       }
       Overlay.decorateSearchCards();
@@ -361,14 +363,14 @@
 
       // Human-paced reading pause AFTER hydration — looks like a real person
       // landed on the profile, read for a moment, then clicked Contact info.
-      // v1.0.21: 20% faster than v1.0.19 baseline (2.0–4.8s / 2.0–8.0s).
-      const base = Human.rand(2000, 4800);
-      const longTail = Math.random() < 0.12 ? Human.rand(2000, 8000) : 0;
+      // v1.0.22: another 30% off — 1.4–3.4s base, 1.4–5.6s long-tail.
+      const base = Human.rand(1400, 3360);
+      const longTail = Math.random() < 0.12 ? Human.rand(1400, 5600) : 0;
       await Human.sleep(base + longTail);
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 1600,
+        settleMs: 1120,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
@@ -392,7 +394,7 @@
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
-      await Human.sleep(Human.rand(240, 640));
+      await Human.sleep(Human.rand(170, 450));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {

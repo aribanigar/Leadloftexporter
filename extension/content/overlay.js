@@ -354,8 +354,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 7200,
-          settleMs: 1440,
+          timeoutMs: 5040,
+          settleMs: 1008,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -521,11 +521,12 @@
       const opts = await ensureOptions();
       if (!opts) return; // Not connected to workspace
 
-      // Human-paced delay: wait 2.4–6.4s for LinkedIn's React to fully
-      // hydrate the profile page. 15% chance of a longer 4.0–11.2s "reading"
-      // pause. (v1.0.21 trimmed 20% off the v1.0.19 baseline of 3–8s / 5–14s.)
-      const base = 2400 + Math.floor(Math.random() * 4000);
-      const bonus = Math.random() < 0.15 ? 4000 + Math.floor(Math.random() * 7200) : 0;
+      // Human-paced delay: wait 1.7–4.5s for LinkedIn's React to fully
+      // hydrate the profile page. 15% chance of a longer 2.8–7.8s "reading"
+      // pause. (v1.0.22 trimmed another 30% for the speed bump the user
+      // asked for; ~44% faster than the v1.0.19 baseline of 3–8s / 5–14s.)
+      const base = 1680 + Math.floor(Math.random() * 2800);
+      const bonus = Math.random() < 0.15 ? 2800 + Math.floor(Math.random() * 5040) : 0;
       await new Promise((r) => setTimeout(r, base + bonus));
 
       // Re-scrape after the hydration delay so we get the fully-rendered name,
@@ -561,6 +562,81 @@
       state.toolbar.remove();
       state.toolbar = null;
     }
+  }
+
+  // Single source of truth for "Select All" / "Clear" toggle. Called by BOTH
+  // the top floating pill and the bottom toolbar's Select All button so they
+  // stay in lock-step. When called with no selection it ticks every visible
+  // /in/ card; when there's any selection it clears the set.
+  function toggleSelectAll() {
+    if (state.selectedUrls.size > 0) {
+      state.selectedUrls.clear();
+    } else {
+      try {
+        const { profiles } = Scraper.scrapeCurrentPage();
+        for (const p of profiles || []) {
+          if (p?.linkedin_url && p.linkedin_url.includes("/in/")) {
+            state.selectedUrls.add(p.linkedin_url);
+          }
+        }
+      } catch {}
+    }
+    // Mirror selection state across all three surfaces: per-card checkboxes,
+    // top pill, bottom toolbar counter. Without this, ticking one place would
+    // leave the others showing stale state.
+    decorateSearchCards();
+    for (const wrap of injectedSaves.values()) {
+      const url = wrap?.dataset?.lcUrl;
+      const check = wrap?.querySelector(".lc-inline-check");
+      if (!url || !check) continue;
+      const on = state.selectedUrls.has(url);
+      check.textContent = on ? "☑" : "☐";
+      check.classList.toggle("lc-inline-check-on", on);
+    }
+    refreshSelectAllHeader();
+    renderToolbar();
+  }
+
+  // Floating Select-All pill at the top of list pages — gives the user a
+  // one-click select-everything affordance without scrolling to the bottom
+  // toolbar. Position is fixed top-right so it doesn't fight LinkedIn's
+  // hashed-class header layout.
+  function mountSelectAllHeader() {
+    if (state.bulkActive) {
+      unmountSelectAllHeader();
+      return null;
+    }
+    let pill = document.getElementById("lc-select-all-top");
+    if (pill) {
+      refreshSelectAllHeader();
+      return pill;
+    }
+    pill = el("button", {
+      id: "lc-select-all-top",
+      type: "button",
+      title: "Select every visible profile for bulk save",
+    });
+    pill.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSelectAll();
+    });
+    document.documentElement.appendChild(pill);
+    refreshSelectAllHeader();
+    return pill;
+  }
+
+  function unmountSelectAllHeader() {
+    const pill = document.getElementById("lc-select-all-top");
+    if (pill) pill.remove();
+  }
+
+  function refreshSelectAllHeader() {
+    const pill = document.getElementById("lc-select-all-top");
+    if (!pill) return;
+    const n = state.selectedUrls.size;
+    pill.textContent = n > 0 ? `☑ Clear (${n})` : "☐ Select All";
+    pill.classList.toggle("lc-active", n > 0);
   }
 
   function dropdown(label, value, items, onPick, opts = {}) {
@@ -665,32 +741,7 @@
               "button",
               {
                 class: "lc-btn lc-btn-ghost",
-                onclick: () => {
-                  if (state.selectedUrls.size > 0) {
-                    state.selectedUrls.clear();
-                  } else {
-                    try {
-                      const { profiles } = Scraper.scrapeCurrentPage();
-                      for (const p of profiles || []) {
-                        if (p?.linkedin_url && p.linkedin_url.includes("/in/")) {
-                          state.selectedUrls.add(p.linkedin_url);
-                        }
-                      }
-                    } catch {}
-                  }
-                  // Re-render BOTH the toolbar (counter) and the cards (chip
-                  // checkboxes) so the visual state stays in lock-step.
-                  decorateSearchCards();
-                  for (const wrap of injectedSaves.values()) {
-                    const url = wrap?.dataset?.lcUrl;
-                    const check = wrap?.querySelector(".lc-inline-check");
-                    if (!url || !check) continue;
-                    const on = state.selectedUrls.has(url);
-                    check.textContent = on ? "☑" : "☐";
-                    check.classList.toggle("lc-inline-check-on", on);
-                  }
-                  renderToolbar();
-                },
+                onclick: toggleSelectAll,
                 title: "Tick every visible /in/ card so Save All processes them",
               },
               state.selectedUrls.size > 0
@@ -830,6 +881,9 @@
     state.bulkActive = true;
     state.bulkCancel = false;
     state.bulkProgress = { current: 0, total: enrichable.length, name: "" };
+    // Hide the top Select-All pill during a run — it can't be used while
+    // enrichment is in progress and would just clutter the screen.
+    unmountSelectAllHeader();
     renderToolbar();
     let enriched = 0;
     let rateLimited = false;
@@ -879,18 +933,20 @@
       }
       if (resp.ok && !resp.timedOut) enriched++;
 
-      // Human-paced gap between sequential opens. v1.0.21 trims to 20% faster
-      // than the v1.0.19 baseline: 4.0–9.6s base with a 15% chance of a
-      // 9.6–20.0s "distracted user" pause.
+      // Human-paced gap between sequential opens. v1.0.22 cuts another 30%:
+      // 2.8–6.7s base with a 15% chance of a 6.7–14.0s "distracted user"
+      // pause. Cumulative ~44% faster than the v1.0.19 baseline.
       if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const base = 4000 + Math.random() * 5600;
+        const base = 2800 + Math.random() * 3920;
         const longTail =
-          Math.random() < 0.15 ? 9600 + Math.random() * 10400 : 0;
+          Math.random() < 0.15 ? 6720 + Math.random() * 7280 : 0;
         await new Promise((r) => setTimeout(r, base + longTail));
       }
     }
     state.bulkActive = false;
     state.bulkProgress = null;
+    // Bring the top pill back so the user can run another batch immediately.
+    mountSelectAllHeader();
     renderToolbar();
 
     let summary;
@@ -964,6 +1020,8 @@
         checkSpan.classList.add("lc-inline-check-on");
       }
       // Re-render toolbar so the "Save N Selected" counter updates live.
+      // Also update the top pill so its counter stays in sync.
+      refreshSelectAllHeader();
       renderToolbar();
     });
 
@@ -1410,5 +1468,7 @@
     unmountToolbar,
     flashStatus,
     triggerAutoSave,
+    mountSelectAllHeader,
+    unmountSelectAllHeader,
   };
 })();
