@@ -151,7 +151,12 @@ def ingest_lead(
         r"^(view\s+\S+\s+profile|view\s+profile|view\s+in\s+sales\s+navigator|"
         r"save\s+in\s+sales\s+navigator|save\s+lead|save|open|open\s+profile|"
         r"open\s+in\s+new\s+tab|connect|pending|message|follow|following|"
-        r"invite|invited|withdraw|more|premium)$",
+        r"invite|invited|withdraw|more|premium|"
+        # Page-chrome / placeholder names that leaked in when the extension
+        # scraped during a brief URL-corruption window (h1 = "LinkedIn"
+        # because /overlay/contact-info/ doesn't render the profile h1) or
+        # when LinkedIn shows a 3rd-degree placeholder card.
+        r"linked\s*in|linked\s*in\s+member)$",
         re.IGNORECASE,
     )
     raw_full = (payload.get("full_name") or "").strip()

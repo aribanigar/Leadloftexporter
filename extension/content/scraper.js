@@ -105,6 +105,33 @@
     ];
     for (const re of cutMarkers) s = s.replace(re, "").trim();
 
+    // Stage 2b — name + headline mashing. LinkedIn occasionally renders the
+    // h1 as <span>Safnaz Saleem</span><span>Data-Driven Digital Marketing
+    // & Social Media Strategist (B.Tech, CSE) | Doha</span>, and textContent
+    // concatenates without whitespace → "SaleemData-Driven Digital Marketing
+    // & Social Media Strategist (B.Tech, CSE) | Doha". The headline always
+    // starts with an uppercase letter butted against the lowercase last char
+    // of the surname (Saleem|Data, Khan|Senior, etc.), so we cut on that
+    // single lower→Upper boundary when the remainder looks like a headline
+    // (contains a vertical bar, parenthesis, or " at ", OR is > 30 chars).
+    if (s && s.length > 30 && !s.includes(" ")) {
+      // Pure CamelCase glob with no spaces — split at first lower→Upper
+      const m = s.match(/^([A-Z][a-z]+)([A-Z].+)$/);
+      if (m) s = m[1];
+    } else if (s && s.length > 30) {
+      // Has spaces. Find a lower→Upper boundary INSIDE a "word", and only
+      // cut if what follows looks like a headline (long, has separators).
+      const camelMatch = s.match(/^(.+?[a-z])([A-Z][a-z].*)$/);
+      if (camelMatch) {
+        const before = camelMatch[1];
+        const after = camelMatch[2];
+        const headlineLike =
+          after.length > 12 &&
+          (/[|()/]|\s+at\s+|—|–|\bmarketing\b|\bmanager\b|\bdirector\b|\bengineer\b|\bdeveloper\b|\bspecialist\b|\bconsultant\b|\bstrategist\b/i.test(after));
+        if (headlineLike) s = before.trim();
+      }
+    }
+
     // Strip trailing punctuation / separators
     s = s.replace(/[\s•·,\-—|]+$/g, "").trim();
 
@@ -167,9 +194,21 @@
   // poison the title field with "Feed post" / "Reposted this" / etc.
   function _isFeedNoise(text) {
     if (!text) return true;
-    return /^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! )/i.test(
-      text.trim()
-    );
+    const t = text.trim();
+    // Original feed/activity noise prefixes.
+    if (/^(feed post|reposted|liked by|commented|shared|recent activity|posts|activity|see all activity|loaded \d+|show all \d+|new! )/i.test(t)) {
+      return true;
+    }
+    // Sales Nav / accessibility noise that's been showing up as the title:
+    //   "Profile details loaded for Ahmed Dergham."  — sr-only announcement
+    //   "Select Ahmed Dergham"                       — checkbox a11y label
+    //   "View Ahmed Dergham's profile"               — anchor a11y label
+    //   "Status is online"                           — presence indicator
+    //   "Open Ahmed's profile in new tab"            — action menu item
+    if (/^(profile details loaded\b|select\s+\S+\s+\S+|view\s+\S+(?:'|')s\s+profile|status is\s+(online|offline|reachable)|open\s+\S+(?:'|')s\s+profile)/i.test(t)) {
+      return true;
+    }
+    return false;
   }
 
   /* ---------- Profile page (/in/handle) ----------
@@ -256,7 +295,16 @@
 
   function scrapeProfile() {
     const { h1, card } = _findTopCard();
-    const fullName = _cleanPersonName(_txt(h1));
+    let fullName = _cleanPersonName(_txt(h1));
+    // Reject page-chrome h1s. When LinkedIn briefly serves the /overlay/
+    // contact-info/ route as a standalone page (no profile rendered),
+    // document.querySelector("main h1") falls back to the global nav h1
+    // which reads literally "LinkedIn". Any save fired in that window
+    // wrote name="LinkedIn" — visible in 4 of the user's pipeline rows.
+    // Also catches "LinkedIn Member" (3rd-degree placeholder).
+    if (fullName && /^linked\s*in(?:\s+member)?$/i.test(fullName)) {
+      fullName = null;
+    }
 
     // Headline: the text line directly under the name. Multiple fallbacks
     // because LinkedIn sometimes wraps it in different structures.
@@ -322,7 +370,23 @@
       }
     }
 
-    const linkedinUrl = normalizeProfileUrl(location.href);
+    // Defense-in-depth against past pushState bugs: if location.href has
+    // been mutated to .../overlay/contact-info/ (or any other sub-route),
+    // strip that suffix so the lead's linkedin_url field always stores
+    // the canonical /in/<handle>/ form. Without this, an old buggy code
+    // path on a stale tab could re-introduce the corrupted URL.
+    const linkedinUrl = (() => {
+      let href = location.href;
+      try {
+        const u = new URL(href);
+        const m = u.pathname.match(/^(\/in\/[^/]+)\//);
+        if (m) {
+          u.pathname = m[1] + "/";
+          href = u.origin + u.pathname;
+        }
+      } catch { /* fall through to normalize on raw href */ }
+      return normalizeProfileUrl(href);
+    })();
     // Final-mile name fallback: if h1 didn't yield a usable name, derive one
     // from the URL slug (linkedin.com/in/nathalie-richani → Nathalie Richani).
     // Better a slug-derived guess than blank rows in the pipeline.
@@ -1217,15 +1281,12 @@
         // connections / people-also-viewed rendered inside the same card <li>).
         .filter((n) => !n.closest("a[href*='/in/'], a[href*='/sales/lead/']"))
         .filter((n) => !n.querySelector("a[href*='/in/'], a[href*='/sales/lead/']"))
-        // Exclude LeadCaptura's own injected chip ("Save", "Saving…", "Saved ✓")
-        // so our own UI text never leaks into the scraped headline field.
-        .filter((n) => !n.closest(".lc-save-row, .lc-inline-save, [class^='lc-']"))
         .map((n) => _txt(n))
         .filter(Boolean)
         .filter(
           (t) =>
             t !== name &&
-            !/^(save(\s+lead)?|saving…?|saved\s*✓?|save\s+in\s+sales\s+navigator|connect|message|follow|view\s+profile|pending|more|premium)$/i.test(t) &&
+            !/connect|message|follow|view profile/i.test(t) &&
             !/•\s*(1st|2nd|3rd\+?)/i.test(t)
         );
       headline = candidates[0] || null;
