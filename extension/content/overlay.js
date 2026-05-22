@@ -36,7 +36,73 @@
     lastSavedLeadIds: [],
     statusTimer: null,
     me: null,
+    // Cache of pre-fetched Contact Info for the current /in/ profile so
+    // clicking Save Lead is instantaneous and one-shot. Keyed by linkedin
+    // URL so SPA navigation between profiles invalidates the cache.
+    //   { url, status: 'loading'|'ready'|'failed', data, promise }
+    preFetch: null,
   };
+
+  // Silently pre-fetch the Contact info modal for the currently visible
+  // /in/<handle> page via a hidden same-origin iframe. Runs once when the
+  // profile panel mounts so that by the time the user clicks Save Lead the
+  // email / phone / website / address are already cached — one click, one
+  // save, no second pass and no URL navigation on the user's tab.
+  function _maybePreFetchContact() {
+    if (!location.pathname.startsWith("/in/")) return;
+    if (!Scraper?.scrapeContactInfoViaIframe) return;
+    const currentKey = location.pathname.replace(/\/$/, "");
+    // Same /in/<handle> already being fetched / done — skip.
+    if (state.preFetch && state.preFetch.key === currentKey) return;
+    // Different profile (or first visit): start a new pre-fetch and drop
+    // any stale entry from a previously-viewed profile.
+    state.preFetch = {
+      key: currentKey,
+      url: location.href,
+      status: "loading",
+      data: null,
+      promise: null,
+    };
+    state.preFetch.promise = (async () => {
+      // Brief delay so users who quickly scroll past a profile don't
+      // burn rate-limit budget on profiles they aren't actually saving.
+      await new Promise((r) => setTimeout(r, 2500));
+      if (state.preFetch?.key !== currentKey) return null; // navigated away
+      try {
+        const allowed = await new Promise((r) => {
+          try {
+            chrome.runtime.sendMessage(
+              { type: "lc:reserveEnrich" },
+              (resp) => {
+                if (chrome.runtime.lastError) return r(false);
+                r(resp?.ok === true);
+              }
+            );
+          } catch {
+            r(false);
+          }
+        });
+        if (!allowed) {
+          if (state.preFetch?.key === currentKey) {
+            state.preFetch.status = "failed";
+          }
+          return null;
+        }
+        const data = await Scraper.scrapeContactInfoViaIframe(location.href);
+        if (state.preFetch?.key !== currentKey) return null;
+        state.preFetch.data = data;
+        state.preFetch.status = "ready";
+        console.log("[LeadCaptura] pre-fetched contact for", currentKey, data);
+        return data;
+      } catch (e) {
+        if (state.preFetch?.key === currentKey) {
+          state.preFetch.status = "failed";
+        }
+        console.warn("[LeadCaptura] pre-fetch failed", e?.message || e);
+        return null;
+      }
+    })();
+  }
 
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -116,6 +182,10 @@
     if (!root) return;
     const opts = await ensureOptions();
     const connected = !!opts;
+    // Kick off the silent iframe pre-fetch so the data is ready by the
+    // time the user clicks Save Lead. Cheap call — it no-ops when a
+    // pre-fetch for this profile is already in flight or completed.
+    _maybePreFetchContact();
     const scraped = Scraper.scrapeCurrentPage();
     const profile = scraped.profile;
     // LinkedIn renders the top card asynchronously; the h1 sometimes
@@ -311,36 +381,60 @@
       website: visible.website,
     });
 
-    // Step 3: AUTO-OPEN the Contact info modal if we still don't have email
-    // or phone and we're on a /in/ profile page. This is the synchronous
-    // foreground enrichment the user demanded: one click → modal opens →
-    // email + phone scraped → modal closes → save.
+    // Step 3: USE THE PRE-FETCHED CONTACT INFO (silent iframe, kicked off
+    // when the panel mounted). If pre-fetch is already done → instant. If
+    // still loading → wait up to 6s. If failed / unavailable → fall back
+    // to the foreground click-and-read path.
     //
-    // scrapeContactInfo() does the human-paced click on the Contact info
-    // link, waits for the modal to render, reads mailto:/tel: anchors + the
-    // labelled "Email"/"Phone" lines, then dismisses the modal. The user
-    // briefly SEES the modal flash open — that's the visible feedback that
-    // the system is working and what differentiates it from the previous
-    // "click Save then nothing seems to happen" UX.
+    // CRITICAL: we never call scrapeContactInfo with allowPushStateFallback.
+    // The pushState fallback navigates the user's tab to /overlay/contact-
+    // info/, which (a) shows "This page doesn't exist" on direct
+    // navigation, (b) makes the h1 read "LinkedIn" instead of the real
+    // name on rescrape, and (c) double-appends the path if Save is clicked
+    // twice ("/overlay/contact-info/overlay/contact-info/"). The user's
+    // bug report — "saves without email, page-not-found flash, second
+    // click needed" — was exactly this pushState pathology.
+    const currentKey = location.pathname.replace(/\/$/, "");
     const needsContact =
       (!enriched.email || !enriched.phone) &&
-      location.pathname.startsWith("/in/") &&
-      Scraper.scrapeContactInfo;
-    if (needsContact) {
+      location.pathname.startsWith("/in/");
+
+    if (needsContact && state.preFetch?.key === currentKey) {
+      if (state.preFetch.status === "loading" && state.preFetch.promise) {
+        flashStatus("Reading Contact info…");
+        try {
+          await Promise.race([
+            state.preFetch.promise,
+            new Promise((r) => setTimeout(r, 6000)),
+          ]);
+        } catch { /* falls through to whatever data we have */ }
+      }
+      const cached = state.preFetch.data;
+      if (cached) {
+        console.log("[LeadCaptura] using pre-fetched contact:", cached);
+        if (cached.email && !enriched.email) enriched.email = cached.email;
+        if (cached.phone && !enriched.phone) enriched.phone = cached.phone;
+        if (cached.website && !enriched.company_url) enriched.company_url = cached.website;
+        if (cached.address && (!enriched.location || enriched.location.length < 4)) {
+          enriched.location = cached.address.slice(0, 200);
+        }
+      }
+    }
+
+    // Step 3b: if pre-fetch missed (e.g. user clicked Save before panel had
+    // a chance to fire, or pre-fetch failed), fall back to clicking the
+    // visible Contact info link — WITHOUT the pushState fallback. The
+    // worst case here is "no contact captured this round" which Step 6
+    // recovers from via a second iframe pass after save.
+    if ((!enriched.email || !enriched.phone) && location.pathname.startsWith("/in/") && Scraper.scrapeContactInfo) {
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 9000,
-          settleMs: 1500,
-          // We intentionally allow the pushState fallback so that when the
-          // Contact info link isn't found (or click is swallowed by React),
-          // the SPA router navigates to /overlay/contact-info/ and the modal
-          // renders as the page content. URL bar changes briefly, but the
-          // alternative is no email scraped — the user explicitly chose
-          // this trade-off.
-          allowPushStateFallback: true,
+          timeoutMs: 5000,
+          settleMs: 1200,
+          allowPushStateFallback: false, // NEVER navigate the user's tab
         });
-        console.log("[LeadCaptura] auto-opened modal scraped:", contact);
+        console.log("[LeadCaptura] click-open modal scraped:", contact);
         if (contact.email && !enriched.email) enriched.email = contact.email;
         if (contact.phone && !enriched.phone) enriched.phone = contact.phone;
         if (contact.website && !enriched.company_url) enriched.company_url = contact.website;
@@ -348,7 +442,7 @@
           enriched.location = contact.address.slice(0, 200);
         }
       } catch (e) {
-        console.warn("[LeadCaptura] auto-open Contact info failed", e?.message || e);
+        console.warn("[LeadCaptura] click-open Contact info failed", e?.message || e);
       }
     }
 
