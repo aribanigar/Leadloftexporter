@@ -447,35 +447,53 @@
   function _findContactModal() {
     const onOverlayUrl = location.pathname.includes("/overlay/contact-info");
 
-    // Mode A — search for a visible role="dialog"
+    // Mode A — search for a visible role="dialog". Selector also covers
+    // HTML5 <dialog> elements (LinkedIn shipped some routes on these in
+    // 2025) and the artdeco-modal custom element family.
     const dialogs = document.querySelectorAll(
-      "div[role='dialog'], artdeco-modal, div.artdeco-modal__content"
+      "dialog, div[role='dialog'], artdeco-modal, div.artdeco-modal__content"
     );
+
+    // Snapshot the visible candidates once so we don't redo the visibility
+    // computation across two passes.
+    const visible = [];
     for (const d of dialogs) {
-      // Skip explicitly hidden elements. We intentionally avoid getClientRects()
-      // because artdeco-modal custom elements report zero rects even when their
-      // content is fully rendered and visible — that check was silently dropping
-      // every Contact info modal on profile pages.
       try {
         if (d.hasAttribute("hidden")) continue;
         if (d.getAttribute("aria-hidden") === "true") continue;
         const cs = window.getComputedStyle(d);
         if (cs.display === "none" || cs.visibility === "hidden") continue;
       } catch { /* assume visible */ }
-      if (onOverlayUrl) return d;
+      visible.push(d);
+    }
+
+    // First pass — STRICT match. Prefer a dialog that proves it IS the
+    // Contact info modal. This runs the same way whether we're on the
+    // /overlay/contact-info/ URL or popping the modal over the profile
+    // page. The old code did `if (onOverlayUrl) return d;` on the first
+    // visible dialog, which picked up LinkedIn's "Get 50% Off Sales Nav"
+    // / InMail upsell dialog (rendered as a sibling on the overlay route)
+    // and never even looked at the actual Contact info modal — saving
+    // leads with empty email/phone despite the data being right there.
+    for (const d of visible) {
       const aria = (d.getAttribute("aria-label") || "").toLowerCase();
       const labelledBy = (d.getAttribute("aria-labelledby") || "").toLowerCase();
       const text = (d.innerText || d.textContent || "").slice(0, 600);
+      const html = d.innerHTML || "";
       if (
         aria.includes("contact") ||
         labelledBy.includes("contact") ||
         /\bcontact info\b/i.test(text) ||
-        (/\b(mailto:|tel:)/i.test(d.innerHTML || "") &&
-          /\b(email|phone)\b/i.test(text))
+        /href=["']mailto:/i.test(html) ||
+        /href=["']tel:/i.test(html)
       ) {
         return d;
       }
     }
+
+    // (No early dialog-fallback yet — Mode B's heading walk below is more
+    // reliable than picking an arbitrary largest dialog. We use the
+    // largest-visible-dialog as a final last resort AFTER Mode B fails.)
 
     // Mode B — on /overlay/contact-info/, find the "Contact info" heading
     // and walk up to the smallest container that holds both the heading
@@ -520,8 +538,27 @@
         }
       }
 
-      // Last resort: <main>. The label-line extractor will still scope to
-      // text after the "Contact info" header so this is safer than nothing.
+      // Penultimate resort: largest visible dialog on the page. This
+      // catches layouts where Mode A's strict-signal pass missed
+      // (LinkedIn changed aria-labels) and Mode B's heading walk missed
+      // (LinkedIn used a non-text element for the heading). Picking the
+      // BIGGEST dialog avoids returning a narrow promo banner like
+      // "Get 50% Off Sales Nav".
+      if (visible.length) {
+        let best = null;
+        let bestArea = 0;
+        for (const d of visible) {
+          try {
+            const r = d.getBoundingClientRect();
+            const area = r.width * r.height;
+            if (area > bestArea) { bestArea = area; best = d; }
+          } catch { /* skip */ }
+        }
+        if (best) return best;
+      }
+
+      // Final resort: <main>. The label-line extractor scopes to text
+      // after the "Contact info" header so this is safer than nothing.
       const main = document.querySelector("main");
       if (main) return main;
     }
