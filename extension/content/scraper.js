@@ -1238,20 +1238,26 @@
   }
 
   // Text-pattern fallback for mutual-connection / social-proof rows when
-  // LinkedIn rotates class names. Walks 3 levels up from the link and rejects
-  // it if the ancestor text reads like a mutual-connection blurb.
-  // The patterns must NOT match the card-owner headline (e.g. "and 12 other
-  // mutual connections" appears under mutual rows but not card titles).
+  // LinkedIn rotates class names. Walks ancestors and rejects the link if a
+  // SHORT ancestor (=tight wrapper, like the mutual-strip itself) clearly
+  // reads as a mutual-connection blurb. The patterns must be SPECIFIC enough
+  // that they only match dedicated mutual-strip wrappers — never the card's
+  // title/avatar area — even if LinkedIn's React condenses card markup.
   function _isMutualConnectionContext(link) {
     try {
       let node = link.parentElement;
-      for (let i = 0; i < 4 && node; i++) {
+      // 2 levels up only — anything deeper risks reaching the card root
+      // whose text legitimately contains "...and N other mutual connections"
+      // in its bottom strip even though the title link is at the top.
+      for (let i = 0; i < 2 && node; i++) {
         const txt = (node.textContent || "").toLowerCase();
-        // Constrain to short ancestor text so we don't reject the whole card
-        // for a single mutual-connection row inside it. The mutual row text
-        // is typically under 200 chars; the full card text is much longer.
-        if (txt.length < 240) {
-          if (/mutual connection|shared connection|people also (view|follow)|\band\s+\d+\s+other\b/.test(txt)) {
+        // 120-char cap: real mutual-strip text is "First Last, Other Person and
+        // N other mutual connections" (~80 chars). Anything larger is almost
+        // certainly the whole card and must not be rejected.
+        if (txt.length < 120) {
+          if (
+            /\bmutual connection|\bshared connection|\bpeople also (view|follow)/i.test(txt)
+          ) {
             return true;
           }
         }

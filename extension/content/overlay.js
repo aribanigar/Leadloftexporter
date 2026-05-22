@@ -1168,10 +1168,12 @@
   function _isMutualConnectionContext(link) {
     try {
       let node = link.parentElement;
-      for (let i = 0; i < 4 && node; i++) {
+      for (let i = 0; i < 2 && node; i++) {
         const txt = (node.textContent || "").toLowerCase();
-        if (txt.length < 240) {
-          if (/mutual connection|shared connection|people also (view|follow)|\band\s+\d+\s+other\b/.test(txt)) {
+        if (txt.length < 120) {
+          if (
+            /\bmutual connection|\bshared connection|\bpeople also (view|follow)/i.test(txt)
+          ) {
             return true;
           }
         }
