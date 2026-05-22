@@ -295,6 +295,23 @@
       }
     } catch {}
 
+    // Snapshot the canonical identity captured BEFORE any modal interaction.
+    // The pushState fallback re-enabled below temporarily navigates the URL
+    // bar to /overlay/contact-info/ to force the modal to render. Without
+    // these snapshots a subsequent re-scrape would read:
+    //   - h1 = "LinkedIn"           (page-chrome on overlay route)
+    //   - location.href = /in/<handle>/overlay/contact-info/
+    // and persist BOTH as the lead's name and linkedin_url. We commit
+    // these snapshots back into `enriched` right before the save so the
+    // backend always receives the canonical /in/<handle>/ identity.
+    const snapshot = {
+      originalHref: location.href,
+      linkedin_url: enriched.linkedin_url,
+      full_name: enriched.full_name,
+      first_name: enriched.first_name,
+      last_name: enriched.last_name,
+    };
+
     // Step 2: read any Contact info modal the user has already opened.
     // If they did, we use that data immediately — no need to re-open.
     const visible = _harvestVisibleContact();
@@ -312,16 +329,15 @@
     });
 
     // Step 3: AUTO-OPEN the Contact info modal if we still don't have email
-    // or phone and we're on a /in/ profile page. This is the synchronous
-    // foreground enrichment the user demanded: one click → modal opens →
-    // email + phone scraped → modal closes → save.
+    // or phone and we're on a /in/ profile page.
     //
-    // scrapeContactInfo() does the human-paced click on the Contact info
-    // link, waits for the modal to render, reads mailto:/tel: anchors + the
-    // labelled "Email"/"Phone" lines, then dismisses the modal. The user
-    // briefly SEES the modal flash open — that's the visible feedback that
-    // the system is working and what differentiates it from the previous
-    // "click Save then nothing seems to happen" UX.
+    // This restores the v1.0.12 behaviour where the pushState fallback
+    // navigates the SPA router to /overlay/contact-info/ when the visible
+    // "Contact info" anchor isn't clickable (React handler missing, link
+    // not yet hydrated, etc.) — that's what makes enrichment RELIABLE.
+    // Disabling it in v1.0.15 was the regression. URL-corruption
+    // safeguards are: (1) the snapshot above pins name/URL to canonical,
+    // (2) Step 6 below history.replaceState-restores the URL bar.
     const needsContact =
       (!enriched.email || !enriched.phone) &&
       location.pathname.startsWith("/in/") &&
@@ -331,20 +347,8 @@
       try {
         const contact = await Scraper.scrapeContactInfo({
           timeoutMs: 9000,
-          settleMs: 1500,
-          // NEVER use pushState on the user's main tab. Doing so navigates
-          // location.href to /in/<handle>/overlay/contact-info/ which:
-          //   (a) makes the page chrome's only <h1> read "LinkedIn",
-          //       which then gets saved as the lead's name;
-          //   (b) bleeds into linkedin_url since scrapeProfile reads
-          //       normalizeProfileUrl(location.href);
-          //   (c) re-clicking Save appends /overlay/contact-info/ a SECOND
-          //       time, leaving the URL bar at
-          //       /in/<handle>/overlay/contact-info/overlay/contact-info/.
-          // The Step 5 hidden-iframe enrichment handles the no-modal case
-          // silently — that's the safe fallback. The brief URL flip from
-          // pushState produced 4 distinct corruption bugs in the wild.
-          allowPushStateFallback: false,
+          settleMs: 1800,
+          allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
         if (contact.email && !enriched.email) enriched.email = contact.email;
@@ -374,7 +378,33 @@
       } catch {}
     }
 
-    // Step 5: SAVE with everything we have. Email/phone are already in
+    // Step 5: COMMIT THE SNAPSHOT — overwrite any name/URL that the pushState
+    // fallback above may have polluted with the canonical values captured
+    // before navigation. Email/phone/website/location/etc. are kept as-is
+    // (those were the WHOLE POINT of the modal-open detour).
+    if (snapshot.linkedin_url) enriched.linkedin_url = snapshot.linkedin_url;
+    if (snapshot.full_name) enriched.full_name = snapshot.full_name;
+    if (snapshot.first_name) enriched.first_name = snapshot.first_name;
+    if (snapshot.last_name) enriched.last_name = snapshot.last_name;
+
+    // Step 6: RESTORE the URL bar. If scrapeContactInfo's pushState fallback
+    // fired, location.href is now /in/<handle>/overlay/contact-info/.
+    // replaceState back to the originally-loaded URL so the user's tab
+    // looks untouched. dispatching popstate lets LinkedIn's SPA router
+    // re-render the profile body.
+    try {
+      if (
+        location.href !== snapshot.originalHref &&
+        location.pathname.includes("/overlay/contact-info")
+      ) {
+        history.replaceState({}, "", snapshot.originalHref);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+    } catch (e) {
+      console.warn("[LeadCaptura] URL restore failed", e?.message || e);
+    }
+
+    // Step 7: SAVE with everything we have. Email/phone are already in
     // `enriched` from the auto-opened modal above — the saved row appears
     // in the pipeline already populated, no second-pass re-save needed.
     flashStatus("Saving…");

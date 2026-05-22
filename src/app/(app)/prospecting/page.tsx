@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap, Wrench } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap, Wrench, Bot } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -28,6 +28,16 @@ export default function ProspectingPage() {
   const [findingEmails, setFindingEmails] = useState(false);
   const [findResult, setFindResult] = useState<string | null>(null);
   const [repairing, setRepairing] = useState(false);
+  // Bulk-enrich progress state. `bulkEnrich.cancel` is a ref-stable
+  // boolean toggled by the Cancel button so the in-flight loop can
+  // bail between leads without an unmount.
+  const [bulkEnrich, setBulkEnrich] = useState<{
+    running: boolean;
+    done: number;
+    total: number;
+    currentName: string;
+  }>({ running: false, done: 0, total: 0, currentName: "" });
+  const bulkCancelRef = useRef(false);
 
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
@@ -188,6 +198,29 @@ export default function ProspectingPage() {
             <Wrench className="h-4 w-4" />
             {repairing ? "Repairing…" : "Repair leads"}
           </button>
+          <button
+            className="btn-secondary"
+            disabled={bulkEnrich.running}
+            onClick={async () => {
+              if (bulkEnrich.running) return;
+              await startBulkEnrich({ qc, setBulkEnrich, bulkCancelRef, setFindResult });
+            }}
+            title="Walk through every lead missing email or phone, open the LinkedIn profile in a background tab, scrape Contact info, sync back. Human-paced 35–80 seconds between leads."
+          >
+            <Bot className="h-4 w-4" />
+            {bulkEnrich.running
+              ? `Enriching ${bulkEnrich.done}/${bulkEnrich.total}…`
+              : "Bulk Enrich"}
+          </button>
+          {bulkEnrich.running && (
+            <button
+              className="btn-secondary"
+              onClick={() => { bulkCancelRef.current = true; }}
+              title="Stop after the current lead finishes"
+            >
+              Cancel
+            </button>
+          )}
           <button className="btn-primary" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4" /> Add Lead
           </button>
@@ -370,6 +403,142 @@ function enrichLead(lead: Lead, qc: ReturnType<typeof useQueryClient>) {
   // Refresh twice — early in case enrichment is fast, late as a safety net.
   setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 12_000);
   setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 25_000);
+}
+
+// Bulk Enrich — walk every lead in the workspace missing email or phone,
+// open the LinkedIn profile in a background tab with ?lc_enrich=1, wait
+// for the extension to scrape Contact info and sync back, then move to
+// the next lead. Spacing is human-paced (35–80s typical, ~15% chance of
+// a 90–180s "distracted user" pause) so it doesn't look like a bot to
+// LinkedIn's behavioural anti-abuse. Cancellable mid-flight.
+//
+// Implementation choices:
+//   - We pull leads via /leads/needs-enrichment (server filters for
+//     linkedin_url IS NOT NULL AND (email IS NULL OR phone IS NULL)).
+//     Sorting by date_created so newly-captured leads enrich first.
+//   - window.open() is used because the extension can't be addressed
+//     directly from a non-LinkedIn page (no externally_connectable in
+//     manifest). The extension's main.js maybeRunEnrichmentTrigger()
+//     detects ?lc_enrich=1, does the scrape, then asks its service
+//     worker (lc:closeMe) to close the tab — so visible tabs flash
+//     open for ~6–12s each then disappear.
+//   - Popup blocker check on the first lead only; if it fires there
+//     we abort the whole run with a clear error.
+//   - Cancel button flips a ref that the loop polls between leads.
+async function startBulkEnrich(opts: {
+  qc: ReturnType<typeof useQueryClient>;
+  setBulkEnrich: (s: {
+    running: boolean;
+    done: number;
+    total: number;
+    currentName: string;
+  }) => void;
+  bulkCancelRef: React.MutableRefObject<boolean>;
+  setFindResult: (s: string | null) => void;
+}) {
+  const { qc, setBulkEnrich, bulkCancelRef, setFindResult } = opts;
+  bulkCancelRef.current = false;
+  setFindResult(null);
+
+  // Fetch the candidate list from the backend.
+  let candidates: Lead[] = [];
+  try {
+    const res = await api<{ items: Lead[] }>(
+      "/leads/needs-enrichment?limit=500"
+    );
+    candidates = res.items.filter((l) => !!l.linkedin_url);
+  } catch (e: unknown) {
+    setFindResult(
+      `Bulk Enrich failed: ${e instanceof Error ? e.message : String(e)}`
+    );
+    return;
+  }
+
+  if (candidates.length === 0) {
+    setFindResult("All leads already have email and phone — nothing to enrich.");
+    return;
+  }
+
+  // Confirm with the user — show count + estimated time before opening
+  // dozens of tabs unexpectedly.
+  const estMinLow = Math.round((candidates.length * 35) / 60);
+  const estMinHigh = Math.round((candidates.length * 90) / 60);
+  const proceed = confirm(
+    `Bulk Enrich ${candidates.length} leads?\n\n` +
+      `LeadCaptura will open each LinkedIn profile in a background tab one ` +
+      `at a time, scrape Contact info, sync back, and close the tab. ` +
+      `Human-paced 35–80 seconds between leads so it stays under LinkedIn's ` +
+      `behavioural radar.\n\n` +
+      `Estimated time: ~${estMinLow}–${estMinHigh} minutes. ` +
+      `You can keep working in other tabs. Click Cancel here to stop, or ` +
+      `click the Cancel button in the toolbar after starting.`
+  );
+  if (!proceed) return;
+
+  setBulkEnrich({
+    running: true,
+    done: 0,
+    total: candidates.length,
+    currentName: "",
+  });
+
+  for (let i = 0; i < candidates.length; i++) {
+    if (bulkCancelRef.current) break;
+    const lead = candidates[i];
+    setBulkEnrich({
+      running: true,
+      done: i,
+      total: candidates.length,
+      currentName: lead.full_name || lead.linkedin_url || "(unnamed)",
+    });
+
+    // Open the lead's URL with ?lc_enrich=1 — extension auto-runs scrape
+    // and closes the tab when done.
+    let target: string;
+    try {
+      const u = new URL(lead.linkedin_url!);
+      u.searchParams.set("lc_enrich", "1");
+      target = u.toString();
+    } catch {
+      const sep = lead.linkedin_url!.includes("?") ? "&" : "?";
+      target = `${lead.linkedin_url}${sep}lc_enrich=1`;
+    }
+    const win = window.open(target, "_blank", "noopener");
+    if (!win && i === 0) {
+      alert(
+        "Popup blocked. Allow popups for this site so Bulk Enrich can open LinkedIn profiles in background tabs."
+      );
+      setBulkEnrich({ running: false, done: 0, total: 0, currentName: "" });
+      return;
+    }
+
+    // Refresh the leads list mid-run so the user sees progress.
+    setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 15_000);
+
+    // Skip the wait after the last lead.
+    if (i < candidates.length - 1) {
+      // Human-paced gap: 35–80s, ~15% chance of a 90–180s long-tail
+      // (mimics "user got distracted by another tab").
+      const base = 35_000 + Math.random() * 45_000;
+      const longTail =
+        Math.random() < 0.15 ? 90_000 + Math.random() * 90_000 : 0;
+      const totalWait = base + longTail;
+      // Poll the cancel flag every second so the user doesn't wait
+      // 80s after clicking Cancel.
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < totalWait) {
+        if (bulkCancelRef.current) break;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  const finishedCount = bulkCancelRef.current
+    ? `Cancelled after ${candidates.findIndex((_, i) => i)}/${candidates.length}`
+    : `Enriched ${candidates.length} leads`;
+  setBulkEnrich({ running: false, done: 0, total: 0, currentName: "" });
+  qc.invalidateQueries({ queryKey: ["leads"] });
+  setFindResult(finishedCount);
 }
 
 // Headlines like "Save" / "Save Lead" / "Save in Sales Navigator" come from

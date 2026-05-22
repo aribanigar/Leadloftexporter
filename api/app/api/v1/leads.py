@@ -316,6 +316,38 @@ def wipe_workspace_pipeline_data(
     return {"deleted": counts}
 
 
+@router.get("/needs-enrichment", response_model=LeadList)
+def leads_needing_enrichment(
+    limit: int = 500,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Return leads that have a linkedin_url but are missing email OR phone.
+
+    Used by the Bulk Enrich runner on the prospecting page to walk every
+    candidate one at a time. Sorted oldest-created-first so the longest
+    sitting leads enrich first (newer ones likely captured by a version
+    of the extension that already scraped the modal).
+    """
+    rows = (
+        db.query(Lead)
+        .filter(
+            Lead.workspace_id == ctx.workspace_id,
+            Lead.linkedin_url.isnot(None),
+            (Lead.email.is_(None)) | (Lead.phone.is_(None)),
+        )
+        .order_by(Lead.created_at.asc())
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
+    return LeadList(
+        items=[_serialize(r) for r in rows],
+        total=len(rows),
+        page=1,
+        page_size=len(rows),
+    )
+
+
 @router.post("/cleanup/repair-corrupted")
 def repair_corrupted_leads(
     ctx: AuthContext = Depends(get_workspace_context),
