@@ -852,20 +852,23 @@
   function _isInsightLink(link) {
     try {
       if (link.closest(_INSIGHT_ANCESTOR_SEL)) return true;
-      // Mirror of scraper.js _isInsightLink. Only LinkedIn's two real
-      // card-link shapes pass: (a) title link with <span aria-hidden=
-      // "true">Name</span> child (LinkedIn's accessibility pattern), or
-      // (b) photo-only anchor with no text. Everything else is rejected
-      // — that includes every mutual-strip <a>Name</a>.
-      const hasAriaName = !!link.querySelector("span[aria-hidden='true']");
-      const isPhotoAnchor =
-        !!link.querySelector(":scope > img, :scope > div img, :scope > picture img") &&
-        !(link.textContent || "").trim();
-      if (!hasAriaName && !isPhotoAnchor) return true;
     } catch {
       /* defensive */
     }
     return false;
+  }
+
+  // Tiebreaker for card-owner dedup: does this link use LinkedIn's
+  // accessible title pattern (<a><span aria-hidden="true">Name</span></a>)?
+  // Mutual-strip anchors are plain <a>Name</a> with no such span.
+  // When a card's first /in/ link is a mutual anchor but a later one is the
+  // title link, we upgrade to the title link even though the URL differs.
+  function _hasAccessibleTitle(link) {
+    try {
+      return !!link.querySelector("span[aria-hidden='true']");
+    } catch {
+      return false;
+    }
   }
 
   function _cardFromLink(link) {
@@ -1115,13 +1118,18 @@
       const card = _cardFromLink(link);
       if (!card) continue;
       if (cardOwner.has(card)) {
-        // We already have the owner link for this card; if the existing
-        // record has no text but the new candidate does AND points to the
-        // same URL, upgrade (so we use the name anchor over the photo
-        // anchor for downstream name extraction). DIFFERENT URLs are
-        // mutual-connection links — never overwrite the owner.
         const existing = cardOwner.get(card);
-        if (existing.url !== url) continue;
+        if (existing.url !== url) {
+          // Different URL = possible mutual-connection link embedded in this card.
+          // Prefer the title link (has aria-hidden span) over a plain anchor
+          // so a mutual strip that appears first in DOM order doesn't hijack
+          // the card owner when the real title link appears later.
+          if (_hasAccessibleTitle(link) && !_hasAccessibleTitle(existing.link)) {
+            cardOwner.set(card, { url, link });
+          }
+          continue;
+        }
+        // Same URL: upgrade to the anchor with name text (photo anchor is often empty).
         const newHasText = (link.textContent || "").trim().length > 0;
         const oldHasText = (existing.link.textContent || "").trim().length > 0;
         if (newHasText && !oldHasText) {
