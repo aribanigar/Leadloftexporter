@@ -305,13 +305,29 @@ export default function ProspectingPage() {
 // the leads query after a short delay so the row picks up the new fields.
 function enrichLead(lead: Lead, qc: ReturnType<typeof useQueryClient>) {
   if (!lead.linkedin_url) return;
-  const sep = lead.linkedin_url.includes("?") ? "&" : "?";
-  const url = `${lead.linkedin_url}${sep}lc_enrich=1`;
-  // open in a new tab; the extension closes it itself once enrichment finishes
-  window.open(url, "_blank", "noopener");
-  // refresh after enrichment is expected to complete
-  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 12000);
-  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 25000);
+  // Build the enrichment URL via URL() so we don't double-append the param
+  // if the stored linkedin_url already contains a query string. Fall back to
+  // naive concat only if the URL is malformed.
+  let target: string;
+  try {
+    const u = new URL(lead.linkedin_url);
+    u.searchParams.set("lc_enrich", "1");
+    target = u.toString();
+  } catch {
+    const sep = lead.linkedin_url.includes("?") ? "&" : "?";
+    target = `${lead.linkedin_url}${sep}lc_enrich=1`;
+  }
+  const win = window.open(target, "_blank", "noopener");
+  if (!win) {
+    // Popup blocked — surface a hint rather than silently failing.
+    alert(
+      "Please allow popups for this site so LeadCaptura can open the LinkedIn profile and run enrichment."
+    );
+    return;
+  }
+  // Refresh twice — early in case enrichment is fast, late as a safety net.
+  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 12_000);
+  setTimeout(() => qc.invalidateQueries({ queryKey: ["leads"] }), 25_000);
 }
 
 // Headlines like "Save" / "Save Lead" / "Save in Sales Navigator" come from

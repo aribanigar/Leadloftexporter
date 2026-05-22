@@ -224,17 +224,17 @@ def ingest_lead(
     # fields when the extension's overlay chips were picked up by the page
     # scraper. Without this guard the pipeline shows rows like
     # "Waleed Khan / Save" because "Save" was stored as the headline.
+    _UI_NOISE_RE = re.compile(
+        r"^(save(\s+lead)?|saving…?|saved\s*✓?|save\s+in\s+sales\s+navigator|"
+        r"add\s+to\s+pipeline|connect|message|follow|following|pending|more|premium)$",
+        re.IGNORECASE,
+    )
+
+    def _is_ui_noise(v) -> bool:
+        return bool(v) and bool(_UI_NOISE_RE.fullmatch(str(v).strip()))
+
     def _strip_ui_noise(v):
-        if not v:
-            return v
-        s = str(v).strip()
-        if re.fullmatch(
-            r"(save(\s+lead)?|save\s+in\s+sales\s+navigator|add\s+to\s+pipeline|connect|message|follow|following|pending|more|premium)",
-            s,
-            re.IGNORECASE,
-        ):
-            return None
-        return v
+        return None if _is_ui_noise(v) else v
 
     # Resolve each scalar to its column-capped value once. Reused below in
     # both the update-existing-lead and insert-new-lead branches.
@@ -332,15 +332,17 @@ def ingest_lead(
                 if mismatched_attribution and capped.get("title"):
                     lead.title = capped["title"]
 
-        # Merge other descriptive fields fill-only so user-edited values
-        # aren't clobbered. first_name / last_name are excluded here because
-        # the block above already handles them in lock-step with full_name.
-        for attr in (
-            "title",
-            "headline",
-            "location",
-            "avatar_url",
-        ):
+        # Merge other descriptive fields. For title/headline we ALSO overwrite
+        # if the EXISTING value is UI-button noise ("Save", "Connect", …) —
+        # leads captured by old buggy extension versions had headline="Save"
+        # because the scraper picked up its own injected chip. Plain fill-only
+        # would leave those rows polluted forever even after a clean re-sync.
+        for attr in ("title", "headline"):
+            val = capped.get(attr)
+            old = getattr(lead, attr)
+            if val and (not old or _is_ui_noise(old)):
+                setattr(lead, attr, val)
+        for attr in ("location", "avatar_url"):
             val = capped.get(attr)
             if val and not getattr(lead, attr):
                 setattr(lead, attr, val)
