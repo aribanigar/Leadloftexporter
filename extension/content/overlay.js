@@ -1867,6 +1867,207 @@
     }
   }
 
+  // ---- Auto-fill Easy Apply form questions (Option A profile + Option B Gemini) ----
+
+  async function _getAutoApplyConfig() {
+    const s = await Storage.getSettings();
+    return {
+      profile: s.applicationProfile || {},
+      aiEnabled: !!s.aiEnabled && !!s.geminiApiKey,
+    };
+  }
+
+  // React-aware value setter so LinkedIn's controlled inputs register the change.
+  function _setNativeValue(el, value) {
+    const proto =
+      el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype
+      : el.tagName === "SELECT" ? HTMLSelectElement.prototype
+      : HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, "value");
+    try {
+      if (desc && desc.set) desc.set.call(el, value);
+      else el.value = value;
+    } catch { el.value = value; }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function _fieldLabelFor(el) {
+    const aria = el.getAttribute("aria-label");
+    if (aria && aria.trim()) return aria.trim();
+    const id = el.id;
+    if (id) {
+      try {
+        const lbl = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+        if (lbl) { const t = (lbl.innerText || lbl.textContent || "").trim(); if (t) return t; }
+      } catch {}
+    }
+    const lblby = el.getAttribute("aria-labelledby");
+    if (lblby) {
+      const t = lblby.split(/\s+/).map((i) => document.getElementById(i)?.innerText || "").join(" ").trim();
+      if (t) return t;
+    }
+    const group = el.closest(".fb-dash-form-element, [data-test-form-element], .jobs-easy-apply-form-element, fieldset");
+    if (group) {
+      const lbl = group.querySelector("label, legend, .fb-dash-form-element__label, .artdeco-text-input--label");
+      if (lbl) { const t = (lbl.innerText || lbl.textContent || "").trim(); if (t) return t; }
+    }
+    return "";
+  }
+
+  function _yesNoOption(boolish, options) {
+    const want = /^y/i.test(boolish || "") ? "yes" : "no";
+    if (!options || !options.length) return boolish;
+    const found =
+      options.find((o) => o.toLowerCase().trim() === want) ||
+      options.find((o) => new RegExp(`^${want}`, "i").test(o.trim()));
+    return found || boolish;
+  }
+
+  // Option A: deterministic answers from the user's saved profile.
+  function _matchProfileAnswer(label, profile, kind, options) {
+    const l = (label || "").toLowerCase();
+    if (!l) return null;
+    const p = profile || {};
+    if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || null;
+    if (/phone|mobile|cell|contact number|whatsapp/i.test(l)) return p.phone || null;
+    if (/e-?mail/i.test(l)) return p.email || null;
+    if (/full name|your name/i.test(l)) return p.fullName || null;
+    if (/first name/i.test(l)) return (p.fullName || "").split(" ")[0] || null;
+    if (/last name|surname|family name/i.test(l)) return (p.fullName || "").split(" ").slice(1).join(" ") || null;
+    if (/expected[^a-z]{0,10}(salary|compensation|ctc|pay)|salary[^a-z]{0,10}expectation|desired[^a-z]{0,10}salary/i.test(l)) return p.expectedSalary || null;
+    if (/current[^a-z]{0,10}(salary|compensation|ctc)/i.test(l)) return p.currentSalary || null;
+    if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || null;
+    if (/relocat/i.test(l)) return _yesNoOption(p.relocate || "Yes", options);
+    if (/sponsor|require[^a-z]{0,10}visa|visa sponsor/i.test(l)) return _yesNoOption(p.sponsorship || "No", options);
+    if (/authoriz|authoris|right to work|legally[^a-z]{0,15}work|eligible to work|work permit/i.test(l)) return _yesNoOption(p.workAuth || "Yes", options);
+    if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
+    if (/\bcountry\b/i.test(l)) return p.country || null;
+    // Generic Yes/No leaning positive when only Yes/No options exist
+    if (options && options.length && options.length <= 3) {
+      const lo = options.map((o) => o.toLowerCase().trim());
+      if (lo.includes("yes") && lo.includes("no") && /(do you|are you|have you|can you|will you|willing|comfortable|able to)/i.test(l)) {
+        return _yesNoOption("Yes", options);
+      }
+    }
+    return null;
+  }
+
+  function _pickOption(options, desired) {
+    if (!desired) return null;
+    const d = String(desired).toLowerCase().trim();
+    let m = options.find((o) => o.toLowerCase().trim() === d);
+    if (m) return m;
+    m = options.find((o) => o.toLowerCase().trim().startsWith(d) || d.startsWith(o.toLowerCase().trim()));
+    if (m) return m;
+    m = options.find((o) => o.toLowerCase().includes(d) || d.includes(o.toLowerCase().trim()));
+    if (m) return m;
+    return null;
+  }
+
+  function _radioLabel(r) {
+    if (r.id) {
+      try {
+        const lbl = document.querySelector(`label[for="${CSS.escape(r.id)}"]`);
+        if (lbl) return (lbl.innerText || lbl.textContent || "").trim();
+      } catch {}
+    }
+    const wrap = r.closest("label");
+    if (wrap) return (wrap.innerText || wrap.textContent || "").trim();
+    return (r.value || "").trim();
+  }
+
+  function _groupRadios(modal) {
+    const radios = Array.from(modal.querySelectorAll("input[type='radio']")).filter(_isVisible);
+    const byKey = new Map();
+    let anon = 0;
+    for (const r of radios) {
+      const key = r.name || r.closest("fieldset")?.id || `anon${anon++}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(r);
+    }
+    const groups = [];
+    for (const rs of byKey.values()) {
+      const fs = rs[0].closest("fieldset, .fb-dash-form-element, [data-test-form-element]");
+      const legend = fs?.querySelector("legend, .fb-dash-form-element__label, label");
+      const question = (legend?.innerText || legend?.textContent || "").replace(/\s+/g, " ").trim();
+      groups.push({ question, radios: rs });
+    }
+    return groups;
+  }
+
+  // Fill every empty field in the modal. Profile first, then Gemini for the rest.
+  async function _answerModalQuestions(modal) {
+    if (!modal) return;
+    const { sleep } = globalThis.__lcHuman;
+    const { profile, aiEnabled } = await _getAutoApplyConfig();
+    const askGemini = async (question, kind, options) => {
+      if (!aiEnabled || !question) return null;
+      try {
+        const r = await Api.geminiAnswer({ question, kind, options: options || [] });
+        return r && r.ok && r.answer ? r.answer : null;
+      } catch { return null; }
+    };
+
+    // Text / number / tel / email / textarea
+    const textInputs = Array.from(modal.querySelectorAll(
+      "input[type='text'], input[type='tel'], input[type='email'], input[type='number'], input:not([type]), textarea"
+    )).filter((el) => _isVisible(el) && !el.disabled && !el.readOnly);
+    for (const inp of textInputs) {
+      if (inp.value && inp.value.trim()) continue;
+      const label = _fieldLabelFor(inp);
+      if (!label) continue;
+      const isNumber = inp.type === "number" || /\b(year|years|salary|number|how many|amount|ctc|experience)\b/i.test(label);
+      let ans = _matchProfileAnswer(label, profile, isNumber ? "number" : "text", null);
+      if (ans == null) ans = await askGemini(label, isNumber ? "number" : "text", null);
+      if (ans != null && String(ans).trim()) {
+        let val = String(ans).trim();
+        if (isNumber) { const num = val.match(/-?\d+(\.\d+)?/); if (num) val = num[0]; }
+        _setNativeValue(inp, val);
+        await sleep(150 + Math.random() * 250);
+      }
+    }
+
+    // Select dropdowns
+    const selects = Array.from(modal.querySelectorAll("select")).filter((el) => _isVisible(el) && !el.disabled);
+    for (const sel of selects) {
+      const curTxt = (sel.options[sel.selectedIndex]?.text || "").toLowerCase().trim();
+      const answered = sel.value && curTxt && !/^(select|choose|please|--)/.test(curTxt);
+      if (answered) continue;
+      const label = _fieldLabelFor(sel);
+      const options = Array.from(sel.options).map((o) => o.text.trim())
+        .filter((t) => t && !/^(select|choose|please|--)/i.test(t));
+      if (!options.length) continue;
+      let ans = _matchProfileAnswer(label, profile, "select", options);
+      if (ans == null) ans = await askGemini(label, "select", options);
+      const pick = ans ? _pickOption(options, ans) : null;
+      if (pick) {
+        const opt = Array.from(sel.options).find((o) => o.text.trim() === pick);
+        if (opt) { _setNativeValue(sel, opt.value); await sleep(150 + Math.random() * 250); }
+      }
+    }
+
+    // Radio groups
+    for (const group of _groupRadios(modal)) {
+      if (group.radios.some((r) => r.checked)) continue;
+      const options = group.radios.map((r) => _radioLabel(r));
+      let ans = _matchProfileAnswer(group.question, profile, "radio", options);
+      if (ans == null) ans = await askGemini(group.question, "radio", options);
+      const pick = ans ? _pickOption(options, ans) : null;
+      if (pick) {
+        const idx = options.findIndex((o) => o === pick);
+        const radio = group.radios[idx];
+        if (radio) {
+          let lbl = null;
+          if (radio.id) { try { lbl = document.querySelector(`label[for="${CSS.escape(radio.id)}"]`); } catch {} }
+          try { (lbl || radio).click(); }
+          catch { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+          await sleep(150 + Math.random() * 250);
+        }
+      }
+    }
+  }
+
   // Step through the open Easy Apply modal. Returns {ok, reason}.
   async function _runEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
@@ -1889,6 +2090,10 @@
       // Keep a resume selected + don't auto-follow companies.
       _ensureResumeSelected(modal);
       _uncheckFollow(modal);
+      // Auto-fill this step's questions (profile answers + Gemini fallback)
+      // before trying to advance.
+      try { await _answerModalQuestions(modal); }
+      catch (e) { console.warn("[LeadCaptura] question auto-fill failed", e?.message); }
       await sleep(500 + Math.random() * 500);
 
       const action = _modalActionButton(modal);

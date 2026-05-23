@@ -59,6 +59,11 @@ html, body {
   background: white;
 }
 .inp:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+textarea.inp { resize: vertical; min-height: 80px; font-family: inherit; line-height: 1.4; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 14px; }
+.grid2 .lbl, .grid3 .lbl { margin-top: 8px; }
+@media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 
 .row { display: flex; gap: 8px; align-items: center; }
 .row.checkbox { margin-top: 10px; }

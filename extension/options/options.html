@@ -65,6 +65,105 @@
       </section>
 
       <section class="card">
+        <h2>Auto-Apply — Application profile</h2>
+        <p class="muted small">
+          Used to auto-fill the standard questions on LinkedIn Easy Apply forms (phone, location, years of experience, salary, etc.). Leave a field blank to skip it.
+        </p>
+        <div class="grid2">
+          <div>
+            <label class="lbl">Full name</label>
+            <input id="ap_fullName" class="inp" type="text" placeholder="Todd Santner" />
+          </div>
+          <div>
+            <label class="lbl">Email</label>
+            <input id="ap_email" class="inp" type="email" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label class="lbl">Phone (with country code)</label>
+            <input id="ap_phone" class="inp" type="tel" placeholder="+966 5x xxx xxxx" />
+          </div>
+          <div>
+            <label class="lbl">City</label>
+            <input id="ap_city" class="inp" type="text" placeholder="Riyadh" />
+          </div>
+          <div>
+            <label class="lbl">Country</label>
+            <input id="ap_country" class="inp" type="text" placeholder="Saudi Arabia" />
+          </div>
+          <div>
+            <label class="lbl">Years of experience</label>
+            <input id="ap_years" class="inp" type="text" placeholder="9" />
+          </div>
+          <div>
+            <label class="lbl">Notice period / availability</label>
+            <input id="ap_notice" class="inp" type="text" placeholder="1 month" />
+          </div>
+          <div>
+            <label class="lbl">Expected salary</label>
+            <input id="ap_expectedSalary" class="inp" type="text" placeholder="e.g. 25000" />
+          </div>
+          <div>
+            <label class="lbl">Current salary</label>
+            <input id="ap_currentSalary" class="inp" type="text" placeholder="e.g. 20000" />
+          </div>
+        </div>
+        <div class="grid3" style="margin-top:10px">
+          <div>
+            <label class="lbl">Authorized to work?</label>
+            <select id="ap_workAuth" class="inp">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Need sponsorship?</label>
+            <select id="ap_sponsorship" class="inp">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Willing to relocate?</label>
+            <select id="ap_relocate" class="inp">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Auto-Apply — AI answers (Gemini)</h2>
+        <p class="muted small">
+          For questions the profile above can't answer, LeadCaptura asks Google Gemini to answer using your CV. Get a free API key at
+          <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> — the free tier is enough for everyday job applying.
+        </p>
+        <label class="row checkbox">
+          <input type="checkbox" id="aiEnabled" /> <span>Use Gemini to answer unmatched questions from my CV</span>
+        </label>
+
+        <label class="lbl">Gemini API key</label>
+        <div class="row">
+          <input id="geminiApiKey" class="inp" type="password" placeholder="AIza…" autocomplete="off" />
+          <button class="btn ghost" id="toggle-gemini">Show</button>
+        </div>
+
+        <label class="lbl">Gemini model</label>
+        <input id="geminiModel" class="inp" type="text" placeholder="gemini-2.0-flash" />
+
+        <label class="lbl">Your CV / résumé text (Gemini reads this to answer)</label>
+        <textarea id="cvText" class="inp" rows="10" placeholder="Paste your full CV here…"></textarea>
+
+        <div class="actions">
+          <button class="btn ghost" id="test-gemini">Test Gemini key</button>
+        </div>
+        <div id="gemini-status" class="status"></div>
+        <p class="muted small">
+          AI answers are best-effort. Review applications you care about — for tricky/required questions LeadCaptura skips the job rather than guessing wrong.
+        </p>
+      </section>
+
+      <section class="card">
         <h2>Privacy</h2>
         <p class="muted small">
           This extension reads only the DOM of LinkedIn pages you're already viewing. It never calls LinkedIn's internal APIs, never spawns headless sessions, and never reads any other site. Scraped data is sent only to your configured backend URL.

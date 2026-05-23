@@ -298,6 +298,81 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     return true;
   }
+  // Ask Gemini to answer a single Easy-Apply question using the stored CV.
+  // Routed through the SW so the content script (linkedin.com origin) doesn't
+  // make the cross-origin call itself, and the API key never touches the page.
+  if (msg?.type === "lc:geminiAnswer") {
+    (async () => {
+      try {
+        const { geminiApiKey, geminiModel, cvText, applicationProfile } = await getSettings();
+        if (!geminiApiKey) { sendResponse({ ok: false, error: "no_gemini_key" }); return; }
+        const model = geminiModel || "gemini-2.0-flash";
+        const q = String(msg.question || "").slice(0, 500);
+        const kind = msg.kind || "text"; // text | number | select | radio
+        const options = Array.isArray(msg.options) ? msg.options.filter(Boolean) : [];
+
+        let instruction;
+        if (kind === "select" || kind === "radio") {
+          instruction =
+            `Choose the single best option for this job-application question. ` +
+            `Respond with EXACTLY one option copied verbatim from this list, nothing else:\n` +
+            options.map((o) => `- ${o}`).join("\n");
+        } else if (kind === "number") {
+          instruction =
+            `Answer this job-application question with ONLY a number (no words, no units, no symbols). ` +
+            `If it asks years of experience, give a realistic integer based on the CV.`;
+        } else {
+          instruction =
+            `Answer this job-application question concisely (a short phrase or a single value). ` +
+            `Do not add explanations or quotation marks.`;
+        }
+
+        const profileLines = applicationProfile
+          ? Object.entries(applicationProfile)
+              .filter(([, v]) => v)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join("\n")
+          : "";
+
+        const prompt =
+          `You are filling out a LinkedIn job application on behalf of a candidate. ` +
+          `Use the candidate's CV and profile below to answer truthfully and favourably.\n\n` +
+          `=== CANDIDATE PROFILE ===\n${profileLines}\n\n` +
+          `=== CANDIDATE CV ===\n${String(cvText || "").slice(0, 8000)}\n\n` +
+          `=== QUESTION ===\n${q}\n\n` +
+          `=== INSTRUCTION ===\n${instruction}\n\nAnswer:`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 80 },
+            }),
+          });
+        } catch (e) {
+          sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
+          return;
+        }
+        if (!res.ok) {
+          const t = await res.text().catch(() => "");
+          sendResponse({ ok: false, error: `gemini_http_${res.status}: ${t.slice(0, 160)}` });
+          return;
+        }
+        const data = await res.json();
+        let answer = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+        // Strip surrounding quotes / trailing punctuation Gemini sometimes adds
+        answer = answer.replace(/^["'`]+|["'`]+$/g, "").trim();
+        sendResponse({ ok: true, answer });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
   if (msg?.type !== "lc:api") return;
   const handler = handlers[msg.action];
   if (!handler) {
