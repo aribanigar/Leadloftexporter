@@ -1517,15 +1517,20 @@
   const injectedJobChips = new Map(); // canonical job url -> wrap element
   const _jobChipCards = new Map();    // canonical job url -> source card element
 
-  // Portal root — chips appended here as position:fixed, completely bypassing
-  // LinkedIn's overflow:hidden scroll containers in the left-panel list.
+  // Portal root — chips appended here as position:fixed, bypassing LinkedIn's
+  // overflow:hidden scroll containers. Mounted on <html> (not <body>) with an
+  // explicit max z-index so it layers ABOVE LinkedIn's positioned content —
+  // the same pattern the visible toolbar + Select-All pill already use. A
+  // position:fixed element creates its own stacking context, so WITHOUT a high
+  // z-index the chips get trapped at body level and painted under the page.
   let _portalRoot = null;
   function _ensurePortalRoot() {
-    if (_portalRoot && document.body.contains(_portalRoot)) return _portalRoot;
+    if (_portalRoot && document.documentElement.contains(_portalRoot)) return _portalRoot;
     _portalRoot = document.createElement("div");
     _portalRoot.id = "lc-job-portal";
-    _portalRoot.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
-    document.body.appendChild(_portalRoot);
+    _portalRoot.style.cssText =
+      "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483640;pointer-events:none;";
+    document.documentElement.appendChild(_portalRoot);
     return _portalRoot;
   }
 
@@ -1673,7 +1678,7 @@
 
   function _setJobChipState(url, st, text) {
     const wrap = injectedJobChips.get(url);
-    if (!wrap || !document.body.contains(wrap)) return;
+    if (!wrap) return;
     const btn = wrap.querySelector(".lc-inline-save");
     const span = wrap.querySelector(".lc-inline-save-text");
     if (btn) btn.dataset.state = st;
