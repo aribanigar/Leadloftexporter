@@ -1633,99 +1633,75 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // KEY INVARIANT: one Save chip per CARD, using the FIRST /in/ link
-    // inside that card as the canonical profile owner.
-    //
-    // LinkedIn embeds mutual-connection people's profile links INSIDE the
-    // card of the person being viewed (e.g. Mohamad's card contains links
-    // to Joann Deeb and Lulwa Al Qadi as "mutual connections"). The old
-    // "group all /in/ anchors on the page by URL, inject one chip per
-    // URL" approach injected chips for Joann and Lulwa as separate "cards"
-    // — saving the wrong person when the user clicked. Now we walk cards
-    // and only consider the FIRST /in/ link per card. Mutual-connection
-    // links never become canonical because they're never first in DOM
-    // order within their containing card.
-    const allLinks = Array.from(
-      document.querySelectorAll("a[href*='/in/'], a[href*='/sales/lead/']")
-    ).filter((link) => !_isInsightLink(link) && !_isMutualConnectionContext(link));
-    const cardOwner = new Map(); // card element -> { url, link }
-    for (const link of allLinks) {
-      const url = globalThis.__lcDom.normalizeProfileUrl(link.href);
-      if (!url) continue;
-      const card = _cardFromLink(link);
-      if (!card) continue;
-      if (cardOwner.has(card)) {
-        const existing = cardOwner.get(card);
-        if (existing.url !== url) {
-          // Different URL = possible mutual-connection link embedded in this card.
-          // Prefer the title link (has aria-hidden span) over a plain anchor
-          // so a mutual strip that appears first in DOM order doesn't hijack
-          // the card owner when the real title link appears later.
-          if (_hasAccessibleTitle(link) && !_hasAccessibleTitle(existing.link)) {
-            cardOwner.set(card, { url, link });
-          }
-          continue;
-        }
-        // Same URL: upgrade to the anchor with name text (photo anchor is often empty).
-        const newHasText = (link.textContent || "").trim().length > 0;
-        const oldHasText = (existing.link.textContent || "").trim().length > 0;
-        if (newHasText && !oldHasText) {
-          cardOwner.set(card, { url, link });
-        }
-        continue;
-      }
-      cardOwner.set(card, { url, link });
-    }
-    // SECOND PASS — avatar-link override. The /in/ link wrapping the largest
-    // img in the card is the canonical owner. Catches the "Ellen Landes
-    // hijacks Zeina Gammoh's card" bug when LinkedIn rotates class names
-    // and a mutual-connection anchor with aria-hidden span sneaks in before
-    // the title link in DOM order.
-    for (const [card, current] of cardOwner.entries()) {
-      const avatarLink = _findAvatarLink(card);
-      if (!avatarLink) continue;
-      if (_isInsightLink(avatarLink) || _isMutualConnectionContext(avatarLink)) continue;
-      const avatarUrl = globalThis.__lcDom.normalizeProfileUrl(avatarLink.href);
-      if (avatarUrl && avatarUrl !== current.url) {
-        cardOwner.set(card, { url: avatarUrl, link: avatarLink });
-      }
-    }
-    // Surface as the same byUrl shape the rest of the function expects.
-    const byUrl = new Map();
-    for (const [, { url, link }] of cardOwner) {
-      byUrl.set(url, link);
+    // CARD-FIRST detection. Discover every result card by walking up from
+    // EVERY profile link on the page, then pick each card's canonical owner.
+    // This is robust to link-level filtering: even if a card's title link
+    // looks mutual-ish (LinkedIn rotates class names), the card is still
+    // found, and the owner is resolved by avatar proximity. The old
+    // link-first approach lost an entire card whenever its only surviving
+    // link got filtered — that's why some cards had no Save chip.
+    const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
+    const cards = new Set();
+    for (const a of document.querySelectorAll(linkSel)) {
+      const card = _cardFromLink(a);
+      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") cards.add(card);
     }
 
-    for (const [url, link] of byUrl.entries()) {
+    for (const card of cards) {
       try {
+        const ownerLink = _resolveCardOwnerLink(card, linkSel);
+        if (!ownerLink) continue;
+        const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
+        if (!url) continue;
+
+        // Already have a live chip for this URL → nothing to do.
         const existing = injectedSaves.get(url);
         if (existing && document.body.contains(existing)) continue;
 
-        const card = _cardFromLink(link);
-        if (!card) continue;
-
+        // A stray chip on this card (recycled <li>, or a Sales Nav card whose
+        // chip is keyed under its /in/ URL). If it's our tracked chip for the
+        // SAME url, leave it; otherwise remove and re-inject for the new owner.
         const stray = card.querySelector(".lc-save-row");
         if (stray) {
-          // Check by identity: if the chip is still tracked in our registry
-          // it's OUR chip for this card — leave it alone. This happens when
-          // a Sales Nav card has both a /sales/lead/ anchor (the byUrl key
-          // here) and a /in/ anchor; injectInlineSave() stores the chip
-          // under the /in/ URL, so it looks like a "stray" but isn't.
           const trackedNode = injectedSaves.get(stray.dataset.lcUrl);
-          if (trackedNode === stray) continue;
-          // Truly recycled <li>: LinkedIn reused this DOM node for a
-          // different person. Remove the old chip before re-injecting.
+          if (trackedNode === stray && stray.dataset.lcUrl === url) continue;
           injectedSaves.delete(stray.dataset.lcUrl);
           stray.remove();
         }
 
-        const profile = profileFromCard(card, link);
+        const profile = profileFromCard(card, ownerLink);
         if (!profile?.linkedin_url) continue;
         injectInlineSave(card, profile);
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
     }
+  }
+
+  // Resolve the canonical profile-owner link for a card. Preference order:
+  //   1. The /in/ link wrapping the LARGEST image (avatar proximity) — this
+  //      is the most reliable owner signal and beats mutual-connection rows
+  //      whose avatars are always smaller stacked thumbnails.
+  //   2. A clean (non-insight, non-mutual) link that has an accessible title.
+  //   3. Any clean link.
+  //   4. LAST RESORT: any link at all — a chip on the right card beats no chip.
+  //      Steps 1-2 already guard against mutual hijack in the common case.
+  function _resolveCardOwnerLink(card, linkSel) {
+    let avatar = _findAvatarLink(card);
+    if (avatar && !_isInsightLink(avatar) && !_isMutualConnectionContext(avatar)) {
+      return avatar;
+    }
+    const links = Array.from(card.querySelectorAll(linkSel));
+    const clean = links.filter(
+      (l) => !_isInsightLink(l) && !_isMutualConnectionContext(l)
+    );
+    return (
+      clean.find((l) => _hasAccessibleTitle(l)) ||
+      clean[0] ||
+      links.find((l) => _hasAccessibleTitle(l)) ||
+      links[0] ||
+      null
+    );
   }
 
   globalThis.__lcOverlay = {

@@ -1453,64 +1453,27 @@
   }
 
   function scrapeSearchResults() {
-    // One profile per CARD. The card owner is determined by AVATAR PROXIMITY:
-    // the /in/ link wrapping the largest <img> in the card is the canonical
-    // profile, because mutual-connection rows always use a stack of tiny
-    // avatars while the card owner's photo is much larger. Falls back to
-    // first-link-in-DOM-order if no avatar wrapper can be identified.
-    const allLinks = Array.from(
-      document.querySelectorAll("a[href*='/in/']")
-    ).filter((link) => !_isInsightLink(link) && !_isMutualConnectionContext(link));
-    const cardOwner = new Map(); // card → { url, link }
-    for (const link of allLinks) {
-      try {
-        const url = normalizeProfileUrl(link.href);
-        if (!url) continue;
-        const card = _profileCardFromLink(link);
-        if (!card) continue;
-        if (cardOwner.has(card)) {
-          const existing = cardOwner.get(card);
-          if (existing.url !== url) {
-            // Different URL = possible mutual-connection link. Prefer the title
-            // link (has aria-hidden span) over a plain anchor so a mutual strip
-            // that appears first in DOM order doesn't hijack the card owner.
-            if (_hasAccessibleTitle(link) && !_hasAccessibleTitle(existing.link)) {
-              cardOwner.set(card, { url, link });
-            }
-            continue;
-          }
-          // Same URL: upgrade to the anchor with name text (photo anchor is often empty).
-          const newHasText = (link.textContent || "").trim().length > 0;
-          const oldHasText = (existing.link.textContent || "").trim().length > 0;
-          if (newHasText && !oldHasText) cardOwner.set(card, { url, link });
-          continue;
-        }
-        cardOwner.set(card, { url, link });
-      } catch {
-        /* skip malformed */
-      }
-    }
-    // SECOND PASS — avatar-link override. If a card's largest image is
-    // wrapped in an /in/ link, that's the canonical card owner. This
-    // catches the bug where LinkedIn rotates class names and a mutual-
-    // connection anchor (with aria-hidden span) sneaks in before the
-    // title link in DOM order — Ellen Landes hijacking Zeina Gammoh's
-    // card was exactly this scenario.
-    for (const [card, current] of cardOwner.entries()) {
-      const avatarLink = _findAvatarLink(card);
-      if (!avatarLink) continue;
-      if (_isInsightLink(avatarLink) || _isMutualConnectionContext(avatarLink)) continue;
-      const avatarUrl = normalizeProfileUrl(avatarLink.href);
-      if (avatarUrl && avatarUrl !== current.url) {
-        cardOwner.set(card, { url: avatarUrl, link: avatarLink });
-      }
+    // CARD-FIRST. Discover every result card by walking up from EVERY /in/
+    // link, then resolve each card's canonical owner by avatar proximity
+    // (largest image's /in/ link). This must stay in lock-step with
+    // overlay.js decorateSearchCards so Select All and the Save chips agree
+    // on exactly which cards exist. Card-first is robust to link-level
+    // filtering: a card is never lost just because its title link looked
+    // mutual-ish under a LinkedIn class-name rotation.
+    const cards = new Set();
+    for (const a of document.querySelectorAll("a[href*='/in/']")) {
+      const card = _profileCardFromLink(a);
+      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") cards.add(card);
     }
 
     const results = [];
     const seen = new Set();
-    for (const [card, { url, link }] of cardOwner.entries()) {
+    for (const card of cards) {
       try {
-        if (seen.has(url)) continue;
+        const link = _resolveCardOwnerLink(card);
+        if (!link) continue;
+        const url = normalizeProfileUrl(link.href);
+        if (!url || seen.has(url)) continue;
         const p = _profileFromCard(card, link);
         if (!p) continue;
         seen.add(url);
@@ -1520,6 +1483,30 @@
       }
     }
     return results;
+  }
+
+  // Resolve a card's canonical profile-owner link. Mirror of overlay.js
+  // _resolveCardOwnerLink — keep in lock-step. Preference order:
+  //   1. /in/ link wrapping the LARGEST image (avatar proximity).
+  //   2. Clean (non-insight, non-mutual) link with an accessible title.
+  //   3. Any clean link.
+  //   4. LAST RESORT: any /in/ link — a result on the right card beats none.
+  function _resolveCardOwnerLink(card) {
+    const avatar = _findAvatarLink(card);
+    if (avatar && !_isInsightLink(avatar) && !_isMutualConnectionContext(avatar)) {
+      return avatar;
+    }
+    const links = Array.from(card.querySelectorAll("a[href*='/in/']"));
+    const clean = links.filter(
+      (l) => !_isInsightLink(l) && !_isMutualConnectionContext(l)
+    );
+    return (
+      clean.find((l) => _hasAccessibleTitle(l)) ||
+      clean[0] ||
+      links.find((l) => _hasAccessibleTitle(l)) ||
+      links[0] ||
+      null
+    );
   }
 
   /* ---------- Sales Navigator ---------- */
