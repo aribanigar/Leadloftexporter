@@ -174,8 +174,47 @@
   };
   window.addEventListener("popstate", onPathChange);
 
-  // Periodically re-decorate (LinkedIn re-renders cards on scroll)
-  setInterval(() => Overlay.decorateSearchCards?.(), 2500);
+  // Pagination (and most LinkedIn search filters) change only the QUERY
+  // STRING, not the pathname — so onPathChange early-returns and never
+  // re-decorates. Watch location.search separately and re-decorate hard when
+  // it changes, with a few staggered passes because the new page's cards
+  // hydrate lazily over a couple of seconds.
+  let lastSearch = location.search;
+  function _onSearchMaybeChanged() {
+    if (location.search === lastSearch) return;
+    lastSearch = location.search;
+    const type = Scraper.pageType();
+    if (type !== "search-people" && type !== "salesnav-search") return;
+    [300, 900, 1800, 3000].forEach((ms) =>
+      setTimeout(() => {
+        try { Overlay.decorateSearchCards?.(); } catch {}
+      }, ms)
+    );
+  }
+
+  // Periodically re-decorate (LinkedIn re-renders cards on scroll AND
+  // paginates without a pathname change). 1.5s keeps chips appearing quickly
+  // on freshly-rendered cards without hammering the DOM.
+  setInterval(() => {
+    _onSearchMaybeChanged();
+    Overlay.decorateSearchCards?.();
+  }, 1500);
+
+  // Re-decorate shortly after the user stops scrolling — catches lazily
+  // virtualised cards the moment they render, rather than waiting for the
+  // next interval tick.
+  let _scrollDecorateTimer = null;
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (_scrollDecorateTimer) return;
+      _scrollDecorateTimer = setTimeout(() => {
+        _scrollDecorateTimer = null;
+        try { Overlay.decorateSearchCards?.(); } catch {}
+      }, 400);
+    },
+    { passive: true }
+  );
 
   // Autopilot tick: roughly every minute, but only when the tab is foreground,
   // and the actual gap between actions is enforced inside automate.js by

@@ -1905,59 +1905,92 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // Anchor on the native ACTION BUTTON (Connect/Follow/Message/Pending).
-    // Every result card has exactly ONE such button, and — unlike a profile
-    // photo's /in/ <a> — it is never nested in an avatar sub-container. From
-    // each button we walk UP to the largest ancestor that still represents a
-    // SINGLE card: we keep climbing while the ancestor holds an /in/ link and
-    // at most ONE action button, and stop the moment it would span two cards
-    // (>1 action button). That yields the true card row every time, with no
-    // fragile "outermost" filter that could collapse the whole list into one.
     const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
-    const cards = new Set();
-    for (const b of document.querySelectorAll("button")) {
-      if (!_isActionButton(b)) continue;
-      let node = b.parentElement;
-      let card = null;
-      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
-        if (node.querySelector(linkSel)) {
-          const actionCount = Array.from(node.querySelectorAll("button")).filter(
-            _isActionButton
-          ).length;
-          if (actionCount <= 1) card = node; // still a single card → keep climbing
-          else break; // crossed into a multi-card container → stop
-        }
-        node = node.parentElement;
+
+    // How many DISTINCT profile owners does this node enclose? Used as the
+    // card boundary: a node holding ≤1 owner is still a single card; the
+    // moment it holds 2+ it has grown into a multi-card container and we stop.
+    // Insight / mutual-connection links don't count — they belong to OTHER
+    // people referenced inside a card, not the card's own owner.
+    const ownerCount = (node) => {
+      const set = new Set();
+      for (const a of node.querySelectorAll(linkSel)) {
+        if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
+        const u = globalThis.__lcDom.normalizeProfileUrl(a.href);
+        if (u) set.add(u);
       }
-      if (card) cards.add(card);
-    }
-    // Supplement: cards with NO action button (already-connected / following).
-    // Walk up from each /in/ link with the same single-card guard.
-    for (const a of document.querySelectorAll(linkSel)) {
-      let node = a.parentElement;
-      let card = null;
-      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
-        const actionCount = Array.from(node.querySelectorAll("button")).filter(
+      return set.size;
+    };
+
+    // Climb from a seed node (an action button or a profile link) to the
+    // LARGEST ancestor that still represents a SINGLE profile card. Tag-
+    // agnostic on purpose — LinkedIn wraps cards in <li>, <article>, <div>,
+    // <tr> etc. depending on surface, and requiring a specific tag is exactly
+    // what made earlier versions miss cards.
+    //
+    // Boundary uses BOTH signals: a container spanning two cards has 2+ native
+    // action buttons (every result has exactly one) AND/OR 2+ distinct owners.
+    // When the action-button count is still ≤1 but the owner count jumped to
+    // 2, the extra "owner" is almost always a mutual-connection link embedded
+    // inside ONE card — so we trust the button count, accept that node as the
+    // full card, then stop.
+    const climbToCard = (seed) => {
+      let node = seed.parentElement;
+      let best = null;
+      for (
+        let i = 0;
+        i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
+        i++
+      ) {
+        const actionBtns = Array.from(node.querySelectorAll("button")).filter(
           _isActionButton
         ).length;
-        if (actionCount <= 1 && (node.tagName === "LI" || node.getAttribute?.("role") === "listitem" || node.tagName === "ARTICLE")) {
-          card = node;
-          break;
+        const owners = ownerCount(node);
+        if (actionBtns > 1 || owners > 1) {
+          if (actionBtns <= 1 && node.querySelector(linkSel)) best = node;
+          break; // crossed into a multi-card container → stop
         }
-        if (actionCount > 1) break;
+        if (node.querySelector(linkSel)) best = node;
         node = node.parentElement;
       }
-      if (card && !Array.from(cards).some((c) => c.contains(card) || card.contains(c))) {
-        cards.add(card);
-      }
+      return best;
+    };
+
+    const cards = new Set();
+
+    // PASS 1 — anchor on the native action button (Connect/Follow/Message/
+    // Pending). Stable card boundary when present.
+    for (const b of document.querySelectorAll("button")) {
+      if (!_isActionButton(b)) continue;
+      const card = climbToCard(b);
+      if (card) cards.add(card);
     }
 
-    for (const card of cards) {
+    // PASS 2 — anchor on EVERY profile link. This is the safety net that
+    // guarantees a chip even when a card has no recognised action button
+    // (already-following rows, icon-only buttons, markup LinkedIn just
+    // changed). Insight/mutual links are skipped so we never chip a mutual-
+    // connection avatar.
+    for (const a of document.querySelectorAll(linkSel)) {
+      if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
+      const card = climbToCard(a);
+      if (card) cards.add(card);
+    }
+
+    // Both passes converge on the same "largest single-owner ancestor", but if
+    // any outer container slipped in, drop it in favour of the inner card it
+    // contains — one chip per profile row, never a wrapper spanning a card.
+    const cardList = Array.from(cards);
+    const finalCards = cardList.filter(
+      (c) => !cardList.some((o) => o !== c && c.contains(o))
+    );
+
+    for (const card of finalCards) {
       try {
         const ownerLink = _resolveCardOwnerLink(card, linkSel);
         if (!ownerLink) continue;
         const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-        if (!url) continue;
+        if (!url || !url.includes("/in/")) continue;
 
         // Already have a live chip for this URL → nothing to do.
         const existing = injectedSaves.get(url);
@@ -1974,8 +2007,14 @@
           stray.remove();
         }
 
-        const profile = profileFromCard(card, ownerLink);
-        if (!profile?.linkedin_url) continue;
+        // Build full card metadata (name/title/company/location). If the name
+        // can't be resolved we DON'T drop the card — the chip's core job is to
+        // open the profile by URL, and the canonical name is scraped on the
+        // /in/ page during enrichment anyway. Fall back to a slug-derived label.
+        let profile = profileFromCard(card, ownerLink);
+        if (!profile?.linkedin_url) {
+          profile = { linkedin_url: url, full_name: _labelFromUrl(url) };
+        }
         injectInlineSave(card, profile);
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
