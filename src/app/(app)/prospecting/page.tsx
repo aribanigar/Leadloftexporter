@@ -10,6 +10,7 @@ import Link from "next/link";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
 import { CreateLeadModal } from "@/components/create-lead-modal";
 import { ColumnPicker } from "@/components/column-picker";
+import { BulkActionsBar } from "@/components/bulk-actions-bar";
 
 const STAGE_COLORS: Record<string, string> = {
   new: "bg-sky-100 text-sky-700",
@@ -29,6 +30,7 @@ export default function ProspectingPage() {
   const [page, setPage] = useState(1);
   const [stageFilter, setStageFilter] = useState<string>("");
   const [showFilter, setShowFilter] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
   const [pickingColumns, setPickingColumns] = useState(false);
   const [findingEmails, setFindingEmails] = useState(false);
@@ -99,6 +101,36 @@ export default function ProspectingPage() {
     stages?.forEach((s) => m.set(s.id, s));
     return m;
   }, [stages]);
+
+  const leadsById = useMemo(() => {
+    const m = new Map<string, Lead>();
+    leads?.items.forEach((l) => m.set(l.id, l));
+    return m;
+  }, [leads]);
+
+  // Clear selection whenever the visible result set changes.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page, stageFilter, q]);
+
+  const pageIds = useMemo(() => (leads?.items || []).map((l) => l.id), [leads]);
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
 
   const removeLead = useMutation({
     mutationFn: (id: string) => api(`/leads/${id}`, { method: "DELETE" }),
@@ -309,7 +341,12 @@ export default function ProspectingPage() {
           <thead className="sticky top-0 z-10 bg-slate-50/95 text-xs uppercase tracking-wide text-slate-500 backdrop-blur">
             <tr>
               <th className="w-10 px-3 py-2">
-                <input type="checkbox" />
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label="Select all on this page"
+                />
               </th>
               {visibleColumns.map((c) => (
                 <th key={c} className="whitespace-nowrap px-3 py-2 text-left font-semibold">
@@ -372,9 +409,17 @@ export default function ProspectingPage() {
               const needsEnrichment =
                 !!lead.linkedin_url && (!lead.email || !lead.phone);
               return (
-                <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr
+                  key={lead.id}
+                  className={`border-b border-slate-100 hover:bg-slate-50 ${selected.has(lead.id) ? "bg-brand-50/60" : ""}`}
+                >
                   <td className="w-10 px-3 py-2">
-                    <input type="checkbox" />
+                    <input
+                      type="checkbox"
+                      checked={selected.has(lead.id)}
+                      onChange={() => toggleOne(lead.id)}
+                      aria-label="Select lead"
+                    />
                   </td>
                   {visibleColumns.map((c) => (
                     <td key={c} className="whitespace-nowrap px-3 py-2 text-sm">
@@ -438,6 +483,15 @@ export default function ProspectingPage() {
             setColumns(cols);
             setPickingColumns(false);
           }}
+        />
+      )}
+
+      {selected.size > 0 && (
+        <BulkActionsBar
+          selectedIds={Array.from(selected)}
+          leadsById={leadsById}
+          stages={stages || []}
+          onClear={() => setSelected(new Set())}
         />
       )}
     </div>

@@ -21,6 +21,14 @@ interface BulkMessageResult {
   total: number;
 }
 
+interface Template {
+  id: string;
+  name: string;
+  subject?: string | null;
+  body: string;
+  channel?: string;
+}
+
 const TOKENS = ["{first_name}", "{last_name}", "{full_name}", "{title}", "{company}"];
 
 function renderPreview(template: string, lead: Lead): string {
@@ -44,11 +52,16 @@ export default function MessagingPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BulkMessageResult | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
     queryFn: () => api("/pipeline/stages"),
+  });
+  const { data: templates } = useQuery<Template[]>({
+    queryKey: ["templates"],
+    queryFn: () => api("/templates"),
   });
 
   const { data: leads } = useQuery<LeadList>({
@@ -157,7 +170,46 @@ export default function MessagingPage() {
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         {/* ---- Composer ---- */}
         <div className="card p-5">
-          <label className="label">Message</label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="label mb-0">Message</label>
+            {/* Template picker — loads saved templates and drops one in */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTemplates((s) => !s)}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
+              >
+                Use template
+              </button>
+              {showTemplates && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowTemplates(false)} />
+                  <div className="absolute right-0 z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                    {(templates || []).length === 0 && (
+                      <div className="px-3 py-2 text-xs text-slate-400">
+                        No templates yet. Create them in Settings → Templates.
+                      </div>
+                    )}
+                    {(templates || []).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="block w-full truncate rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        title={t.body}
+                        onClick={() => {
+                          setMessage(t.body || "");
+                          setResult(null);
+                          setShowTemplates(false);
+                        }}
+                      >
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* Merge-tag buttons */}
           <div className="mb-2 flex flex-wrap gap-1.5">
