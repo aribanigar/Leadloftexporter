@@ -1758,6 +1758,22 @@
     renderToolbar();
   }
 
+  // Always-select (never toggles off) — used by Apply All when it lands on a
+  // fresh page so the user sees every new card get ticked before applying.
+  function _selectAllVisibleJobs() {
+    try { decorateJobCards(); } catch {}
+    for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
+    for (const wrap of injectedJobChips.values()) {
+      const url = wrap?.dataset?.lcUrl;
+      const check = wrap?.querySelector(".lc-inline-check");
+      if (!url || !check) continue;
+      const on = state.selectedJobUrls.has(url);
+      check.textContent = on ? "☑" : "☐";
+      check.classList.toggle("lc-inline-check-on", on);
+    }
+    refreshSelectAllHeader();
+  }
+
   // ---- Easy Apply modal driving ----
 
   function _easyApplyModal() {
@@ -2317,6 +2333,11 @@
     const singleJob = Array.isArray(onlyUrls) && onlyUrls.length > 0;
 
     try { decorateJobCards(); } catch {}
+    // Bulk "Apply All" with no explicit tick selection → select every visible
+    // job first so the user sees the whole page get ticked before we start.
+    if (!singleJob && state.selectedJobUrls.size === 0) {
+      _selectAllVisibleJobs();
+    }
     let firstPageUrls = singleJob
       ? onlyUrls
       : state.selectedJobUrls.size > 0
@@ -2409,7 +2430,10 @@
       const moved = await _goToNextJobsPage();
       if (!moved) break; // No more pages
       pageNum++;
-      flashStatus(`Page ${pageNum + 1} — ${applied} applied so far`);
+      // Visibly select every job on the fresh page, then apply them all —
+      // matching the requested "next page → select all → apply all" loop.
+      _selectAllVisibleJobs();
+      flashStatus(`Page ${pageNum + 1} — selected all, applying… (${applied} done)`);
       const nextUrls = _allJobUrls().filter((u) => u && u.includes("/jobs/view/"));
       if (!nextUrls.length) break;
       state.applyProgress = { current: applied + 1, total: applied + nextUrls.length, name: "" };
