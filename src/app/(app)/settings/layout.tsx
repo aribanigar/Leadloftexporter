@@ -21,6 +21,7 @@ const SECTIONS = [
     { href: "/settings/import", label: "Import Data" },
     { href: "/settings/pipeline", label: "Pipeline & Segments" },
     { href: "/settings/integrations", label: "Integrations" },
+    { href: "/settings/whatsapp", label: "WhatsApp API" },
     { href: "/settings/api-keys", label: "API Keys" },
     { href: "/settings/billing", label: "Subscription" },
   ]},

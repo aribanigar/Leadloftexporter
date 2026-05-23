@@ -14,6 +14,7 @@ from app.api.v1 import (
     integrations,
     search_scrapers,
     ai,
+    whatsapp,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -31,3 +32,4 @@ api_router.include_router(integrations.router)
 api_router.include_router(search_scrapers.router)
 api_router.include_router(extension.router)
 api_router.include_router(ai.router)
+api_router.include_router(whatsapp.router)

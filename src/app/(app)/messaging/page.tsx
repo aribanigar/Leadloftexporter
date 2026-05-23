@@ -14,9 +14,18 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Lead, LeadList, PipelineStage } from "@/lib/types";
 import { cn, initials } from "@/lib/utils";
+
+interface WaSendResult {
+  sent: number;
+  failed: number;
+  skipped_no_phone: number;
+  total: number;
+  errors: string[];
+}
 
 interface BulkMessageResult {
   queued: number;
@@ -66,6 +75,7 @@ export default function MessagingPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BulkMessageResult | null>(null);
+  const [waResult, setWaResult] = useState<WaSendResult | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   // WhatsApp guided send-queue: a list of lead ids + a cursor.
   const [waQueue, setWaQueue] = useState<{ ids: string[]; index: number } | null>(null);
@@ -85,6 +95,10 @@ export default function MessagingPage() {
     queryKey: ["messaging-leads", stageId],
     queryFn: () =>
       api(`/leads?page_size=500${stageId ? `&stage_id=${stageId}` : ""}`),
+  });
+  const { data: waConfig } = useQuery<{ connected: boolean; display?: string | null }>({
+    queryKey: ["whatsapp-config"],
+    queryFn: () => api("/whatsapp/config"),
   });
 
   const items = useMemo(() => leads?.items || [], [leads]);
@@ -126,6 +140,7 @@ export default function MessagingPage() {
   useEffect(() => {
     setSelected(new Set());
     setResult(null);
+    setWaResult(null);
     setWaQueue(null);
   }, [channel]);
 
@@ -181,6 +196,23 @@ export default function MessagingPage() {
       }),
     onSuccess: (r) => {
       setResult(r);
+      setSelected(new Set());
+    },
+  });
+
+  // WhatsApp Business API — true server-side automated send (when connected).
+  const waSend = useMutation<WaSendResult, Error, void>({
+    mutationFn: () =>
+      api("/whatsapp/send", {
+        method: "POST",
+        body: {
+          message: message.trim(),
+          stage_id: usingSelection ? undefined : stageId || undefined,
+          lead_ids: usingSelection ? selectedReachable.map((l) => l.id) : undefined,
+        },
+      }),
+    onSuccess: (r) => {
+      setWaResult(r);
       setSelected(new Set());
     },
   });
@@ -332,10 +364,23 @@ export default function MessagingPage() {
             <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
             {isWa ? (
               <span>
-                WhatsApp opens each chat with your message pre-filled — you tap
-                send in WhatsApp (WhatsApp doesn&apos;t allow silent auto-send).
-                Numbers must include the country code. Use the guided queue below
-                to go through recipients one tap at a time.
+                {waConfig?.connected ? (
+                  <>
+                    <strong>Auto-send</strong> delivers instantly via your connected WhatsApp
+                    Business API ({waConfig.display || "active"}). Or use <strong>Open chats</strong>{" "}
+                    to send manually. Numbers must include the country code.
+                  </>
+                ) : (
+                  <>
+                    WhatsApp opens each chat with your message pre-filled — you tap
+                    send in WhatsApp (no silent auto-send). Numbers must include the
+                    country code. Want true automated bulk send?{" "}
+                    <Link href="/settings/whatsapp" className="font-medium text-emerald-700 underline">
+                      Connect the WhatsApp Business API
+                    </Link>
+                    .
+                  </>
+                )}
               </span>
             ) : (
               <span>
@@ -355,14 +400,42 @@ export default function MessagingPage() {
               </span>
             )}
             {isWa ? (
-              <button
-                className="btn bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!canAct}
-                onClick={startWaQueue}
-              >
-                <MessageCircle className="h-4 w-4" />
-                {`Start WhatsApp · ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
-              </button>
+              <div className="flex items-center gap-2">
+                {waConfig?.connected && (
+                  <span className="mr-1 hidden text-xs text-slate-400 sm:inline">
+                    open chats manually, or
+                  </span>
+                )}
+                <button
+                  className={cn(
+                    waConfig?.connected
+                      ? "btn-secondary"
+                      : "btn bg-emerald-600 text-white hover:bg-emerald-700",
+                    "disabled:cursor-not-allowed disabled:opacity-50"
+                  )}
+                  disabled={!canAct}
+                  onClick={startWaQueue}
+                  title="Open each chat in WhatsApp to send manually"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {waConfig?.connected
+                    ? "Open chats"
+                    : `Start WhatsApp · ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
+                </button>
+                {waConfig?.connected && (
+                  <button
+                    className="btn bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!canAct || waSend.isPending}
+                    onClick={() => waSend.mutate()}
+                    title="Send automatically via the WhatsApp Business API"
+                  >
+                    {waSend.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {waSend.isPending
+                      ? "Sending…"
+                      : `Auto-send · ${recipientCount}`}
+                  </button>
+                )}
+              </div>
             ) : (
               <button
                 className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -392,6 +465,37 @@ export default function MessagingPage() {
                     <>{result.skipped_pending} already had a pending message. </>
                   )}
                   Keep a LinkedIn tab open so the extension can deliver them.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isWa && waSend.isError && (
+            <p className="mt-3 text-sm text-red-600">
+              {waSend.error?.message || "WhatsApp send failed."}
+            </p>
+          )}
+
+          {waResult && (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                <div>
+                  <div className="font-medium">
+                    {waResult.sent} sent{waResult.failed ? `, ${waResult.failed} failed` : ""}
+                    {waResult.skipped_no_phone ? `, ${waResult.skipped_no_phone} skipped (no phone)` : ""}.
+                  </div>
+                  {waResult.errors.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
+                      {waResult.errors.map((e, i) => (
+                        <li key={i} className="break-all">{e}</li>
+                      ))}
+                      <li>
+                        Failures are usually Meta&apos;s 24-hour / template rule — outside the
+                        window you must use an approved template.
+                      </li>
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
