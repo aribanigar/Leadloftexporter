@@ -103,6 +103,30 @@ class BulkMessageIn(BaseModel):
     stage_id: Optional[str] = None
 
 
+def _render_message(template: str, lead: Lead) -> str:
+    """Substitute {first_name}/{last_name}/{full_name}/{title}/{company}
+    merge tags with the lead's own values so every message is personalized.
+    {first_name} falls back to the first word of the full name, then "there",
+    so a blank greeting never goes out."""
+    first = (lead.first_name or "").strip()
+    if not first and lead.full_name:
+        first = lead.full_name.strip().split(" ")[0]
+    company = ""
+    if lead.company_id and getattr(lead, "company", None):
+        company = (lead.company.name or "").strip()
+    tokens = {
+        "{first_name}": first or "there",
+        "{last_name}": (lead.last_name or "").strip(),
+        "{full_name}": (lead.full_name or first or "there").strip(),
+        "{title}": (lead.title or "").strip(),
+        "{company}": company,
+    }
+    out = template
+    for token, value in tokens.items():
+        out = out.replace(token, value)
+    return out
+
+
 @router.post("/bulk-message")
 def bulk_message(
     body: BulkMessageIn,
@@ -121,7 +145,11 @@ def bulk_message(
     if not msg:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "message_required")
 
-    base = db.query(Lead).filter(Lead.workspace_id == ctx.workspace_id)
+    base = (
+        db.query(Lead)
+        .options(joinedload(Lead.company))  # type: ignore[attr-defined]
+        .filter(Lead.workspace_id == ctx.workspace_id)
+    )
     if body.lead_ids:
         base = base.filter(Lead.id.in_(body.lead_ids))
     if body.stage_id:
@@ -159,7 +187,7 @@ def bulk_message(
             user_id=ctx.user_id,
             lead_id=lead.id,
             kind="message",
-            payload={"linkedin_url": lead.linkedin_url, "body": msg},
+            payload={"linkedin_url": lead.linkedin_url, "body": _render_message(msg, lead)},
             not_before=now + timedelta(minutes=delay_min),
         )
         queued += 1
