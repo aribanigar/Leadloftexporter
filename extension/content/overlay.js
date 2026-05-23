@@ -1514,8 +1514,9 @@
   // skipped. Human-paced throughout; a per-run cap protects the account.
   // ====================================================================
 
-  const injectedJobChips = new Map(); // canonical job url -> wrap element
-  const _jobChipCards = new Map();    // canonical job url -> source card element
+  const injectedJobChips = new Map();   // cardKey -> wrap element
+  const _jobChipCards = new Map();      // cardKey -> source card element
+  const _jobChipApplyUrls = new Map();  // cardKey -> apply url (or null = click card)
 
   // Portal root — chips appended here as position:fixed, bypassing LinkedIn's
   // overflow:hidden scroll containers. Mounted on <html> (not <body>) with an
@@ -1634,93 +1635,109 @@
     return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
   }
 
-  const _JOB_LINK_SEL =
-    "a[href*='/jobs/view/'], a[href*='currentJobId='], " +
-    "a.job-card-container__link, a.job-card-list__title, " +
-    "a.job-card-job-posting-card-wrapper__card-link";
+  // ----- Card detection (markup-agnostic, currentJobId-collision-proof) -----
+  // LinkedIn's search-results cards frequently expose only ONE page-level
+  // ?currentJobId=, identical on every card link, so keying cards by job id
+  // collapsed the whole list to a single card (the bug behind "detected 1
+  // cards"). We instead detect each card STRUCTURALLY — one box per job-title
+  // link — and key it per-card, independent of ids and class names.
 
-  // Count distinct job ids contained within a node (via links + data attrs).
-  function _distinctJobIds(node) {
-    const ids = new Set();
-    node.querySelectorAll?.(_JOB_LINK_SEL).forEach((a) => {
-      const id = _jobIdFromHref(a.getAttribute("href"));
-      if (id) ids.add(id);
-    });
-    node.querySelectorAll?.("[data-occludable-job-id], [data-job-id]").forEach((e) => {
-      const id = e.getAttribute("data-occludable-job-id") || e.getAttribute("data-job-id");
-      if (id && /^\d+$/.test(id)) ids.add(id);
-    });
-    return ids;
+  const _TITLE_LINK_SEL =
+    "a.job-card-list__title, a.job-card-container__link, " +
+    "a.job-card-job-posting-card-wrapper__card-link, a[href*='/jobs/view/'], " +
+    "a[href*='/jobs/search-results/'][href*='currentJobId=']";
+
+  function _countContained(node, nodeList) {
+    let n = 0;
+    for (const el of nodeList) {
+      if (node.contains(el)) { n++; if (n > 1) return n; }
+    }
+    return n;
   }
 
-  // Climb from a job link to the LARGEST ancestor that still represents a
-  // SINGLE job (stops the moment a node encloses 2+ distinct job ids). This is
-  // the analog of the proven people-search climbToCard — tag/class agnostic, so
-  // it survives LinkedIn markup changes that broke the old closest("li") path.
-  function _climbToJobCard(seed) {
+  // Climb until the box would hold 2+ title links — the single-card boundary.
+  function _climbByLinkCount(seed, links) {
     let node = seed;
     let best = seed;
-    for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
-      if (_distinctJobIds(node).size > 1) break; // crossed into a multi-card box
+    for (let i = 0; i < 14 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+      if (_countContained(node, links) > 1) break;
       best = node;
       node = node.parentElement;
     }
     return best;
   }
 
-  // Job cards across ALL jobs surfaces (search-results, collections, recommended).
-  // We anchor on the job LINKS — every card has at least one link to its job —
-  // and climb to the card box by job-id uniqueness, so detection never depends
-  // on LinkedIn's volatile <li>/div class names.
+  // One box per visible job card. Prefers the enclosing <li>; if that <li> spans
+  // multiple cards (i.e. it's actually the list), climbs by title-link count.
   function _jobCardEls() {
-    const byId = new Map(); // jobId -> card element
-    // Scope to the results column when we can find it (keeps the right-hand
-    // detail pane's "similar jobs" from sprouting stray chips); fall back to
-    // the whole document if the container selector misses.
-    const scope =
-      document.querySelector(
-        ".scaffold-layout__list, .jobs-search-results-list, " +
-        "ul.jobs-search__results-list, [class*='jobs-search-results-list']"
-      ) || document;
-    let seeds = scope.querySelectorAll(_JOB_LINK_SEL);
-    if (!seeds.length && scope !== document) seeds = document.querySelectorAll(_JOB_LINK_SEL);
-    seeds.forEach((seed) => {
-      const id = _jobIdFromHref(seed.getAttribute("href")) || _jobIdFromCard(seed);
-      if (!id || byId.has(id)) return;
-      byId.set(id, _climbToJobCard(seed));
+    const titleLinks = document.querySelectorAll(_TITLE_LINK_SEL);
+    const boxes = [];
+    const seen = new Set();
+    titleLinks.forEach((link) => {
+      let box = link.closest("li");
+      if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
+      if (box && !seen.has(box)) { seen.add(box); boxes.push(box); }
     });
-    // Catch attribute-tagged cards whose link href has no parseable id.
-    document.querySelectorAll("[data-occludable-job-id], [data-job-id]").forEach((c) => {
-      const id = c.getAttribute("data-occludable-job-id") || c.getAttribute("data-job-id");
-      if (id && /^\d+$/.test(id) && !byId.has(id)) byId.set(id, c);
+    // Attribute-tagged cards as an extra safety net.
+    document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
+      if (!seen.has(c) && c.querySelector("a[href*='/jobs/']")) { seen.add(c); boxes.push(c); }
     });
-    const list = Array.from(byId.values());
-    // Keep innermost when a parent+child both matched
-    return list.filter((c) => !list.some((o) => o !== c && c.contains(o)));
+    return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
+  }
+
+  // Real LinkedIn job id from a card, when one is actually present (data attr
+  // or /jobs/view/<id> link). NOT currentJobId — that collides across cards.
+  function _realJobId(card) {
+    const direct = card.getAttribute?.("data-occludable-job-id") || card.getAttribute?.("data-job-id");
+    if (direct && /^\d+$/.test(direct)) return direct;
+    const attrEl = card.querySelector?.("[data-occludable-job-id], [data-job-id]");
+    const attr = attrEl?.getAttribute("data-occludable-job-id") || attrEl?.getAttribute("data-job-id");
+    if (attr && /^\d+$/.test(attr)) return attr;
+    const view = card.querySelector?.("a[href*='/jobs/view/']");
+    const vm = (view?.getAttribute("href") || "").match(/\/jobs\/view\/(\d+)/);
+    if (vm) return vm[1];
+    return null;
+  }
+
+  // Stable per-card key — unique even when cards share one page-level
+  // currentJobId (falls back to the job title text).
+  function _jobCardKey(card) {
+    const real = _realJobId(card);
+    if (real) return "job:" + real;
+    return "card:" + _jobLabel(card).toLowerCase();
+  }
+
+  // Apply URL for a card, when a real job id is known; else null (we open the
+  // job by clicking the card element directly).
+  function _jobApplyUrlFromCard(card) {
+    const id = _realJobId(card);
+    return id ? _jobUrlFromId(id) : null;
   }
 
   function _gcJobChips() {
-    for (const [url, node] of injectedJobChips.entries()) {
-      const card = _jobChipCards.get(url);
+    for (const [key, node] of injectedJobChips.entries()) {
+      const card = _jobChipCards.get(key);
       if (!node || !card || !document.body.contains(card)) {
-        injectedJobChips.delete(url);
-        _jobChipCards.delete(url);
+        injectedJobChips.delete(key);
+        _jobChipCards.delete(key);
+        _jobChipApplyUrls.delete(key);
         try { if (node) node.remove(); } catch {}
       }
     }
   }
 
+  // Live card keys (the single source of truth for selection + Apply All).
   function _allJobUrls() {
-    const urls = [];
-    for (const [url] of injectedJobChips.entries()) {
-      const card = _jobChipCards.get(url);
-      if (url && card && document.body.contains(card)) urls.push(url);
+    const keys = [];
+    for (const [key] of injectedJobChips.entries()) {
+      const card = _jobChipCards.get(key);
+      if (key && card && document.body.contains(card)) keys.push(key);
     }
-    return urls;
+    return keys;
   }
 
-  function _setJobChipState(url, st, text) {
-    const wrap = injectedJobChips.get(url);
+  function _setJobChipState(key, st, text) {
+    const wrap = injectedJobChips.get(key);
     if (!wrap) return;
     const btn = wrap.querySelector(".lc-inline-save");
     const span = wrap.querySelector(".lc-inline-save-text");
@@ -1728,10 +1745,12 @@
     if (span) span.textContent = text;
   }
 
-  function _jobCardForUrl(url) {
-    for (const card of _jobCardEls()) {
-      const id = _jobIdFromCard(card);
-      if (id && _jobUrlFromId(id) === url) return card;
+  // The live card element for a given key.
+  function _jobCardForKey(key) {
+    const card = _jobChipCards.get(key);
+    if (card && document.body.contains(card)) return card;
+    for (const c of _jobCardEls()) {
+      if (_jobCardKey(c) === key) return c;
     }
     return null;
   }
@@ -1748,27 +1767,30 @@
     let created = 0;
     for (const card of cards) {
       try {
-        const id = _jobIdFromCard(card);
-        if (!id) continue;
-        const url = _jobUrlFromId(id);
+        const key = _jobCardKey(card);
+        if (!key) continue;
 
-        if (injectedJobChips.has(url)) continue;
+        // Keep our tracking pointed at the freshest card element for this key
+        // (LinkedIn recycles card nodes on scroll/pagination).
+        _jobChipCards.set(key, card);
+        _jobChipApplyUrls.set(key, _jobApplyUrlFromCard(card));
+        if (injectedJobChips.has(key)) continue;
 
         const checkSpan = el(
           "span",
           { class: "lc-inline-check", title: "Select this job for Apply All" },
-          state.selectedJobUrls.has(url) ? "☑" : "☐"
+          state.selectedJobUrls.has(key) ? "☑" : "☐"
         );
-        if (state.selectedJobUrls.has(url)) checkSpan.classList.add("lc-inline-check-on");
+        if (state.selectedJobUrls.has(key)) checkSpan.classList.add("lc-inline-check-on");
         checkSpan.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (state.selectedJobUrls.has(url)) {
-            state.selectedJobUrls.delete(url);
+          if (state.selectedJobUrls.has(key)) {
+            state.selectedJobUrls.delete(key);
             checkSpan.textContent = "☐";
             checkSpan.classList.remove("lc-inline-check-on");
           } else {
-            state.selectedJobUrls.add(url);
+            state.selectedJobUrls.add(key);
             checkSpan.textContent = "☑";
             checkSpan.classList.add("lc-inline-check-on");
           }
@@ -1787,14 +1809,13 @@
           e.preventDefault();
           e.stopPropagation();
           if (state.applyActive || btn.dataset.state === "saving") return;
-          await applyAllJobs([url]);
+          await applyAllJobs([key]);
         });
 
         const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
-        wrap.dataset.lcUrl = url;
+        wrap.dataset.lcKey = key;
         portal.appendChild(wrap);
-        _jobChipCards.set(url, card);
-        injectedJobChips.set(url, wrap);
+        injectedJobChips.set(key, wrap);
         created++;
       } catch (e) {
         console.warn("[LeadCaptura] decorateJobCards failed", e?.message);
@@ -1822,10 +1843,10 @@
     }
     decorateJobCards();
     for (const wrap of injectedJobChips.values()) {
-      const url = wrap?.dataset?.lcUrl;
+      const key = wrap?.dataset?.lcKey;
       const check = wrap?.querySelector(".lc-inline-check");
-      if (!url || !check) continue;
-      const on = state.selectedJobUrls.has(url);
+      if (!key || !check) continue;
+      const on = state.selectedJobUrls.has(key);
       check.textContent = on ? "☑" : "☐";
       check.classList.toggle("lc-inline-check-on", on);
     }
@@ -1839,10 +1860,10 @@
     try { decorateJobCards(); } catch {}
     for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
     for (const wrap of injectedJobChips.values()) {
-      const url = wrap?.dataset?.lcUrl;
+      const key = wrap?.dataset?.lcKey;
       const check = wrap?.querySelector(".lc-inline-check");
-      if (!url || !check) continue;
-      const on = state.selectedJobUrls.has(url);
+      if (!key || !check) continue;
+      const on = state.selectedJobUrls.has(key);
       check.textContent = on ? "☑" : "☐";
       check.classList.toggle("lc-inline-check-on", on);
     }
@@ -2290,8 +2311,14 @@
     await sleep(400 + Math.random() * 500);
     try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
 
-    // Poll until the URL's currentJobId (or the /jobs/view/<id> path) matches
-    // the job we clicked. LinkedIn updates this when the detail pane swaps.
+    // When we know the job's real id, wait until the detail pane reflects THIS
+    // job before clicking Easy Apply (so a slow pane swap can't apply to the
+    // previously-open job). When we don't (cards expose only a shared
+    // currentJobId), just give the pane time to settle after the click.
+    if (!expectedId) {
+      await sleep(1400 + Math.random() * 1000);
+      return true;
+    }
     const matches = () => {
       try {
         const u = new URL(location.href);
@@ -2308,14 +2335,16 @@
     }
     // Let the detail pane finish hydrating its apply button.
     await sleep(900 + Math.random() * 1000);
-    return matches();
+    // Even if the URL never matched (LinkedIn sometimes doesn't reflect the id
+    // for search-results cards), proceed — the click opened the pane.
+    return true;
   }
 
   // Apply to one job (its card is already in the list). Returns {ok, reason}.
   async function _applyToJob(card) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
-    const id = _jobIdFromCard(card);
+    const id = _realJobId(card);
     const onRightJob = await _openJobDetail(card, id);
     if (state.applyCancel) return { ok: false, reason: "cancelled" };
     if (!onRightJob) return { ok: false, reason: "detail_mismatch" };
@@ -2378,9 +2407,14 @@
     }
     if (location.search === prevSearch) return false; // Navigation didn't happen
 
-    // Wait for new cards to hydrate then re-decorate
+    // Wait for new cards to hydrate then re-decorate. Tear down the old page's
+    // chips (remove the portal nodes + clear all tracking) so the new page
+    // gets a clean set.
     await sleep(2200 + Math.random() * 1000);
+    for (const node of injectedJobChips.values()) { try { node.remove(); } catch {} }
     injectedJobChips.clear();
+    _jobChipCards.clear();
+    _jobChipApplyUrls.clear();
     try { decorateJobCards(); } catch {}
     await sleep(700);
     try { decorateJobCards(); } catch {}
@@ -2398,14 +2432,14 @@
     return gap;
   }
 
-  // Bulk auto-apply. `onlyUrls` (optional) restricts to specific jobs (used by
-  // the per-card Apply button); otherwise it uses the tick selection, or every
-  // visible job when nothing is ticked. Automatically pages through results.
-  async function applyAllJobs(onlyUrls = null) {
+  // Bulk auto-apply. `onlyKeys` (optional) restricts to specific cards (used by
+  // the per-card Auto Apply button); otherwise it uses the tick selection, or
+  // every visible job when nothing is ticked. Automatically pages through results.
+  async function applyAllJobs(onlyKeys = null) {
     if (state.applyActive) return;
     const { sleep } = globalThis.__lcHuman;
     const MAX_APPLIES_PER_RUN = 50;
-    const singleJob = Array.isArray(onlyUrls) && onlyUrls.length > 0;
+    const singleJob = Array.isArray(onlyKeys) && onlyKeys.length > 0;
 
     try { decorateJobCards(); } catch {}
     // Bulk "Apply All" with no explicit tick selection → select every visible
@@ -2413,20 +2447,20 @@
     if (!singleJob && state.selectedJobUrls.size === 0) {
       _selectAllVisibleJobs();
     }
-    let firstPageUrls = singleJob
-      ? onlyUrls
+    let firstPageKeys = singleJob
+      ? onlyKeys
       : state.selectedJobUrls.size > 0
       ? Array.from(state.selectedJobUrls)
       : _allJobUrls();
-    firstPageUrls = firstPageUrls.filter((u) => u && u.includes("/jobs/view/"));
-    if (!firstPageUrls.length) {
+    firstPageKeys = firstPageKeys.filter(Boolean);
+    if (!firstPageKeys.length) {
       flashStatus("No jobs to apply to — tick some jobs or open a jobs search.", "warn");
       return;
     }
 
     state.applyActive = true;
     state.applyCancel = false;
-    state.applyProgress = { current: 0, total: Math.min(firstPageUrls.length, MAX_APPLIES_PER_RUN), name: "" };
+    state.applyProgress = { current: 0, total: Math.min(firstPageKeys.length, MAX_APPLIES_PER_RUN), name: "" };
     unmountSelectAllHeader();
     renderToolbar();
 
@@ -2434,22 +2468,22 @@
     let sinceBreak = 0;
     let nextBreakAt = 8 + Math.floor(Math.random() * 5);
 
-    // Process a list of job URLs. Returns false if cancelled/limit hit.
-    const processPage = async (urls) => {
-      for (let i = 0; i < urls.length; i++) {
+    // Process a list of card keys. Returns false if cancelled/limit hit.
+    const processPage = async (keys) => {
+      for (let i = 0; i < keys.length; i++) {
         if (state.applyCancel) { cancelled = true; return false; }
         if (applied >= MAX_APPLIES_PER_RUN) return false;
-        const url = urls[i];
-        const card = _jobCardForUrl(url);
+        const key = keys[i];
+        const card = _jobCardForKey(key);
         state.applyProgress = {
           current: applied + 1,
-          total: Math.min(urls.length + applied, MAX_APPLIES_PER_RUN),
+          total: Math.min(keys.length + applied, MAX_APPLIES_PER_RUN),
           name: card ? _jobLabel(card) : "job",
         };
-        _setJobChipState(url, "saving", "Applying…");
+        _setJobChipState(key, "saving", "Applying…");
         renderToolbar();
 
-        if (!card) { skipped++; _setJobChipState(url, "error", "Not visible"); continue; }
+        if (!card) { skipped++; _setJobChipState(key, "error", "Not visible"); continue; }
 
         let res;
         try {
@@ -2460,20 +2494,20 @@
 
         if (res.ok) {
           applied++; sinceBreak++;
-          _setJobChipState(url, "saved", "Applied ✓");
+          _setJobChipState(key, "saved", "Applied ✓");
         } else if (res.reason === "already_applied") {
-          skipped++; _setJobChipState(url, "saved", "Already applied ✓");
+          skipped++; _setJobChipState(key, "saved", "Already applied ✓");
         } else if (res.reason === "external_apply") {
-          skipped++; _setJobChipState(url, "error", "External apply");
+          skipped++; _setJobChipState(key, "error", "External apply");
         } else if (res.reason === "needs_manual_input") {
-          manual++; _setJobChipState(url, "error", "Needs answers");
+          manual++; _setJobChipState(key, "error", "Needs answers");
         } else if (res.reason === "captcha_or_checkpoint") {
-          _setJobChipState(url, "error", "Security check");
+          _setJobChipState(key, "error", "Security check");
           flashStatus("LinkedIn security check detected — stopping auto-apply.", "err");
           cancelled = true;
           return false;
         } else {
-          failed++; _setJobChipState(url, "error", "Couldn't apply");
+          failed++; _setJobChipState(key, "error", "Couldn't apply");
         }
 
         // Make sure any leftover dialog is gone before the next job.
@@ -2497,7 +2531,7 @@
     };
 
     // Process first page
-    await processPage(firstPageUrls);
+    await processPage(firstPageKeys);
 
     // Auto-paginate through subsequent pages (bulk mode only, not singleJob)
     let pageNum = 0;
@@ -2509,11 +2543,11 @@
       // matching the requested "next page → select all → apply all" loop.
       _selectAllVisibleJobs();
       flashStatus(`Page ${pageNum + 1} — selected all, applying… (${applied} done)`);
-      const nextUrls = _allJobUrls().filter((u) => u && u.includes("/jobs/view/"));
-      if (!nextUrls.length) break;
-      state.applyProgress = { current: applied + 1, total: applied + nextUrls.length, name: "" };
+      const nextKeys = _allJobUrls();
+      if (!nextKeys.length) break;
+      state.applyProgress = { current: applied + 1, total: applied + nextKeys.length, name: "" };
       renderToolbar();
-      const cont = await processPage(nextUrls);
+      const cont = await processPage(nextKeys);
       if (!cont) break;
     }
 
