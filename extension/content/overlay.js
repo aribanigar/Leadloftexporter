@@ -1565,8 +1565,16 @@
   let _jobChipScrollBound = false;
   function _bindJobChipScroll() {
     if (_jobChipScrollBound) return;
+    // capture:true catches scroll on LinkedIn's inner results container (the
+    // jobs list scrolls independently of the window), not just window scroll.
     window.addEventListener("scroll", _scheduleJobChipSync, { passive: true, capture: true });
     window.addEventListener("resize", _scheduleJobChipSync, { passive: true });
+    // Safety-net poll: cards reflow as LinkedIn lazily hydrates / the detail
+    // pane resizes the list column. A cheap 400ms reposition keeps every chip
+    // glued to its card even if a scroll/resize event is missed.
+    setInterval(() => {
+      if (injectedJobChips.size) _syncJobChipPositions();
+    }, 400);
     _jobChipScrollBound = true;
   }
 
@@ -1641,13 +1649,16 @@
     // Pass 2: anchor on every job link and climb to its card container. The
     // nearest <li> ancestor of a job-title link IS that job's card (the list
     // itself is a <ul>, never an <li>), so closest("li") lands precisely.
-    document.querySelectorAll("a[href*='/jobs/view/'], a[href*='currentJobId=']").forEach((link) => {
-      const id = _jobIdFromHref(link.getAttribute("href"));
+    document.querySelectorAll(
+      "a[href*='/jobs/view/'], a[href*='currentJobId='], " +
+      "a.job-card-container__link, a.job-card-list__title, a.job-card-job-posting-card-wrapper__card-link"
+    ).forEach((link) => {
+      const id = _jobIdFromHref(link.getAttribute("href")) || _jobIdFromCard(link.closest("li") || link);
       if (!id || byId.has(id)) return;
       const card =
         link.closest("li") ||
         link.closest(
-          "div.job-card-container, div[class*='job-card-container'], div[class*='job-card-list']"
+          "div.job-card-container, div[class*='job-card-container'], div[class*='job-card-list'], div[class*='job-card']"
         );
       if (card) byId.set(id, card);
     });
@@ -1761,6 +1772,9 @@
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
     }
     _bindJobChipScroll();
+    // Position immediately (synchronously) so chips are visible on this frame —
+    // not only on the next requestAnimationFrame, which can be delayed.
+    try { _syncJobChipPositions(); } catch {}
     _scheduleJobChipSync();
     // Surface the live count on the toolbar's Apply button the moment new
     // chips appear, so the user can confirm detection at a glance.
