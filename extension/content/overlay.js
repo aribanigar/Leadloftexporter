@@ -49,6 +49,12 @@
     connectActive: false,
     connectCancel: false,
     connectProgress: null,
+    // Auto-apply (LinkedIn Jobs) run state. Jobs are tracked separately from
+    // people because the Jobs page is a wholly different surface.
+    selectedJobUrls: new Set(),
+    applyActive: false,
+    applyCancel: false,
+    applyProgress: null,
   };
 
   function el(tag, attrs = {}, ...children) {
@@ -604,6 +610,18 @@
   // the top floating pill and the bottom toolbar's Select All button so they
   // stay in lock-step. When called with no selection it ticks every visible
   // /in/ card; when there's any selection it clears the set.
+  // True when we're on a LinkedIn Jobs surface (search / collections / view).
+  function _isJobsPage() {
+    try { return Scraper.pageType() === "jobs"; } catch { return false; }
+  }
+
+  // Select-all dispatcher used by the top pill + toolbar button: routes to the
+  // jobs selection on Jobs pages, the people selection everywhere else.
+  function toggleSelectAllCurrent() {
+    if (_isJobsPage()) toggleSelectAllJobs();
+    else toggleSelectAll();
+  }
+
   function toggleSelectAll() {
     if (state.selectedUrls.size > 0) {
       state.selectedUrls.clear();
@@ -635,7 +653,7 @@
   // toolbar. Position is fixed top-right so it doesn't fight LinkedIn's
   // hashed-class header layout.
   function mountSelectAllHeader() {
-    if (state.bulkActive || state.connectActive) {
+    if (state.bulkActive || state.connectActive || state.applyActive) {
       unmountSelectAllHeader();
       return null;
     }
@@ -652,7 +670,7 @@
     pill.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      toggleSelectAll();
+      toggleSelectAllCurrent();
     });
     document.documentElement.appendChild(pill);
     refreshSelectAllHeader();
@@ -667,7 +685,7 @@
   function refreshSelectAllHeader() {
     const pill = document.getElementById("lc-select-all-top");
     if (!pill) return;
-    const n = state.selectedUrls.size;
+    const n = _isJobsPage() ? state.selectedJobUrls.size : state.selectedUrls.size;
     pill.textContent = n > 0 ? `☑ Clear (${n})` : "☐ Select All";
     pill.classList.toggle("lc-active", n > 0);
   }
@@ -765,21 +783,26 @@
           { includeNone: false }
         ),
         // Select-all toggle: when no cards are selected, click ticks every
-        // visible /in/ card; when ANY are selected, click clears the set.
-        // The label flips so the user always sees the action that'll happen
-        // on the next click.
-        state.bulkActive
+        // visible card; when ANY are selected, click clears the set. The label
+        // flips so the user always sees the action that'll happen next. On Jobs
+        // pages it operates on the job selection instead of the people set.
+        (state.bulkActive || state.connectActive || state.applyActive)
           ? null
           : el(
               "button",
               {
                 class: "lc-btn lc-btn-ghost",
-                onclick: toggleSelectAll,
-                title: "Tick every visible /in/ card so Save All processes them",
+                onclick: toggleSelectAllCurrent,
+                title: _isJobsPage()
+                  ? "Tick every visible job so Apply All processes them"
+                  : "Tick every visible /in/ card so Save All processes them",
               },
-              state.selectedUrls.size > 0
-                ? `Clear (${state.selectedUrls.size})`
-                : "Select All"
+              (() => {
+                const n = _isJobsPage()
+                  ? state.selectedJobUrls.size
+                  : state.selectedUrls.size;
+                return n > 0 ? `Clear (${n})` : "Select All";
+              })()
             ),
         el("span", { class: "lc-flex" }),
         // Realtime bulk progress: shown only during a Save-All run. Always
@@ -788,7 +811,8 @@
         // keeps flashStatus() working (e.g. "Stopping after current profile…"
         // when the user clicks Stop mid-run).
         (state.bulkActive && state.bulkProgress) ||
-        (state.connectActive && state.connectProgress)
+        (state.connectActive && state.connectProgress) ||
+        (state.applyActive && state.applyProgress)
           ? el(
               "div",
               { class: "lc-bulk-progress" },
@@ -797,17 +821,23 @@
                 "span",
                 { class: "lc-bulk-progress-text" },
                 (() => {
-                  const p = state.connectProgress || state.bulkProgress;
-                  const verb = state.connectActive ? "Connecting" : "Enriching";
+                  const p =
+                    state.applyProgress ||
+                    state.connectProgress ||
+                    state.bulkProgress;
+                  const verb = state.applyActive
+                    ? "Applying"
+                    : state.connectActive
+                    ? "Connecting"
+                    : "Enriching";
                   return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
                 })()
               ),
               el("span", { class: "lc-status-slot lc-status-slot-inline" })
             )
           : el("div", { class: "lc-status-slot" }),
-        // Connect Selected — hidden during any active run. Sends connection
-        // requests via each card's own native Connect button, human-paced.
-        state.bulkActive || state.connectActive
+        // Connect Selected — people pages only, hidden during any active run.
+        _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
           ? null
           : el(
               "button",
@@ -821,7 +851,9 @@
                 ? `Connect ${state.selectedUrls.size}`
                 : "Connect All"
             ),
-        state.bulkActive || state.connectActive
+        // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
+        // pages, Save All Leads on people pages.
+        state.bulkActive || state.connectActive || state.applyActive
           ? el(
               "button",
               {
@@ -829,10 +861,24 @@
                 onclick: () => {
                   if (state.bulkActive) state.bulkCancel = true;
                   if (state.connectActive) state.connectCancel = true;
-                  flashStatus("Stopping after current profile…");
+                  if (state.applyActive) state.applyCancel = true;
+                  flashStatus("Stopping after current item…");
                 },
               },
               "Stop"
+            )
+          : _isJobsPage()
+          ? el(
+              "button",
+              {
+                class: "lc-btn lc-btn-primary",
+                onclick: applyAllJobs,
+                title:
+                  "Auto-apply to selected (or all visible) Easy Apply jobs. Human-paced; skips external-apply jobs, already-applied jobs, and any that need extra screening answers.",
+              },
+              state.selectedJobUrls.size > 0
+                ? `Apply ${state.selectedJobUrls.size}`
+                : "Apply All"
             )
           : el(
               "button",
@@ -1397,6 +1443,584 @@
       msg = `Done: ${sent} invites sent across ${pageNum} page(s)${tail} ✓`;
     }
     flashStatus(msg, hitCap ? "warn" : "ok");
+  }
+
+  // ====================================================================
+  // LinkedIn Jobs — auto Easy-Apply
+  // --------------------------------------------------------------------
+  // Self-contained subsystem. Mirrors the people-search UX (per-card tick +
+  // Select All + a bulk action) but drives LinkedIn's native Easy Apply modal:
+  //   1. open a job's detail pane
+  //   2. click "Easy Apply"
+  //   3. step through the modal (Contact info → Next, pick the uploaded resume
+  //      → Next, … → Review → Submit application)
+  //   4. close the confirmation
+  //
+  // SAFETY: never submits an incomplete application. If a step has screening
+  // questions we can't fill (the modal won't advance), we discard that job and
+  // move on. External-apply jobs (company website) and already-applied jobs are
+  // skipped. Human-paced throughout; a per-run cap protects the account.
+  // ====================================================================
+
+  const injectedJobChips = new Map(); // canonical job url -> wrap element
+
+  function _isVisible(el) {
+    if (!el) return false;
+    try {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return false;
+      const cs = getComputedStyle(el);
+      return cs.visibility !== "hidden" && cs.display !== "none";
+    } catch {
+      return true;
+    }
+  }
+
+  function _jobIdFromCard(card) {
+    const direct =
+      card.getAttribute?.("data-occludable-job-id") ||
+      card.getAttribute?.("data-job-id");
+    if (direct && /^\d+$/.test(direct)) return direct;
+    const link = card.querySelector(
+      "a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']"
+    );
+    const href = link?.getAttribute("href") || "";
+    const m = href.match(/\/jobs\/view\/(\d+)/);
+    if (m) return m[1];
+    try {
+      const u = new URL(href, location.href);
+      const cj = u.searchParams.get("currentJobId");
+      if (cj && /^\d+$/.test(cj)) return cj;
+    } catch {}
+    return null;
+  }
+
+  function _jobUrlFromId(id) {
+    return id ? `https://www.linkedin.com/jobs/view/${id}/` : null;
+  }
+
+  function _jobLabel(card) {
+    const t =
+      card.querySelector(
+        "a.job-card-list__title, a.job-card-container__link, .artdeco-entity-lockup__title, .job-card-list__title--link"
+      )?.innerText ||
+      card.querySelector("strong")?.innerText ||
+      "";
+    return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
+  }
+
+  // Job cards in the left-hand list. data-occludable-job-id is the most stable
+  // anchor; the others are fallbacks for layout drift.
+  function _jobCardEls() {
+    const set = new Set();
+    document
+      .querySelectorAll(
+        "li[data-occludable-job-id], div.job-card-container, li.scaffold-layout__list-item, li.jobs-search-results__list-item"
+      )
+      .forEach((c) => {
+        if (_jobIdFromCard(c)) set.add(c);
+      });
+    // Drop any card that contains another detected card (keep the innermost).
+    const list = Array.from(set);
+    return list.filter((c) => !list.some((o) => o !== c && c.contains(o)));
+  }
+
+  function _gcJobChips() {
+    for (const [url, node] of injectedJobChips.entries()) {
+      if (!node || !document.body.contains(node)) injectedJobChips.delete(url);
+    }
+  }
+
+  function _allJobUrls() {
+    const urls = [];
+    for (const [url, wrap] of injectedJobChips.entries()) {
+      if (url && wrap && document.body.contains(wrap)) urls.push(url);
+    }
+    return urls;
+  }
+
+  function _setJobChipState(url, st, text) {
+    const wrap = injectedJobChips.get(url);
+    if (!wrap || !document.body.contains(wrap)) return;
+    const btn = wrap.querySelector(".lc-inline-save");
+    const span = wrap.querySelector(".lc-inline-save-text");
+    if (btn) btn.dataset.state = st;
+    if (span) span.textContent = text;
+  }
+
+  function _jobCardForUrl(url) {
+    for (const card of _jobCardEls()) {
+      const id = _jobIdFromCard(card);
+      if (id && _jobUrlFromId(id) === url) return card;
+    }
+    return null;
+  }
+
+  // Inject a select-tick + Apply chip onto every visible job card.
+  function decorateJobCards() {
+    if (!_isJobsPage()) return;
+    _gcJobChips();
+    for (const card of _jobCardEls()) {
+      try {
+        const id = _jobIdFromCard(card);
+        if (!id) continue;
+        const url = _jobUrlFromId(id);
+
+        const existing = injectedJobChips.get(url);
+        if (existing && document.body.contains(existing)) continue;
+
+        const stray = card.querySelector(".lc-job-row");
+        if (stray) {
+          if (stray.dataset.lcUrl === url) continue;
+          injectedJobChips.delete(stray.dataset.lcUrl);
+          stray.remove();
+        }
+
+        const checkSpan = el(
+          "span",
+          { class: "lc-inline-check", title: "Select this job for Apply All" },
+          state.selectedJobUrls.has(url) ? "☑" : "☐"
+        );
+        if (state.selectedJobUrls.has(url)) checkSpan.classList.add("lc-inline-check-on");
+        checkSpan.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.selectedJobUrls.has(url)) {
+            state.selectedJobUrls.delete(url);
+            checkSpan.textContent = "☐";
+            checkSpan.classList.remove("lc-inline-check-on");
+          } else {
+            state.selectedJobUrls.add(url);
+            checkSpan.textContent = "☑";
+            checkSpan.classList.add("lc-inline-check-on");
+          }
+          refreshSelectAllHeader();
+          renderToolbar();
+        });
+
+        const textSpan = el("span", { class: "lc-inline-save-text" }, "Apply");
+        const btn = el(
+          "button",
+          { class: "lc-inline-save", type: "button", title: "Auto-apply to this job" },
+          textSpan
+        );
+        btn.dataset.state = "ready";
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.applyActive || btn.dataset.state === "saving") return;
+          await applyAllJobs([url]);
+        });
+
+        const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
+        wrap.dataset.lcUrl = url;
+        try {
+          if (getComputedStyle(card).position === "static") card.style.position = "relative";
+        } catch {
+          card.style.position = "relative";
+        }
+        card.appendChild(wrap);
+        injectedJobChips.set(url, wrap);
+      } catch (e) {
+        console.warn("[LeadCaptura] decorateJobCards failed", e?.message);
+      }
+    }
+  }
+
+  function toggleSelectAllJobs() {
+    if (state.selectedJobUrls.size > 0) {
+      state.selectedJobUrls.clear();
+    } else {
+      try { decorateJobCards(); } catch {}
+      for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
+    }
+    decorateJobCards();
+    for (const wrap of injectedJobChips.values()) {
+      const url = wrap?.dataset?.lcUrl;
+      const check = wrap?.querySelector(".lc-inline-check");
+      if (!url || !check) continue;
+      const on = state.selectedJobUrls.has(url);
+      check.textContent = on ? "☑" : "☐";
+      check.classList.toggle("lc-inline-check-on", on);
+    }
+    refreshSelectAllHeader();
+    renderToolbar();
+  }
+
+  // ---- Easy Apply modal driving ----
+
+  function _easyApplyModal() {
+    return (
+      document.querySelector("div.jobs-easy-apply-modal") ||
+      document.querySelector("div[data-test-modal][role='dialog']") ||
+      Array.from(document.querySelectorAll("div[role='dialog']")).find(
+        (d) =>
+          /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
+          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form")
+      ) ||
+      null
+    );
+  }
+
+  function _challengeOnPage() {
+    return [
+      "form#captcha",
+      "form[action*='checkpoint']",
+      "div[data-test-id='challenge']",
+      "input[name='pin']",
+    ].some((s) => document.querySelector(s));
+  }
+
+  // The job detail's apply control + its classification.
+  function _classifyJobDetail() {
+    const cands = Array.from(
+      document.querySelectorAll(
+        "button.jobs-apply-button, button[aria-label*='Easy Apply' i], .jobs-apply-button--top-card button, .jobs-s-apply button"
+      )
+    ).filter(_isVisible);
+    for (const b of cands) {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (/easy apply/i.test(t) || /easy apply/i.test(a)) return { status: "easy", btn: b };
+    }
+    // No Easy Apply button visible — figure out why.
+    const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout")?.innerText || "");
+    if (/\bapplied\b/i.test(bodyTxt) && !cands.length) return { status: "applied", btn: null };
+    for (const b of cands) {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (/company website|apply\b/i.test(t) || /company website/i.test(a)) {
+        return { status: "external", btn: null };
+      }
+    }
+    return { status: "none", btn: null };
+  }
+
+  function _modalProgress(modal) {
+    if (!modal) return null;
+    const prog = modal.querySelector("progress");
+    if (prog && prog.max) return Math.round((Number(prog.value) / Number(prog.max)) * 100);
+    const bar = modal.querySelector("[role='progressbar'][aria-valuenow]");
+    if (bar) return Number(bar.getAttribute("aria-valuenow"));
+    return null;
+  }
+
+  function _modalHeading(modal) {
+    if (!modal) return "";
+    return (modal.querySelector("h2, h3")?.innerText || "").replace(/\s+/g, " ").trim();
+  }
+
+  // Find the footer action button + its kind. Order matters: submit/review are
+  // terminal-ish; "next/continue" advances.
+  function _modalActionButton(modal) {
+    if (!modal) return null;
+    const btns = Array.from(modal.querySelectorAll("button")).filter(_isVisible);
+    const match = (b, re) =>
+      re.test((b.getAttribute("aria-label") || "")) ||
+      re.test((b.innerText || b.textContent || "").replace(/\s+/g, " ").trim());
+    let b;
+    if ((b = btns.find((x) => match(x, /submit application/i)))) return { type: "submit", btn: b };
+    if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
+    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$/i)))) return { type: "next", btn: b };
+    return null;
+  }
+
+  // If a resume picker is present, make sure one resume is selected. LinkedIn
+  // usually pre-selects the most recent upload; we only act if none is chosen.
+  function _ensureResumeSelected(modal) {
+    if (!modal) return;
+    const cards = Array.from(
+      modal.querySelectorAll(
+        ".jobs-document-upload-redesign-card__container, .jobs-resume-picker__resume, .ui-attachment"
+      )
+    );
+    if (!cards.length) return;
+    const isSelected = (c) =>
+      c.classList.contains("jobs-document-upload-redesign-card__container--selected") ||
+      c.querySelector("input[type='radio']:checked") ||
+      c.getAttribute("aria-selected") === "true";
+    if (cards.some(isSelected)) return;
+    const firstCard = cards[0];
+    const target =
+      firstCard.querySelector("input[type='radio'], button, [role='button']") || firstCard;
+    try { target.click(); } catch {}
+  }
+
+  // Uncheck the "Follow <company>" box that some submit steps pre-tick, so we
+  // don't silently follow every company we apply to.
+  function _uncheckFollow(modal) {
+    if (!modal) return;
+    const boxes = Array.from(modal.querySelectorAll("input[type='checkbox']"));
+    for (const cb of boxes) {
+      const id = cb.id || "";
+      const lbl = modal.querySelector(`label[for='${id}']`);
+      const txt = (lbl?.innerText || cb.getAttribute("aria-label") || "").toLowerCase();
+      if (/follow/i.test(txt) && cb.checked) {
+        try { cb.click(); } catch {}
+      }
+    }
+  }
+
+  async function _dismissEasyApplyModal() {
+    const { sleep } = globalThis.__lcHuman;
+    const dismiss =
+      document.querySelector("button[aria-label='Dismiss']") ||
+      document.querySelector("button[aria-label*='Dismiss' i]");
+    if (dismiss) {
+      try { dismiss.click(); } catch {}
+      await sleep(500 + Math.random() * 400);
+    }
+    // A "Discard application?" confirmation may appear.
+    const discard =
+      document.querySelector("button[data-control-name='discard_application_confirm_btn']") ||
+      Array.from(document.querySelectorAll("div[role='alertdialog'] button, div[role='dialog'] button"))
+        .find((b) => /^discard$/i.test((b.innerText || b.textContent || "").trim()));
+    if (discard) {
+      try { discard.click(); } catch {}
+      await sleep(400 + Math.random() * 300);
+    }
+  }
+
+  // Step through the open Easy Apply modal. Returns {ok, reason}.
+  async function _runEasyApplyModal() {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
+
+    let modal = await waitFor(
+      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']", "div[role='dialog']"],
+      { timeout: 6000 }
+    );
+    modal = _easyApplyModal() || modal;
+    if (!modal) return { ok: false, reason: "modal_not_found" };
+
+    const MAX_STEPS = 14;
+    for (let step = 0; step < MAX_STEPS; step++) {
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+      if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
+      modal = _easyApplyModal() || modal;
+      if (!modal) return { ok: false, reason: "modal_closed" };
+
+      // Keep a resume selected + don't auto-follow companies.
+      _ensureResumeSelected(modal);
+      _uncheckFollow(modal);
+      await sleep(500 + Math.random() * 500);
+
+      const action = _modalActionButton(modal);
+      if (!action) {
+        await _dismissEasyApplyModal();
+        return { ok: false, reason: "no_action_button" };
+      }
+
+      if (action.type === "submit") {
+        await dispatchHumanClick(action.btn);
+        await sleep(1400 + Math.random() * 1200);
+        // Close the "application sent" confirmation.
+        await _dismissEasyApplyModal();
+        return { ok: true };
+      }
+
+      // Advance (next / review) and verify the modal actually moved on.
+      const before = { progress: _modalProgress(modal), heading: _modalHeading(modal) };
+      // Reading pause before clicking — looks like a human checking the form.
+      await sleep(600 + Math.random() * 900);
+      await dispatchHumanClick(action.btn);
+      await sleep(1100 + Math.random() * 1000);
+
+      const after = _easyApplyModal();
+      if (!after) return { ok: false, reason: "modal_vanished" }; // unexpected
+      const act2 = _modalActionButton(after);
+      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
+      const progAfter = _modalProgress(after);
+      const headAfter = _modalHeading(after);
+      const errorShown = !!after.querySelector(
+        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text"
+      );
+      const progressed =
+        progressedByButton ||
+        (before.progress != null && progAfter != null && progAfter > before.progress) ||
+        (before.heading && headAfter && headAfter !== before.heading);
+
+      if (!progressed && (errorShown || (progAfter === before.progress && headAfter === before.heading))) {
+        // Stuck — this job needs answers we can't safely fill. Discard.
+        await _dismissEasyApplyModal();
+        return { ok: false, reason: "needs_manual_input" };
+      }
+    }
+    await _dismissEasyApplyModal();
+    return { ok: false, reason: "too_many_steps" };
+  }
+
+  // Open one job's detail pane (clicks its card link) and wait until the detail
+  // actually reflects THIS job — otherwise a slow detail-pane update could make
+  // us click Easy Apply on the previously-open job.
+  async function _openJobDetail(card, expectedId) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const link =
+      card.querySelector("a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']") ||
+      card;
+    try { card.scrollIntoView({ block: "center" }); } catch {}
+    await sleep(400 + Math.random() * 500);
+    try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
+
+    // Poll until the URL's currentJobId (or the /jobs/view/<id> path) matches
+    // the job we clicked. LinkedIn updates this when the detail pane swaps.
+    const matches = () => {
+      try {
+        const u = new URL(location.href);
+        if (u.searchParams.get("currentJobId") === expectedId) return true;
+        const m = u.pathname.match(/\/jobs\/view\/(\d+)/);
+        if (m && m[1] === expectedId) return true;
+      } catch {}
+      return false;
+    };
+    const start = Date.now();
+    while (Date.now() - start < 6000 && !matches()) {
+      if (state.applyCancel) return false;
+      await sleep(300);
+    }
+    // Let the detail pane finish hydrating its apply button.
+    await sleep(900 + Math.random() * 1000);
+    return matches();
+  }
+
+  // Apply to one job (its card is already in the list). Returns {ok, reason}.
+  async function _applyToJob(card) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const id = _jobIdFromCard(card);
+    const onRightJob = await _openJobDetail(card, id);
+    if (state.applyCancel) return { ok: false, reason: "cancelled" };
+    if (!onRightJob) return { ok: false, reason: "detail_mismatch" };
+    if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
+
+    const detail = _classifyJobDetail();
+    if (detail.status === "applied") return { ok: false, reason: "already_applied" };
+    if (detail.status === "external") return { ok: false, reason: "external_apply" };
+    if (detail.status !== "easy" || !detail.btn) return { ok: false, reason: "no_easy_apply" };
+
+    await sleep(500 + Math.random() * 700);
+    await dispatchHumanClick(detail.btn);
+    return await _runEasyApplyModal();
+  }
+
+  // Pacing between job applications: paced but not glacial. 4-tier + periodic
+  // micro-break, same anti-pattern philosophy as bulk Connect.
+  function _applyGap(doneCount) {
+    const r = Math.random();
+    let gap;
+    if (r < 0.62) gap = 4000 + Math.random() * 4000;     // 4-8s
+    else if (r < 0.85) gap = 8000 + Math.random() * 7000; // 8-15s
+    else if (r < 0.95) gap = 16000 + Math.random() * 10000; // 16-26s
+    else gap = 30000 + Math.random() * 20000;             // 30-50s
+    return gap;
+  }
+
+  // Bulk auto-apply. `onlyUrls` (optional) restricts to specific jobs (used by
+  // the per-card Apply button); otherwise it uses the tick selection, or every
+  // visible job when nothing is ticked.
+  async function applyAllJobs(onlyUrls = null) {
+    if (state.applyActive) return;
+    const { sleep } = globalThis.__lcHuman;
+    const MAX_APPLIES_PER_RUN = 50;
+    const singleJob = Array.isArray(onlyUrls) && onlyUrls.length > 0;
+
+    try { decorateJobCards(); } catch {}
+    let urls = singleJob
+      ? onlyUrls
+      : state.selectedJobUrls.size > 0
+      ? Array.from(state.selectedJobUrls)
+      : _allJobUrls();
+    urls = urls.filter((u) => u && u.includes("/jobs/view/"));
+    if (!urls.length) {
+      flashStatus("No jobs to apply to — tick some jobs or open a jobs search.", "warn");
+      return;
+    }
+
+    state.applyActive = true;
+    state.applyCancel = false;
+    state.applyProgress = { current: 0, total: Math.min(urls.length, MAX_APPLIES_PER_RUN), name: "" };
+    unmountSelectAllHeader();
+    renderToolbar();
+
+    let applied = 0, skipped = 0, manual = 0, failed = 0, cancelled = false;
+    let sinceBreak = 0;
+    let nextBreakAt = 8 + Math.floor(Math.random() * 5);
+
+    for (let i = 0; i < urls.length; i++) {
+      if (state.applyCancel) { cancelled = true; break; }
+      if (applied >= MAX_APPLIES_PER_RUN) break;
+      const url = urls[i];
+      const card = _jobCardForUrl(url);
+      state.applyProgress = {
+        current: applied + 1,
+        total: Math.min(urls.length, MAX_APPLIES_PER_RUN),
+        name: card ? _jobLabel(card) : "job",
+      };
+      _setJobChipState(url, "saving", "Applying…");
+      renderToolbar();
+
+      if (!card) { skipped++; _setJobChipState(url, "error", "Not visible"); continue; }
+
+      let res;
+      try {
+        res = await _applyToJob(card);
+      } catch (e) {
+        res = { ok: false, reason: String(e) };
+      }
+
+      if (res.ok) {
+        applied++; sinceBreak++;
+        _setJobChipState(url, "saved", "Applied ✓");
+      } else if (res.reason === "already_applied") {
+        skipped++; _setJobChipState(url, "saved", "Already applied ✓");
+      } else if (res.reason === "external_apply") {
+        skipped++; _setJobChipState(url, "error", "External apply");
+      } else if (res.reason === "needs_manual_input") {
+        manual++; _setJobChipState(url, "error", "Needs answers");
+      } else if (res.reason === "captcha_or_checkpoint") {
+        _setJobChipState(url, "error", "Security check");
+        flashStatus("LinkedIn security check detected — stopping auto-apply.", "err");
+        break;
+      } else {
+        failed++; _setJobChipState(url, "error", "Couldn't apply");
+      }
+
+      // Make sure any leftover dialog is gone before the next job.
+      await _dismissEasyApplyModal();
+
+      const last = i >= urls.length - 1;
+      if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
+        let gap;
+        if (sinceBreak >= nextBreakAt) {
+          sinceBreak = 0;
+          nextBreakAt = 8 + Math.floor(Math.random() * 5);
+          gap = 25000 + Math.random() * 20000;
+          flashStatus(`Short break… (${applied} applied)`);
+        } else {
+          gap = _applyGap(applied);
+        }
+        await sleep(gap);
+      }
+    }
+
+    state.applyActive = false;
+    state.applyProgress = null;
+    if (!singleJob) state.selectedJobUrls.clear();
+    mountSelectAllHeader();
+    renderToolbar();
+    try { decorateJobCards(); } catch {}
+
+    const extra = [
+      skipped ? `${skipped} skipped` : "",
+      manual ? `${manual} need answers` : "",
+      failed ? `${failed} failed` : "",
+    ].filter(Boolean).join(", ");
+    const tail = extra ? ` (${extra})` : "";
+    const msg = cancelled
+      ? `Stopped: ${applied} applied${tail}`
+      : `Done: ${applied} applied${tail} ✓`;
+    flashStatus(msg, applied ? "ok" : "warn");
   }
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
@@ -2052,6 +2676,7 @@
     renderProfilePanel,
     renderToolbar,
     decorateSearchCards,
+    decorateJobCards,
     unmountProfilePanel,
     unmountToolbar,
     flashStatus,

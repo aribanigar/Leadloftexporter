@@ -269,6 +269,23 @@
   pointer-events: auto !important;
 }
 
+/* Per-job chip (LinkedIn Jobs list). Job cards put a Dismiss "X" at the top-
+ * right, so we anchor our tick+Apply pill at the BOTTOM-right to stay clear. */
+.lc-job-row {
+  position: absolute !important;
+  bottom: 10px !important;
+  right: 12px !important;
+  z-index: 50 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  pointer-events: auto !important;
+}
+
 .lc-inline-check {
   display: inline-flex !important;
   align-items: center !important;

@@ -144,18 +144,20 @@
     setTimeout(() => {
       const isProfile = type === "profile" || type === "salesnav-profile";
       const isList = type === "search-people" || type === "salesnav-search";
+      const isJobs = type === "jobs";
       if (isProfile) {
         Overlay.renderProfilePanel();
         // Auto-save + auto-enrich (name+title+email+phone+location) without
         // any user interaction. Dedup is handled inside triggerAutoSave.
         Overlay.triggerAutoSave?.();
       }
-      if (isList) {
+      if (isList || isJobs) {
         Overlay.renderToolbar();
         Overlay.mountSelectAllHeader?.();
         document.body.classList.add("lc-toolbar-mounted");
       }
-      Overlay.decorateSearchCards();
+      if (isJobs) Overlay.decorateJobCards?.();
+      else Overlay.decorateSearchCards();
     }, 600);
   }
 
@@ -174,6 +176,15 @@
   };
   window.addEventListener("popstate", onPathChange);
 
+  // Re-decorate the current surface (people cards on search, job cards on
+  // jobs). Centralised so the interval / scroll / search-change handlers stay
+  // in lock-step about which decorator to call.
+  function _decorateCurrent() {
+    const type = Scraper.pageType();
+    if (type === "jobs") Overlay.decorateJobCards?.();
+    else Overlay.decorateSearchCards?.();
+  }
+
   // Pagination (and most LinkedIn search filters) change only the QUERY
   // STRING, not the pathname — so onPathChange early-returns and never
   // re-decorates. Watch location.search separately and re-decorate hard when
@@ -184,10 +195,10 @@
     if (location.search === lastSearch) return;
     lastSearch = location.search;
     const type = Scraper.pageType();
-    if (type !== "search-people" && type !== "salesnav-search") return;
+    if (type !== "search-people" && type !== "salesnav-search" && type !== "jobs") return;
     [300, 900, 1800, 3000].forEach((ms) =>
       setTimeout(() => {
-        try { Overlay.decorateSearchCards?.(); } catch {}
+        try { _decorateCurrent(); } catch {}
       }, ms)
     );
   }
@@ -197,7 +208,7 @@
   // on freshly-rendered cards without hammering the DOM.
   setInterval(() => {
     _onSearchMaybeChanged();
-    Overlay.decorateSearchCards?.();
+    _decorateCurrent();
   }, 1500);
 
   // Re-decorate shortly after the user stops scrolling — catches lazily
@@ -210,7 +221,7 @@
       if (_scrollDecorateTimer) return;
       _scrollDecorateTimer = setTimeout(() => {
         _scrollDecorateTimer = null;
-        try { Overlay.decorateSearchCards?.(); } catch {}
+        try { _decorateCurrent(); } catch {}
       }, 400);
     },
     { passive: true }
