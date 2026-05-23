@@ -14,7 +14,20 @@
   if (globalThis.__lcApi) return;
 
   function _decorate(rawError, action) {
-    const m = String(rawError || "");
+    let m;
+    if (rawError && typeof rawError === "object") {
+      // Backend sometimes returns a structured error ({detail}, {message},
+      // FastAPI validation arrays, etc.). Stringifying directly yields a
+      // useless "[object Object]"; pull the human-readable field instead.
+      m =
+        rawError.message ||
+        rawError.detail ||
+        rawError.error ||
+        (() => { try { return JSON.stringify(rawError); } catch { return "Unknown error"; } })();
+      m = String(m);
+    } else {
+      m = String(rawError || "");
+    }
     if (/401|invalid.*api.*key|unauthorized/i.test(m)) {
       return "Invalid API key — open the LeadCaptura extension Options and paste a fresh key from Settings → API Keys";
     }

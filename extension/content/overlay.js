@@ -930,7 +930,7 @@
               },
               state.selectedJobUrls.size > 0
                 ? `Apply ${state.selectedJobUrls.size}`
-                : "Apply All"
+                : `Apply All (${_allJobUrls().length})`
             )
           : el(
               "button",
@@ -1577,15 +1577,8 @@
     }
   }
 
-  function _jobIdFromCard(card) {
-    const direct =
-      card.getAttribute?.("data-occludable-job-id") ||
-      card.getAttribute?.("data-job-id");
-    if (direct && /^\d+$/.test(direct)) return direct;
-    const link = card.querySelector(
-      "a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']"
-    );
-    const href = link?.getAttribute("href") || "";
+  function _jobIdFromHref(href) {
+    if (!href) return null;
     const m = href.match(/\/jobs\/view\/(\d+)/);
     if (m) return m[1];
     try {
@@ -1593,6 +1586,24 @@
       const cj = u.searchParams.get("currentJobId");
       if (cj && /^\d+$/.test(cj)) return cj;
     } catch {}
+    return null;
+  }
+
+  function _jobIdFromCard(card) {
+    const direct =
+      card.getAttribute?.("data-occludable-job-id") ||
+      card.getAttribute?.("data-job-id");
+    if (direct && /^\d+$/.test(direct)) return direct;
+    const attrEl = card.querySelector?.("[data-occludable-job-id], [data-job-id]");
+    const attr =
+      attrEl?.getAttribute("data-occludable-job-id") ||
+      attrEl?.getAttribute("data-job-id");
+    if (attr && /^\d+$/.test(attr)) return attr;
+    const links = card.querySelectorAll?.("a[href*='/jobs/view/'], a[href*='currentJobId=']") || [];
+    for (const link of links) {
+      const id = _jobIdFromHref(link.getAttribute("href"));
+      if (id) return id;
+    }
     return null;
   }
 
@@ -1610,26 +1621,30 @@
     return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
   }
 
-  // Job cards in the left-hand list. data-occludable-job-id is the most stable
-  // anchor; the others are fallbacks for layout drift. We cast a wide net and
-  // then deduplicate by job-id so each job is only decorated once.
+  // Job cards in the left-hand results list. We anchor on the job LINKS — the
+  // single most reliable signal, since every card contains at least one link
+  // to its job (/jobs/view/<id> or ?currentJobId=<id>) — then climb to the
+  // enclosing list-item. This mirrors the proven people-search card detection
+  // and does NOT depend on LinkedIn's volatile <li> class names.
   function _jobCardEls() {
-    const byId = new Map(); // jobId -> element (prefer element with explicit attribute)
-    // Pass 1: elements with explicit job-id attribute — highest confidence
+    const byId = new Map(); // jobId -> card element
+    // Pass 1: explicit job-id attribute elements (most stable when present)
     document.querySelectorAll("[data-occludable-job-id], [data-job-id]").forEach((c) => {
       const id = c.getAttribute("data-occludable-job-id") || c.getAttribute("data-job-id");
-      if (!id || !/^\d+$/.test(id)) return;
-      if (!byId.has(id)) byId.set(id, c);
+      if (id && /^\d+$/.test(id) && !byId.has(id)) byId.set(id, c);
     });
-    // Pass 2: fallback container selectors for layouts that don't set data attrs
-    // on the outer li (e.g. /jobs/search-results/ and /jobs/collections/)
-    document.querySelectorAll(
-      "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
-      "li.discovery-templates-entity-item, div.job-card-container, " +
-      "div[class*='job-card-container'], div[class*='job-card-list']"
-    ).forEach((c) => {
-      const id = _jobIdFromCard(c);
-      if (id && !byId.has(id)) byId.set(id, c);
+    // Pass 2: anchor on every job link and climb to its card container. The
+    // nearest <li> ancestor of a job-title link IS that job's card (the list
+    // itself is a <ul>, never an <li>), so closest("li") lands precisely.
+    document.querySelectorAll("a[href*='/jobs/view/'], a[href*='currentJobId=']").forEach((link) => {
+      const id = _jobIdFromHref(link.getAttribute("href"));
+      if (!id || byId.has(id)) return;
+      const card =
+        link.closest("li") ||
+        link.closest(
+          "div.job-card-container, div[class*='job-card-container'], div[class*='job-card-list']"
+        );
+      if (card) byId.set(id, card);
     });
     const list = Array.from(byId.values());
     // Keep innermost when a parent+child both matched
@@ -1681,7 +1696,9 @@
     if (!_isJobsPage()) return;
     _gcJobChips();
     const portal = _ensurePortalRoot();
-    for (const card of _jobCardEls()) {
+    const cards = _jobCardEls();
+    let created = 0;
+    for (const card of cards) {
       try {
         const id = _jobIdFromCard(card);
         if (!id) continue;
@@ -1730,12 +1747,19 @@
         portal.appendChild(wrap);
         _jobChipCards.set(url, card);
         injectedJobChips.set(url, wrap);
+        created++;
       } catch (e) {
         console.warn("[LeadCaptura] decorateJobCards failed", e?.message);
       }
     }
+    if (cards.length || created) {
+      console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+    }
     _bindJobChipScroll();
     _scheduleJobChipSync();
+    // Surface the live count on the toolbar's Apply button the moment new
+    // chips appear, so the user can confirm detection at a glance.
+    if (created > 0) { try { renderToolbar(); } catch {} }
   }
 
   function toggleSelectAllJobs() {
