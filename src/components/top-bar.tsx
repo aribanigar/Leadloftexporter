@@ -3,6 +3,8 @@
 import { RefreshCw, Search, AlertCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -12,7 +14,9 @@ interface LinkedInStatus {
 
 export function TopBar() {
   const qc = useQueryClient();
+  const router = useRouter();
   const { user } = useAuth();
+  const [search, setSearch] = useState("");
   const { data: liStatus } = useQuery<LinkedInStatus>({
     queryKey: ["linkedin-status"],
     queryFn: async () => {
@@ -41,10 +45,22 @@ export function TopBar() {
       >
         <RefreshCw className="h-4 w-4" />
       </button>
-      <div className="relative w-96 max-w-full">
+      <form
+        className="relative w-96 max-w-full"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = search.trim();
+          router.push(q ? `/prospecting?q=${encodeURIComponent(q)}` : "/prospecting");
+        }}
+      >
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input className="input pl-9" placeholder="Search your leads" />
-      </div>
+        <input
+          className="input pl-9"
+          placeholder="Search your leads"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </form>
       <div className="ml-auto flex items-center gap-2">
         {!liStatus?.connected && (
           <div className="flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm shadow-card">

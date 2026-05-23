@@ -66,6 +66,22 @@ export default function PipelinePage() {
     },
   });
 
+  const saveView = useMutation({
+    mutationFn: (name: string) =>
+      api("/workspaces/current/views", {
+        method: "POST",
+        body: {
+          name,
+          filters: { stage_id: stageFilter || undefined, owner: ownerFilter },
+          sort: {
+            field: SORT_OPTIONS[sortIdx].key,
+            dir: SORT_OPTIONS[sortIdx].dir,
+          },
+        },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-views"] }),
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -200,11 +216,15 @@ export default function PipelinePage() {
       {/* Toolbar row */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-sm">
         <button
-          className="inline-flex items-center gap-1 text-brand-600 hover:underline"
-          title="Save current filters as a view (coming soon)"
-          onClick={() => alert("Saved views coming soon.")}
+          className="inline-flex items-center gap-1 text-brand-600 hover:underline disabled:opacity-50"
+          title="Save the current stage/owner/sort filters as a Quick View"
+          disabled={saveView.isPending}
+          onClick={() => {
+            const name = window.prompt("Name this view:");
+            if (name && name.trim()) saveView.mutate(name.trim());
+          }}
         >
-          <Bookmark className="h-4 w-4" /> Save View
+          <Bookmark className="h-4 w-4" /> {saveView.isPending ? "Saving…" : "Save View"}
         </button>
 
         <Divider />

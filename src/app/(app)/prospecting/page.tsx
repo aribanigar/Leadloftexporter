@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap, Wrench, Bot } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
@@ -22,7 +23,12 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function ProspectingPage() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const viewId = searchParams.get("view");
+  const q = (searchParams.get("q") || "").trim();
   const [page, setPage] = useState(1);
+  const [stageFilter, setStageFilter] = useState<string>("");
+  const [showFilter, setShowFilter] = useState(false);
   const [creating, setCreating] = useState(false);
   const [pickingColumns, setPickingColumns] = useState(false);
   const [findingEmails, setFindingEmails] = useState(false);
@@ -52,9 +58,32 @@ export default function ProspectingPage() {
     queryFn: () => api("/workspaces/current/views"),
   });
   const { data: leads, isLoading } = useQuery<LeadList>({
-    queryKey: ["leads", page],
-    queryFn: () => api(`/leads?page=${page}&page_size=50`),
+    queryKey: ["leads", page, stageFilter, q],
+    queryFn: () =>
+      api(
+        `/leads?page=${page}&page_size=50${stageFilter ? `&stage_id=${stageFilter}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`
+      ),
   });
+
+  // A Saved View opened from the sidebar ("/prospecting?view=<id>") applies its
+  // saved stage filter + columns. Without this the Quick View links navigated
+  // but changed nothing on the page.
+  const activeView = useMemo(
+    () => views?.find((v) => v.id === viewId) || null,
+    [views, viewId]
+  );
+  const [columns, setColumns] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!activeView) return;
+    const sid = (activeView.filters?.stage_id as string) || "";
+    setStageFilter(sid);
+    setPage(1);
+    if (activeView.columns?.length) setColumns(activeView.columns);
+  }, [activeView]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q]);
 
   const defaultCols = useMemo(
     () =>
@@ -63,7 +92,6 @@ export default function ProspectingPage() {
         : ["full_name", "title", "company", "email", "stage", "owner", "close_date"],
     [views]
   );
-  const [columns, setColumns] = useState<string[] | null>(null);
   const visibleColumns = columns ?? defaultCols;
 
   const stageById = useMemo(() => {
@@ -109,9 +137,53 @@ export default function ProspectingPage() {
           <button className="btn-secondary" onClick={() => setPickingColumns(true)}>
             <Columns3 className="h-4 w-4" /> Columns
           </button>
-          <button className="btn-secondary">
-            <Filter className="h-4 w-4" /> Filter
-          </button>
+          <div className="relative">
+            <button
+              className="btn-secondary"
+              onClick={() => setShowFilter((s) => !s)}
+              title="Filter leads by stage"
+            >
+              <Filter className="h-4 w-4" /> Filter{stageFilter ? " (1)" : ""}
+            </button>
+            {showFilter && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowFilter(false)}
+                />
+                <div className="absolute right-0 z-20 mt-1 w-60 rounded-md border border-slate-200 bg-white p-3 shadow-lg">
+                  <label className="label">Stage</label>
+                  <select
+                    className="input"
+                    value={stageFilter}
+                    onChange={(e) => {
+                      setStageFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">All stages</option>
+                    {(stages || []).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  {stageFilter && (
+                    <button
+                      className="btn-ghost mt-2 w-full justify-center"
+                      onClick={() => {
+                        setStageFilter("");
+                        setPage(1);
+                        setShowFilter(false);
+                      }}
+                    >
+                      Clear filter
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button className="btn-secondary" onClick={exportCsv}>
             <Download className="h-4 w-4" /> Export
           </button>
