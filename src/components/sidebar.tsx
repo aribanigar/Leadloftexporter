@@ -10,6 +10,7 @@ import {
   CheckSquare,
   Send,
   Columns3,
+  MessageSquare,
   Settings,
   Gift,
   Play,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/playbooks", label: "Playbooks", icon: Send },
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
+  { href: "/messaging", label: "Messaging", icon: MessageSquare },
 ] as const;
 
 export function Sidebar() {

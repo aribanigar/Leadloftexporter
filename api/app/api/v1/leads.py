@@ -1,9 +1,11 @@
 import csv
 import io
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,6 +33,7 @@ from app.schemas import (
     LeadUpdate,
 )
 from app.services.leads import ingest_lead, upsert_company, default_stage, normalize_linkedin
+from app.services.outreach import queue_extension_job
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -89,6 +92,86 @@ def list_leads(
             item.company = CompanyMini.model_validate(r.company)
         items.append(item)
     return LeadList(items=items, total=total, page=page, page_size=page_size)
+
+
+class BulkMessageIn(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    # When omitted, every lead in the workspace that has a LinkedIn URL is
+    # messaged. Pass a subset to target specific leads, and/or stage_id to
+    # target a single pipeline stage.
+    lead_ids: Optional[list[str]] = None
+    stage_id: Optional[str] = None
+
+
+@router.post("/bulk-message")
+def bulk_message(
+    body: BulkMessageIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Queue a LinkedIn message to every (or selected) pipeline lead.
+
+    Creates one queued ExtensionJob(kind="message") per lead with a LinkedIn
+    URL. The user's browser extension polls /extension/jobs/next and sends each
+    message from inside their own LinkedIn session, human-paced. We stagger
+    not_before across the batch as an extra safety layer so the sends never
+    burst — LinkedIn restricts accounts that message too fast.
+    """
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "message_required")
+
+    base = db.query(Lead).filter(Lead.workspace_id == ctx.workspace_id)
+    if body.lead_ids:
+        base = base.filter(Lead.id.in_(body.lead_ids))
+    if body.stage_id:
+        base = base.filter(Lead.stage_id == body.stage_id)
+    leads = base.all()
+
+    # Skip leads that already have a pending message job so an accidental
+    # double-send doesn't queue the same message twice.
+    already_pending = {
+        r[0]
+        for r in db.query(ExtensionJob.lead_id)
+        .filter(
+            ExtensionJob.workspace_id == ctx.workspace_id,
+            ExtensionJob.kind == "message",
+            ExtensionJob.status.in_(("queued", "claimed")),
+        )
+        .all()
+    }
+
+    now = datetime.now(timezone.utc)
+    queued = 0
+    skipped_no_linkedin = 0
+    skipped_pending = 0
+    delay_min = 0.0
+    for lead in leads:
+        if not lead.linkedin_url:
+            skipped_no_linkedin += 1
+            continue
+        if lead.id in already_pending:
+            skipped_pending += 1
+            continue
+        queue_extension_job(
+            db,
+            workspace_id=ctx.workspace_id,
+            user_id=ctx.user_id,
+            lead_id=lead.id,
+            kind="message",
+            payload={"linkedin_url": lead.linkedin_url, "body": msg},
+            not_before=now + timedelta(minutes=delay_min),
+        )
+        queued += 1
+        # 1.5–4 min between consecutive sends — paced, never a burst.
+        delay_min += random.uniform(1.5, 4.0)
+    db.commit()
+    return {
+        "queued": queued,
+        "skipped_no_linkedin": skipped_no_linkedin,
+        "skipped_pending": skipped_pending,
+        "total": len(leads),
+    }
 
 
 @router.post("", response_model=LeadOut, status_code=status.HTTP_201_CREATED)
