@@ -1552,7 +1552,7 @@
       }
       // Anchor bottom-right of the card, 46px above bottom edge
       const top = Math.max(4, r.bottom - 46);
-      const left = Math.max(4, r.right - 162);
+      const left = Math.max(4, r.right - 184);
       wrap.style.setProperty("top", `${top}px`, "important");
       wrap.style.setProperty("left", `${left}px`, "important");
       wrap.style.setProperty("visibility", "visible", "important");
@@ -1634,33 +1634,65 @@
     return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
   }
 
-  // Job cards in the left-hand results list. We anchor on the job LINKS — the
-  // single most reliable signal, since every card contains at least one link
-  // to its job (/jobs/view/<id> or ?currentJobId=<id>) — then climb to the
-  // enclosing list-item. This mirrors the proven people-search card detection
-  // and does NOT depend on LinkedIn's volatile <li> class names.
+  const _JOB_LINK_SEL =
+    "a[href*='/jobs/view/'], a[href*='currentJobId='], " +
+    "a.job-card-container__link, a.job-card-list__title, " +
+    "a.job-card-job-posting-card-wrapper__card-link";
+
+  // Count distinct job ids contained within a node (via links + data attrs).
+  function _distinctJobIds(node) {
+    const ids = new Set();
+    node.querySelectorAll?.(_JOB_LINK_SEL).forEach((a) => {
+      const id = _jobIdFromHref(a.getAttribute("href"));
+      if (id) ids.add(id);
+    });
+    node.querySelectorAll?.("[data-occludable-job-id], [data-job-id]").forEach((e) => {
+      const id = e.getAttribute("data-occludable-job-id") || e.getAttribute("data-job-id");
+      if (id && /^\d+$/.test(id)) ids.add(id);
+    });
+    return ids;
+  }
+
+  // Climb from a job link to the LARGEST ancestor that still represents a
+  // SINGLE job (stops the moment a node encloses 2+ distinct job ids). This is
+  // the analog of the proven people-search climbToCard — tag/class agnostic, so
+  // it survives LinkedIn markup changes that broke the old closest("li") path.
+  function _climbToJobCard(seed) {
+    let node = seed;
+    let best = seed;
+    for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+      if (_distinctJobIds(node).size > 1) break; // crossed into a multi-card box
+      best = node;
+      node = node.parentElement;
+    }
+    return best;
+  }
+
+  // Job cards across ALL jobs surfaces (search-results, collections, recommended).
+  // We anchor on the job LINKS — every card has at least one link to its job —
+  // and climb to the card box by job-id uniqueness, so detection never depends
+  // on LinkedIn's volatile <li>/div class names.
   function _jobCardEls() {
     const byId = new Map(); // jobId -> card element
-    // Pass 1: explicit job-id attribute elements (most stable when present)
+    // Scope to the results column when we can find it (keeps the right-hand
+    // detail pane's "similar jobs" from sprouting stray chips); fall back to
+    // the whole document if the container selector misses.
+    const scope =
+      document.querySelector(
+        ".scaffold-layout__list, .jobs-search-results-list, " +
+        "ul.jobs-search__results-list, [class*='jobs-search-results-list']"
+      ) || document;
+    let seeds = scope.querySelectorAll(_JOB_LINK_SEL);
+    if (!seeds.length && scope !== document) seeds = document.querySelectorAll(_JOB_LINK_SEL);
+    seeds.forEach((seed) => {
+      const id = _jobIdFromHref(seed.getAttribute("href")) || _jobIdFromCard(seed);
+      if (!id || byId.has(id)) return;
+      byId.set(id, _climbToJobCard(seed));
+    });
+    // Catch attribute-tagged cards whose link href has no parseable id.
     document.querySelectorAll("[data-occludable-job-id], [data-job-id]").forEach((c) => {
       const id = c.getAttribute("data-occludable-job-id") || c.getAttribute("data-job-id");
       if (id && /^\d+$/.test(id) && !byId.has(id)) byId.set(id, c);
-    });
-    // Pass 2: anchor on every job link and climb to its card container. The
-    // nearest <li> ancestor of a job-title link IS that job's card (the list
-    // itself is a <ul>, never an <li>), so closest("li") lands precisely.
-    document.querySelectorAll(
-      "a[href*='/jobs/view/'], a[href*='currentJobId='], " +
-      "a.job-card-container__link, a.job-card-list__title, a.job-card-job-posting-card-wrapper__card-link"
-    ).forEach((link) => {
-      const id = _jobIdFromHref(link.getAttribute("href")) || _jobIdFromCard(link.closest("li") || link);
-      if (!id || byId.has(id)) return;
-      const card =
-        link.closest("li") ||
-        link.closest(
-          "div.job-card-container, div[class*='job-card-container'], div[class*='job-card-list'], div[class*='job-card']"
-        );
-      if (card) byId.set(id, card);
     });
     const list = Array.from(byId.values());
     // Keep innermost when a parent+child both matched
@@ -1744,7 +1776,7 @@
           renderToolbar();
         });
 
-        const textSpan = el("span", { class: "lc-inline-save-text" }, "Apply");
+        const textSpan = el("span", { class: "lc-inline-save-text" }, "Auto Apply");
         const btn = el(
           "button",
           { class: "lc-inline-save", type: "button", title: "Auto-apply to this job" },
