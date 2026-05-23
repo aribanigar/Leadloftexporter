@@ -567,6 +567,39 @@
     }
   }
 
+  // Every /in/ URL that currently has a LIVE chip on the page. The injected
+  // chips are the SINGLE SOURCE OF TRUTH for bulk operations — Select All,
+  // Save All and Connect All all read from here, so they can never diverge
+  // from what the user actually sees. (The old approach re-ran the scraper
+  // independently, which under-counted real-photo cards.)
+  function _allChipUrls() {
+    const urls = [];
+    for (const [url, wrap] of injectedSaves.entries()) {
+      if (url && url.includes("/in/") && wrap && document.body.contains(wrap)) {
+        urls.push(url);
+      }
+    }
+    return urls;
+  }
+
+  // Human-ish label from an /in/ URL slug, for progress display only. The
+  // real name is scraped on the profile page during enrichment.
+  function _labelFromUrl(url) {
+    try {
+      const slug = decodeURIComponent(url.split("/in/")[1] || "")
+        .replace(/\/.*$/, "")
+        .replace(/-[0-9a-f]{6,}$/i, "");
+      if (!slug) return url;
+      return slug
+        .split("-")
+        .filter((p) => p && !/^\d+$/.test(p))
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(" ");
+    } catch {
+      return url;
+    }
+  }
+
   // Single source of truth for "Select All" / "Clear" toggle. Called by BOTH
   // the top floating pill and the bottom toolbar's Select All button so they
   // stay in lock-step. When called with no selection it ticks every visible
@@ -575,14 +608,11 @@
     if (state.selectedUrls.size > 0) {
       state.selectedUrls.clear();
     } else {
-      try {
-        const { profiles } = Scraper.scrapeCurrentPage();
-        for (const p of profiles || []) {
-          if (p?.linkedin_url && p.linkedin_url.includes("/in/")) {
-            state.selectedUrls.add(p.linkedin_url);
-          }
-        }
-      } catch {}
+      // Make sure every visible card has a chip, THEN select exactly those
+      // chips. Using the chips (not a fresh scrape) guarantees Select All
+      // matches what the user sees one-for-one.
+      try { decorateSearchCards(); } catch {}
+      for (const url of _allChipUrls()) state.selectedUrls.add(url);
     }
     // Mirror selection state across all three surfaces: per-card checkboxes,
     // top pill, bottom toolbar counter. Without this, ticking one place would
@@ -864,22 +894,19 @@
   }
 
   async function saveAllVisible() {
-    // Pick the working set:
+    // Pick the working set FROM THE INJECTED CHIPS (single source of truth):
     //   - If the user has explicitly ticked checkboxes, process EXACTLY those.
-    //   - Else process every visible /in/ card (legacy one-click bulk).
-    let { profiles } = Scraper.scrapeCurrentPage();
-    if (!profiles?.length) {
-      flashStatus("No profiles found on this page.", "warn");
+    //   - Else process every visible /in/ card that has a chip.
+    // Driving off the chips (not a fresh scrape) guarantees Save All covers
+    // every card the user sees — no divergence on real-photo cards.
+    try { decorateSearchCards(); } catch {}
+    const urls =
+      state.selectedUrls.size > 0
+        ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
+        : _allChipUrls();
+    if (!urls.length) {
+      flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
       return;
-    }
-    if (state.selectedUrls.size > 0) {
-      profiles = profiles.filter(
-        (p) => p?.linkedin_url && state.selectedUrls.has(p.linkedin_url)
-      );
-      if (!profiles.length) {
-        flashStatus("Selected URLs are not visible — scroll or reselect.", "warn");
-        return;
-      }
     }
 
     // INTENTIONAL: no syncSearch pre-save. Card-level scrapes can pick up
@@ -887,10 +914,11 @@
     // "Hady"). We only trust profile-page scrapes for persistence — the
     // background-tab enrichment below saves the canonical name+title+
     // company+email+phone+location pulled from the unambiguous /in/<handle>
-    // DOM.
-    const enrichable = profiles.filter(
-      (p) => p?.linkedin_url && p.linkedin_url.includes("/in/")
-    );
+    // DOM. We only need the URL here; the profile page yields the real name.
+    const enrichable = urls.map((u) => ({
+      linkedin_url: u,
+      full_name: _labelFromUrl(u),
+    }));
     if (!enrichable.length) {
       flashStatus("No /in/ profiles to enrich.", "warn");
       return;
@@ -1157,28 +1185,26 @@
       await _scrollLoadPage();
       if (state.connectCancel) { cancelled = true; break; }
 
-      let { profiles } = Scraper.scrapeCurrentPage();
-      profiles = (profiles || []).filter(
-        (p) => p?.linkedin_url && p.linkedin_url.includes("/in/")
-      );
-      if (pageNum === 1 && page1Selection) {
-        profiles = profiles.filter((p) => page1Selection.has(p.linkedin_url));
-      }
+      // Targets from the CHIPS (single source of truth). Page 1 honours the
+      // user's tick selection; later pages take every chip on the page.
+      let urls =
+        pageNum === 1 && page1Selection
+          ? Array.from(page1Selection).filter((u) => u && u.includes("/in/"))
+          : _allChipUrls();
 
-      for (let i = 0; i < profiles.length; i++) {
+      for (let i = 0; i < urls.length; i++) {
         if (state.connectCancel) { cancelled = true; break; }
         if (sent >= MAX_INVITES_PER_RUN) { hitCap = true; break; }
-        const profile = profiles[i];
-        const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
+        const url = urls[i];
         state.connectProgress = {
           current: sent + 1,
           total: MAX_INVITES_PER_RUN,
-          name: `p${pageNum}: ${label}`,
+          name: `p${pageNum}: ${_labelFromUrl(url)}`,
         };
-        _setChipState(profile.linkedin_url, "saving", "Connecting…");
+        _setChipState(url, "saving", "Connecting…");
         renderToolbar();
 
-        const card = _cardForUrl(profile.linkedin_url);
+        const card = _cardForUrl(url);
         if (!card) { skipped++; continue; }
         try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
         await sleep(500 + Math.random() * 400);
@@ -1191,13 +1217,13 @@
         }
         if (res.ok) {
           sent++;
-          _setChipState(profile.linkedin_url, "saved", "Invited ✓");
+          _setChipState(url, "saved", "Invited ✓");
         } else {
           skipped++;
-          _setChipState(profile.linkedin_url, "error", "No Connect");
+          _setChipState(url, "error", "No Connect");
         }
 
-        if (i < profiles.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
+        if (i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
           const base = 4000 + Math.random() * 5000;
           const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
           await sleep(base + longTail);
