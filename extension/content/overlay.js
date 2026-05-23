@@ -812,10 +812,10 @@
           : el(
               "button",
               {
-                class: "lc-btn lc-btn-ghost",
+                class: "lc-btn lc-btn-connect",
                 onclick: connectAllVisible,
                 title:
-                  "Send connection requests to selected (or all visible) profiles. Human-paced; LinkedIn weekly invite caps still apply.",
+                  "Send connection requests to selected (or all visible) profiles. Auto-advances pages, skips already-sent/connected. Human-paced; LinkedIn weekly invite caps still apply.",
               },
               state.selectedUrls.size > 0
                 ? `Connect ${state.selectedUrls.size}`
@@ -825,7 +825,7 @@
           ? el(
               "button",
               {
-                class: "lc-btn lc-btn-primary",
+                class: "lc-btn lc-btn-stop",
                 onclick: () => {
                   if (state.bulkActive) state.bulkCancel = true;
                   if (state.connectActive) state.connectCancel = true;
@@ -1048,6 +1048,35 @@
     return null;
   }
 
+  // Classify a card's connection state from its native buttons so the bulk
+  // connector can SKIP people already contacted/connected:
+  //   "connect"   → a real Connect button is present → send an invite
+  //   "pending"   → request already sent → skip
+  //   "connected" → Message but no Connect → already a connection → skip
+  //   "follow"    → only Follow available → can't connect → skip
+  //   "unknown"   → no recognisable action button
+  function _cardConnectState(card) {
+    let hasConnect = false, hasPending = false, hasMessage = false, hasFollow = false;
+    for (const b of card.querySelectorAll("button")) {
+      if (b.classList.contains("lc-inline-save")) continue;
+      const aria = (b.getAttribute("aria-label") || "").trim();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      if (/^pending$/i.test(txt) || /\bpending\b/i.test(aria)) hasPending = true;
+      else if (
+        /^connect$/i.test(txt) ||
+        /\binvite\b.*\bto connect\b/i.test(aria) ||
+        /^connect$/i.test(aria)
+      ) hasConnect = true;
+      else if (/^message\b/i.test(txt) || /^message\b/i.test(aria)) hasMessage = true;
+      else if (/^follow$/i.test(txt) || /^follow$/i.test(aria)) hasFollow = true;
+    }
+    if (hasConnect) return "connect";
+    if (hasPending) return "pending";
+    if (hasMessage) return "connected";
+    if (hasFollow) return "follow";
+    return "unknown";
+  }
+
   async function _sendConnectOnCard(card) {
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
@@ -1180,6 +1209,7 @@
 
     let sent = 0;
     let skipped = 0;
+    let alreadyDone = 0; // already invited / already connected — skipped
     let pageNum = 1;
     let cancelled = false;
     let hitCap = false;
@@ -1210,6 +1240,28 @@
 
         const card = _cardForUrl(url);
         if (!card) { skipped++; continue; }
+
+        // SKIP people we've already contacted or are already connected to —
+        // don't waste the daily invite quota. The native button state is the
+        // source of truth: Pending = request already sent, Message-without-
+        // Connect = already a connection, Follow-only = can't connect.
+        const cstate = _cardConnectState(card);
+        if (cstate === "pending") {
+          alreadyDone++;
+          _setChipState(url, "saved", "Already sent ✓");
+          continue;
+        }
+        if (cstate === "connected") {
+          alreadyDone++;
+          _setChipState(url, "saved", "Connected ✓");
+          continue;
+        }
+        if (cstate !== "connect") {
+          skipped++;
+          _setChipState(url, "error", cstate === "follow" ? "Follow only" : "No Connect");
+          continue;
+        }
+
         // Instant (not "smooth") — smooth scroll relies on the rendering
         // pipeline which Chrome pauses in a backgrounded tab; instant keeps
         // the run working when the user switches to another tab.
@@ -1230,6 +1282,8 @@
           _setChipState(url, "error", "No Connect");
         }
 
+        // Pace only after an ACTUAL invite — skipped/already-done cards cost
+        // no quota, so don't burn the human-pacing delay on them.
         if (i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
           const base = 4000 + Math.random() * 5000;
           const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
@@ -1265,13 +1319,18 @@
     mountSelectAllHeader();
     renderToolbar();
 
+    const extra = [
+      alreadyDone ? `${alreadyDone} already contacted` : "",
+      skipped ? `${skipped} skipped` : "",
+    ].filter(Boolean).join(", ");
+    const tail = extra ? ` (${extra})` : "";
     let msg;
     if (cancelled) {
-      msg = `Stopped: ${sent} invites sent across ${pageNum} page(s)`;
+      msg = `Stopped: ${sent} invites sent across ${pageNum} page(s)${tail}`;
     } else if (hitCap) {
-      msg = `Reached ${MAX_INVITES_PER_RUN}-invite safety cap: ${sent} sent. Run again later to continue.`;
+      msg = `Reached ${MAX_INVITES_PER_RUN}-invite cap: ${sent} sent${tail}. Run again later.`;
     } else {
-      msg = `Done: ${sent} invites sent across ${pageNum} page(s)${skipped ? ` (${skipped} skipped)` : ""} ✓`;
+      msg = `Done: ${sent} invites sent across ${pageNum} page(s)${tail} ✓`;
     }
     flashStatus(msg, hitCap ? "warn" : "ok");
   }
