@@ -140,17 +140,22 @@
     // LinkedIn finished hydrating just confused the user.
     if (new URLSearchParams(location.search).has("lc_enrich")) return;
 
-    // Small settling delay because LinkedIn is a heavy SPA
-    setTimeout(() => {
-      const isProfile = type === "profile" || type === "salesnav-profile";
-      const isList = type === "search-people" || type === "salesnav-search";
-      const isJobs = type === "jobs";
-      if (isProfile) {
+    const isProfile = type === "profile" || type === "salesnav-profile";
+    const isList = type === "search-people" || type === "salesnav-search";
+    const isJobs = type === "jobs";
+
+    // Profile panel opens immediately so the user sees it the moment the
+    // profile URL loads. The overlay watches the h1 for name mutations and
+    // re-renders as soon as LinkedIn hydrates the correct person's name.
+    if (isProfile) {
+      setTimeout(() => {
         Overlay.renderProfilePanel();
-        // Auto-save + auto-enrich (name+title+email+phone+location) without
-        // any user interaction. Dedup is handled inside triggerAutoSave.
         Overlay.triggerAutoSave?.();
-      }
+      }, 50);
+    }
+
+    // Toolbar + card chips need the search-results DOM to settle first.
+    setTimeout(() => {
       if (isList || isJobs) {
         Overlay.renderToolbar();
         Overlay.mountSelectAllHeader?.();

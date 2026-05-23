@@ -124,10 +124,61 @@
   }
 
   function unmountProfilePanel() {
+    _stopProfileNameObserver();
     if (state.profilePanel) {
       state.profilePanel.remove();
       state.profilePanel = null;
     }
+  }
+
+  // Watches the profile h1 for DOM mutations and re-renders the panel the
+  // moment LinkedIn hydrates the correct person's name — so the panel never
+  // stays stuck on a stale name from the previous profile visit.
+  let _profileNameObserver = null;
+  let _profileNameObserverPath = null;
+  let _profileNameObserverTimer = null;
+
+  function _stopProfileNameObserver() {
+    if (_profileNameObserver) {
+      _profileNameObserver.disconnect();
+      _profileNameObserver = null;
+    }
+    if (_profileNameObserverTimer) {
+      clearTimeout(_profileNameObserverTimer);
+      _profileNameObserverTimer = null;
+    }
+    _profileNameObserverPath = null;
+  }
+
+  function _startProfileNameObserver(expectedPath, knownName) {
+    _stopProfileNameObserver();
+    _profileNameObserverPath = expectedPath;
+    const target = document.querySelector("main") || document.body;
+    let debounce = null;
+    let lastSeen = knownName || "";
+
+    _profileNameObserver = new MutationObserver(() => {
+      if (location.pathname !== _profileNameObserverPath) {
+        _stopProfileNameObserver();
+        return;
+      }
+      if (debounce) return;
+      debounce = setTimeout(() => {
+        debounce = null;
+        try {
+          const fresh = Scraper.scrapeProfile?.();
+          const freshName = fresh?.full_name || "";
+          if (freshName && freshName !== lastSeen) {
+            _stopProfileNameObserver();
+            renderProfilePanel();
+          }
+        } catch {}
+      }, 120);
+    });
+
+    _profileNameObserver.observe(target, { childList: true, subtree: true });
+    // Safety cutoff: stop observing after 12s regardless
+    _profileNameObserverTimer = setTimeout(_stopProfileNameObserver, 12000);
   }
 
   async function renderProfilePanel() {
@@ -137,19 +188,20 @@
     const connected = !!opts;
     const scraped = Scraper.scrapeCurrentPage();
     const profile = scraped.profile;
-    // LinkedIn renders the top card asynchronously; the h1 sometimes
-    // doesn't exist on the first onPathChange tick. If we have no name
-    // yet, schedule one re-render attempt 1.2s later so the panel fills
-    // in instead of staying stuck on "Open a LinkedIn profile to capture
-    // it." Cap retries via a tag on the panel so we don't loop forever.
-    if (
-      (!profile || !profile.full_name) &&
-      Number(root.dataset.lcRetries || 0) < 4
-    ) {
-      const n = Number(root.dataset.lcRetries || 0) + 1;
-      root.dataset.lcRetries = String(n);
-      setTimeout(() => renderProfilePanel(), 1200);
-    } else if (profile?.full_name) {
+    // LinkedIn hydrates the profile h1 asynchronously. Start a
+    // MutationObserver on the main element so the panel re-renders the
+    // instant the correct name appears in the DOM — no fixed retry delays.
+    // Keep the timed retry as a belt-and-suspenders fallback for cases
+    // where mutations fire before LinkedIn writes the final name.
+    if (!profile?.full_name) {
+      _startProfileNameObserver(location.pathname, "");
+      if (Number(root.dataset.lcRetries || 0) < 4) {
+        const n = Number(root.dataset.lcRetries || 0) + 1;
+        root.dataset.lcRetries = String(n);
+        setTimeout(() => renderProfilePanel(), 1200);
+      }
+    } else {
+      _stopProfileNameObserver();
       root.dataset.lcRetries = "0";
     }
 
