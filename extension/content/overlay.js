@@ -44,6 +44,11 @@
     // works for users who don't care about selection.
     selectedUrls: new Set(),
     bulkProgress: null, // { current, total, name } during a bulk run
+    // Bulk-connect run state — mirrors the bulk-save flags but drives the
+    // native LinkedIn "Connect" button on each selected card instead.
+    connectActive: false,
+    connectCancel: false,
+    connectProgress: null,
   };
 
   function el(tag, attrs = {}, ...children) {
@@ -600,7 +605,7 @@
   // toolbar. Position is fixed top-right so it doesn't fight LinkedIn's
   // hashed-class header layout.
   function mountSelectAllHeader() {
-    if (state.bulkActive) {
+    if (state.bulkActive || state.connectActive) {
       unmountSelectAllHeader();
       return null;
     }
@@ -752,7 +757,8 @@
         // automation is alive and on-track. The hidden .lc-status-slot child
         // keeps flashStatus() working (e.g. "Stopping after current profile…"
         // when the user clicks Stop mid-run).
-        state.bulkActive && state.bulkProgress
+        (state.bulkActive && state.bulkProgress) ||
+        (state.connectActive && state.connectProgress)
           ? el(
               "div",
               { class: "lc-bulk-progress" },
@@ -760,18 +766,39 @@
               el(
                 "span",
                 { class: "lc-bulk-progress-text" },
-                `Enriching ${state.bulkProgress.current} of ${state.bulkProgress.total}: ${state.bulkProgress.name}…`
+                (() => {
+                  const p = state.connectProgress || state.bulkProgress;
+                  const verb = state.connectActive ? "Connecting" : "Enriching";
+                  return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
+                })()
               ),
               el("span", { class: "lc-status-slot lc-status-slot-inline" })
             )
           : el("div", { class: "lc-status-slot" }),
-        state.bulkActive
+        // Connect Selected — hidden during any active run. Sends connection
+        // requests via each card's own native Connect button, human-paced.
+        state.bulkActive || state.connectActive
+          ? null
+          : el(
+              "button",
+              {
+                class: "lc-btn lc-btn-ghost",
+                onclick: connectAllVisible,
+                title:
+                  "Send connection requests to selected (or all visible) profiles. Human-paced; LinkedIn weekly invite caps still apply.",
+              },
+              state.selectedUrls.size > 0
+                ? `Connect ${state.selectedUrls.size}`
+                : "Connect All"
+            ),
+        state.bulkActive || state.connectActive
           ? el(
               "button",
               {
                 class: "lc-btn lc-btn-primary",
                 onclick: () => {
-                  state.bulkCancel = true;
+                  if (state.bulkActive) state.bulkCancel = true;
+                  if (state.connectActive) state.connectCancel = true;
                   flashStatus("Stopping after current profile…");
                 },
               },
@@ -967,6 +994,152 @@
     }
     flashStatus(summary, rateLimited ? "warn" : "ok");
     decorateSearchCards();
+  }
+
+  // ---------- Bulk Connect ----------
+  // Sends connection requests by clicking each selected card's OWN native
+  // "Connect" button — no new tab, no navigation. Every action happens in the
+  // visible foreground tab, honoring the bot-avoidance rule that write actions
+  // never run hidden. Human-paced: 4-9s base gap with an ~18% long-tail.
+  //
+  // NOTE: LinkedIn caps weekly invites (~100-200) and restricts accounts that
+  // fire them too fast. This automates the clicking; it can't bypass the cap.
+  function _findConnectButtonInCard(card) {
+    const buttons = Array.from(card.querySelectorAll("button"));
+    for (const b of buttons) {
+      const aria = (b.getAttribute("aria-label") || "").trim();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      if (b.classList.contains("lc-inline-save")) continue;
+      if (/pending/i.test(aria) || /pending/i.test(txt)) continue;
+      // Match a real Connect button by visible text ("Connect") or aria-label
+      // ("Invite <Name> to connect"). Skip Follow / Message / Save.
+      if (/^connect$/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /^connect$/i.test(aria)) {
+        return b;
+      }
+    }
+    return null;
+  }
+
+  async function _sendConnectOnCard(card) {
+    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
+    const { sleep } = globalThis.__lcHuman;
+    const btn = _findConnectButtonInCard(card);
+    if (!btn) return { ok: false, reason: "no_connect_button" };
+    await dispatchHumanClick(btn);
+    await sleep(700 + Math.random() * 500);
+    // A modal usually appears with "Send without a note" / "Send". Click it.
+    const sendBtn = await waitFor(
+      [
+        "button[aria-label*='Send without a note' i]",
+        "button[aria-label='Send now']",
+        "button[aria-label*='Send invitation' i]",
+        "button[aria-label*='Send' i]",
+        "div[role='dialog'] button.artdeco-button--primary",
+      ],
+      { timeout: 3500 }
+    );
+    if (sendBtn) {
+      await dispatchHumanClick(sendBtn);
+      await sleep(500);
+      return { ok: true };
+    }
+    // No modal — LinkedIn may have sent directly, OR an email-verify wall
+    // surfaced. Dismiss any lingering dialog so the next card isn't blocked.
+    const dismiss = document.querySelector("button[aria-label='Dismiss']");
+    if (dismiss) { try { dismiss.click(); } catch {} }
+    return { ok: true, note: "no_modal" };
+  }
+
+  function _cardForUrl(url) {
+    const wrap = injectedSaves.get(url);
+    if (wrap && document.body.contains(wrap)) {
+      return wrap.closest("li, article, [role='listitem'], [role='row']") || wrap.parentElement;
+    }
+    const a = Array.from(document.querySelectorAll("a[href*='/in/']")).find(
+      (l) => globalThis.__lcDom.normalizeProfileUrl(l.href) === url
+    );
+    return a ? _cardFromLink(a) : null;
+  }
+
+  async function connectAllVisible() {
+    let { profiles } = Scraper.scrapeCurrentPage();
+    if (!profiles?.length) {
+      flashStatus("No profiles found on this page.", "warn");
+      return;
+    }
+    if (state.selectedUrls.size > 0) {
+      profiles = profiles.filter(
+        (p) => p?.linkedin_url && state.selectedUrls.has(p.linkedin_url)
+      );
+      if (!profiles.length) {
+        flashStatus("Selected URLs are not visible — scroll or reselect.", "warn");
+        return;
+      }
+    }
+    const targets = profiles.filter((p) => p?.linkedin_url && p.linkedin_url.includes("/in/"));
+    if (!targets.length) {
+      flashStatus("No connectable profiles.", "warn");
+      return;
+    }
+
+    state.connectActive = true;
+    state.connectCancel = false;
+    state.connectProgress = { current: 0, total: targets.length, name: "" };
+    unmountSelectAllHeader();
+    renderToolbar();
+
+    const { sleep } = globalThis.__lcHuman;
+    let sent = 0;
+    let skipped = 0;
+    let cancelled = false;
+    for (let i = 0; i < targets.length; i++) {
+      if (state.connectCancel) { cancelled = true; break; }
+      const profile = targets[i];
+      const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
+      state.connectProgress = { current: i + 1, total: targets.length, name: label };
+      _setChipState(profile.linkedin_url, "saving", "Connecting…");
+      renderToolbar();
+
+      const card = _cardForUrl(profile.linkedin_url);
+      if (!card) { skipped++; continue; }
+
+      // Scroll into view so the button is rendered + the click looks natural.
+      try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+      await sleep(500 + Math.random() * 400);
+
+      let res;
+      try {
+        res = await _sendConnectOnCard(card);
+      } catch (e) {
+        res = { ok: false, reason: String(e) };
+      }
+      if (res.ok) {
+        sent++;
+        _setChipState(profile.linkedin_url, "saved", "Invited ✓");
+      } else {
+        skipped++;
+        _setChipState(profile.linkedin_url, "error", "No Connect");
+      }
+
+      // Human-paced gap before the next invite. 4-9s base, ~18% long-tail.
+      if (i < targets.length - 1 && !state.connectCancel) {
+        const base = 4000 + Math.random() * 5000;
+        const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
+        await sleep(base + longTail);
+      }
+    }
+
+    state.connectActive = false;
+    state.connectProgress = null;
+    state.selectedUrls.clear();
+    mountSelectAllHeader();
+    renderToolbar();
+    flashStatus(
+      cancelled
+        ? `Stopped: ${sent} invites sent`
+        : `Done: ${sent} connection requests sent${skipped ? ` (${skipped} skipped)` : ""} ✓`,
+      "ok"
+    );
   }
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
