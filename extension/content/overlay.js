@@ -1055,17 +1055,21 @@
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
     await sleep(700 + Math.random() * 500);
-    // A modal usually appears with "Send without a note" / "Send". Click it.
-    const sendBtn = await waitFor(
-      [
-        "button[aria-label*='Send without a note' i]",
-        "button[aria-label='Send now']",
-        "button[aria-label*='Send invitation' i]",
-        "button[aria-label*='Send' i]",
-        "div[role='dialog'] button.artdeco-button--primary",
-      ],
-      { timeout: 3500 }
-    );
+    // A modal usually appears with "Send without a note" / "Send". When the
+    // tab is BACKGROUNDED, LinkedIn can defer rendering the modal, so poll a
+    // few times (longer overall) rather than a single short wait.
+    const sendSel = [
+      "button[aria-label*='Send without a note' i]",
+      "button[aria-label='Send now']",
+      "button[aria-label*='Send invitation' i]",
+      "button[aria-label*='Send' i]",
+      "div[role='dialog'] button.artdeco-button--primary",
+    ];
+    let sendBtn = null;
+    for (let attempt = 0; attempt < 3 && !sendBtn; attempt++) {
+      sendBtn = await waitFor(sendSel, { timeout: 3000 });
+      if (!sendBtn) await sleep(700);
+    }
     if (sendBtn) {
       await dispatchHumanClick(sendBtn);
       await sleep(500);
@@ -1206,7 +1210,10 @@
 
         const card = _cardForUrl(url);
         if (!card) { skipped++; continue; }
-        try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+        // Instant (not "smooth") — smooth scroll relies on the rendering
+        // pipeline which Chrome pauses in a backgrounded tab; instant keeps
+        // the run working when the user switches to another tab.
+        try { card.scrollIntoView({ block: "center" }); } catch {}
         await sleep(500 + Math.random() * 400);
 
         let res;
@@ -1494,6 +1501,21 @@
     }
   }
 
+  // Is this a native LinkedIn per-card action button (Connect/Follow/Message/
+  // Pending)? Used to anchor card detection — there's exactly one per card.
+  function _isActionButton(b) {
+    if (!b || b.classList?.contains("lc-inline-save")) return false;
+    const aria = b.getAttribute?.("aria-label") || "";
+    const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+    return (
+      /^(connect|follow|message|pending)$/i.test(txt) ||
+      /\binvite\b.*\bto connect\b/i.test(aria) ||
+      /^(connect|follow|pending)$/i.test(aria) ||
+      /^message\b/i.test(aria) ||
+      /\bfollow\b/i.test(aria)
+    );
+  }
+
   // Mirror of scraper.js _findAvatarLink — keep in lock-step.
   function _findAvatarLink(card) {
     const imgs = Array.from(card.querySelectorAll("img"));
@@ -1760,53 +1782,52 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // CARD-FIRST detection, anchored on the native ACTION BUTTON.
-    //
-    // Why not anchor on the profile link? Cards with a real profile PHOTO wrap
-    // that photo in its own /in/ <a> that can sit inside a nested
-    // role="listitem"/article sub-container. Walking up from that avatar link
-    // lands on the INNER container, not the true card row — so the chip got
-    // injected into the wrong element (or skipped by URL-dedup against the
-    // outer card). Cards with the gray DEFAULT avatar have no such nesting,
-    // which is exactly why those got chips and photo cards didn't.
-    //
-    // The Connect/Follow/Message/Pending button is never nested in an avatar
-    // sub-container, so walking up from it yields the real card row every
-    // time. We union button-anchored cards with link-anchored cards, then
-    // keep only OUTERMOST cards (drop any card contained within another) so a
-    // nested avatar container can't double- or mis-inject.
+    // Anchor on the native ACTION BUTTON (Connect/Follow/Message/Pending).
+    // Every result card has exactly ONE such button, and — unlike a profile
+    // photo's /in/ <a> — it is never nested in an avatar sub-container. From
+    // each button we walk UP to the largest ancestor that still represents a
+    // SINGLE card: we keep climbing while the ancestor holds an /in/ link and
+    // at most ONE action button, and stop the moment it would span two cards
+    // (>1 action button). That yields the true card row every time, with no
+    // fragile "outermost" filter that could collapse the whole list into one.
     const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
-    const rawCards = new Set();
+    const cards = new Set();
     for (const b of document.querySelectorAll("button")) {
-      if (b.classList.contains("lc-inline-save")) continue;
-      const aria = b.getAttribute("aria-label") || "";
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      const isAction =
-        /^(connect|follow|message|pending)$/i.test(txt) ||
-        /\binvite\b.*\bto connect\b/i.test(aria) ||
-        /^(connect|follow|pending)$/i.test(aria) ||
-        /^message\b/i.test(aria) ||
-        /\bfollow\b/i.test(aria);
-      if (!isAction) continue;
-      const card = _cardFromLink(b);
-      if (
-        card &&
-        card.tagName !== "BODY" &&
-        card.tagName !== "HTML" &&
-        card.querySelector(linkSel)
-      ) {
-        rawCards.add(card);
+      if (!_isActionButton(b)) continue;
+      let node = b.parentElement;
+      let card = null;
+      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+        if (node.querySelector(linkSel)) {
+          const actionCount = Array.from(node.querySelectorAll("button")).filter(
+            _isActionButton
+          ).length;
+          if (actionCount <= 1) card = node; // still a single card → keep climbing
+          else break; // crossed into a multi-card container → stop
+        }
+        node = node.parentElement;
+      }
+      if (card) cards.add(card);
+    }
+    // Supplement: cards with NO action button (already-connected / following).
+    // Walk up from each /in/ link with the same single-card guard.
+    for (const a of document.querySelectorAll(linkSel)) {
+      let node = a.parentElement;
+      let card = null;
+      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+        const actionCount = Array.from(node.querySelectorAll("button")).filter(
+          _isActionButton
+        ).length;
+        if (actionCount <= 1 && (node.tagName === "LI" || node.getAttribute?.("role") === "listitem" || node.tagName === "ARTICLE")) {
+          card = node;
+          break;
+        }
+        if (actionCount > 1) break;
+        node = node.parentElement;
+      }
+      if (card && !Array.from(cards).some((c) => c.contains(card) || card.contains(c))) {
+        cards.add(card);
       }
     }
-    for (const a of document.querySelectorAll(linkSel)) {
-      const card = _cardFromLink(a);
-      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") rawCards.add(card);
-    }
-    // Keep only outermost cards — drop any card contained within another.
-    const rawList = Array.from(rawCards);
-    const cards = rawList.filter(
-      (c) => !rawList.some((other) => other !== c && other.contains(c))
-    );
 
     for (const card of cards) {
       try {

@@ -1452,42 +1452,56 @@
     };
   }
 
+  function _isActionButtonSc(b) {
+    if (!b) return false;
+    const aria = b.getAttribute?.("aria-label") || "";
+    const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+    return (
+      /^(connect|follow|message|pending)$/i.test(txt) ||
+      /\binvite\b.*\bto connect\b/i.test(aria) ||
+      /^(connect|follow|pending)$/i.test(aria) ||
+      /^message\b/i.test(aria) ||
+      /\bfollow\b/i.test(aria)
+    );
+  }
+
   function scrapeSearchResults() {
-    // CARD-FIRST, anchored on the native action button (Connect/Follow/
-    // Message/Pending) which — unlike a profile-photo /in/ link — is never
-    // nested in an avatar sub-container, so walking up yields the true card
-    // row. Union with link-anchored cards, then keep only OUTERMOST cards.
-    // Must stay in lock-step with overlay.js decorateSearchCards so Select
-    // All and the Save chips agree on which cards exist.
-    const rawCards = new Set();
+    // Anchor on the native action button and walk UP to the largest ancestor
+    // that is still a SINGLE card (holds an /in/ link and ≤1 action button),
+    // stopping before it spans two cards. Robust to avatar-link nesting and
+    // to LinkedIn dropping <li> wrappers. Must stay in lock-step with
+    // overlay.js decorateSearchCards so Select All / chips agree.
+    const cards = new Set();
     for (const b of document.querySelectorAll("button")) {
-      const aria = b.getAttribute("aria-label") || "";
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      const isAction =
-        /^(connect|follow|message|pending)$/i.test(txt) ||
-        /\binvite\b.*\bto connect\b/i.test(aria) ||
-        /^(connect|follow|pending)$/i.test(aria) ||
-        /^message\b/i.test(aria) ||
-        /\bfollow\b/i.test(aria);
-      if (!isAction) continue;
-      const card = _profileCardFromLink(b);
-      if (
-        card &&
-        card.tagName !== "BODY" &&
-        card.tagName !== "HTML" &&
-        card.querySelector("a[href*='/in/']")
-      ) {
-        rawCards.add(card);
+      if (!_isActionButtonSc(b)) continue;
+      let node = b.parentElement;
+      let card = null;
+      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+        if (node.querySelector("a[href*='/in/']")) {
+          const cnt = Array.from(node.querySelectorAll("button")).filter(_isActionButtonSc).length;
+          if (cnt <= 1) card = node;
+          else break;
+        }
+        node = node.parentElement;
       }
+      if (card) cards.add(card);
     }
     for (const a of document.querySelectorAll("a[href*='/in/']")) {
-      const card = _profileCardFromLink(a);
-      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") rawCards.add(card);
+      let node = a.parentElement;
+      let card = null;
+      for (let i = 0; i < 12 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+        const cnt = Array.from(node.querySelectorAll("button")).filter(_isActionButtonSc).length;
+        if (cnt <= 1 && (node.tagName === "LI" || node.getAttribute?.("role") === "listitem" || node.tagName === "ARTICLE")) {
+          card = node;
+          break;
+        }
+        if (cnt > 1) break;
+        node = node.parentElement;
+      }
+      if (card && !Array.from(cards).some((c) => c.contains(card) || card.contains(c))) {
+        cards.add(card);
+      }
     }
-    const rawList = Array.from(rawCards);
-    const cards = rawList.filter(
-      (c) => !rawList.some((other) => other !== c && other.contains(c))
-    );
 
     const results = [];
     const seen = new Set();
