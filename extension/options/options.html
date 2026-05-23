@@ -133,29 +133,53 @@
       </section>
 
       <section class="card">
-        <h2>Auto-Apply — AI answers (Gemini)</h2>
+        <h2>Auto-Apply — AI answers</h2>
         <p class="muted small">
-          For questions the profile above can't answer, LeadCaptura asks Google Gemini to answer using your CV. Get a free API key at
-          <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> — the free tier is enough for everyday job applying.
+          For questions the profile above can't answer, LeadCaptura asks an AI to answer using your CV.
+          Choose your provider below and paste that provider's key.
         </p>
         <label class="row checkbox">
-          <input type="checkbox" id="aiEnabled" /> <span>Use Gemini to answer unmatched questions from my CV</span>
+          <input type="checkbox" id="aiEnabled" /> <span>Use AI to answer unmatched questions from my CV</span>
         </label>
 
-        <label class="lbl">Gemini API key</label>
-        <div class="row">
-          <input id="geminiApiKey" class="inp" type="password" placeholder="AIza…" autocomplete="off" />
-          <button class="btn ghost" id="toggle-gemini">Show</button>
+        <label class="lbl">AI provider</label>
+        <select id="aiProvider" class="inp">
+          <option value="gemini">Google Gemini (free tier)</option>
+          <option value="claude">Anthropic Claude (paid, higher quality)</option>
+        </select>
+
+        <div id="gemini-fields">
+          <p class="muted small">
+            Free key: <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a>
+          </p>
+          <label class="lbl">Gemini API key</label>
+          <div class="row">
+            <input id="geminiApiKey" class="inp" type="password" placeholder="AIza…" autocomplete="off" />
+            <button class="btn ghost" id="toggle-gemini" type="button">Show</button>
+          </div>
+          <label class="lbl">Gemini model</label>
+          <input id="geminiModel" class="inp" type="text" placeholder="gemini-2.0-flash" />
         </div>
 
-        <label class="lbl">Gemini model</label>
-        <input id="geminiModel" class="inp" type="text" placeholder="gemini-2.0-flash" />
+        <div id="claude-fields">
+          <p class="muted small">
+            Key: <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a>
+            — paste it here, never into a chat.
+          </p>
+          <label class="lbl">Claude API key</label>
+          <div class="row">
+            <input id="claudeApiKey" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" />
+            <button class="btn ghost" id="toggle-claude" type="button">Show</button>
+          </div>
+          <label class="lbl">Claude model</label>
+          <input id="claudeModel" class="inp" type="text" placeholder="claude-haiku-4-5-20251001" />
+        </div>
 
-        <label class="lbl">Your CV / résumé text (Gemini reads this to answer)</label>
+        <label class="lbl">Your CV / résumé text (the AI reads this to answer)</label>
         <textarea id="cvText" class="inp" rows="10" placeholder="Paste your full CV here…"></textarea>
 
         <div class="actions">
-          <button class="btn ghost" id="test-gemini">Test Gemini key</button>
+          <button class="btn ghost" id="test-gemini" type="button">Test AI key</button>
         </div>
         <div id="gemini-status" class="status"></div>
         <p class="muted small">

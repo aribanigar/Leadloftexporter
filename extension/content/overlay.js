@@ -1871,9 +1871,11 @@
 
   async function _getAutoApplyConfig() {
     const s = await Storage.getSettings();
+    const provider = s.aiProvider || "gemini";
+    const hasKey = provider === "claude" ? !!s.claudeApiKey : !!s.geminiApiKey;
     return {
       profile: s.applicationProfile || {},
-      aiEnabled: !!s.aiEnabled && !!s.geminiApiKey,
+      aiEnabled: !!s.aiEnabled && hasKey,
     };
   }
 

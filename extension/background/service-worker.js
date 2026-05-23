@@ -298,15 +298,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     return true;
   }
-  // Ask Gemini to answer a single Easy-Apply question using the stored CV.
-  // Routed through the SW so the content script (linkedin.com origin) doesn't
-  // make the cross-origin call itself, and the API key never touches the page.
-  if (msg?.type === "lc:geminiAnswer") {
+  // Ask the configured AI provider (Gemini or Claude) to answer a single
+  // Easy-Apply question using the stored CV. Routed through the SW so the
+  // content script (linkedin.com origin) doesn't make the cross-origin call
+  // itself, and the API key never touches the page.
+  if (msg?.type === "lc:aiAnswer" || msg?.type === "lc:geminiAnswer") {
     (async () => {
       try {
-        const { geminiApiKey, geminiModel, cvText, applicationProfile } = await getSettings();
-        if (!geminiApiKey) { sendResponse({ ok: false, error: "no_gemini_key" }); return; }
-        const model = geminiModel || "gemini-2.0-flash";
+        const s = await getSettings();
+        const provider = s.aiProvider || "gemini";
         const q = String(msg.question || "").slice(0, 500);
         const kind = msg.kind || "text"; // text | number | select | radio
         const options = Array.isArray(msg.options) ? msg.options.filter(Boolean) : [];
@@ -327,8 +327,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             `Do not add explanations or quotation marks.`;
         }
 
-        const profileLines = applicationProfile
-          ? Object.entries(applicationProfile)
+        const profileLines = s.applicationProfile
+          ? Object.entries(s.applicationProfile)
               .filter(([, v]) => v)
               .map(([k, v]) => `${k}: ${v}`)
               .join("\n")
@@ -338,33 +338,68 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           `You are filling out a LinkedIn job application on behalf of a candidate. ` +
           `Use the candidate's CV and profile below to answer truthfully and favourably.\n\n` +
           `=== CANDIDATE PROFILE ===\n${profileLines}\n\n` +
-          `=== CANDIDATE CV ===\n${String(cvText || "").slice(0, 8000)}\n\n` +
+          `=== CANDIDATE CV ===\n${String(s.cvText || "").slice(0, 8000)}\n\n` +
           `=== QUESTION ===\n${q}\n\n` +
           `=== INSTRUCTION ===\n${instruction}\n\nAnswer:`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
-        let res;
-        try {
-          res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 80 },
-            }),
-          });
-        } catch (e) {
-          sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
-          return;
+        let answer = "";
+        if (provider === "claude") {
+          if (!s.claudeApiKey) { sendResponse({ ok: false, error: "no_claude_key" }); return; }
+          const model = s.claudeModel || "claude-haiku-4-5-20251001";
+          let res;
+          try {
+            res = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": s.claudeApiKey,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-browser-access": "true",
+              },
+              body: JSON.stringify({
+                model,
+                max_tokens: 80,
+                messages: [{ role: "user", content: prompt }],
+              }),
+            });
+          } catch (e) {
+            sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
+            return;
+          }
+          if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            sendResponse({ ok: false, error: `claude_http_${res.status}: ${t.slice(0, 160)}` });
+            return;
+          }
+          const data = await res.json();
+          answer = (data?.content?.[0]?.text || "").trim();
+        } else {
+          if (!s.geminiApiKey) { sendResponse({ ok: false, error: "no_gemini_key" }); return; }
+          const model = s.geminiModel || "gemini-2.0-flash";
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(s.geminiApiKey)}`;
+          let res;
+          try {
+            res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.2, maxOutputTokens: 80 },
+              }),
+            });
+          } catch (e) {
+            sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
+            return;
+          }
+          if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            sendResponse({ ok: false, error: `gemini_http_${res.status}: ${t.slice(0, 160)}` });
+            return;
+          }
+          const data = await res.json();
+          answer = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
         }
-        if (!res.ok) {
-          const t = await res.text().catch(() => "");
-          sendResponse({ ok: false, error: `gemini_http_${res.status}: ${t.slice(0, 160)}` });
-          return;
-        }
-        const data = await res.json();
-        let answer = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
-        // Strip surrounding quotes / trailing punctuation Gemini sometimes adds
+        // Strip surrounding quotes the model sometimes adds
         answer = answer.replace(/^["'`]+|["'`]+$/g, "").trim();
         sendResponse({ ok: true, answer });
       } catch (e) {

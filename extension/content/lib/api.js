@@ -84,14 +84,14 @@
     enrollBatch: (playbook_id, lead_ids) => call("enrollBatch", { playbook_id, lead_ids }),
     nextJobs: (limit = 1) => call("nextJobs", { limit }),
     submitJobResult: (jobId, result) => call("submitJobResult", { jobId, result }),
-    // Gemini answer for an Easy-Apply form question. Resolves to { ok, answer }
-    // or { ok:false, error }. Never throws — the caller treats any failure as
-    // "leave the field blank".
+    // AI answer (Gemini or Claude, per the user's chosen provider) for an
+    // Easy-Apply form question. Resolves to { ok, answer } or { ok:false,
+    // error }. Never throws — the caller treats any failure as "leave blank".
     geminiAnswer: ({ question, kind, options }) =>
       new Promise((resolve) => {
         try {
           chrome.runtime.sendMessage(
-            { type: "lc:geminiAnswer", question, kind, options },
+            { type: "lc:aiAnswer", question, kind, options },
             (response) => {
               if (chrome.runtime.lastError || !response) {
                 resolve({ ok: false, error: chrome.runtime.lastError?.message || "no_response" });

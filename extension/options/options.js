@@ -63,10 +63,13 @@ const DEFAULTS = {
     sponsorship: "No",
     relocate: "Yes",
   },
-  // Auto-apply: Gemini AI fallback (Option B)
+  // Auto-apply: AI fallback (Option B)
   aiEnabled: false,
+  aiProvider: "gemini", // "gemini" | "claude"
   geminiApiKey: "",
   geminiModel: "gemini-2.0-flash",
+  claudeApiKey: "",
+  claudeModel: "claude-haiku-4-5-20251001",
   cvText: DEFAULT_CV,
 };
 
@@ -135,50 +138,88 @@ function setGeminiStatus(msg, level = "") {
   el.className = "status " + level;
 }
 
+async function ensureAiPermission(provider) {
+  const origin =
+    provider === "claude"
+      ? "https://api.anthropic.com/*"
+      : "https://generativelanguage.googleapis.com/*";
+  const has = await chrome.permissions.contains({ origins: [origin] });
+  if (has) return true;
+  return await chrome.permissions.request({ origins: [origin] });
+}
+
 async function testGemini() {
   setGeminiStatus("Checking…");
-  const key = $("#geminiApiKey").value.trim();
-  const model = $("#geminiModel").value.trim() || "gemini-2.0-flash";
-  if (!key) {
-    setGeminiStatus("Add a Gemini API key first.", "err");
-    return;
-  }
-  // Ensure host permission for the Gemini endpoint so the service worker can fetch it.
+  const provider = $("#aiProvider").value;
   try {
-    const origin = "https://generativelanguage.googleapis.com/*";
-    const has = await chrome.permissions.contains({ origins: [origin] });
-    if (!has) {
-      const ok = await chrome.permissions.request({ origins: [origin] });
-      if (!ok) {
-        setGeminiStatus("Browser blocked access to Gemini. Click Test again and approve the prompt.", "err");
-        return;
-      }
+    const ok = await ensureAiPermission(provider);
+    if (!ok) {
+      setGeminiStatus("Browser blocked access. Click Test again and approve the prompt.", "err");
+      return;
     }
   } catch (e) {
     setGeminiStatus("Couldn't request permission: " + (e.message || e), "err");
     return;
   }
+
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: "Reply with the single word: OK" }] }],
-        generationConfig: { maxOutputTokens: 10, temperature: 0 },
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      setGeminiStatus(`Gemini rejected (${res.status}). ${t.slice(0, 160)}`, "err");
-      return;
+    if (provider === "claude") {
+      const key = $("#claudeApiKey").value.trim();
+      const model = $("#claudeModel").value.trim() || "claude-haiku-4-5-20251001";
+      if (!key) { setGeminiStatus("Add a Claude API key first.", "err"); return; }
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 10,
+          messages: [{ role: "user", content: "Reply with the single word: OK" }],
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        setGeminiStatus(`Claude rejected (${res.status}). ${t.slice(0, 160)}`, "err");
+        return;
+      }
+      const data = await res.json();
+      const reply = (data?.content?.[0]?.text || "").trim();
+      setGeminiStatus(reply ? `Claude connected ✓ (replied: ${reply.slice(0, 40)})` : "Claude connected ✓", "ok");
+    } else {
+      const key = $("#geminiApiKey").value.trim();
+      const model = $("#geminiModel").value.trim() || "gemini-2.0-flash";
+      if (!key) { setGeminiStatus("Add a Gemini API key first.", "err"); return; }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: "Reply with the single word: OK" }] }],
+          generationConfig: { maxOutputTokens: 10, temperature: 0 },
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        setGeminiStatus(`Gemini rejected (${res.status}). ${t.slice(0, 160)}`, "err");
+        return;
+      }
+      const data = await res.json();
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      setGeminiStatus(reply ? `Gemini connected ✓ (replied: ${reply.slice(0, 40)})` : "Gemini connected ✓", "ok");
     }
-    const data = await res.json();
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-    setGeminiStatus(reply ? `Gemini connected ✓ (replied: ${reply.slice(0, 40)})` : "Gemini connected ✓", "ok");
   } catch (err) {
-    setGeminiStatus(err.message || "Failed to reach Gemini.", "err");
+    setGeminiStatus(err.message || "Failed to reach the AI provider.", "err");
   }
+}
+
+function syncAiFields() {
+  const provider = $("#aiProvider").value;
+  $("#gemini-fields").style.display = provider === "gemini" ? "" : "none";
+  $("#claude-fields").style.display = provider === "claude" ? "" : "none";
 }
 
 async function onSave() {
@@ -205,15 +246,16 @@ async function onSave() {
       relocate: $("#ap_relocate").value,
     },
     aiEnabled: $("#aiEnabled").checked,
+    aiProvider: $("#aiProvider").value,
     geminiApiKey: $("#geminiApiKey").value.trim(),
     geminiModel: $("#geminiModel").value.trim() || "gemini-2.0-flash",
+    claudeApiKey: $("#claudeApiKey").value.trim(),
+    claudeModel: $("#claudeModel").value.trim() || "claude-haiku-4-5-20251001",
     cvText: $("#cvText").value,
   });
-  // Pre-request Gemini host permission if AI is enabled so the SW can fetch later.
-  if ($("#aiEnabled").checked && $("#geminiApiKey").value.trim()) {
-    try {
-      await chrome.permissions.request({ origins: ["https://generativelanguage.googleapis.com/*"] });
-    } catch {}
+  // Pre-request the AI host permission if AI is enabled so the SW can fetch later.
+  if ($("#aiEnabled").checked) {
+    try { await ensureAiPermission($("#aiProvider").value); } catch {}
   }
   await testConnection();
 }
@@ -244,11 +286,15 @@ async function init() {
   $("#ap_sponsorship").value = ap.sponsorship || "No";
   $("#ap_relocate").value = ap.relocate || "Yes";
 
-  // Gemini AI (Option B)
+  // AI (Option B)
   $("#aiEnabled").checked = !!settings.aiEnabled;
+  $("#aiProvider").value = settings.aiProvider || "gemini";
   $("#geminiApiKey").value = settings.geminiApiKey || "";
   $("#geminiModel").value = settings.geminiModel || "gemini-2.0-flash";
+  $("#claudeApiKey").value = settings.claudeApiKey || "";
+  $("#claudeModel").value = settings.claudeModel || "claude-haiku-4-5-20251001";
   $("#cvText").value = settings.cvText || "";
+  syncAiFields();
 
   $("#save").addEventListener("click", onSave);
   $("#test").addEventListener("click", testConnection);
@@ -263,6 +309,12 @@ async function init() {
     inp.type = inp.type === "password" ? "text" : "password";
     $("#toggle-gemini").textContent = inp.type === "password" ? "Show" : "Hide";
   });
+  $("#toggle-claude").addEventListener("click", () => {
+    const inp = $("#claudeApiKey");
+    inp.type = inp.type === "password" ? "text" : "password";
+    $("#toggle-claude").textContent = inp.type === "password" ? "Show" : "Hide";
+  });
+  $("#aiProvider").addEventListener("change", syncAiFields);
 }
 
 document.addEventListener("DOMContentLoaded", init);
