@@ -138,6 +138,25 @@ Two-column screen. Left rail is profile + stage selector + tasks + lead-info fie
 
 ## Extension architecture (`/extension`)
 
+> **🔒 LOCKED STABLE BASELINE — `extension-v1.0.34-stable` (commit `bdc96af`).**
+> The per-card Save-chip detection and the bulk-Connect anti-bot timing are
+> confirmed working as of v1.0.34 and **must not regress** while new features
+> are added. Do **not** modify the following without an explicit request to
+> change *that specific behavior*:
+>
+> - `overlay.js` → `decorateSearchCards`, `climbToCard`/`ownerCount` (card
+>   detection), `_isActionButton`, `_resolveCardOwnerLink`, `injectInlineSave`,
+>   `profileFromCard` (incl. the slug-label fallback that injects a chip even
+>   when the name can't be resolved).
+> - `overlay.js` → `connectAllVisible`, `_scrollLoadPage`, `_sendConnectOnCard`
+>   and their timing distributions (4-tier gaps + micro-breaks).
+> - `main.js` → the `location.search` watcher, scroll-stop re-decorate, and the
+>   1.5s decorate interval.
+>
+> If a new feature seems to require touching these, prefer adding alongside
+> rather than editing in place. To restore the baseline: `git checkout bdc96af`
+> (or the `extension-v1.0.34-stable` tag in the local clone).
+
 ```
 manifest.json                MV3, host: linkedin.com only (backend host requested at runtime)
 background/service-worker.js API proxy for content scripts; routes openOptionsPage; enrichProfile/closeMe
