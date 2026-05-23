@@ -25,13 +25,10 @@
     const p = location.pathname;
     if (p.startsWith("/in/")) return "profile";
     if (p.startsWith("/sales/lead/")) return "salesnav-profile";
-    // Jobs search / collections / a single job view all share the same
-    // list+detail layout the auto-apply feature drives.
-    if (
-      p.startsWith("/jobs/search") ||
-      p.startsWith("/jobs/collections") ||
-      p.startsWith("/jobs/view")
-    ) return "jobs";
+    // Any /jobs/ path (homepage, search, collections, view, recommended, etc.)
+    // gets the jobs toolbar + chip decoration. Preference/settings sub-paths
+    // are harmless — _jobCardEls() finds nothing and decorateJobCards() exits.
+    if (p === "/jobs" || p.startsWith("/jobs/")) return "jobs";
     // Sales Navigator has many list-type surfaces. `/sales/lists/*` catches
     // every saved-list / saved-search / saved-on-linkedin variant
     // ('Saved on LinkedIn.com' lives at /sales/lists/<id>/ with no
