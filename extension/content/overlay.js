@@ -1061,72 +1061,169 @@
     return a ? _cardFromLink(a) : null;
   }
 
-  async function connectAllVisible() {
-    let { profiles } = Scraper.scrapeCurrentPage();
-    if (!profiles?.length) {
-      flashStatus("No profiles found on this page.", "warn");
-      return;
+  // LinkedIn's "Next" pagination button (disabled on the last page).
+  function _findNextPageButton() {
+    const cands = [
+      document.querySelector("button[aria-label='Next']"),
+      document.querySelector("button.artdeco-pagination__button--next"),
+    ].filter(Boolean);
+    for (const b of cands) {
+      if (!b.disabled && b.getAttribute("aria-disabled") !== "true") return b;
     }
-    if (state.selectedUrls.size > 0) {
-      profiles = profiles.filter(
-        (p) => p?.linkedin_url && state.selectedUrls.has(p.linkedin_url)
-      );
-      if (!profiles.length) {
-        flashStatus("Selected URLs are not visible — scroll or reselect.", "warn");
-        return;
+    const byText = Array.from(document.querySelectorAll("button")).find(
+      (b) =>
+        /^next\b/i.test((b.textContent || "").replace(/\s+/g, " ").trim()) &&
+        !b.disabled &&
+        b.getAttribute("aria-disabled") !== "true"
+    );
+    return byText || null;
+  }
+
+  // A signature of the current results page — changes when we paginate.
+  function _pageSignature() {
+    let pageParam = "";
+    try {
+      pageParam = new URL(location.href).searchParams.get("page") || "";
+    } catch {}
+    const active = document.querySelector(
+      "li.artdeco-pagination__indicator--number.active button, button[aria-current='true'], .artdeco-pagination__indicator.active"
+    );
+    const firstLink = document.querySelector("a[href*='/in/']");
+    return [pageParam, active?.textContent?.trim() || "", firstLink?.href || ""].join("|");
+  }
+
+  async function _waitForPageChange(prevSig) {
+    const { sleep } = globalThis.__lcHuman;
+    const start = Date.now();
+    while (Date.now() - start < 15000) {
+      if (state.connectCancel) return false;
+      await sleep(500);
+      if (_pageSignature() !== prevSig) {
+        await sleep(1500); // let the new page settle
+        return true;
       }
     }
-    const targets = profiles.filter((p) => p?.linkedin_url && p.linkedin_url.includes("/in/"));
-    if (!targets.length) {
-      flashStatus("No connectable profiles.", "warn");
-      return;
+    return false;
+  }
+
+  // Scroll through the page so LinkedIn renders every (lazy) result card,
+  // then re-decorate so chips exist for newly rendered cards.
+  async function _scrollLoadPage() {
+    const { sleep } = globalThis.__lcHuman;
+    let lastCount = -1;
+    for (let i = 0; i < 8; i++) {
+      if (state.connectCancel) break;
+      window.scrollTo(0, document.body.scrollHeight);
+      await sleep(450 + Math.random() * 350);
+      const count = document.querySelectorAll("a[href*='/in/']").length;
+      if (count === lastCount && i >= 3) break;
+      lastCount = count;
     }
+    window.scrollTo(0, 0);
+    await sleep(600);
+    try { decorateSearchCards(); } catch {}
+  }
+
+  // Bulk connect, AUTO-ADVANCING across result pages. After every card on a
+  // page is invited it clicks "Next", waits for the new page, and continues —
+  // until the last page, the safety cap, or the user clicks Stop.
+  //
+  // SAFETY CAP: LinkedIn restricts accounts that exceed ~100-200 invites/week.
+  // We hard-stop a single run at MAX_INVITES_PER_RUN so the auto-advance can't
+  // silently blow past the weekly budget across 100 pages.
+  async function connectAllVisible() {
+    const { sleep } = globalThis.__lcHuman;
+    const MAX_INVITES_PER_RUN = 100;
+
+    // Page 1 honours an explicit selection (if any). Later pages process every
+    // visible card — the page-1 ticks don't apply to other pages.
+    const page1Selection =
+      state.selectedUrls.size > 0 ? new Set(state.selectedUrls) : null;
 
     state.connectActive = true;
     state.connectCancel = false;
-    state.connectProgress = { current: 0, total: targets.length, name: "" };
+    state.connectProgress = { current: 0, total: MAX_INVITES_PER_RUN, name: "" };
     unmountSelectAllHeader();
     renderToolbar();
 
-    const { sleep } = globalThis.__lcHuman;
     let sent = 0;
     let skipped = 0;
+    let pageNum = 1;
     let cancelled = false;
-    for (let i = 0; i < targets.length; i++) {
+    let hitCap = false;
+
+    while (!state.connectCancel) {
+      // Render all cards on this page, then read them.
+      await _scrollLoadPage();
       if (state.connectCancel) { cancelled = true; break; }
-      const profile = targets[i];
-      const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
-      state.connectProgress = { current: i + 1, total: targets.length, name: label };
-      _setChipState(profile.linkedin_url, "saving", "Connecting…");
-      renderToolbar();
 
-      const card = _cardForUrl(profile.linkedin_url);
-      if (!card) { skipped++; continue; }
+      let { profiles } = Scraper.scrapeCurrentPage();
+      profiles = (profiles || []).filter(
+        (p) => p?.linkedin_url && p.linkedin_url.includes("/in/")
+      );
+      if (pageNum === 1 && page1Selection) {
+        profiles = profiles.filter((p) => page1Selection.has(p.linkedin_url));
+      }
 
-      // Scroll into view so the button is rendered + the click looks natural.
-      try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
-      await sleep(500 + Math.random() * 400);
+      for (let i = 0; i < profiles.length; i++) {
+        if (state.connectCancel) { cancelled = true; break; }
+        if (sent >= MAX_INVITES_PER_RUN) { hitCap = true; break; }
+        const profile = profiles[i];
+        const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
+        state.connectProgress = {
+          current: sent + 1,
+          total: MAX_INVITES_PER_RUN,
+          name: `p${pageNum}: ${label}`,
+        };
+        _setChipState(profile.linkedin_url, "saving", "Connecting…");
+        renderToolbar();
 
-      let res;
+        const card = _cardForUrl(profile.linkedin_url);
+        if (!card) { skipped++; continue; }
+        try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+        await sleep(500 + Math.random() * 400);
+
+        let res;
+        try {
+          res = await _sendConnectOnCard(card);
+        } catch (e) {
+          res = { ok: false, reason: String(e) };
+        }
+        if (res.ok) {
+          sent++;
+          _setChipState(profile.linkedin_url, "saved", "Invited ✓");
+        } else {
+          skipped++;
+          _setChipState(profile.linkedin_url, "error", "No Connect");
+        }
+
+        if (i < profiles.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
+          const base = 4000 + Math.random() * 5000;
+          const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
+          await sleep(base + longTail);
+        }
+      }
+
+      if (state.connectCancel) { cancelled = true; break; }
+      if (hitCap) break;
+
+      // Advance to the next page.
+      const nextBtn = _findNextPageButton();
+      if (!nextBtn) break; // last page reached
+      flashStatus(`Page ${pageNum} done — ${sent} sent. Moving to next page…`);
+      const sig = _pageSignature();
+      await sleep(7000 + Math.random() * 8000); // longer human pause between pages
+      if (state.connectCancel) { cancelled = true; break; }
+      try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+      await sleep(600);
       try {
-        res = await _sendConnectOnCard(card);
-      } catch (e) {
-        res = { ok: false, reason: String(e) };
+        await globalThis.__lcDom.dispatchHumanClick(nextBtn);
+      } catch {
+        try { nextBtn.click(); } catch {}
       }
-      if (res.ok) {
-        sent++;
-        _setChipState(profile.linkedin_url, "saved", "Invited ✓");
-      } else {
-        skipped++;
-        _setChipState(profile.linkedin_url, "error", "No Connect");
-      }
-
-      // Human-paced gap before the next invite. 4-9s base, ~18% long-tail.
-      if (i < targets.length - 1 && !state.connectCancel) {
-        const base = 4000 + Math.random() * 5000;
-        const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
-        await sleep(base + longTail);
-      }
+      const changed = await _waitForPageChange(sig);
+      if (!changed) break; // page didn't advance — stop cleanly
+      pageNum++;
     }
 
     state.connectActive = false;
@@ -1134,12 +1231,16 @@
     state.selectedUrls.clear();
     mountSelectAllHeader();
     renderToolbar();
-    flashStatus(
-      cancelled
-        ? `Stopped: ${sent} invites sent`
-        : `Done: ${sent} connection requests sent${skipped ? ` (${skipped} skipped)` : ""} ✓`,
-      "ok"
-    );
+
+    let msg;
+    if (cancelled) {
+      msg = `Stopped: ${sent} invites sent across ${pageNum} page(s)`;
+    } else if (hitCap) {
+      msg = `Reached ${MAX_INVITES_PER_RUN}-invite safety cap: ${sent} sent. Run again later to continue.`;
+    } else {
+      msg = `Done: ${sent} invites sent across ${pageNum} page(s)${skipped ? ` (${skipped} skipped)` : ""} ✓`;
+    }
+    flashStatus(msg, hitCap ? "warn" : "ok");
   }
 
   // ---------- Inline per-card Save buttons (search + sales nav) ----------
@@ -1633,19 +1734,53 @@
     // Garbage-collect entries whose DOM nodes are gone (pagination/SPA churn)
     _gcInjected();
 
-    // CARD-FIRST detection. Discover every result card by walking up from
-    // EVERY profile link on the page, then pick each card's canonical owner.
-    // This is robust to link-level filtering: even if a card's title link
-    // looks mutual-ish (LinkedIn rotates class names), the card is still
-    // found, and the owner is resolved by avatar proximity. The old
-    // link-first approach lost an entire card whenever its only surviving
-    // link got filtered — that's why some cards had no Save chip.
+    // CARD-FIRST detection, anchored on the native ACTION BUTTON.
+    //
+    // Why not anchor on the profile link? Cards with a real profile PHOTO wrap
+    // that photo in its own /in/ <a> that can sit inside a nested
+    // role="listitem"/article sub-container. Walking up from that avatar link
+    // lands on the INNER container, not the true card row — so the chip got
+    // injected into the wrong element (or skipped by URL-dedup against the
+    // outer card). Cards with the gray DEFAULT avatar have no such nesting,
+    // which is exactly why those got chips and photo cards didn't.
+    //
+    // The Connect/Follow/Message/Pending button is never nested in an avatar
+    // sub-container, so walking up from it yields the real card row every
+    // time. We union button-anchored cards with link-anchored cards, then
+    // keep only OUTERMOST cards (drop any card contained within another) so a
+    // nested avatar container can't double- or mis-inject.
     const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
-    const cards = new Set();
+    const rawCards = new Set();
+    for (const b of document.querySelectorAll("button")) {
+      if (b.classList.contains("lc-inline-save")) continue;
+      const aria = b.getAttribute("aria-label") || "";
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const isAction =
+        /^(connect|follow|message|pending)$/i.test(txt) ||
+        /\binvite\b.*\bto connect\b/i.test(aria) ||
+        /^(connect|follow|pending)$/i.test(aria) ||
+        /^message\b/i.test(aria) ||
+        /\bfollow\b/i.test(aria);
+      if (!isAction) continue;
+      const card = _cardFromLink(b);
+      if (
+        card &&
+        card.tagName !== "BODY" &&
+        card.tagName !== "HTML" &&
+        card.querySelector(linkSel)
+      ) {
+        rawCards.add(card);
+      }
+    }
     for (const a of document.querySelectorAll(linkSel)) {
       const card = _cardFromLink(a);
-      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") cards.add(card);
+      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") rawCards.add(card);
     }
+    // Keep only outermost cards — drop any card contained within another.
+    const rawList = Array.from(rawCards);
+    const cards = rawList.filter(
+      (c) => !rawList.some((other) => other !== c && other.contains(c))
+    );
 
     for (const card of cards) {
       try {

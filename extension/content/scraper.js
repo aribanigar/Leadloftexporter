@@ -1453,18 +1453,41 @@
   }
 
   function scrapeSearchResults() {
-    // CARD-FIRST. Discover every result card by walking up from EVERY /in/
-    // link, then resolve each card's canonical owner by avatar proximity
-    // (largest image's /in/ link). This must stay in lock-step with
-    // overlay.js decorateSearchCards so Select All and the Save chips agree
-    // on exactly which cards exist. Card-first is robust to link-level
-    // filtering: a card is never lost just because its title link looked
-    // mutual-ish under a LinkedIn class-name rotation.
-    const cards = new Set();
+    // CARD-FIRST, anchored on the native action button (Connect/Follow/
+    // Message/Pending) which — unlike a profile-photo /in/ link — is never
+    // nested in an avatar sub-container, so walking up yields the true card
+    // row. Union with link-anchored cards, then keep only OUTERMOST cards.
+    // Must stay in lock-step with overlay.js decorateSearchCards so Select
+    // All and the Save chips agree on which cards exist.
+    const rawCards = new Set();
+    for (const b of document.querySelectorAll("button")) {
+      const aria = b.getAttribute("aria-label") || "";
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const isAction =
+        /^(connect|follow|message|pending)$/i.test(txt) ||
+        /\binvite\b.*\bto connect\b/i.test(aria) ||
+        /^(connect|follow|pending)$/i.test(aria) ||
+        /^message\b/i.test(aria) ||
+        /\bfollow\b/i.test(aria);
+      if (!isAction) continue;
+      const card = _profileCardFromLink(b);
+      if (
+        card &&
+        card.tagName !== "BODY" &&
+        card.tagName !== "HTML" &&
+        card.querySelector("a[href*='/in/']")
+      ) {
+        rawCards.add(card);
+      }
+    }
     for (const a of document.querySelectorAll("a[href*='/in/']")) {
       const card = _profileCardFromLink(a);
-      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") cards.add(card);
+      if (card && card.tagName !== "BODY" && card.tagName !== "HTML") rawCards.add(card);
     }
+    const rawList = Array.from(rawCards);
+    const cards = rawList.filter(
+      (c) => !rawList.some((other) => other !== c && other.contains(c))
+    );
 
     const results = [];
     const seen = new Set();
