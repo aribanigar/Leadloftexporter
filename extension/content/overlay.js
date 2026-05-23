@@ -1562,18 +1562,28 @@
   }
 
   // Job cards in the left-hand list. data-occludable-job-id is the most stable
-  // anchor; the others are fallbacks for layout drift.
+  // anchor; the others are fallbacks for layout drift. We cast a wide net and
+  // then deduplicate by job-id so each job is only decorated once.
   function _jobCardEls() {
-    const set = new Set();
-    document
-      .querySelectorAll(
-        "li[data-occludable-job-id], div.job-card-container, li.scaffold-layout__list-item, li.jobs-search-results__list-item"
-      )
-      .forEach((c) => {
-        if (_jobIdFromCard(c)) set.add(c);
-      });
-    // Drop any card that contains another detected card (keep the innermost).
-    const list = Array.from(set);
+    const byId = new Map(); // jobId -> element (prefer element with explicit attribute)
+    // Pass 1: elements with explicit job-id attribute — highest confidence
+    document.querySelectorAll("[data-occludable-job-id], [data-job-id]").forEach((c) => {
+      const id = c.getAttribute("data-occludable-job-id") || c.getAttribute("data-job-id");
+      if (!id || !/^\d+$/.test(id)) return;
+      if (!byId.has(id)) byId.set(id, c);
+    });
+    // Pass 2: fallback container selectors for layouts that don't set data attrs
+    // on the outer li (e.g. /jobs/search-results/ and /jobs/collections/)
+    document.querySelectorAll(
+      "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
+      "li.discovery-templates-entity-item, div.job-card-container, " +
+      "div[class*='job-card-container'], div[class*='job-card-list']"
+    ).forEach((c) => {
+      const id = _jobIdFromCard(c);
+      if (id && !byId.has(id)) byId.set(id, c);
+    });
+    const list = Array.from(byId.values());
+    // Keep innermost when a parent+child both matched
     return list.filter((c) => !list.some((o) => o !== c && c.contains(o)));
   }
 
@@ -1666,8 +1676,14 @@
 
         const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
         wrap.dataset.lcUrl = url;
+        // Ensure the card is positioned so our absolute chip sits relative to it,
+        // and that overflow doesn't clip the chip.
         try {
-          if (getComputedStyle(card).position === "static") card.style.position = "relative";
+          if (getComputedStyle(card).position === "static") card.style.setProperty("position", "relative", "important");
+          card.style.setProperty("overflow", "visible", "important");
+          if (card.parentElement && getComputedStyle(card.parentElement).overflow === "hidden") {
+            card.parentElement.style.setProperty("overflow", "visible", "important");
+          }
         } catch {
           card.style.position = "relative";
         }
@@ -1705,10 +1721,12 @@
     return (
       document.querySelector("div.jobs-easy-apply-modal") ||
       document.querySelector("div[data-test-modal][role='dialog']") ||
-      Array.from(document.querySelectorAll("div[role='dialog']")).find(
+      document.querySelector(".artdeco-modal[role='dialog']") ||
+      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog']")).find(
         (d) =>
           /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
-          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form")
+          /easy apply|application/i.test(d.getAttribute("aria-labelledby") ? (document.getElementById(d.getAttribute("aria-labelledby"))?.innerText || "") : "") ||
+          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form")
       ) ||
       null
     );
@@ -1727,7 +1745,11 @@
   function _classifyJobDetail() {
     const cands = Array.from(
       document.querySelectorAll(
-        "button.jobs-apply-button, button[aria-label*='Easy Apply' i], .jobs-apply-button--top-card button, .jobs-s-apply button"
+        "button.jobs-apply-button, button[aria-label*='Easy Apply' i], " +
+        "button[data-control-name*='apply' i], " +
+        ".jobs-apply-button--top-card button, .jobs-s-apply button, " +
+        ".jobs-unified-top-card button, .jobs-details-top-card button, " +
+        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button"
       )
     ).filter(_isVisible);
     for (const b of cands) {
@@ -1735,7 +1757,11 @@
       const a = b.getAttribute("aria-label") || "";
       if (/easy apply/i.test(t) || /easy apply/i.test(a)) return { status: "easy", btn: b };
     }
-    // No Easy Apply button visible — figure out why.
+    // Check for "Applied" badge / button (already submitted)
+    const applied = Array.from(document.querySelectorAll(
+      "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied"
+    )).filter(_isVisible);
+    if (applied.length) return { status: "applied", btn: null };
     const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout")?.innerText || "");
     if (/\bapplied\b/i.test(bodyTxt) && !cands.length) return { status: "applied", btn: null };
     for (const b of cands) {
@@ -1766,14 +1792,22 @@
   // terminal-ish; "next/continue" advances.
   function _modalActionButton(modal) {
     if (!modal) return null;
-    const btns = Array.from(modal.querySelectorAll("button")).filter(_isVisible);
+    // Prefer footer buttons but fall back to all visible buttons
+    const footer = modal.querySelector("footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer']");
+    const btns = Array.from((footer || modal).querySelectorAll("button")).filter(_isVisible);
     const match = (b, re) =>
       re.test((b.getAttribute("aria-label") || "")) ||
       re.test((b.innerText || b.textContent || "").replace(/\s+/g, " ").trim());
     let b;
-    if ((b = btns.find((x) => match(x, /submit application/i)))) return { type: "submit", btn: b };
+    if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
     if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$/i)))) return { type: "next", btn: b };
+    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$/i)))) return { type: "next", btn: b };
+    // Last resort: any non-dismiss, non-back primary button in the modal footer
+    const primaryBtn = btns.find((x) => {
+      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      return !["back", "dismiss", "discard", "cancel", "close"].includes(t) && t.length > 0;
+    });
+    if (primaryBtn) return { type: "next", btn: primaryBtn };
     return null;
   }
 
@@ -1958,6 +1992,61 @@
 
   // Pacing between job applications: paced but not glacial. 4-tier + periodic
   // micro-break, same anti-pattern philosophy as bulk Connect.
+  // Navigate to the next page of job results (SPA pagination).
+  // Returns true if we successfully moved to a new page.
+  async function _goToNextJobsPage() {
+    const { sleep } = globalThis.__lcHuman;
+
+    // Try multiple pagination button selectors
+    let nextBtn =
+      document.querySelector("button[aria-label='View next page']") ||
+      document.querySelector("button[aria-label*='next page' i]") ||
+      document.querySelector(".artdeco-pagination__button--next:not([disabled])") ||
+      null;
+
+    if (!nextBtn) {
+      // Walk pagination indicators: find active → click next sibling
+      const indicators = Array.from(
+        document.querySelectorAll("li.artdeco-pagination__indicator--number")
+      );
+      const activeIdx = indicators.findIndex(
+        (li) =>
+          li.classList.contains("active") ||
+          li.querySelector("[aria-current]") ||
+          li.getAttribute("aria-current") === "true"
+      );
+      if (activeIdx >= 0 && activeIdx < indicators.length - 1) {
+        nextBtn = indicators[activeIdx + 1].querySelector("button");
+      }
+    }
+
+    if (!nextBtn || nextBtn.disabled || nextBtn.getAttribute("aria-disabled") === "true") {
+      return false; // No next page available
+    }
+
+    const prevSearch = location.search;
+    try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+    await sleep(700 + Math.random() * 500);
+    try { nextBtn.click(); } catch { return false; }
+
+    // Wait for the URL query string to update (LinkedIn uses SPA pushState for pagination)
+    const deadline = Date.now() + 9000;
+    while (Date.now() < deadline) {
+      if (location.search !== prevSearch) break;
+      await sleep(300);
+    }
+    if (location.search === prevSearch) return false; // Navigation didn't happen
+
+    // Wait for new cards to hydrate then re-decorate
+    await sleep(2200 + Math.random() * 1000);
+    injectedJobChips.clear();
+    try { decorateJobCards(); } catch {}
+    await sleep(700);
+    try { decorateJobCards(); } catch {}
+
+    return true;
+  }
+
   function _applyGap(doneCount) {
     const r = Math.random();
     let gap;
@@ -1970,7 +2059,7 @@
 
   // Bulk auto-apply. `onlyUrls` (optional) restricts to specific jobs (used by
   // the per-card Apply button); otherwise it uses the tick selection, or every
-  // visible job when nothing is ticked.
+  // visible job when nothing is ticked. Automatically pages through results.
   async function applyAllJobs(onlyUrls = null) {
     if (state.applyActive) return;
     const { sleep } = globalThis.__lcHuman;
@@ -1978,20 +2067,20 @@
     const singleJob = Array.isArray(onlyUrls) && onlyUrls.length > 0;
 
     try { decorateJobCards(); } catch {}
-    let urls = singleJob
+    let firstPageUrls = singleJob
       ? onlyUrls
       : state.selectedJobUrls.size > 0
       ? Array.from(state.selectedJobUrls)
       : _allJobUrls();
-    urls = urls.filter((u) => u && u.includes("/jobs/view/"));
-    if (!urls.length) {
+    firstPageUrls = firstPageUrls.filter((u) => u && u.includes("/jobs/view/"));
+    if (!firstPageUrls.length) {
       flashStatus("No jobs to apply to — tick some jobs or open a jobs search.", "warn");
       return;
     }
 
     state.applyActive = true;
     state.applyCancel = false;
-    state.applyProgress = { current: 0, total: Math.min(urls.length, MAX_APPLIES_PER_RUN), name: "" };
+    state.applyProgress = { current: 0, total: Math.min(firstPageUrls.length, MAX_APPLIES_PER_RUN), name: "" };
     unmountSelectAllHeader();
     renderToolbar();
 
@@ -1999,61 +2088,84 @@
     let sinceBreak = 0;
     let nextBreakAt = 8 + Math.floor(Math.random() * 5);
 
-    for (let i = 0; i < urls.length; i++) {
-      if (state.applyCancel) { cancelled = true; break; }
-      if (applied >= MAX_APPLIES_PER_RUN) break;
-      const url = urls[i];
-      const card = _jobCardForUrl(url);
-      state.applyProgress = {
-        current: applied + 1,
-        total: Math.min(urls.length, MAX_APPLIES_PER_RUN),
-        name: card ? _jobLabel(card) : "job",
-      };
-      _setJobChipState(url, "saving", "Applying…");
-      renderToolbar();
+    // Process a list of job URLs. Returns false if cancelled/limit hit.
+    const processPage = async (urls) => {
+      for (let i = 0; i < urls.length; i++) {
+        if (state.applyCancel) { cancelled = true; return false; }
+        if (applied >= MAX_APPLIES_PER_RUN) return false;
+        const url = urls[i];
+        const card = _jobCardForUrl(url);
+        state.applyProgress = {
+          current: applied + 1,
+          total: Math.min(urls.length + applied, MAX_APPLIES_PER_RUN),
+          name: card ? _jobLabel(card) : "job",
+        };
+        _setJobChipState(url, "saving", "Applying…");
+        renderToolbar();
 
-      if (!card) { skipped++; _setJobChipState(url, "error", "Not visible"); continue; }
+        if (!card) { skipped++; _setJobChipState(url, "error", "Not visible"); continue; }
 
-      let res;
-      try {
-        res = await _applyToJob(card);
-      } catch (e) {
-        res = { ok: false, reason: String(e) };
-      }
-
-      if (res.ok) {
-        applied++; sinceBreak++;
-        _setJobChipState(url, "saved", "Applied ✓");
-      } else if (res.reason === "already_applied") {
-        skipped++; _setJobChipState(url, "saved", "Already applied ✓");
-      } else if (res.reason === "external_apply") {
-        skipped++; _setJobChipState(url, "error", "External apply");
-      } else if (res.reason === "needs_manual_input") {
-        manual++; _setJobChipState(url, "error", "Needs answers");
-      } else if (res.reason === "captcha_or_checkpoint") {
-        _setJobChipState(url, "error", "Security check");
-        flashStatus("LinkedIn security check detected — stopping auto-apply.", "err");
-        break;
-      } else {
-        failed++; _setJobChipState(url, "error", "Couldn't apply");
-      }
-
-      // Make sure any leftover dialog is gone before the next job.
-      await _dismissEasyApplyModal();
-
-      const last = i >= urls.length - 1;
-      if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
-        let gap;
-        if (sinceBreak >= nextBreakAt) {
-          sinceBreak = 0;
-          nextBreakAt = 8 + Math.floor(Math.random() * 5);
-          gap = 25000 + Math.random() * 20000;
-          flashStatus(`Short break… (${applied} applied)`);
-        } else {
-          gap = _applyGap(applied);
+        let res;
+        try {
+          res = await _applyToJob(card);
+        } catch (e) {
+          res = { ok: false, reason: String(e) };
         }
-        await sleep(gap);
+
+        if (res.ok) {
+          applied++; sinceBreak++;
+          _setJobChipState(url, "saved", "Applied ✓");
+        } else if (res.reason === "already_applied") {
+          skipped++; _setJobChipState(url, "saved", "Already applied ✓");
+        } else if (res.reason === "external_apply") {
+          skipped++; _setJobChipState(url, "error", "External apply");
+        } else if (res.reason === "needs_manual_input") {
+          manual++; _setJobChipState(url, "error", "Needs answers");
+        } else if (res.reason === "captcha_or_checkpoint") {
+          _setJobChipState(url, "error", "Security check");
+          flashStatus("LinkedIn security check detected — stopping auto-apply.", "err");
+          cancelled = true;
+          return false;
+        } else {
+          failed++; _setJobChipState(url, "error", "Couldn't apply");
+        }
+
+        // Make sure any leftover dialog is gone before the next job.
+        await _dismissEasyApplyModal();
+
+        const last = i >= urls.length - 1;
+        if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
+          let gap;
+          if (sinceBreak >= nextBreakAt) {
+            sinceBreak = 0;
+            nextBreakAt = 8 + Math.floor(Math.random() * 5);
+            gap = 25000 + Math.random() * 20000;
+            flashStatus(`Short break… (${applied} applied)`);
+          } else {
+            gap = _applyGap(applied);
+          }
+          await sleep(gap);
+        }
       }
+      return true; // Completed page without cancellation
+    };
+
+    // Process first page
+    await processPage(firstPageUrls);
+
+    // Auto-paginate through subsequent pages (bulk mode only, not singleJob)
+    let pageNum = 0;
+    while (!singleJob && !cancelled && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
+      const moved = await _goToNextJobsPage();
+      if (!moved) break; // No more pages
+      pageNum++;
+      flashStatus(`Page ${pageNum + 1} — ${applied} applied so far`);
+      const nextUrls = _allJobUrls().filter((u) => u && u.includes("/jobs/view/"));
+      if (!nextUrls.length) break;
+      state.applyProgress = { current: applied + 1, total: applied + nextUrls.length, name: "" };
+      renderToolbar();
+      const cont = await processPage(nextUrls);
+      if (!cont) break;
     }
 
     state.applyActive = false;
@@ -2069,9 +2181,10 @@
       failed ? `${failed} failed` : "",
     ].filter(Boolean).join(", ");
     const tail = extra ? ` (${extra})` : "";
+    const pages = pageNum > 0 ? `, ${pageNum + 1} pages` : "";
     const msg = cancelled
       ? `Stopped: ${applied} applied${tail}`
-      : `Done: ${applied} applied${tail} ✓`;
+      : `Done: ${applied} applied${tail}${pages} ✓`;
     flashStatus(msg, applied ? "ok" : "warn");
   }
 

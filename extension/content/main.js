@@ -154,16 +154,29 @@
       }, 50);
     }
 
-    // Toolbar + card chips need the search-results DOM to settle first.
-    setTimeout(() => {
-      if (isList || isJobs) {
+    if (isJobs) {
+      // Jobs toolbar + select-all header show immediately; chip decoration
+      // runs in multiple passes as cards hydrate lazily.
+      setTimeout(() => {
         Overlay.renderToolbar();
         Overlay.mountSelectAllHeader?.();
         document.body.classList.add("lc-toolbar-mounted");
-      }
-      if (isJobs) Overlay.decorateJobCards?.();
-      else Overlay.decorateSearchCards();
-    }, 600);
+        try { Overlay.decorateJobCards?.(); } catch {}
+      }, 150);
+      [700, 1500].forEach((ms) =>
+        setTimeout(() => { try { Overlay.decorateJobCards?.(); } catch {} }, ms)
+      );
+    } else {
+      // People lists and other toolbar pages settle before decoration.
+      setTimeout(() => {
+        if (isList) {
+          Overlay.renderToolbar();
+          Overlay.mountSelectAllHeader?.();
+          document.body.classList.add("lc-toolbar-mounted");
+        }
+        Overlay.decorateSearchCards();
+      }, 600);
+    }
   }
 
   // Detect SPA navigation
