@@ -1515,6 +1515,55 @@
   // ====================================================================
 
   const injectedJobChips = new Map(); // canonical job url -> wrap element
+  const _jobChipCards = new Map();    // canonical job url -> source card element
+
+  // Portal root — chips appended here as position:fixed, completely bypassing
+  // LinkedIn's overflow:hidden scroll containers in the left-panel list.
+  let _portalRoot = null;
+  function _ensurePortalRoot() {
+    if (_portalRoot && document.body.contains(_portalRoot)) return _portalRoot;
+    _portalRoot = document.createElement("div");
+    _portalRoot.id = "lc-job-portal";
+    _portalRoot.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
+    document.body.appendChild(_portalRoot);
+    return _portalRoot;
+  }
+
+  // RAF-throttled position sync — recalculates each chip's fixed coords from
+  // its source card's getBoundingClientRect(). Fires on scroll + resize.
+  let _jobChipSyncRaf = null;
+  function _syncJobChipPositions() {
+    _jobChipSyncRaf = null;
+    for (const [url, wrap] of injectedJobChips.entries()) {
+      const card = _jobChipCards.get(url);
+      if (!wrap || !card || !document.body.contains(card)) {
+        if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
+        continue;
+      }
+      const r = card.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= window.innerHeight || r.width < 2 || r.height < 2) {
+        wrap.style.setProperty("visibility", "hidden", "important");
+        continue;
+      }
+      // Anchor bottom-right of the card, 46px above bottom edge
+      const top = Math.max(4, r.bottom - 46);
+      const left = Math.max(4, r.right - 162);
+      wrap.style.setProperty("top", `${top}px`, "important");
+      wrap.style.setProperty("left", `${left}px`, "important");
+      wrap.style.setProperty("visibility", "visible", "important");
+    }
+  }
+  function _scheduleJobChipSync() {
+    if (!_jobChipSyncRaf) _jobChipSyncRaf = requestAnimationFrame(_syncJobChipPositions);
+  }
+
+  let _jobChipScrollBound = false;
+  function _bindJobChipScroll() {
+    if (_jobChipScrollBound) return;
+    window.addEventListener("scroll", _scheduleJobChipSync, { passive: true, capture: true });
+    window.addEventListener("resize", _scheduleJobChipSync, { passive: true });
+    _jobChipScrollBound = true;
+  }
 
   function _isVisible(el) {
     if (!el) return false;
@@ -1589,14 +1638,20 @@
 
   function _gcJobChips() {
     for (const [url, node] of injectedJobChips.entries()) {
-      if (!node || !document.body.contains(node)) injectedJobChips.delete(url);
+      const card = _jobChipCards.get(url);
+      if (!node || !card || !document.body.contains(card)) {
+        injectedJobChips.delete(url);
+        _jobChipCards.delete(url);
+        try { if (node) node.remove(); } catch {}
+      }
     }
   }
 
   function _allJobUrls() {
     const urls = [];
-    for (const [url, wrap] of injectedJobChips.entries()) {
-      if (url && wrap && document.body.contains(wrap)) urls.push(url);
+    for (const [url] of injectedJobChips.entries()) {
+      const card = _jobChipCards.get(url);
+      if (url && card && document.body.contains(card)) urls.push(url);
     }
     return urls;
   }
@@ -1619,24 +1674,20 @@
   }
 
   // Inject a select-tick + Apply chip onto every visible job card.
+  // Chips are mounted in a fixed-position portal on document.body, completely
+  // bypassing LinkedIn's overflow:hidden scroll containers. Positions are
+  // recalculated each animation frame via _syncJobChipPositions().
   function decorateJobCards() {
     if (!_isJobsPage()) return;
     _gcJobChips();
+    const portal = _ensurePortalRoot();
     for (const card of _jobCardEls()) {
       try {
         const id = _jobIdFromCard(card);
         if (!id) continue;
         const url = _jobUrlFromId(id);
 
-        const existing = injectedJobChips.get(url);
-        if (existing && document.body.contains(existing)) continue;
-
-        const stray = card.querySelector(".lc-job-row");
-        if (stray) {
-          if (stray.dataset.lcUrl === url) continue;
-          injectedJobChips.delete(stray.dataset.lcUrl);
-          stray.remove();
-        }
+        if (injectedJobChips.has(url)) continue;
 
         const checkSpan = el(
           "span",
@@ -1676,23 +1727,15 @@
 
         const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
         wrap.dataset.lcUrl = url;
-        // Ensure the card is positioned so our absolute chip sits relative to it,
-        // and that overflow doesn't clip the chip.
-        try {
-          if (getComputedStyle(card).position === "static") card.style.setProperty("position", "relative", "important");
-          card.style.setProperty("overflow", "visible", "important");
-          if (card.parentElement && getComputedStyle(card.parentElement).overflow === "hidden") {
-            card.parentElement.style.setProperty("overflow", "visible", "important");
-          }
-        } catch {
-          card.style.position = "relative";
-        }
-        card.appendChild(wrap);
+        portal.appendChild(wrap);
+        _jobChipCards.set(url, card);
         injectedJobChips.set(url, wrap);
       } catch (e) {
         console.warn("[LeadCaptura] decorateJobCards failed", e?.message);
       }
     }
+    _bindJobChipScroll();
+    _scheduleJobChipSync();
   }
 
   function toggleSelectAllJobs() {
