@@ -994,13 +994,16 @@
         _setChipState(profile.linkedin_url, "error", resp.timedOut ? "Timed out" : "Failed");
       }
 
-      // Aggressive gap: 0.6–1.5s base with 8% chance of 1.5–3.0s pause.
-      // Target end-to-end ≤5s/profile including the tab work itself.
+      // Gap between enrichment tabs. Keeps ≤5s end-to-end target while
+      // avoiding perfectly uniform bursts that look scripted.
       if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const base = 600 + Math.random() * 900;
-        const longTail =
-          Math.random() < 0.08 ? 1500 + Math.random() * 1500 : 0;
-        await new Promise((r) => setTimeout(r, base + longTail));
+        const r = Math.random();
+        const base = r < 0.70
+          ? 700 + Math.random() * 900     // 0.7-1.6s (70%)
+          : r < 0.92
+          ? 1800 + Math.random() * 1400   // 1.8-3.2s (22%)
+          : 3500 + Math.random() * 1500;  // 3.5-5s   (8%)
+        await new Promise((resolve) => setTimeout(resolve, base));
       }
     }
     state.bulkActive = false;
@@ -1028,10 +1031,15 @@
   // Sends connection requests by clicking each selected card's OWN native
   // "Connect" button — no new tab, no navigation. Every action happens in the
   // visible foreground tab, honoring the bot-avoidance rule that write actions
-  // never run hidden. Human-paced: 4-9s base gap with an ~18% long-tail.
+  // never run hidden.
   //
-  // NOTE: LinkedIn caps weekly invites (~100-200) and restricts accounts that
-  // fire them too fast. This automates the clicking; it can't bypass the cap.
+  // Bot-avoidance timing: 4-tier gap distribution (4-8.5s / 9-17s / 19-32s /
+  // 38-60s) with micro-breaks every 12-16 invites (22-42s). Scroll pattern is
+  // incremental (not jump-to-bottom). All distributions are smooth, not bimodal,
+  // to avoid statistical fingerprinting.
+  //
+  // NOTE: LinkedIn caps weekly invites (~100-200). This automates the clicking;
+  // it cannot bypass that cap.
   function _findConnectButtonInCard(card) {
     const buttons = Array.from(card.querySelectorAll("button"));
     for (const b of buttons) {
@@ -1101,7 +1109,7 @@
     }
     if (sendBtn) {
       await dispatchHumanClick(sendBtn);
-      await sleep(500);
+      await sleep(500 + Math.random() * 400); // 500-900ms — modal dismiss animation
       return { ok: true };
     }
     // No modal — LinkedIn may have sent directly, OR an email-verify wall
@@ -1169,19 +1177,42 @@
 
   // Scroll through the page so LinkedIn renders every (lazy) result card,
   // then re-decorate so chips exist for newly rendered cards.
+  // Scrolls incrementally (not jump-to-bottom) so the motion pattern matches
+  // how a human reads down a list, then scrolls back to the top.
   async function _scrollLoadPage() {
     const { sleep } = globalThis.__lcHuman;
-    let lastCount = -1;
-    for (let i = 0; i < 8; i++) {
-      if (state.connectCancel) break;
-      window.scrollTo(0, document.body.scrollHeight);
-      await sleep(450 + Math.random() * 350);
+    const viewH = window.innerHeight;
+    let pos = window.scrollY;
+    let prevCount = -1;
+    let stableRounds = 0;
+    // Phase 1: scroll down in variable-size steps
+    for (let i = 0; i < 16 && !state.connectCancel; i++) {
+      const pageH = document.body.scrollHeight;
+      // 22-38% of viewport per step — mimics reading speed variation
+      const stepPx = Math.round(viewH * (0.22 + Math.random() * 0.16));
+      pos = Math.min(pageH - 40, pos + stepPx);
+      window.scrollTo(0, pos);
+      await sleep(260 + Math.random() * 420); // 260-680ms between steps
       const count = document.querySelectorAll("a[href*='/in/']").length;
-      if (count === lastCount && i >= 3) break;
-      lastCount = count;
+      if (count === prevCount) {
+        stableRounds++;
+        if (stableRounds >= 2 && pos >= pageH * 0.88) break;
+      } else {
+        stableRounds = 0;
+      }
+      prevCount = count;
+      if (pos >= document.body.scrollHeight * 0.96) break;
+    }
+    // Brief pause at the bottom (like finishing reading the page)
+    await sleep(420 + Math.random() * 480);
+    // Phase 2: scroll back up in steps — faster but not instant
+    while (pos > 80 && !state.connectCancel) {
+      pos = Math.max(0, pos - Math.round(viewH * (0.38 + Math.random() * 0.22)));
+      window.scrollTo(0, pos);
+      await sleep(50 + Math.random() * 80);
     }
     window.scrollTo(0, 0);
-    await sleep(600);
+    await sleep(320 + Math.random() * 320);
     try { decorateSearchCards(); } catch {}
   }
 
@@ -1213,6 +1244,10 @@
     let pageNum = 1;
     let cancelled = false;
     let hitCap = false;
+    // Periodic micro-break counter: every 12-16 actual invites, insert a
+    // longer pause (22-42s) to break any detectable rhythmic pattern.
+    let invitesSinceBreak = 0;
+    let nextBreakAt = 12 + Math.floor(Math.random() * 5);
 
     while (!state.connectCancel) {
       // Render all cards on this page, then read them.
@@ -1266,7 +1301,11 @@
         // pipeline which Chrome pauses in a backgrounded tab; instant keeps
         // the run working when the user switches to another tab.
         try { card.scrollIntoView({ block: "center" }); } catch {}
-        await sleep(500 + Math.random() * 400);
+        // Variable reading pause: glance at the card before clicking.
+        // 15% chance of a longer "reconsidering" pause (reads the headline).
+        const readMs = 600 + Math.random() * 800;
+        const readBonus = Math.random() < 0.15 ? 900 + Math.random() * 1100 : 0;
+        await sleep(readMs + readBonus);
 
         let res;
         try {
@@ -1276,6 +1315,7 @@
         }
         if (res.ok) {
           sent++;
+          invitesSinceBreak++;
           _setChipState(url, "saved", "Invited ✓");
         } else {
           skipped++;
@@ -1284,10 +1324,30 @@
 
         // Pace only after an ACTUAL invite — skipped/already-done cards cost
         // no quota, so don't burn the human-pacing delay on them.
-        if (i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
-          const base = 4000 + Math.random() * 5000;
-          const longTail = Math.random() < 0.18 ? 8000 + Math.random() * 12000 : 0;
-          await sleep(base + longTail);
+        if (res.ok && i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
+          let gap;
+          // Micro-break: every 12-16 invites take a genuine longer pause.
+          // Breaks any statistical fingerprint across a session.
+          if (invitesSinceBreak >= nextBreakAt) {
+            invitesSinceBreak = 0;
+            nextBreakAt = 12 + Math.floor(Math.random() * 5);
+            gap = 22000 + Math.random() * 20000; // 22-42s break
+            flashStatus(`Short break… (${sent} invites sent)`);
+          } else {
+            // 4-tier smooth distribution — avoids the detectable bimodal pattern
+            // of a fixed base + occasional long-tail that ML can fingerprint.
+            const r = Math.random();
+            if (r < 0.60) {
+              gap = 4000 + Math.random() * 4500;    // 4-8.5s  (60%)
+            } else if (r < 0.82) {
+              gap = 9000 + Math.random() * 8000;    // 9-17s   (22%)
+            } else if (r < 0.93) {
+              gap = 19000 + Math.random() * 13000;  // 19-32s  (11%)
+            } else {
+              gap = 38000 + Math.random() * 22000;  // 38-60s  (7%)
+            }
+          }
+          await sleep(gap);
         }
       }
 
@@ -1299,7 +1359,11 @@
       if (!nextBtn) break; // last page reached
       flashStatus(`Page ${pageNum} done — ${sent} sent. Moving to next page…`);
       const sig = _pageSignature();
-      await sleep(7000 + Math.random() * 8000); // longer human pause between pages
+      // Inter-page pause: variable base + occasional "deciding if it's worth
+      // continuing" hesitation. Breaks the always-same-gap-between-pages pattern.
+      const pageGapBase = 8000 + Math.random() * 12000; // 8-20s
+      const pageGapBonus = Math.random() < 0.25 ? 12000 + Math.random() * 18000 : 0; // 25% → +12-30s
+      await sleep(pageGapBase + pageGapBonus);
       if (state.connectCancel) { cancelled = true; break; }
       try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
       await sleep(600);
