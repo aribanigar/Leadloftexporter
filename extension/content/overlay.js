@@ -114,7 +114,13 @@
   // ---------- Profile panel (compact top-right card on /in/ pages) ----------
 
   async function mountProfilePanel() {
-    if (state.profilePanel) return state.profilePanel;
+    // Re-use the panel only if it's still attached. If a previous reference is
+    // detached (SPA churn), fall through and mount a fresh one — otherwise we'd
+    // render into an orphan node and the user would see nothing.
+    if (state.profilePanel && document.documentElement.contains(state.profilePanel)) {
+      return state.profilePanel;
+    }
+    state.profilePanel = null;
     const settings = await Storage.getSettings();
     if (!settings.showOverlay) return null;
     const root = el("div", { id: "lc-profile-panel", class: "lc-card" });
