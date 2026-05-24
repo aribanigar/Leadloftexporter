@@ -1884,11 +1884,11 @@
     if (cards.length || created) {
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
     }
-    // Structural probe when detection looks wrong — logged as a FLAT string
-    // (not an object) on every low-detection pass so it's always visible at
-    // the bottom of the console, never scrolled away.
-    if (cards.length < 2) {
-      try {
+    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
+    // up in screenshots — plus the console. Only while detection looks wrong.
+    try {
+      let badge = document.getElementById("lc-jobs-diag");
+      if (cards.length < 2) {
         const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
         const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
         const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
@@ -1897,19 +1897,34 @@
         const divJob = document.querySelectorAll(
           "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
         ).length;
-        console.log(
-          "[LeadCaptura] jobs-diag" +
-            " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
-            " viewLinks=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
-            " cjLinks=" + document.querySelectorAll("a[href*='currentJobId=']").length +
-            " liJob=" + liJob +
-            " divJob=" + divJob +
-            " card1=" + (probeCard?.tagName || "-") + "." + ((probeCard?.className || "").toString().split(" ")[0] || "-") +
-            " href=" + (probeCard?.querySelector("a[href*='/jobs/']")?.getAttribute("href") || "-").slice(0, 90)
-        );
-      } catch (e) {
-        console.log("[LeadCaptura] jobs-diag failed", e?.message);
+        const card1 =
+          (probeCard?.tagName || "-") +
+          "." +
+          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
+        const txt =
+          "LC diag · cards=" + cards.length +
+          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
+          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
+          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
+          " liJob=" + liJob +
+          " divJob=" + divJob +
+          " card1=" + card1;
+        console.log("[LeadCaptura] jobs-diag " + txt);
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.id = "lc-jobs-diag";
+          badge.style.cssText =
+            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
+            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
+          document.documentElement.appendChild(badge);
+        }
+        badge.textContent = txt;
+      } else if (badge) {
+        badge.remove();
       }
+    } catch {
+      /* diag is best-effort */
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
