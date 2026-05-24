@@ -1701,14 +1701,12 @@
   function _jobCardEls() {
     const seen = new Set();
     const boxes = [];
+    // No /jobs/ anchor requirement: modern LinkedIn cards navigate via the
+    // whole-card click / data-job-id and may not expose a job <a> inside, so
+    // requiring one rejected every card but the open one. We trust the
+    // strategy selectors instead and just dedupe + exclude the detail pane.
     const add = (box) => {
-      if (
-        box &&
-        !seen.has(box) &&
-        !_inDetailPane(box) &&
-        box.querySelector &&
-        box.querySelector("a[href*='/jobs/']")
-      ) {
+      if (box && !seen.has(box) && !_inDetailPane(box)) {
         seen.add(box);
         boxes.push(box);
       }
@@ -1886,10 +1884,10 @@
     if (cards.length || created) {
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
     }
-    // One-time structural probe when detection looks wrong — logged as a FLAT
-    // string (not an object) so it's readable straight from the console.
-    if (cards.length < 2 && !window.__lcJobsProbed) {
-      window.__lcJobsProbed = true;
+    // Structural probe when detection looks wrong — logged as a FLAT string
+    // (not an object) on every low-detection pass so it's always visible at
+    // the bottom of the console, never scrolled away.
+    if (cards.length < 2) {
       try {
         const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
         const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
