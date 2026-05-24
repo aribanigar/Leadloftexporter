@@ -1687,29 +1687,53 @@
     }
   }
 
+  // Smallest ancestor of a node that encloses a job link — used to climb from
+  // a card's Dismiss "X" up to the card container.
+  function _climbToJobBox(node) {
+    let n = node.parentElement;
+    for (let i = 0; i < 10 && n && n.tagName !== "BODY" && n.tagName !== "HTML"; i++) {
+      if (n.querySelector("a[href*='/jobs/']")) return n;
+      n = n.parentElement;
+    }
+    return null;
+  }
+
   function _jobCardEls() {
-    // Ignore the detail pane entirely — only the left results list gets chips.
-    const titleLinks = Array.from(document.querySelectorAll(_TITLE_LINK_SEL)).filter(
-      (l) => !_inDetailPane(l)
-    );
     const boxes = [];
     const seen = new Set();
-    titleLinks.forEach((link) => {
-      let box = link.closest("li");
-      if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
-      if (box && !_inDetailPane(box) && !seen.has(box)) {
+    const add = (box) => {
+      if (box && !seen.has(box)) {
         seen.add(box);
         boxes.push(box);
       }
+    };
+
+    // PRIMARY signal: the Dismiss "X". There is exactly one per left-list card
+    // and NONE in the right-hand detail pane, so this can never chip the pane.
+    const dismissBtns = document.querySelectorAll(
+      "button[aria-label*='Dismiss' i], button[aria-label*='dismiss' i]"
+    );
+    dismissBtns.forEach((btn) => {
+      const box = btn.closest("li") || _climbToJobBox(btn);
+      if (box && box.querySelector("a[href*='/jobs/']")) add(box);
     });
-    // Attribute-tagged cards as an extra safety net (still excluding the pane).
-    document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
-      if (_inDetailPane(c)) return;
-      if (!seen.has(c) && c.querySelector("a[href*='/jobs/']")) {
-        seen.add(c);
-        boxes.push(c);
-      }
-    });
+
+    // FALLBACK (only if no dismiss buttons exist): title links, with the
+    // detail pane explicitly excluded.
+    if (boxes.length === 0) {
+      const titleLinks = Array.from(document.querySelectorAll(_TITLE_LINK_SEL)).filter(
+        (l) => !_inDetailPane(l)
+      );
+      titleLinks.forEach((link) => {
+        let box = link.closest("li");
+        if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
+        if (box && !_inDetailPane(box)) add(box);
+      });
+      document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
+        if (!_inDetailPane(c) && c.querySelector("a[href*='/jobs/']")) add(c);
+      });
+    }
+
     return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
   }
 
@@ -1851,6 +1875,26 @@
     }
     if (cards.length || created) {
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+    }
+    // One-time structural probe when detection looks wrong — surfaces the live
+    // DOM so we can pin selectors without guessing.
+    if (cards.length < 2 && !window.__lcJobsProbed) {
+      window.__lcJobsProbed = true;
+      try {
+        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
+        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
+        console.log("[LeadCaptura] jobs-diag", {
+          dismissBtns: document.querySelectorAll("button[aria-label*='Dismiss' i]").length,
+          titleLinks: document.querySelectorAll(_TITLE_LINK_SEL).length,
+          viewLinks: document.querySelectorAll("a[href*='/jobs/view/']").length,
+          liWithJobLink: Array.from(document.querySelectorAll("li")).filter((li) =>
+            li.querySelector("a[href*='/jobs/']")
+          ).length,
+          firstCardTag: probeCard?.tagName,
+          firstCardClass: (probeCard?.className || "").toString().slice(0, 140),
+          firstCardHref: (probeCard?.querySelector("a[href*='/jobs/']")?.getAttribute("href") || "").slice(0, 120),
+        });
+      } catch {}
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
