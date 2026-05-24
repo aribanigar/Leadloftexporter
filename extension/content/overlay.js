@@ -1669,18 +1669,46 @@
 
   // One box per visible job card. Prefers the enclosing <li>; if that <li> spans
   // multiple cards (i.e. it's actually the list), climbs by title-link count.
+  // True when a node lives inside the right-hand JOB DETAIL pane (the open
+  // job's description + apply buttons), NOT the left results list. The detail
+  // pane contains its own job-title/apply links, which were getting chips of
+  // their own (duplicated + mis-positioned over the pane). We anchor chips on
+  // the left list only.
+  function _inDetailPane(node) {
+    try {
+      return !!node.closest(
+        ".jobs-search__job-details, .jobs-search__job-details--container, " +
+        ".jobs-search__job-details--wrapper, .jobs-details, .job-view-layout, " +
+        ".scaffold-layout__detail, [class*='jobs-search__job-details'], " +
+        "[class*='job-details']"
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function _jobCardEls() {
-    const titleLinks = document.querySelectorAll(_TITLE_LINK_SEL);
+    // Ignore the detail pane entirely — only the left results list gets chips.
+    const titleLinks = Array.from(document.querySelectorAll(_TITLE_LINK_SEL)).filter(
+      (l) => !_inDetailPane(l)
+    );
     const boxes = [];
     const seen = new Set();
     titleLinks.forEach((link) => {
       let box = link.closest("li");
       if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
-      if (box && !seen.has(box)) { seen.add(box); boxes.push(box); }
+      if (box && !_inDetailPane(box) && !seen.has(box)) {
+        seen.add(box);
+        boxes.push(box);
+      }
     });
-    // Attribute-tagged cards as an extra safety net.
+    // Attribute-tagged cards as an extra safety net (still excluding the pane).
     document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
-      if (!seen.has(c) && c.querySelector("a[href*='/jobs/']")) { seen.add(c); boxes.push(c); }
+      if (_inDetailPane(c)) return;
+      if (!seen.has(c) && c.querySelector("a[href*='/jobs/']")) {
+        seen.add(c);
+        boxes.push(c);
+      }
     });
     return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
   }
@@ -1717,7 +1745,7 @@
   function _gcJobChips() {
     for (const [key, node] of injectedJobChips.entries()) {
       const card = _jobChipCards.get(key);
-      if (!node || !card || !document.body.contains(card)) {
+      if (!node || !card || !document.body.contains(card) || _inDetailPane(card)) {
         injectedJobChips.delete(key);
         _jobChipCards.delete(key);
         _jobChipApplyUrls.delete(key);
