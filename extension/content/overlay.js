@@ -1626,21 +1626,41 @@
   }
 
   function _jobLabel(card) {
+    const dis = card.querySelector("button[aria-label*='Dismiss' i]");
+    const aria = (dis?.getAttribute("aria-label") || "")
+      .replace(/^dismiss\s+/i, "")
+      .replace(/\s+job$/i, "")
+      .trim();
+    if (aria) return aria.slice(0, 60);
     const t =
       card.querySelector(
-        "a.job-card-list__title, a.job-card-container__link, .artdeco-entity-lockup__title, .job-card-list__title--link"
+        "a.job-card-list__title, a.job-card-container__link, .artdeco-entity-lockup__title, " +
+        ".job-card-list__title--link, [class*='title'], a, strong, h3"
       )?.innerText ||
-      card.querySelector("strong")?.innerText ||
       "";
-    return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
+    return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 60) || "Job";
   }
 
-  // ----- Card detection (markup-agnostic, currentJobId-collision-proof) -----
-  // LinkedIn's search-results cards frequently expose only ONE page-level
-  // ?currentJobId=, identical on every card link, so keying cards by job id
-  // collapsed the whole list to a single card (the bug behind "detected 1
-  // cards"). We instead detect each card STRUCTURALLY — one box per job-title
-  // link — and key it per-card, independent of ids and class names.
+  // The repeated card unit for a Dismiss "X": climb until the node's PARENT
+  // holds 2+ dismiss buttons (i.e. the parent is the list and the node is one
+  // card among siblings). Works with NO job links or data-ids on the card —
+  // which is exactly the search-results layout LinkedIn now ships.
+  function _cardFromDismiss(btn) {
+    let node = btn;
+    for (let i = 0; i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+      const parent = node.parentElement;
+      if (
+        parent &&
+        parent.querySelectorAll("button[aria-label*='Dismiss' i]").length >= 2
+      ) {
+        return node;
+      }
+      node = parent;
+    }
+    return btn.closest("li") || btn.parentElement;
+  }
+
+  // ----- Card detection -----
 
   const _TITLE_LINK_SEL =
     "a.job-card-list__title, a.job-card-container__link, " +
@@ -1712,34 +1732,36 @@
       }
     };
 
-    // Strategy 1: explicit job-card containers across <li> AND <div> layouts.
-    document
-      .querySelectorAll(
-        "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
-        "[data-occludable-job-id], " +
-        "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
-        "li.discovery-templates-entity-item, " +
-        "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
-        "div[class*='jobs-job-board-list__item']"
-      )
-      .forEach(add);
-
-    // Strategy 2: climb from each Dismiss "X" (one per left card, none in pane).
+    // PRIMARY: one card per Dismiss "X". Robust even when cards expose no job
+    // link or data-id (the current search-results layout). Climbs to the
+    // repeated card unit via _cardFromDismiss.
     document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
       if (_inDetailPane(btn)) return;
-      add(btn.closest("li") || _climbToJobBox(btn));
+      add(_cardFromDismiss(btn));
     });
 
-    // Strategy 3: climb from job/title links (detail pane excluded).
-    const titleLinks = Array.from(
-      document.querySelectorAll(
-        "a[href*='/jobs/view/'], a[href*='currentJobId='], a.job-card-list__title, " +
-        "a.job-card-container__link, a.job-card-job-posting-card-wrapper__card-link"
-      )
-    ).filter((l) => !_inDetailPane(l));
-    titleLinks.forEach((link) => {
-      add(link.closest("li") || _climbByLinkCount(link, titleLinks));
-    });
+    // SUPPLEMENTS — only when no dismiss buttons exist on the surface.
+    if (boxes.length === 0) {
+      document
+        .querySelectorAll(
+          "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
+          "[data-occludable-job-id], " +
+          "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
+          "li.discovery-templates-entity-item, " +
+          "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
+          "div[class*='jobs-job-board-list__item']"
+        )
+        .forEach(add);
+      const titleLinks = Array.from(
+        document.querySelectorAll(
+          "a[href*='/jobs/view/'], a[href*='currentJobId='], a.job-card-list__title, " +
+          "a.job-card-container__link, a.job-card-job-posting-card-wrapper__card-link"
+        )
+      ).filter((l) => !_inDetailPane(l));
+      titleLinks.forEach((link) => {
+        add(link.closest("li") || _climbByLinkCount(link, titleLinks));
+      });
+    }
 
     // Keep the innermost when a parent and child both got detected.
     return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
@@ -2406,8 +2428,12 @@
   async function _openJobDetail(card, expectedId) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
+    // Prefer a real job link; otherwise click the card's title/clickable area
+    // (current search-results cards open on card click, not via a job <a>).
     const link =
       card.querySelector("a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']") ||
+      card.querySelector("a[href*='/jobs/']") ||
+      card.querySelector("a, [class*='title'], strong, h3") ||
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
