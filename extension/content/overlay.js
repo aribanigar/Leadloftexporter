@@ -1699,41 +1699,51 @@
   }
 
   function _jobCardEls() {
-    const boxes = [];
     const seen = new Set();
+    const boxes = [];
     const add = (box) => {
-      if (box && !seen.has(box)) {
+      if (
+        box &&
+        !seen.has(box) &&
+        !_inDetailPane(box) &&
+        box.querySelector &&
+        box.querySelector("a[href*='/jobs/']")
+      ) {
         seen.add(box);
         boxes.push(box);
       }
     };
 
-    // PRIMARY signal: the Dismiss "X". There is exactly one per left-list card
-    // and NONE in the right-hand detail pane, so this can never chip the pane.
-    const dismissBtns = document.querySelectorAll(
-      "button[aria-label*='Dismiss' i], button[aria-label*='dismiss' i]"
-    );
-    dismissBtns.forEach((btn) => {
-      const box = btn.closest("li") || _climbToJobBox(btn);
-      if (box && box.querySelector("a[href*='/jobs/']")) add(box);
+    // Strategy 1: explicit job-card containers across <li> AND <div> layouts.
+    document
+      .querySelectorAll(
+        "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
+        "[data-occludable-job-id], " +
+        "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
+        "li.discovery-templates-entity-item, " +
+        "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
+        "div[class*='jobs-job-board-list__item']"
+      )
+      .forEach(add);
+
+    // Strategy 2: climb from each Dismiss "X" (one per left card, none in pane).
+    document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
+      if (_inDetailPane(btn)) return;
+      add(btn.closest("li") || _climbToJobBox(btn));
     });
 
-    // FALLBACK (only if no dismiss buttons exist): title links, with the
-    // detail pane explicitly excluded.
-    if (boxes.length === 0) {
-      const titleLinks = Array.from(document.querySelectorAll(_TITLE_LINK_SEL)).filter(
-        (l) => !_inDetailPane(l)
-      );
-      titleLinks.forEach((link) => {
-        let box = link.closest("li");
-        if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
-        if (box && !_inDetailPane(box)) add(box);
-      });
-      document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
-        if (!_inDetailPane(c) && c.querySelector("a[href*='/jobs/']")) add(c);
-      });
-    }
+    // Strategy 3: climb from job/title links (detail pane excluded).
+    const titleLinks = Array.from(
+      document.querySelectorAll(
+        "a[href*='/jobs/view/'], a[href*='currentJobId='], a.job-card-list__title, " +
+        "a.job-card-container__link, a.job-card-job-posting-card-wrapper__card-link"
+      )
+    ).filter((l) => !_inDetailPane(l));
+    titleLinks.forEach((link) => {
+      add(link.closest("li") || _climbByLinkCount(link, titleLinks));
+    });
 
+    // Keep the innermost when a parent and child both got detected.
     return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
   }
 
@@ -1876,25 +1886,32 @@
     if (cards.length || created) {
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
     }
-    // One-time structural probe when detection looks wrong — surfaces the live
-    // DOM so we can pin selectors without guessing.
+    // One-time structural probe when detection looks wrong — logged as a FLAT
+    // string (not an object) so it's readable straight from the console.
     if (cards.length < 2 && !window.__lcJobsProbed) {
       window.__lcJobsProbed = true;
       try {
         const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
         const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
-        console.log("[LeadCaptura] jobs-diag", {
-          dismissBtns: document.querySelectorAll("button[aria-label*='Dismiss' i]").length,
-          titleLinks: document.querySelectorAll(_TITLE_LINK_SEL).length,
-          viewLinks: document.querySelectorAll("a[href*='/jobs/view/']").length,
-          liWithJobLink: Array.from(document.querySelectorAll("li")).filter((li) =>
-            li.querySelector("a[href*='/jobs/']")
-          ).length,
-          firstCardTag: probeCard?.tagName,
-          firstCardClass: (probeCard?.className || "").toString().slice(0, 140),
-          firstCardHref: (probeCard?.querySelector("a[href*='/jobs/']")?.getAttribute("href") || "").slice(0, 120),
-        });
-      } catch {}
+        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
+          li.querySelector("a[href*='/jobs/']")
+        ).length;
+        const divJob = document.querySelectorAll(
+          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
+        ).length;
+        console.log(
+          "[LeadCaptura] jobs-diag" +
+            " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
+            " viewLinks=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
+            " cjLinks=" + document.querySelectorAll("a[href*='currentJobId=']").length +
+            " liJob=" + liJob +
+            " divJob=" + divJob +
+            " card1=" + (probeCard?.tagName || "-") + "." + ((probeCard?.className || "").toString().split(" ")[0] || "-") +
+            " href=" + (probeCard?.querySelector("a[href*='/jobs/']")?.getAttribute("href") || "-").slice(0, 90)
+        );
+      } catch (e) {
+        console.log("[LeadCaptura] jobs-diag failed", e?.message);
+      }
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
