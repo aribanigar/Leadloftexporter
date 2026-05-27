@@ -1184,15 +1184,67 @@
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
+    // Sales Navigator hides Connect under the "…" overflow menu, so a card may
+    // show only Message + "…". Don't write those off as already-connected:
+    // if an overflow trigger exists and we're not pending, treat as a connect
+    // candidate (the actual Connect item is resolved when we open the menu).
+    let isSalesNav = false;
+    try { isSalesNav = Scraper.pageType() === "salesnav-search"; } catch {}
+    if (isSalesNav) {
+      const hasMore = Array.from(card.querySelectorAll("button, [role='button']")).some((b) => {
+        if (b.classList?.contains("lc-inline-save")) return false;
+        const a = (b.getAttribute("aria-label") || "").toLowerCase();
+        return /\bmore\b|overflow|more actions|other actions/.test(a) || b.classList?.contains("artdeco-dropdown__trigger");
+      });
+      if (hasMore) return "connect";
+    }
     if (hasMessage) return "connected";
     if (hasFollow) return "follow";
     return "unknown";
   }
 
+  // Sales Navigator tucks "Connect" inside the "…" overflow menu. Open it and
+  // return the Connect item so the normal send flow can click it.
+  async function _openOverflowConnect(card) {
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const { sleep } = globalThis.__lcHuman;
+    const moreBtn = Array.from(card.querySelectorAll("button, [role='button']")).find((b) => {
+      if (b.classList?.contains("lc-inline-save")) return false;
+      const a = (b.getAttribute("aria-label") || "").toLowerCase();
+      return (
+        /\bmore\b|overflow|more actions|other actions/.test(a) ||
+        b.classList?.contains("artdeco-dropdown__trigger")
+      );
+    });
+    if (!moreBtn) return null;
+    try { await dispatchHumanClick(moreBtn); } catch { try { moreBtn.click(); } catch {} }
+    await sleep(450 + Math.random() * 400);
+    // Menu items render in an open dropdown/portal, often outside the card.
+    const items = Array.from(
+      document.querySelectorAll(
+        "div.artdeco-dropdown__content--is-open [role='button'], " +
+        "div.artdeco-dropdown__content--is-open button, " +
+        "div.artdeco-dropdown__content--is-open li, " +
+        "div[role='menu'] [role='menuitem'], div[role='menu'] [role='button'], " +
+        "div[role='menu'] button, ul[role='menu'] li, " +
+        ".artdeco-dropdown__content button, .artdeco-dropdown__content [role='button']"
+      )
+    );
+    return (
+      items.find((el) => {
+        const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+        const a = el.getAttribute("aria-label") || "";
+        return /^connect\b/i.test(t) || /\binvite\b.*\bto connect\b/i.test(a) || /^connect$/i.test(a);
+      }) || null
+    );
+  }
+
   async function _sendConnectOnCard(card) {
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
-    const btn = _findConnectButtonInCard(card);
+    let btn = _findConnectButtonInCard(card);
+    // Sales Nav: Connect lives behind the "…" menu — open it and grab Connect.
+    if (!btn) btn = await _openOverflowConnect(card);
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
     await sleep(700 + Math.random() * 500);
@@ -1552,14 +1604,24 @@
         if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
         continue;
       }
-      const r = card.getBoundingClientRect();
-      if (r.bottom <= 0 || r.top >= window.innerHeight || r.width < 2 || r.height < 2) {
+      // Anchor to the always-visible Dismiss "X". The card box returned by
+      // _cardFromDismiss can be a zero-size wrapper on the search-results
+      // layout, which (with the old width<2 guard) hid EVERY chip. The X is a
+      // real, painted button with a stable rect, so we anchor to it and place
+      // the chip just to its left — i.e. the card's top-right, like screen 1.
+      const dismiss = card.querySelector("button[aria-label*='Dismiss' i]");
+      const anchor = dismiss || card;
+      const r = anchor.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= window.innerHeight || (r.width < 2 && r.height < 2)) {
         wrap.style.setProperty("visibility", "hidden", "important");
         continue;
       }
-      // Anchor bottom-right of the card, 46px above bottom edge
-      const top = Math.max(4, r.bottom - 46);
-      const left = Math.max(4, r.right - 184);
+      const chipW = wrap.getBoundingClientRect().width || 150;
+      const top = Math.max(4, r.top + 1);
+      // If anchored on the X, sit to its left; if on the card box, bottom-right.
+      const left = dismiss
+        ? Math.max(4, r.left - chipW - 8)
+        : Math.max(4, r.right - 184);
       wrap.style.setProperty("top", `${top}px`, "important");
       wrap.style.setProperty("left", `${left}px`, "important");
       wrap.style.setProperty("visibility", "visible", "important");
@@ -2856,11 +2918,23 @@
     wrap.dataset.lcUrl = url;
 
     // The chip floats absolute at the top-right of the card, just inboard of
-    // LinkedIn's Connect/Pending button. The card needs position:relative
-    // for the absolute child to anchor correctly.
+    // LinkedIn's Connect/Pending button. The card needs position:relative for
+    // the absolute child to anchor correctly, and overflow:visible so a
+    // clipping ancestor can't hide the chip (LinkedIn's newer card markup wraps
+    // rows in overflow:hidden containers — that was hiding every Save chip).
     try {
       if (getComputedStyle(card).position === "static") {
-        card.style.position = "relative";
+        card.style.setProperty("position", "relative", "important");
+      }
+      card.style.setProperty("overflow", "visible", "important");
+      let p = card.parentElement;
+      for (let i = 0; i < 3 && p; i++) {
+        try {
+          if (getComputedStyle(p).overflow !== "visible") {
+            p.style.setProperty("overflow", "visible", "important");
+          }
+        } catch {}
+        p = p.parentElement;
       }
     } catch {
       card.style.position = "relative";
@@ -3325,6 +3399,41 @@
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
+    }
+
+    // On-page diagnostic (people / Sales Nav search) so the detection state is
+    // captured in a screenshot. Shows when no chips got injected — the exact
+    // signal counts tell us whether detection or rendering is the problem.
+    try {
+      const liveChips = _allChipUrls().length;
+      let badge = document.getElementById("lc-search-diag");
+      if (liveChips < 1) {
+        const actionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton).length;
+        const inLinks = document.querySelectorAll("a[href*='/in/']").length;
+        const salesLinks = document.querySelectorAll("a[href*='/sales/lead/']").length;
+        const txt =
+          "LC search-diag · type=" + type +
+          " chips=" + liveChips +
+          " cards=" + finalCards.length +
+          " actionBtns=" + actionBtns +
+          " inLinks=" + inLinks +
+          " salesLinks=" + salesLinks;
+        console.log("[LeadCaptura] " + txt);
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.id = "lc-search-diag";
+          badge.style.cssText =
+            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
+            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
+          document.documentElement.appendChild(badge);
+        }
+        badge.textContent = txt;
+      } else if (badge) {
+        badge.remove();
+      }
+    } catch {
+      /* diag best-effort */
     }
   }
 
