@@ -336,33 +336,13 @@
     if (simulateCursorMove) await simulateCursorMove(connectBtn);
     await sleep(80 + Math.random() * 120);
 
-    // For <a href="/preload/custom-invite/..."> Connect buttons, the synthetic
-    // click would make the browser NAVIGATE to that href. We must stop the
-    // navigation WITHOUT breaking LinkedIn's own click handler. Removing the
-    // href (the v1.0.80 approach) broke LinkedIn's a[href] click-delegation so
-    // the modal opened via a slow fallback path. Instead we keep the href and
-    // attach a one-time capturing listener that only calls preventDefault() —
-    // it cancels the browser's default navigation but lets the event keep
-    // propagating to LinkedIn's delegated handler, which opens the modal fast.
-    if (connectBtn.tagName === "A") {
-      const stopNav = (e) => { e.preventDefault(); };
-      connectBtn.addEventListener("click", stopNav, { capture: true });
-      // also guard the document in case LinkedIn re-targets the anchor
-      const stopNavDoc = (e) => {
-        if (e.target && e.target.closest && e.target.closest("a[href*='invite' i], a[href*='connect' i]")) {
-          e.preventDefault();
-        }
-      };
-      document.addEventListener("click", stopNavDoc, { capture: true });
-      await dispatchHumanClick(connectBtn);
-      // Remove the guards shortly after so we don't interfere with later clicks.
-      setTimeout(() => {
-        connectBtn.removeEventListener("click", stopNav, { capture: true });
-        document.removeEventListener("click", stopNavDoc, { capture: true });
-      }, 1500);
-    } else {
-      await dispatchHumanClick(connectBtn);
-    }
+    // Dispatch the click directly — no custom preventDefault interceptors.
+    // LinkedIn's own delegated handler calls event.preventDefault() itself
+    // to cancel navigation and open the invite modal. Adding our own
+    // capturing-phase preventDefault before LinkedIn's handler runs changes
+    // event.defaultPrevented state and causes LinkedIn to route to a
+    // different action (e.g. the "Share post" modal). Let LinkedIn handle it.
+    await dispatchHumanClick(connectBtn);
 
     // Wait for invitation modal (up to ~20s — slow/janky profiles render the
     // modal late, and we never want to give up before it actually appears).
