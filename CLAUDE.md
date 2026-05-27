@@ -138,24 +138,15 @@ Two-column screen. Left rail is profile + stage selector + tasks + lead-info fie
 
 ## Extension architecture (`/extension`)
 
-> **🔒 LOCKED STABLE BASELINE — `extension-v1.0.34-stable` (commit `bdc96af`).**
-> The per-card Save-chip detection and the bulk-Connect anti-bot timing are
-> confirmed working as of v1.0.34 and **must not regress** while new features
-> are added. Do **not** modify the following without an explicit request to
-> change *that specific behavior*:
+> **Anti-bot timing is load-bearing — do not regress it.** `connectAllVisible`
+> and `_scrollLoadPage` in `overlay.js` use a 4-tier gap distribution + periodic
+> micro-breaks and incremental (not jump-to-bottom) scrolling. Keep those
+> distributions; see "Bot-detection avoidance" below. The `main.js` cadence
+> (1.5s decorate interval, `location.search` watcher, scroll-stop re-decorate)
+> is what keeps chips appearing on lazily-rendered/paginated cards — leave it.
 >
-> - `overlay.js` → `decorateSearchCards`, `climbToCard`/`ownerCount` (card
->   detection), `_isActionButton`, `_resolveCardOwnerLink`, `injectInlineSave`,
->   `profileFromCard` (incl. the slug-label fallback that injects a chip even
->   when the name can't be resolved).
-> - `overlay.js` → `connectAllVisible`, `_scrollLoadPage`, `_sendConnectOnCard`
->   and their timing distributions (4-tier gaps + micro-breaks).
-> - `main.js` → the `location.search` watcher, scroll-stop re-decorate, and the
->   1.5s decorate interval.
->
-> If a new feature seems to require touching these, prefer adding alongside
-> rather than editing in place. To restore the baseline: `git checkout bdc96af`
-> (or the `extension-v1.0.34-stable` tag in the local clone).
+> The version is bumped in `manifest.json` on every shippable change and the
+> zip is named with it (`leadcaptura-extension-v<ver>.zip`).
 
 ```
 manifest.json                MV3, host: linkedin.com only (backend host requested at runtime)
@@ -178,6 +169,39 @@ options/                     API key + capture behavior settings (incl. autoEnri
 4. **Real DOM events.** Clicks go through `dispatchHumanClick` which fires `pointerover` → `pointerdown` → `pointerup` → `click` with realistic coordinates.
 5. **Abort on challenge.** `detectChallenge()` aborts and reports failure if a captcha/checkpoint surfaces.
 6. **Daily caps live server-side.** The extension only runs what `/extension/jobs/next` hands it.
+
+### Search-card decoration + bulk Connect/Follow (regular LinkedIn people search)
+
+The hardest-won part of the extension. The model: `decorateSearchCards()`
+anchors on each **native action button** (`_isActionButton` → Connect / Follow /
+Message / Pending, matched by **whole-word** `\bconnect\b` etc. so the rendered
+"+ Connect" label matches and "Connected"/"Following" don't), climbs to the
+first ancestor that contains a profile link (`cardFromButton`) — that ancestor
+is the row — and injects the Save chip **inline before that button** (the chip
+must NOT be `position:absolute`; absolute placement collapsed every card's chip
+onto one shared positioned ancestor, so only the first profile appeared chipped).
+A link-only fallback pass covers rows with no recognised button.
+
+Three URL→element registries are the single source of truth for bulk actions:
+`injectedSaves` (url→chip wrapper), `chipCardEl` (url→row), and `chipActionBtn`
+(url→the exact native button the chip sits beside). **Bulk Connect/Follow acts
+on the stored button directly** (`_actionBtnForUrl` + `_classifyButton`) rather
+than re-scanning the row — re-scanning was unreliable and produced "No action"
+on connectable cards. `_gcInjected()` drops all three when a node leaves the DOM.
+
+`connectAllVisible()` per row: Connect → `_sendConnectOnCard` clicks Connect,
+waits for the "Add a note to your invitation?" modal, then clicks **"Send
+without a note"**; Follow-only → `_sendFollowOnCard` clicks Follow; already
+connected/pending → skipped. Critical correctness rules:
+- Only ever target a **visible** element (`_isVisible` gates
+  `_findSendWithoutNoteButton` / `_invitationModalOpen`) — LinkedIn leaves
+  stale hidden modal duplicates in the DOM; clicking those does nothing.
+- `_forceClick` uses native `.click()` (React/Ember honour untrusted clicks)
+  **plus** a full pointer/mouse event sequence.
+- Report `ok:true` **only after the invitation modal actually closes** from
+  sending. Never close the modal via its X and call it success — that produced
+  fake "Invited ✓" with no invite sent. Failures surface as "Send failed" /
+  "No modal" on the chip.
 
 ### Contact Info enrichment flow
 

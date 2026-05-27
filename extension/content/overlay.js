@@ -3552,6 +3552,48 @@
     );
   }
 
+  // ---- Global auto-confirm of the invitation modal ----------------------
+  // The "Add a note to your invitation?" dialog appears whenever Connect is
+  // clicked — by Connect All OR by the user manually. The user's rule is: never
+  // add a note, always "Send without a note". This watcher clicks that button
+  // the instant the modal appears, regardless of who triggered the Connect, so
+  // the flow never stalls on the dialog. Bot-detection note: this only fires in
+  // direct response to a Connect the user/extension already made, so it adds no
+  // new outbound action — it just completes the one already in progress.
+  let _inviteAutoBusy = false;
+  async function _autoConfirmInviteModal() {
+    if (_inviteAutoBusy) return;
+    if (!_invitationModalOpen()) return;
+    const btn = _findSendWithoutNoteButton();
+    if (!btn) return;
+    _inviteAutoBusy = true;
+    try {
+      _forceClick(btn);
+      await globalThis.__lcHuman.sleep(400);
+      if (_invitationModalOpen()) {
+        const again = _findSendWithoutNoteButton();
+        if (again) _forceClick(again);
+      }
+    } catch {
+      /* never let the watcher throw */
+    } finally {
+      _inviteAutoBusy = false;
+    }
+  }
+  function _startInviteAutoConfirm() {
+    try {
+      const obs = new MutationObserver(() => {
+        _autoConfirmInviteModal();
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+    } catch {
+      /* observer best-effort */
+    }
+    // Safety-net poll in case a mutation batch is missed.
+    setInterval(_autoConfirmInviteModal, 500);
+  }
+  _startInviteAutoConfirm();
+
   globalThis.__lcOverlay = {
     renderProfilePanel,
     renderToolbar,
