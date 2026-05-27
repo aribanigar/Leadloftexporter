@@ -132,12 +132,12 @@
 
   function _ccFindInviteModal() {
     for (const d of document.querySelectorAll(
-      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog'], [data-test-modal]"
     )) {
       const rect = d.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) continue;
       const cs = getComputedStyle(d);
-      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
       if (
         /add a note to your invitation|send without a note|personalize your invitation/i.test(
           d.textContent || ""
@@ -149,7 +149,8 @@
   }
 
   function _ccFindSendBtn() {
-    const all = Array.from(document.querySelectorAll("button, [role='button']"));
+    // Include <a> — LinkedIn renders some action controls as styled anchors.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
     const label = (b) => ({
       t: (b.textContent || "").replace(/\s+/g, " ").trim(),
       a: b.getAttribute("aria-label") || "",
@@ -335,22 +336,51 @@
     if (simulateCursorMove) await simulateCursorMove(connectBtn);
     await sleep(80 + Math.random() * 120);
 
-    // For <a href="/preload/custom-invite/..."> Connect buttons: temporarily
-    // remove the href so the browser's default anchor-navigation doesn't fire.
-    // LinkedIn's own event handler is bound to the element (not the href), so
-    // it still fires and opens the "Add a note?" modal.
-    const savedHref = connectBtn.tagName === "A" ? connectBtn.getAttribute("href") : null;
-    if (savedHref) connectBtn.removeAttribute("href");
-    await dispatchHumanClick(connectBtn);
-    if (savedHref) connectBtn.setAttribute("href", savedHref);
+    // For <a href="/preload/custom-invite/..."> Connect buttons, the synthetic
+    // click would make the browser NAVIGATE to that href. We must stop the
+    // navigation WITHOUT breaking LinkedIn's own click handler. Removing the
+    // href (the v1.0.80 approach) broke LinkedIn's a[href] click-delegation so
+    // the modal opened via a slow fallback path. Instead we keep the href and
+    // attach a one-time capturing listener that only calls preventDefault() —
+    // it cancels the browser's default navigation but lets the event keep
+    // propagating to LinkedIn's delegated handler, which opens the modal fast.
+    if (connectBtn.tagName === "A") {
+      const stopNav = (e) => { e.preventDefault(); };
+      connectBtn.addEventListener("click", stopNav, { capture: true });
+      // also guard the document in case LinkedIn re-targets the anchor
+      const stopNavDoc = (e) => {
+        if (e.target && e.target.closest && e.target.closest("a[href*='invite' i], a[href*='connect' i]")) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener("click", stopNavDoc, { capture: true });
+      await dispatchHumanClick(connectBtn);
+      // Remove the guards shortly after so we don't interfere with later clicks.
+      setTimeout(() => {
+        connectBtn.removeEventListener("click", stopNav, { capture: true });
+        document.removeEventListener("click", stopNavDoc, { capture: true });
+      }, 1500);
+    } else {
+      await dispatchHumanClick(connectBtn);
+    }
 
-    // Wait for invitation modal (up to 10 s)
+    // Wait for invitation modal (up to ~20s — slow/janky profiles render the
+    // modal late, and we never want to give up before it actually appears).
     let dialogOpen = false;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 80; i++) {
       await sleep(250);
       if (_ccInviteModalOpen()) {
         dialogOpen = true;
         break;
+      }
+      // If the invite completed without a modal (already-1st-degree edge cases),
+      // bail early as success.
+      if (
+        document.querySelector(
+          "main button[aria-label*='Pending' i], main a[aria-label*='Pending' i]"
+        )
+      ) {
+        return { ok: true };
       }
     }
 
