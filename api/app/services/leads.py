@@ -70,12 +70,27 @@ def upsert_company(
 
 
 def default_stage(db: Session, workspace_id: str) -> Optional[PipelineStage]:
-    return (
+    stage = (
         db.query(PipelineStage)
         .filter(PipelineStage.workspace_id == workspace_id)
         .order_by(PipelineStage.position.asc())
         .first()
     )
+    if stage is None:
+        # Workspace was created before defaults were seeded (or the seed
+        # failed). Seed it now so every new lead lands on a real stage and
+        # shows up in the Pipeline immediately.
+        from app.services.bootstrap import seed_workspace_defaults
+
+        seed_workspace_defaults(db, workspace_id)
+        db.flush()
+        stage = (
+            db.query(PipelineStage)
+            .filter(PipelineStage.workspace_id == workspace_id)
+            .order_by(PipelineStage.position.asc())
+            .first()
+        )
+    return stage
 
 
 def normalize_linkedin(url: Optional[str]) -> Optional[str]:
