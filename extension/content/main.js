@@ -245,26 +245,50 @@
       return true;
     };
 
-    // Find Connect button — direct selectors first (profile action area only)
-    let connectBtn = null;
-    const directSels = [
-      // Primary: aria-label "Invite X to connect" (LinkedIn's standard label)
-      "main .pvs-profile-actions button[aria-label*='connect' i]",
-      "main .pvs-profile-actions__action[aria-label*='connect' i]",
-      // Broader fallback scoped to the top-card / actions strip
-      "main button[aria-label*='Invite'][aria-label*='connect' i]",
-      "main button[aria-label*='Connect' i]",
-    ];
-    for (const sel of directSels) {
-      try {
-        for (const el of document.querySelectorAll(sel)) {
-          if (_isConnectBtn(el)) { connectBtn = el; break; }
-        }
-        if (connectBtn) break;
-      } catch {}
+    // Scan for the profile's primary Connect button. LinkedIn's 2025 markup is
+    // inconsistent: the button sometimes has aria-label "Invite X to connect",
+    // sometimes NO aria-label (visible <span>Connect</span> only), and is not
+    // always inside <main>. So we scan the whole document and rely on
+    // _isConnectBtn (whole-word \bconnect\b on text+aria) rather than brittle
+    // selectors. We EXCLUDE the right-rail <aside> ("More profiles for you" /
+    // "People you may know" cards have their own Connect buttons) and any open
+    // dropdown menu, then prefer the match inside the top-card action strip.
+    const _findConnect = () => {
+      const candidates = [];
+      for (const b of document.querySelectorAll("button, [role='button']")) {
+        if (b.closest("aside")) continue; // skip right-rail recommendations
+        if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+        if (!_isConnectBtn(b)) continue;
+        const off = b.getBoundingClientRect();
+        if (off.width === 0 && off.height === 0) continue; // not rendered
+        candidates.push(b);
+      }
+      if (!candidates.length) return null;
+      // Prefer a button inside the profile top-card / actions strip; otherwise
+      // take the first one in document order (the main profile precedes any
+      // lower-page modules).
+      const inActions = candidates.find(
+        (b) =>
+          b.closest(
+            ".pvs-profile-actions, .pv-top-card-v2-ctas, .ph5, .pv-top-card, .scaffold-layout__main"
+          ) && b.closest("main")
+      );
+      return inActions || candidates[0];
+    };
+
+    let connectBtn = _findConnect();
+
+    // SPA hydration: LinkedIn injects the action buttons a beat after the
+    // profile shell mounts. Poll every 500ms for up to ~8s before giving up.
+    if (!connectBtn) {
+      for (let w = 0; w < 16 && !connectBtn; w++) {
+        await sleep(500);
+        connectBtn = _findConnect();
+      }
     }
 
-    // Try "More actions" dropdown fallback (Connect hidden behind "More" on some profiles)
+    // Last resort (has a side effect — opens a menu): "More actions" dropdown,
+    // for the rare profile that hides Connect behind "More".
     if (!connectBtn) {
       const moreBtn =
         document.querySelector("main button[aria-label*='More actions' i]") ||
@@ -274,66 +298,15 @@
         await sleep(400 + Math.random() * 400);
         await dispatchHumanClick(moreBtn);
         await sleep(700 + Math.random() * 500);
-        const dropdownItems = document.querySelectorAll(
-          "div[role='menu'] [aria-label*='Connect' i]," +
-          "div.artdeco-dropdown__content [aria-label*='Connect' i]," +
-          "li.artdeco-dropdown__item [aria-label*='Connect' i]"
+        const found = await waitFor(
+          [
+            "div[role='menu'] [aria-label*='Connect' i]",
+            "div.artdeco-dropdown__content [aria-label*='Connect' i]",
+            "li.artdeco-dropdown__item [aria-label*='Connect' i]",
+          ],
+          { timeout: 3000 }
         );
-        for (const el of dropdownItems) {
-          if (_isConnectBtn(el)) { connectBtn = el; break; }
-        }
-        if (!connectBtn) {
-          connectBtn = await waitFor(
-            [
-              "div[role='menu'] [aria-label*='Connect' i]",
-              "div.artdeco-dropdown__content [aria-label*='Connect' i]",
-              "li.artdeco-dropdown__item [aria-label*='Connect' i]",
-            ],
-            { timeout: 3000 }
-          );
-          if (connectBtn && !_isConnectBtn(connectBtn)) connectBtn = null;
-        }
-      }
-    }
-
-    // Text-content fallback — LinkedIn 2025 buttons often have NO aria-label.
-    // The button contains two spans: <span aria-hidden>Connect</span> and
-    // <span class="visually-hidden">Invite X to connect</span>, so
-    // button.textContent = "ConnectInvite X to connect". Use _isConnectBtn()
-    // which does \bconnect\b matching instead of the broken ^connect$ check.
-    if (!connectBtn) {
-      const scopes = [
-        document.querySelector("main .pvs-profile-actions"),
-        document.querySelector(".pv-top-card-v2-ctas"),
-        document.querySelector("main"),
-      ].filter(Boolean);
-      outer: for (const scope of scopes) {
-        for (const b of scope.querySelectorAll("button, [role='button']")) {
-          if (_isConnectBtn(b)) { connectBtn = b; break outer; }
-        }
-      }
-    }
-
-    // waitFor: LinkedIn SPA injects action buttons after profile hydrates — wait up to 5s
-    if (!connectBtn) {
-      const found = await waitFor(
-        [
-          "main button[aria-label*='connect' i]",
-          "main button[aria-label*='Invite' i]",
-        ],
-        { timeout: 5000 }
-      );
-      if (found && _isConnectBtn(found)) connectBtn = found;
-    }
-
-    // Final poll: scan every 500ms for up to 5s to catch no-aria-label buttons
-    if (!connectBtn) {
-      for (let w = 0; w < 10 && !connectBtn; w++) {
-        await sleep(500);
-        const root = document.querySelector("main") || document.body;
-        for (const b of root.querySelectorAll("button, [role='button']")) {
-          if (_isConnectBtn(b)) { connectBtn = b; break; }
-        }
+        if (found && _isConnectBtn(found)) connectBtn = found;
       }
     }
 
