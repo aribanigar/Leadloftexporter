@@ -3334,6 +3334,29 @@
       if (card) cards.add(card);
     }
 
+    // PASS 3 — repeated-unit detection (robust to LinkedIn's 2026 layout where
+    // the owner/button-count boundary in climbToCard can miss cards). For each
+    // native action button, climb to the element whose PARENT holds 2+ action
+    // buttons — that element is one card among sibling cards. This is the same
+    // proven technique used for job cards (parent-holds-2+-of-the-signal).
+    const _allActionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton);
+    if (_allActionBtns.length >= 2) {
+      for (const b of _allActionBtns) {
+        let node = b;
+        for (let i = 0; i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+          const parent = node.parentElement;
+          if (
+            parent &&
+            Array.from(parent.querySelectorAll("button")).filter(_isActionButton).length >= 2
+          ) {
+            if (node.querySelector(linkSel)) cards.add(node);
+            break;
+          }
+          node = parent;
+        }
+      }
+    }
+
     // Both passes converge on the same "largest single-owner ancestor", but if
     // any outer container slipped in, drop it in favour of the inner card it
     // contains — one chip per profile row, never a wrapper spanning a card.
@@ -3376,6 +3399,34 @@
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
+    }
+
+    // Self-hiding diagnostic: only shows if detection is failing (fewer than 2
+    // chips). Disappears the moment it's working, so no clutter when healthy.
+    try {
+      const liveChips = _allChipUrls().length;
+      let badge = document.getElementById("lc-search-diag");
+      if (liveChips < 2 && (type.includes("search") || type.includes("sales"))) {
+        const txt =
+          "LeadCaptura: " + liveChips + " chip(s) · " + finalCards.length + " cards · " +
+          Array.from(document.querySelectorAll("button")).filter(_isActionButton).length + " action-btns · " +
+          document.querySelectorAll("a[href*='/in/']").length + " in · " +
+          document.querySelectorAll("a[href*='/sales/lead/']").length + " sales";
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.id = "lc-search-diag";
+          badge.style.cssText =
+            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+            "font:11px/1.4 monospace;padding:5px 8px;border-radius:6px;max-width:92vw;" +
+            "white-space:pre-wrap;pointer-events:none;opacity:.85";
+          document.documentElement.appendChild(badge);
+        }
+        badge.textContent = txt;
+      } else if (badge) {
+        badge.remove();
+      }
+    } catch {
+      /* diag best-effort */
     }
   }
 
