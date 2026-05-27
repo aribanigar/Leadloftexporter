@@ -1217,6 +1217,24 @@
     return { ok: true, note: "no_modal" };
   }
 
+  // Click a card's native "Follow" button (no modal). Used by Connect All for
+  // rows where LinkedIn offers Follow instead of Connect — the user wants those
+  // followed automatically rather than skipped.
+  async function _sendFollowOnCard(card) {
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const { sleep } = globalThis.__lcHuman;
+    const btn = Array.from(card.querySelectorAll("button")).find((b) => {
+      if (b.classList.contains("lc-inline-save")) return false;
+      const aria = (b.getAttribute("aria-label") || "").trim();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      return /^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria);
+    });
+    if (!btn) return { ok: false, reason: "no_follow_button" };
+    await dispatchHumanClick(btn);
+    await sleep(450 + Math.random() * 400);
+    return { ok: true, followed: true };
+  }
+
   function _cardForUrl(url) {
     // Prefer the exact card element captured when the chip was injected — it
     // is the authoritative single-profile card boundary the detector resolved.
@@ -1393,9 +1411,12 @@
           _setChipState(url, "saved", "Connected ✓");
           continue;
         }
-        if (cstate !== "connect") {
+        // Decide the action: a real Connect button → send an invitation; a
+        // Follow-only row → follow. Both count as a completed action. Anything
+        // else (no recognised button) is skipped.
+        if (cstate !== "connect" && cstate !== "follow") {
           skipped++;
-          _setChipState(url, "error", cstate === "follow" ? "Follow only" : "No Connect");
+          _setChipState(url, "error", "No action");
           continue;
         }
 
@@ -1409,19 +1430,22 @@
         const readBonus = Math.random() < 0.15 ? 900 + Math.random() * 1100 : 0;
         await sleep(readMs + readBonus);
 
+        const isFollow = cstate === "follow";
         let res;
         try {
-          res = await _sendConnectOnCard(card);
+          res = isFollow
+            ? await _sendFollowOnCard(card)
+            : await _sendConnectOnCard(card);
         } catch (e) {
           res = { ok: false, reason: String(e) };
         }
         if (res.ok) {
           sent++;
           invitesSinceBreak++;
-          _setChipState(url, "saved", "Invited ✓");
+          _setChipState(url, "saved", isFollow ? "Followed ✓" : "Invited ✓");
         } else {
           skipped++;
-          _setChipState(url, "error", "No Connect");
+          _setChipState(url, "error", isFollow ? "Follow failed" : "No Connect");
         }
 
         // Pace only after an ACTUAL invite — skipped/already-done cards cost
@@ -2741,7 +2765,7 @@
     if (span) span.textContent = text;
   }
 
-  function injectInlineSave(card, profile) {
+  function injectInlineSave(card, profile, anchorBtn) {
     // Sales Navigator cards often expose BOTH a /sales/lead/ anchor and an
     // /in/ anchor pointing at the same person. Contact-info scraping only
     // works on /in/ pages (the modal doesn't exist on Sales Nav lead pages),
@@ -2862,17 +2886,30 @@
     const wrap = el("div", { class: "lc-save-row" }, checkSpan, btn);
     wrap.dataset.lcUrl = url;
 
-    // The chip floats absolute at the top-right of the card, just inboard of
-    // LinkedIn's Connect/Pending button. The card needs position:relative
-    // for the absolute child to anchor correctly.
-    try {
-      if (getComputedStyle(card).position === "static") {
+    // Placement: insert the chip INLINE, immediately before the card's native
+    // action button (Connect / Follow / Message), so it flows in the same row.
+    // Inline flow is immune to the absolute-position COLLAPSE that previously
+    // stacked every card's chip at one screen point (top:12px;right:130px of a
+    // shared positioned ancestor) — which is why only the first profile looked
+    // chipped. We only fall back to a pinned placement when a card has no
+    // native action button at all.
+    const anchor =
+      anchorBtn && anchorBtn.parentElement
+        ? anchorBtn
+        : Array.from(card.querySelectorAll("button")).find(_isActionButton);
+    if (anchor && anchor.parentElement) {
+      anchor.parentElement.insertBefore(wrap, anchor);
+    } else {
+      wrap.classList.add("lc-save-row-floating");
+      try {
+        if (getComputedStyle(card).position === "static") {
+          card.style.position = "relative";
+        }
+      } catch {
         card.style.position = "relative";
       }
-    } catch {
-      card.style.position = "relative";
+      card.appendChild(wrap);
     }
-    card.appendChild(wrap);
     injectedSaves.set(url, wrap);
     chipCardEl.set(url, card);
   }
@@ -3221,149 +3258,103 @@
 
     const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
 
-    // How many DISTINCT profile owners does this node enclose? Used as the
-    // card boundary: a node holding ≤1 owner is still a single card; the
-    // moment it holds 2+ it has grown into a multi-card container and we stop.
-    // Insight / mutual-connection links don't count — they belong to OTHER
-    // people referenced inside a card, not the card's own owner.
-    const ownerCount = (node) => {
-      const set = new Set();
-      for (const a of node.querySelectorAll(linkSel)) {
-        if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
-        const u = globalThis.__lcDom.normalizeProfileUrl(a.href);
-        if (u) set.add(u);
-      }
-      return set.size;
-    };
+    // ---- Robust per-row detection anchored on native action buttons ----
+    // Every search result has exactly ONE action button (Connect / Follow /
+    // Message / Pending). Iterating those buttons directly — instead of the old
+    // owner/button-count climb that could collapse the whole list into a single
+    // "card" and stack every chip at one absolute point — guarantees one chip
+    // PER ROW. For each button we climb to the nearest ancestor that contains a
+    // profile link without spanning a second action button; that ancestor is
+    // the card, and the chip is injected inline right beside the button.
+    const handled = new Set(); // canonical urls chipped this pass
 
-    // Climb from a seed node (an action button or a profile link) to the
-    // LARGEST ancestor that still represents a SINGLE profile card. Tag-
-    // agnostic on purpose — LinkedIn wraps cards in <li>, <article>, <div>,
-    // <tr> etc. depending on surface, and requiring a specific tag is exactly
-    // what made earlier versions miss cards.
-    //
-    // Boundary uses BOTH signals: a container spanning two cards has 2+ native
-    // action buttons (every result has exactly one) AND/OR 2+ distinct owners.
-    // When the action-button count is still ≤1 but the owner count jumped to
-    // 2, the extra "owner" is almost always a mutual-connection link embedded
-    // inside ONE card — so we trust the button count, accept that node as the
-    // full card, then stop.
-    const climbToCard = (seed) => {
-      let node = seed.parentElement;
-      let best = null;
+    const cardFromButton = (btn) => {
+      let node = btn.parentElement;
       for (
         let i = 0;
         i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
         i++
       ) {
-        const actionBtns = Array.from(node.querySelectorAll("button")).filter(
+        const ab = Array.from(node.querySelectorAll("button")).filter(
           _isActionButton
         ).length;
-        const owners = ownerCount(node);
-        if (actionBtns > 1 || owners > 1) {
-          if (actionBtns <= 1 && node.querySelector(linkSel)) best = node;
-          break; // crossed into a multi-card container → stop
-        }
-        if (node.querySelector(linkSel)) best = node;
+        if (node.querySelector(linkSel)) return ab <= 1 ? node : null;
+        if (ab >= 2) return null; // crossed into a multi-row container
         node = node.parentElement;
       }
-      return best;
+      return null;
     };
 
-    const cards = new Set();
+    const tryInject = (card, anchorBtn) => {
+      if (!card) return;
+      const ownerLink = _resolveCardOwnerLink(card, linkSel);
+      if (!ownerLink) return;
+      const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
+      if (!url || !url.includes("/in/")) return;
+      if (handled.has(url)) return;
+      handled.add(url);
 
-    // PASS 1 — anchor on the native action button (Connect/Follow/Message/
-    // Pending). Stable card boundary when present.
-    for (const b of document.querySelectorAll("button")) {
-      if (!_isActionButton(b)) continue;
-      const card = climbToCard(b);
-      if (card) cards.add(card);
-    }
+      // Live chip already present for this URL → leave it.
+      const existing = injectedSaves.get(url);
+      if (existing && document.body.contains(existing)) return;
+      if (existing) {
+        injectedSaves.delete(url);
+        chipCardEl.delete(url);
+      }
+      // Clear a stray chip on this card (recycled <li> after pagination).
+      const stray = card.querySelector(".lc-save-row");
+      if (stray) {
+        injectedSaves.delete(stray.dataset.lcUrl);
+        chipCardEl.delete(stray.dataset.lcUrl);
+        stray.remove();
+      }
 
-    // PASS 2 — anchor on EVERY profile link. This is the safety net that
-    // guarantees a chip even when a card has no recognised action button
-    // (already-following rows, icon-only buttons, markup LinkedIn just
-    // changed). Insight/mutual links are skipped so we never chip a mutual-
-    // connection avatar.
-    for (const a of document.querySelectorAll(linkSel)) {
-      if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
-      const card = climbToCard(a);
-      if (card) cards.add(card);
-    }
+      // Card metadata. A missing name never blocks the chip — the canonical
+      // name is scraped on the /in/ page during enrichment; fall back to slug.
+      let profile = profileFromCard(card, ownerLink);
+      if (!profile?.linkedin_url) {
+        profile = { linkedin_url: url, full_name: _labelFromUrl(url) };
+      }
+      injectInlineSave(card, profile, anchorBtn);
+    };
 
-    // PASS 3 — repeated-unit detection. LinkedIn's current people-search layout
-    // can defeat climbToCard's owner/button-count boundary (mutual-connection
-    // avatars + nested links push the owner count past 1 before the real card
-    // root is reached, so PASS 1/2 silently drop those cards — that's why a chip
-    // appeared on SOME but not ALL profiles). For each native action button,
-    // climb to the element whose PARENT holds 2+ action buttons: that element
-    // is one card among sibling cards. Tag-agnostic, boundary-robust.
-    const _allActionBtns = Array.from(document.querySelectorAll("button")).filter(
-      _isActionButton
-    );
-    if (_allActionBtns.length >= 2) {
-      for (const b of _allActionBtns) {
-        let node = b;
-        for (
-          let i = 0;
-          i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
-          i++
-        ) {
-          const parent = node.parentElement;
-          if (
-            parent &&
-            Array.from(parent.querySelectorAll("button")).filter(_isActionButton)
-              .length >= 2
-          ) {
-            if (node.querySelector(linkSel)) cards.add(node);
-            break;
-          }
-          node = parent;
-        }
+    // PRIMARY — one chip per native action button.
+    for (const btn of document.querySelectorAll("button")) {
+      if (!_isActionButton(btn)) continue;
+      try {
+        tryInject(cardFromButton(btn), btn);
+      } catch (e) {
+        console.warn("[LeadCaptura] decorate(btn) failed", e?.message);
       }
     }
 
-    // Both passes converge on the same "largest single-owner ancestor", but if
-    // any outer container slipped in, drop it in favour of the inner card it
-    // contains — one chip per profile row, never a wrapper spanning a card.
-    const cardList = Array.from(cards);
-    const finalCards = cardList.filter(
-      (c) => !cardList.some((o) => o !== c && c.contains(o))
-    );
-
-    for (const card of finalCards) {
+    // FALLBACK — rows with no recognised action button. Climb each owner link
+    // to the nearest ancestor that still encloses exactly one distinct owner.
+    for (const a of document.querySelectorAll(linkSel)) {
+      if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
+      const url = globalThis.__lcDom.normalizeProfileUrl(a.href);
+      if (!url || !url.includes("/in/") || handled.has(url)) continue;
+      let node = a.parentElement;
+      let card = null;
+      for (
+        let i = 0;
+        i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
+        i++
+      ) {
+        const owners = new Set();
+        for (const l of node.querySelectorAll(linkSel)) {
+          if (_isInsightLink(l) || _isMutualConnectionContext(l)) continue;
+          const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
+          if (u) owners.add(u);
+        }
+        if (owners.size > 1) break;
+        if (owners.size === 1) card = node;
+        node = node.parentElement;
+      }
       try {
-        const ownerLink = _resolveCardOwnerLink(card, linkSel);
-        if (!ownerLink) continue;
-        const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-        if (!url || !url.includes("/in/")) continue;
-
-        // Already have a live chip for this URL → nothing to do.
-        const existing = injectedSaves.get(url);
-        if (existing && document.body.contains(existing)) continue;
-
-        // A stray chip on this card (recycled <li>, or a Sales Nav card whose
-        // chip is keyed under its /in/ URL). If it's our tracked chip for the
-        // SAME url, leave it; otherwise remove and re-inject for the new owner.
-        const stray = card.querySelector(".lc-save-row");
-        if (stray) {
-          const trackedNode = injectedSaves.get(stray.dataset.lcUrl);
-          if (trackedNode === stray && stray.dataset.lcUrl === url) continue;
-          injectedSaves.delete(stray.dataset.lcUrl);
-          stray.remove();
-        }
-
-        // Build full card metadata (name/title/company/location). If the name
-        // can't be resolved we DON'T drop the card — the chip's core job is to
-        // open the profile by URL, and the canonical name is scraped on the
-        // /in/ page during enrichment anyway. Fall back to a slug-derived label.
-        let profile = profileFromCard(card, ownerLink);
-        if (!profile?.linkedin_url) {
-          profile = { linkedin_url: url, full_name: _labelFromUrl(url) };
-        }
-        injectInlineSave(card, profile);
+        tryInject(card, null);
       } catch (e) {
-        console.warn("[LeadCaptura] decorate failed", e?.message);
+        console.warn("[LeadCaptura] decorate(link) failed", e?.message);
       }
     }
   }
