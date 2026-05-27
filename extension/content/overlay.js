@@ -1183,10 +1183,36 @@
     return "unknown";
   }
 
-  async function _sendConnectOnCard(card) {
+  // Classify a SINGLE native button (the exact one the chip sits beside). This
+  // is the authoritative signal for Connect All — no card re-scan, no chance of
+  // reading a neighbouring row's button.
+  function _classifyButton(btn) {
+    if (!btn || btn.classList?.contains("lc-inline-save")) return "unknown";
+    const aria = (btn.getAttribute("aria-label") || "").trim();
+    const txt = (btn.textContent || "").replace(/\s+/g, " ").trim();
+    if (/^pending$/i.test(txt) || /\bpending\b/i.test(aria)) return "pending";
+    if (/^connect$/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /^connect$/i.test(aria))
+      return "connect";
+    if (/^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria))
+      return "follow";
+    if (/^message\b/i.test(txt) || /^message\b/i.test(aria)) return "connected";
+    return "unknown";
+  }
+
+  // The native action button captured for this URL at chip-injection time,
+  // only if it's still attached to the live DOM.
+  function _actionBtnForUrl(url) {
+    const b = chipActionBtn.get(url);
+    return b && document.body.contains(b) ? b : null;
+  }
+
+  async function _sendConnectOnCard(card, presetBtn) {
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
-    const btn = _findConnectButtonInCard(card);
+    const btn =
+      presetBtn && document.body.contains(presetBtn)
+        ? presetBtn
+        : _findConnectButtonInCard(card);
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
     await sleep(700 + Math.random() * 500);
@@ -1220,15 +1246,18 @@
   // Click a card's native "Follow" button (no modal). Used by Connect All for
   // rows where LinkedIn offers Follow instead of Connect — the user wants those
   // followed automatically rather than skipped.
-  async function _sendFollowOnCard(card) {
+  async function _sendFollowOnCard(card, presetBtn) {
     const { dispatchHumanClick } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
-    const btn = Array.from(card.querySelectorAll("button")).find((b) => {
-      if (b.classList.contains("lc-inline-save")) return false;
-      const aria = (b.getAttribute("aria-label") || "").trim();
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      return /^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria);
-    });
+    const btn =
+      presetBtn && document.body.contains(presetBtn)
+        ? presetBtn
+        : Array.from(card ? card.querySelectorAll("button") : []).find((b) => {
+            if (b.classList.contains("lc-inline-save")) return false;
+            const aria = (b.getAttribute("aria-label") || "").trim();
+            const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+            return /^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria);
+          });
     if (!btn) return { ok: false, reason: "no_follow_button" };
     await dispatchHumanClick(btn);
     await sleep(450 + Math.random() * 400);
@@ -1394,13 +1423,15 @@
         renderToolbar();
 
         const card = _cardForUrl(url);
-        if (!card) { skipped++; continue; }
+        // The exact native button this chip sits beside is the source of truth.
+        // Fall back to a card scan only if that button is gone (re-render).
+        const actionBtn = _actionBtnForUrl(url);
+        if (!card && !actionBtn) { skipped++; continue; }
 
         // SKIP people we've already contacted or are already connected to —
-        // don't waste the daily invite quota. The native button state is the
-        // source of truth: Pending = request already sent, Message-without-
-        // Connect = already a connection, Follow-only = can't connect.
-        const cstate = _cardConnectState(card);
+        // don't waste the daily invite quota. Classify from the precise button
+        // first (no neighbour-row bleed); otherwise scan the card.
+        const cstate = actionBtn ? _classifyButton(actionBtn) : _cardConnectState(card);
         if (cstate === "pending") {
           alreadyDone++;
           _setChipState(url, "saved", "Already sent ✓");
@@ -1423,7 +1454,7 @@
         // Instant (not "smooth") — smooth scroll relies on the rendering
         // pipeline which Chrome pauses in a backgrounded tab; instant keeps
         // the run working when the user switches to another tab.
-        try { card.scrollIntoView({ block: "center" }); } catch {}
+        try { (actionBtn || card).scrollIntoView({ block: "center" }); } catch {}
         // Variable reading pause: glance at the card before clicking.
         // 15% chance of a longer "reconsidering" pause (reads the headline).
         const readMs = 600 + Math.random() * 800;
@@ -1434,8 +1465,8 @@
         let res;
         try {
           res = isFollow
-            ? await _sendFollowOnCard(card)
-            : await _sendConnectOnCard(card);
+            ? await _sendFollowOnCard(card, actionBtn)
+            : await _sendConnectOnCard(card, actionBtn);
         } catch (e) {
           res = { ok: false, reason: String(e) };
         }
@@ -2741,12 +2772,19 @@
   // guess that can grab an adjacent row's Follow/Message button (that mismatch
   // was why visibly-connectable cards showed "Follow only" / "No Connect").
   const chipCardEl = new Map(); // canonical url -> card element
+  // The EXACT native action button (Connect / Follow / Message / Pending) the
+  // chip was injected beside, captured at injection time. Connect All clicks
+  // THIS button directly rather than re-scanning the card for it — re-scanning
+  // was returning the wrong/empty match on LinkedIn's current layout, which is
+  // why connectable cards showed "No action".
+  const chipActionBtn = new Map(); // canonical url -> native action button
 
   function _gcInjected() {
     for (const [url, node] of injectedSaves.entries()) {
       if (!node || !document.body.contains(node)) {
         injectedSaves.delete(url);
         chipCardEl.delete(url);
+        chipActionBtn.delete(url);
       }
     }
   }
@@ -2912,6 +2950,10 @@
     }
     injectedSaves.set(url, wrap);
     chipCardEl.set(url, card);
+    // Remember the precise native button this chip sits beside (if any) so
+    // Connect All can act on it directly.
+    if (anchor && _isActionButton(anchor)) chipActionBtn.set(url, anchor);
+    else chipActionBtn.delete(url);
   }
 
   // Mirror of scraper.js _isInsightLink — must stay in lock-step. Both the
@@ -3318,9 +3360,18 @@
       injectInlineSave(card, profile, anchorBtn);
     };
 
-    // PRIMARY — one chip per native action button.
-    for (const btn of document.querySelectorAll("button")) {
-      if (!_isActionButton(btn)) continue;
+    // PRIMARY — one chip per native action button. Process in priority order
+    // (Connect → Follow → Pending → Message) so that if a single row exposes
+    // more than one action button, the chip anchors on the most actionable one
+    // and `handled` claims the URL before a lesser button can.
+    const rank = (b) => {
+      const c = _classifyButton(b);
+      return c === "connect" ? 0 : c === "follow" ? 1 : c === "pending" ? 2 : 3;
+    };
+    const actionButtons = Array.from(document.querySelectorAll("button"))
+      .filter(_isActionButton)
+      .sort((a, b) => rank(a) - rank(b));
+    for (const btn of actionButtons) {
       try {
         tryInject(cardFromButton(btn), btn);
       } catch (e) {
