@@ -246,27 +246,32 @@
     };
 
     // Scan for the profile's primary Connect button. LinkedIn's 2025 markup is
-    // inconsistent: the button sometimes has aria-label "Invite X to connect",
-    // sometimes NO aria-label (visible <span>Connect</span> only), and is not
-    // always inside <main>. So we scan the whole document and rely on
-    // _isConnectBtn (whole-word \bconnect\b on text+aria) rather than brittle
-    // selectors. We EXCLUDE the right-rail <aside> ("More profiles for you" /
-    // "People you may know" cards have their own Connect buttons) and any open
-    // dropdown menu, then prefer the match inside the top-card action strip.
+    // inconsistent: the button is sometimes <button>, sometimes NO aria-label
+    // (just <span>Connect</span>), and for many profiles it is an
+    // <a href="/preload/custom-invite/..."> anchor styled to look like a button
+    // — the status-bar URL proves this (hover shows the /preload/custom-invite/ href).
+    // We scan buttons AND anchors with connect/invite in their href, exclude the
+    // right-rail <aside> (recommendation cards), exclude open dropdown menus,
+    // and use CSS visibility (not getBoundingClientRect) so partially-hydrated
+    // buttons aren't filtered out.
     const _findConnect = () => {
       const candidates = [];
-      for (const b of document.querySelectorAll("button, [role='button']")) {
-        if (b.closest("aside")) continue; // skip right-rail recommendations
+      const seen = new Set();
+      const q = (sel) => { try { return document.querySelectorAll(sel); } catch { return []; } };
+      for (const b of [
+        ...q("button, [role='button']"),
+        ...q("a[href*='invite' i], a[href*='connect' i]"),
+      ]) {
+        if (seen.has(b)) continue; seen.add(b);
+        if (b.closest("aside")) continue;
         if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
         if (!_isConnectBtn(b)) continue;
-        const off = b.getBoundingClientRect();
-        if (off.width === 0 && off.height === 0) continue; // not rendered
+        const cs = window.getComputedStyle(b);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
         candidates.push(b);
       }
       if (!candidates.length) return null;
-      // Prefer a button inside the profile top-card / actions strip; otherwise
-      // take the first one in document order (the main profile precedes any
-      // lower-page modules).
+      // Prefer a match inside the profile action strip; else first in document order.
       const inActions = candidates.find(
         (b) =>
           b.closest(
@@ -323,12 +328,21 @@
     if (/\bmessage\b/.test(hay) && !/\bconnect\b/.test(hay))
       return { ok: false, reason: "already_connected" };
 
-    console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname);
+    console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname,
+      connectBtn.tagName === "A" ? "(anchor)" : "(button)");
 
     // Cursor movement + dwell before click (anti-bot)
     if (simulateCursorMove) await simulateCursorMove(connectBtn);
     await sleep(80 + Math.random() * 120);
+
+    // For <a href="/preload/custom-invite/..."> Connect buttons: temporarily
+    // remove the href so the browser's default anchor-navigation doesn't fire.
+    // LinkedIn's own event handler is bound to the element (not the href), so
+    // it still fires and opens the "Add a note?" modal.
+    const savedHref = connectBtn.tagName === "A" ? connectBtn.getAttribute("href") : null;
+    if (savedHref) connectBtn.removeAttribute("href");
     await dispatchHumanClick(connectBtn);
+    if (savedHref) connectBtn.setAttribute("href", savedHref);
 
     // Wait for invitation modal (up to 10 s)
     let dialogOpen = false;
