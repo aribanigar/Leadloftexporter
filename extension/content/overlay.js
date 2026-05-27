@@ -1381,74 +1381,70 @@
     } catch {}
   }
 
+  // The complete Connect flow for ONE card, as a plain linear sequence:
+  //   STEP 1 — click the card's "Connect" button.
+  //   STEP 2 — wait for the "Add a note to your invitation?" dialog to open.
+  //   STEP 3 — click "Send without a note".
+  //   STEP 4 — confirm the dialog closed (= the invite was actually sent).
+  // This function is the SINGLE owner of the sequence during a Connect All run;
+  // the global auto-confirm watcher stands down while `state.connectActive` is
+  // true (see _autoConfirmInviteModal) so nothing double-clicks.
   async function _sendConnectOnCard(card, presetBtn) {
     const { dispatchHumanClick } = globalThis.__lcDom;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const btn =
+
+    // ---- STEP 1: click Connect -------------------------------------------
+    const connectBtn =
       presetBtn && document.body.contains(presetBtn)
         ? presetBtn
         : _findConnectButtonInCard(card);
-    if (!btn) return { ok: false, reason: "no_connect_button" };
-    await dispatchHumanClick(btn);
+    if (!connectBtn) return { ok: false, reason: "no_connect_button" };
+    console.log("[LeadCaptura] step 1 → click Connect");
+    await dispatchHumanClick(connectBtn);
 
-    // Poll up to ~8s for the invitation modal's "Send without a note" button.
-    let sendBtn = null;
-    for (let i = 0; i < 32 && !sendBtn; i++) {
+    // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
+    let dialogOpen = false;
+    for (let i = 0; i < 32; i++) {
       await sleep(250);
-      sendBtn = _findSendWithoutNoteButton();
-      // Also accept: modal appeared but button isn't ready yet — keep polling.
+      if (_invitationModalOpen()) { dialogOpen = true; break; }
     }
-
-    if (!sendBtn) {
-      // No modal appeared — LinkedIn may have directly connected (some accounts
-      // skip the note dialog). Check if the button state changed to Pending.
-      if (!_invitationModalOpen()) return { ok: true };
-      console.log("[LeadCaptura] connect: no send-without-note button after 8s");
-      return { ok: false, reason: "no_send_button" };
+    if (!dialogOpen) {
+      // No dialog appeared. Some connections (e.g. people who already follow
+      // you) complete instantly with no "add a note" step — if the row no
+      // longer offers Connect, treat it as done; otherwise report no-dialog.
+      const cls = _classifyButton(connectBtn);
+      if (cls === "pending" || cls === "connected") return { ok: true };
+      console.log("[LeadCaptura] step 2 → no dialog opened after 8s");
+      return { ok: false, reason: "no_dialog" };
     }
+    console.log("[LeadCaptura] step 2 → dialog opened");
 
-    // Click "Send without a note". LinkedIn's backend can take 1-4 seconds to
-    // process the invitation, so we wait up to 3s per attempt before retrying.
-    // After a successful click the button typically becomes disabled (loading
-    // spinner) while the API call is in flight — we treat that as a signal that
-    // the click registered and wait for the modal to close naturally.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const target = _findSendWithoutNoteButton();
-      if (!target) {
-        if (!_invitationModalOpen()) return { ok: true };
-        // Modal still open but button gone (loading/disabled) — wait for close.
-        for (let w = 0; w < 16; w++) {
-          await sleep(250);
-          if (!_invitationModalOpen()) return { ok: true };
-        }
-        break;
+    // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
+    // LinkedIn's backend can take 1-4s to process and close the dialog, so we
+    // click, then wait, and retry the click only while the dialog is still up.
+    for (let attempt = 0; attempt < 6 && _invitationModalOpen(); attempt++) {
+      const sendBtn = _findSendWithoutNoteButton();
+      if (!sendBtn) {
+        // Button not rendered yet (or already gone mid-close) — give it a beat.
+        await sleep(300);
+        continue;
       }
-      console.log(
-        "[LeadCaptura] send-without-note click attempt", attempt + 1,
-        "→", `"${(target.textContent || "").replace(/\s+/g, " ").trim()}"`
-      );
-      _forceClick(target);
-      // Wait up to 3s for the modal to close (covers slow API round-trips).
-      for (let w = 0; w < 12; w++) {
+      console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
+      _forceClick(sendBtn);
+      // STEP 4: wait up to ~4s for the dialog to disappear = invite sent.
+      for (let w = 0; w < 16; w++) {
         await sleep(250);
-        if (!_invitationModalOpen()) return { ok: true };
-        // If the button is now disabled the click registered — keep waiting.
-        const stillVisible = _findSendWithoutNoteButton();
-        if (!stillVisible && _invitationModalOpen()) {
-          // Button gone (loading state), modal pending close — wait more.
-          for (let ww = 0; ww < 20; ww++) {
-            await sleep(250);
-            if (!_invitationModalOpen()) return { ok: true };
-          }
-          break;
+        if (!_invitationModalOpen()) {
+          console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+          return { ok: true };
         }
       }
-      if (!_invitationModalOpen()) return { ok: true };
     }
 
-    // Give up — report failure and let the connectAllVisible guard handle the
-    // lingering modal before moving to the next card.
-    console.log("[LeadCaptura] send-without-note: gave up after retries");
+    // Dialog gone by now means it was sent on a late close; still-open means
+    // the send genuinely failed.
+    if (!_invitationModalOpen()) return { ok: true };
+    console.log("[LeadCaptura] step 3/4 → could not send, giving up");
     return { ok: false, reason: "send_failed" };
   }
 
@@ -1689,28 +1685,13 @@
           res = { ok: false, reason: String(e) };
         }
 
-        // Hard guarantee: the invitation modal MUST be gone before we move to
-        // the next card. If it's still open (API slow, click missed, etc.) keep
-        // trying to dismiss it for up to 10s. This prevents the next card's
-        // connect attempt from running while the previous modal is still on screen.
+        // Safety net: _sendConnectOnCard already confirms the dialog closed on
+        // success, but if it failed with the dialog still up, dismiss it so the
+        // next card's Connect isn't blocked by a leftover modal.
         if (_invitationModalOpen()) {
-          const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
-          for (let guard = 0; guard < 40 && _invitationModalOpen(); guard++) {
-            await sleepMs(250);
-            if (!_invitationModalOpen()) break;
-            // Every second, try clicking send-without-note again or dismiss.
-            if (guard % 4 === 3) {
-              const sb = _findSendWithoutNoteButton();
-              if (sb) _forceClick(sb);
-              else _closeAnyDialog();
-            }
-          }
-          // If modal is STILL open after 10s and we already got res.ok=true that
-          // was a false positive — downgrade to failure so the chip is truthful.
-          if (_invitationModalOpen() && res.ok) {
-            res = { ok: false, reason: "send_failed" };
-            _closeAnyDialog();
-          }
+          _closeAnyDialog();
+          await sleep(600);
+          if (_invitationModalOpen()) _closeAnyDialog();
         }
 
         if (res.ok) {
@@ -3697,6 +3678,9 @@
   // new outbound action — it just completes the one already in progress.
   let _inviteAutoBusy = false;
   async function _autoConfirmInviteModal() {
+    // During a Connect All run, _sendConnectOnCard owns the full sequence —
+    // stand down so the two don't double-click the same dialog.
+    if (state.connectActive) return;
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) return;
     let btn = _findSendWithoutNoteButton();
