@@ -205,25 +205,33 @@ connected/pending → skipped. Critical correctness rules:
   visible+enabled match but fall back to any match rather than bail.
 - Report `ok:true` **only after the invitation modal actually closes** from
   sending. Never close the modal via its X and call it success — that produced
-  fake "Invited ✓" with no invite sent. `connectAllVisible` adds a hard
-  "wait until `_invitationModalOpen()` is false" guard (up to ~10s) before
-  advancing to the next card, so card N fully completes before card N+1 starts.
+  fake "Invited ✓" with no invite sent. STEP 4 of `_sendConnectOnCard` is the
+  sole success signal; `connectAllVisible`'s post-call guard now only *dismisses*
+  a leftover dialog on failure — it never re-sends.
 
-### Auto-confirm invitation modal (global watcher — load-bearing)
+### Send-invitation sequence — single owner (load-bearing)
 
-`_startInviteAutoConfirm()` (bottom of the `overlay.js` IIFE) runs a
-`MutationObserver` on `document.documentElement` **plus** a 600ms safety-net
-poll. Whenever the "Add a note to your invitation?" modal appears — whether the
-user clicked Connect manually or `connectAllVisible` did — `_autoConfirmInviteModal()`
-waits ~250ms for the modal to finish mounting (so Ember has bound the click
-handler; clicking mid-animation is a silent no-op), then `_forceClick`s "Send
-without a note" and waits up to ~4.5s for the modal to close, re-clicking
-periodically. This watcher is **pure DOM — no `chrome.*` calls** — so it keeps
-working even in an orphaned/stale content-script context. Keep it that way.
+The send flow had three competing clickers (`_sendConnectOnCard`, a
+`connectAllVisible` post-call guard, and the global watcher) racing on the same
+"Send without a note" button. As of v1.0.75 there is **one owner per context**:
 
-`_invitationModalOpen()` returns true if either a matching dialog node is
-visible **or** a visible "Send without a note" button exists, so the watcher
-doesn't bail when LinkedIn changes the dialog's `role` attribute.
+- **During a Connect All run** (`state.connectActive === true`):
+  `_sendConnectOnCard` owns the whole thing as an explicit, logged 4-step
+  sequence — STEP 1 click Connect → STEP 2 wait for the "Add a note to your
+  invitation?" dialog (≤8s) → STEP 3 `_forceClick` "Send without a note" → STEP 4
+  confirm the dialog closed (= invite actually sent). Each step logs
+  `[LeadCaptura] step N → …`, so a stuck run is traceable from the console.
+- **Outside a run** (a manual Connect click by the user): the global watcher
+  `_startInviteAutoConfirm()` handles it — a `MutationObserver` on
+  `document.documentElement` + 600ms poll that waits ~250ms for the modal to
+  mount (Ember binds the handler late; clicking mid-animation is a no-op) then
+  `_forceClick`s the button. **It stands down (`if (state.connectActive) return`)
+  during a Connect All run** so it never double-clicks. Keep this guard.
+
+The watcher is **pure DOM — no `chrome.*` calls** — so it survives an
+orphaned/stale content-script context. `_invitationModalOpen()` returns true if
+either a matching dialog node is visible **or** a visible "Send without a note"
+button exists, so neither owner bails when LinkedIn changes the dialog's `role`.
 
 ### Stale-tab self-heal + version badge
 
@@ -240,8 +248,8 @@ an old `overlay.js` indefinitely. Two mechanisms make this survivable:
   from `chrome.runtime.getManifest().version`). When debugging "my fix isn't
   working", check this first — if it doesn't match the installed version the tab
   is on stale code and just needs a reload. `_lcToast()` is a toolbar-independent
-  on-page toast the auto-confirm watcher uses ("sending invitation… / sent ✓")
-  to give live proof the current build is the one executing.
+  on-page toast ("sending invitation… / sent ✓") giving live proof the current
+  build is the one executing.
 
 ### Contact Info enrichment flow
 
