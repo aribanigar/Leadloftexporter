@@ -636,10 +636,17 @@
   // Save All and Connect All all read from here, so they can never diverge
   // from what the user actually sees. (The old approach re-ran the scraper
   // independently, which under-counted real-photo cards.)
+  // A capture-able profile URL — regular LinkedIn (/in/) OR Sales Navigator
+  // (/sales/lead/). Both configurations must flow through Save / Save All /
+  // Connect All identically.
+  function _isCapUrl(u) {
+    return !!u && (u.includes("/in/") || u.includes("/sales/lead/"));
+  }
+
   function _allChipUrls() {
     const urls = [];
     for (const [url, wrap] of injectedSaves.entries()) {
-      if (url && url.includes("/in/") && wrap && document.body.contains(wrap)) {
+      if (_isCapUrl(url) && wrap && document.body.contains(wrap)) {
         urls.push(url);
       }
     }
@@ -1006,7 +1013,7 @@
     try { decorateSearchCards(); } catch {}
     const urls =
       state.selectedUrls.size > 0
-        ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
+        ? Array.from(state.selectedUrls).filter(_isCapUrl)
         : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
@@ -1313,7 +1320,7 @@
     const active = document.querySelector(
       "li.artdeco-pagination__indicator--number.active button, button[aria-current='true'], .artdeco-pagination__indicator.active"
     );
-    const firstLink = document.querySelector("a[href*='/in/']");
+    const firstLink = document.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
     return [pageParam, active?.textContent?.trim() || "", firstLink?.href || ""].join("|");
   }
 
@@ -1349,7 +1356,7 @@
       pos = Math.min(pageH - 40, pos + stepPx);
       window.scrollTo(0, pos);
       await sleep(260 + Math.random() * 420); // 260-680ms between steps
-      const count = document.querySelectorAll("a[href*='/in/']").length;
+      const count = document.querySelectorAll("a[href*='/in/'], a[href*='/sales/lead/']").length;
       if (count === prevCount) {
         stableRounds++;
         if (stableRounds >= 2 && pos >= pageH * 0.88) break;
@@ -1414,7 +1421,7 @@
       // user's tick selection; later pages take every chip on the page.
       let urls =
         pageNum === 1 && page1Selection
-          ? Array.from(page1Selection).filter((u) => u && u.includes("/in/"))
+          ? Array.from(page1Selection).filter(_isCapUrl)
           : _allChipUrls();
 
       for (let i = 0; i < urls.length; i++) {
@@ -2884,9 +2891,9 @@
         profile.linkedin_url
       );
       try {
-        if (!profile.linkedin_url?.includes("/in/")) {
+        if (!_isCapUrl(profile.linkedin_url)) {
           btn.dataset.state = "error";
-          textSpan.textContent = "Need /in/ URL";
+          textSpan.textContent = "Need profile URL";
           return;
         }
         await new Promise((resolve) => {
@@ -3382,7 +3389,7 @@
         const ownerLink = _resolveCardOwnerLink(card, linkSel);
         if (!ownerLink) continue;
         const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-        if (!url || !url.includes("/in/")) continue;
+        if (!_isCapUrl(url)) continue; // accept /in/ AND Sales Nav /sales/lead/
 
         // Already have a live chip for this URL → nothing to do.
         const existing = injectedSaves.get(url);
