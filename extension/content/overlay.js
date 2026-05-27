@@ -1139,15 +1139,15 @@
   // NOTE: LinkedIn caps weekly invites (~100-200). This automates the clicking;
   // it cannot bypass that cap.
   function _findConnectButtonInCard(card) {
-    const buttons = Array.from(card.querySelectorAll("button"));
+    const buttons = Array.from(card.querySelectorAll("button, a, [role='button']"));
     for (const b of buttons) {
       const aria = (b.getAttribute("aria-label") || "").trim();
       const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
       if (b.classList.contains("lc-inline-save")) continue;
-      if (/pending/i.test(aria) || /pending/i.test(txt)) continue;
-      // Match a real Connect button by visible text ("Connect") or aria-label
-      // ("Invite <Name> to connect"). Skip Follow / Message / Save.
-      if (/^connect$/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /^connect$/i.test(aria)) {
+      if (/\bpending\b/i.test(aria) || /\bpending\b/i.test(txt)) continue;
+      // Match a real Connect control by whole-word "Connect" (handles the
+      // "+ Connect" rendering) or the "Invite <Name> to connect" aria-label.
+      if (/\bconnect\b/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /\bconnect\b/i.test(aria)) {
         return b;
       }
     }
@@ -1163,23 +1163,20 @@
   //   "unknown"   → no recognisable action button
   function _cardConnectState(card) {
     let hasConnect = false, hasPending = false, hasMessage = false, hasFollow = false;
-    for (const b of card.querySelectorAll("button")) {
+    for (const b of card.querySelectorAll("button, a, [role='button']")) {
       if (b.classList.contains("lc-inline-save")) continue;
       const aria = (b.getAttribute("aria-label") || "").trim();
       const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      if (/^pending$/i.test(txt) || /\bpending\b/i.test(aria)) hasPending = true;
-      else if (
-        /^connect$/i.test(txt) ||
-        /\binvite\b.*\bto connect\b/i.test(aria) ||
-        /^connect$/i.test(aria)
-      ) hasConnect = true;
-      else if (/^message\b/i.test(txt) || /^message\b/i.test(aria)) hasMessage = true;
-      else if (/^follow$/i.test(txt) || /^follow$/i.test(aria)) hasFollow = true;
+      const hay = txt + " || " + aria;
+      if (/\bpending\b/i.test(hay)) hasPending = true;
+      else if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) hasConnect = true;
+      else if (/\bfollow\b/i.test(hay)) hasFollow = true; // \bfollow\b excludes "Following"
+      else if (/\bmessage\b/i.test(hay)) hasMessage = true;
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
-    if (hasMessage) return "connected";
     if (hasFollow) return "follow";
+    if (hasMessage) return "connected";
     return "unknown";
   }
 
@@ -1190,12 +1187,12 @@
     if (!btn || btn.classList?.contains("lc-inline-save")) return "unknown";
     const aria = (btn.getAttribute("aria-label") || "").trim();
     const txt = (btn.textContent || "").replace(/\s+/g, " ").trim();
-    if (/^pending$/i.test(txt) || /\bpending\b/i.test(aria)) return "pending";
-    if (/^connect$/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /^connect$/i.test(aria))
-      return "connect";
-    if (/^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria))
-      return "follow";
-    if (/^message\b/i.test(txt) || /^message\b/i.test(aria)) return "connected";
+    const hay = txt + " || " + aria;
+    // Whole-word matching handles the "+ Connect" / "+ Follow" rendering.
+    if (/\bpending\b/i.test(hay)) return "pending";
+    if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) return "connect";
+    if (/\bfollow\b/i.test(hay)) return "follow"; // excludes "Following"
+    if (/\bmessage\b/i.test(hay)) return "connected";
     return "unknown";
   }
 
@@ -1216,24 +1213,37 @@
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
     await sleep(700 + Math.random() * 500);
-    // A modal usually appears with "Send without a note" / "Send". When the
-    // tab is BACKGROUNDED, LinkedIn can defer rendering the modal, so poll a
-    // few times (longer overall) rather than a single short wait.
+    // The "Add a note to your invitation?" modal appears with a
+    // "Send without a note" primary button — that's the one we want (the user
+    // asked to send WITHOUT a note). aria-label first, then a text fallback for
+    // when LinkedIn omits the aria-label. Poll a few times: a backgrounded tab
+    // can defer modal rendering.
     const sendSel = [
       "button[aria-label*='Send without a note' i]",
       "button[aria-label='Send now']",
       "button[aria-label*='Send invitation' i]",
-      "button[aria-label*='Send' i]",
       "div[role='dialog'] button.artdeco-button--primary",
+      "button[aria-label*='Send' i]",
     ];
+    const findSendByText = () =>
+      Array.from(
+        document.querySelectorAll(
+          "div[role='dialog'] button, .artdeco-modal button, [role='alertdialog'] button"
+        )
+      ).find((b) => {
+        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+        return /^send(\s+(without a note|now|invitation))?$/i.test(t);
+      }) || null;
+
     let sendBtn = null;
-    for (let attempt = 0; attempt < 3 && !sendBtn; attempt++) {
-      sendBtn = await waitFor(sendSel, { timeout: 3000 });
-      if (!sendBtn) await sleep(700);
+    for (let attempt = 0; attempt < 4 && !sendBtn; attempt++) {
+      sendBtn = await waitFor(sendSel, { timeout: 2500 });
+      if (!sendBtn) sendBtn = findSendByText();
+      if (!sendBtn) await sleep(600);
     }
     if (sendBtn) {
       await dispatchHumanClick(sendBtn);
-      await sleep(500 + Math.random() * 400); // 500-900ms — modal dismiss animation
+      await sleep(500 + Math.random() * 400); // modal dismiss animation
       return { ok: true };
     }
     // No modal — LinkedIn may have sent directly, OR an email-verify wall
@@ -1432,6 +1442,15 @@
         // don't waste the daily invite quota. Classify from the precise button
         // first (no neighbour-row bleed); otherwise scan the card.
         const cstate = actionBtn ? _classifyButton(actionBtn) : _cardConnectState(card);
+        try {
+          const _b = actionBtn || (card && _findConnectButtonInCard(card));
+          console.log(
+            "[LeadCaptura] connect-all:",
+            _labelFromUrl(url),
+            "→ state =", cstate,
+            "| btn =", _b ? `"${(_b.textContent || "").replace(/\s+/g, " ").trim()}"` : "none"
+          );
+        } catch {}
         if (cstate === "pending") {
           alreadyDone++;
           _setChipState(url, "saved", "Already sent ✓");
@@ -3023,12 +3042,15 @@
     if (!b || b.classList?.contains("lc-inline-save")) return false;
     const aria = b.getAttribute?.("aria-label") || "";
     const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+    // Whole-word match in EITHER the visible text or the aria-label. LinkedIn
+    // renders these as "+ Connect" / "+ Follow" (the leading icon contributes a
+    // glyph), so a strict ^connect$ anchor misses them — that was the bug that
+    // left Connect cards unrecognised. \bconnect\b matches "Connect"/"+ Connect"
+    // but NOT "Connected"/"Connections" (no trailing word boundary).
     return (
-      /^(connect|follow|message|pending)$/i.test(txt) ||
+      /\b(connect|follow|message|pending)\b/i.test(txt) ||
       /\binvite\b.*\bto connect\b/i.test(aria) ||
-      /^(connect|follow|pending)$/i.test(aria) ||
-      /^message\b/i.test(aria) ||
-      /\bfollow\b/i.test(aria)
+      /\b(connect|follow|pending|message)\b/i.test(aria)
     );
   }
 
@@ -3317,11 +3339,12 @@
         i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
         i++
       ) {
-        const ab = Array.from(node.querySelectorAll("button")).filter(
-          _isActionButton
-        ).length;
-        if (node.querySelector(linkSel)) return ab <= 1 ? node : null;
-        if (ab >= 2) return null; // crossed into a multi-row container
+        // The FIRST ancestor (climbing from a single button) that contains a
+        // profile link IS that button's own row — every result row has exactly
+        // one profile link of its own. Return it directly; no button-count
+        // guard needed (and the guard wrongly rejected rows once a row exposed
+        // a Message icon alongside Connect).
+        if (node.querySelector(linkSel)) return node;
         node = node.parentElement;
       }
       return null;
