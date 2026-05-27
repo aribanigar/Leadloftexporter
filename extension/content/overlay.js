@@ -1215,26 +1215,33 @@
     return true;
   }
 
-  // True while a VISIBLE "Add a note to your invitation?" modal is on screen.
-  function _invitationModalOpen() {
-    const dlgs = document.querySelectorAll(
+  // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
+  function _findInvitationModal() {
+    const candidates = document.querySelectorAll(
       "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
     );
-    for (const d of dlgs) {
+    for (const d of candidates) {
       if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
       if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
-        return true;
+        return d;
     }
-    return false;
+    return null;
   }
 
-  // Find the VISIBLE "Send without a note" button of the invitation modal.
-  // Scans the whole document (the modal renders in a body-end portal) but only
-  // returns a button the user can actually see — never a hidden duplicate.
+  // True while a VISIBLE "Add a note to your invitation?" modal is on screen.
+  function _invitationModalOpen() {
+    return !!_findInvitationModal();
+  }
+
+  // Find the VISIBLE "Send without a note" button, scoped to the invitation modal
+  // so we never accidentally match a LinkedIn messaging "Send" button or any other
+  // button elsewhere on the page.
   function _findSendWithoutNoteButton() {
-    const all = Array.from(document.querySelectorAll("button, [role='button']")).filter(
-      (b) => !b.classList?.contains("lc-inline-save") && _isVisible(b)
+    const modal = _findInvitationModal();
+    const root = modal || document;
+    const all = Array.from(root.querySelectorAll("button, [role='button']")).filter(
+      (b) => !b.classList?.contains("lc-inline-save") && _isVisible(b) && !b.disabled
     );
     const match = (re) =>
       all.find((b) => {
@@ -1251,20 +1258,28 @@
     );
   }
 
-  // Close any open dialog (close button, else Escape) so a lingering modal
-  // can't block the next card.
+  // Close any open invitation-modal dialog. Tries the modal's own dismiss button
+  // first (artdeco-modal__dismiss or aria-label variations), then falls back to
+  // Escape on both the modal element and document.
   function _closeAnyDialog() {
-    const close = document.querySelector(
-      "button[aria-label='Dismiss'], button[aria-label*='Dismiss' i], " +
-        "button[aria-label*='Close' i], div[role='dialog'] button[aria-label*='close' i]"
-    );
+    const modal = _findInvitationModal();
+    const closeSelectors =
+      ".artdeco-modal__dismiss, button[aria-label='Dismiss'], " +
+      "button[aria-label*='Dismiss' i], button[aria-label*='Close' i]";
+    const close =
+      (modal && modal.querySelector(closeSelectors)) ||
+      document.querySelector(closeSelectors);
     if (close) {
       try { close.click(); } catch {}
-    } else {
-      try {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      } catch {}
     }
+    // Also dispatch Escape on the modal itself and on document — LinkedIn's
+    // focus-trap keydown handler usually lives on the modal container.
+    try {
+      if (modal) modal.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    } catch {}
+    try {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    } catch {}
   }
 
   // Click an element as reliably as possible: native .click() (React/Ember
@@ -1292,7 +1307,7 @@
 
   async function _sendConnectOnCard(card, presetBtn) {
     const { dispatchHumanClick } = globalThis.__lcDom;
-    const { sleep } = globalThis.__lcHuman;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const btn =
       presetBtn && document.body.contains(presetBtn)
         ? presetBtn
@@ -1300,31 +1315,36 @@
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
 
-    // Poll up to ~8s for the invitation modal's VISIBLE "Send without a note"
-    // button. Bounded loop — it can never hang the run.
+    // Poll up to ~8s for the invitation modal's "Send without a note" button.
     let sendBtn = null;
     for (let i = 0; i < 32 && !sendBtn; i++) {
       await sleep(250);
       sendBtn = _findSendWithoutNoteButton();
+      // Also accept: modal appeared but button isn't ready yet — keep polling.
     }
 
     if (!sendBtn) {
-      // The Connect click didn't surface the invitation modal. If some other
-      // dialog is up, close it so the next card isn't blocked. Report failure —
-      // we did NOT send, so the chip must not say "Invited".
-      if (_invitationModalOpen()) _closeAnyDialog();
-      console.log("[LeadCaptura] connect: no send-without-note button appeared");
+      // No modal appeared — LinkedIn may have directly connected (some accounts
+      // skip the note dialog). Check if the button state changed to Pending.
+      if (!_invitationModalOpen()) return { ok: true };
+      console.log("[LeadCaptura] connect: no send-without-note button after 8s");
       return { ok: false, reason: "no_send_button" };
     }
 
-    // Click "Send without a note" and CONFIRM the modal closed as a result of
-    // sending. We re-find the visible button each attempt and only report
-    // success once the invitation modal is gone — no fake "Invited".
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // Click "Send without a note". LinkedIn's backend can take 1-4 seconds to
+    // process the invitation, so we wait up to 3s per attempt before retrying.
+    // After a successful click the button typically becomes disabled (loading
+    // spinner) while the API call is in flight — we treat that as a signal that
+    // the click registered and wait for the modal to close naturally.
+    for (let attempt = 0; attempt < 4; attempt++) {
       const target = _findSendWithoutNoteButton();
       if (!target) {
-        // Button vanished and modal is gone → the send went through.
         if (!_invitationModalOpen()) return { ok: true };
+        // Modal still open but button gone (loading/disabled) — wait for close.
+        for (let w = 0; w < 16; w++) {
+          await sleep(250);
+          if (!_invitationModalOpen()) return { ok: true };
+        }
         break;
       }
       console.log(
@@ -1332,13 +1352,27 @@
         "→", `"${(target.textContent || "").replace(/\s+/g, " ").trim()}"`
       );
       _forceClick(target);
-      await sleep(550);
+      // Wait up to 3s for the modal to close (covers slow API round-trips).
+      for (let w = 0; w < 12; w++) {
+        await sleep(250);
+        if (!_invitationModalOpen()) return { ok: true };
+        // If the button is now disabled the click registered — keep waiting.
+        const stillVisible = _findSendWithoutNoteButton();
+        if (!stillVisible && _invitationModalOpen()) {
+          // Button gone (loading state), modal pending close — wait more.
+          for (let ww = 0; ww < 20; ww++) {
+            await sleep(250);
+            if (!_invitationModalOpen()) return { ok: true };
+          }
+          break;
+        }
+      }
       if (!_invitationModalOpen()) return { ok: true };
     }
 
-    // Send genuinely failed. Close the lingering modal so the next card isn't
-    // blocked, but report failure so the chip shows the truth (not "Invited").
-    if (_invitationModalOpen()) _closeAnyDialog();
+    // Give up — report failure and let the connectAllVisible guard handle the
+    // lingering modal before moving to the next card.
+    console.log("[LeadCaptura] send-without-note: gave up after retries");
     return { ok: false, reason: "send_failed" };
   }
 
@@ -1578,6 +1612,31 @@
         } catch (e) {
           res = { ok: false, reason: String(e) };
         }
+
+        // Hard guarantee: the invitation modal MUST be gone before we move to
+        // the next card. If it's still open (API slow, click missed, etc.) keep
+        // trying to dismiss it for up to 10s. This prevents the next card's
+        // connect attempt from running while the previous modal is still on screen.
+        if (_invitationModalOpen()) {
+          const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+          for (let guard = 0; guard < 40 && _invitationModalOpen(); guard++) {
+            await sleepMs(250);
+            if (!_invitationModalOpen()) break;
+            // Every second, try clicking send-without-note again or dismiss.
+            if (guard % 4 === 3) {
+              const sb = _findSendWithoutNoteButton();
+              if (sb) _forceClick(sb);
+              else _closeAnyDialog();
+            }
+          }
+          // If modal is STILL open after 10s and we already got res.ok=true that
+          // was a false positive — downgrade to failure so the chip is truthful.
+          if (_invitationModalOpen() && res.ok) {
+            res = { ok: false, reason: "send_failed" };
+            _closeAnyDialog();
+          }
+        }
+
         if (res.ok) {
           sent++;
           invitesSinceBreak++;
@@ -3567,9 +3626,24 @@
     const btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
+      console.log("[LeadCaptura] auto-confirm: clicking Send without a note");
       _forceClick(btn);
-      await globalThis.__lcHuman.sleep(400);
+      // Give LinkedIn's backend 3s to process the send before checking.
+      // The button typically becomes disabled (loading) while the API call runs.
+      for (let i = 0; i < 12; i++) {
+        await sleep(250);
+        if (!_invitationModalOpen()) {
+          console.log("[LeadCaptura] auto-confirm: modal closed ✓");
+          return;
+        }
+        // If button gone but modal still there, keep waiting for API response.
+        const stillBtn = _findSendWithoutNoteButton();
+        if (!stillBtn) continue;
+        // Button still visible and enabled — another click attempt.
+        if (i >= 4) _forceClick(stillBtn);
+      }
       if (_invitationModalOpen()) {
         const again = _findSendWithoutNoteButton();
         if (again) _forceClick(again);
@@ -3590,7 +3664,7 @@
       /* observer best-effort */
     }
     // Safety-net poll in case a mutation batch is missed.
-    setInterval(_autoConfirmInviteModal, 500);
+    setInterval(_autoConfirmInviteModal, 600);
   }
   _startInviteAutoConfirm();
 
