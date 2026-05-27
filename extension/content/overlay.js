@@ -1598,7 +1598,18 @@
   let _jobChipSyncRaf = null;
   function _syncJobChipPositions() {
     _jobChipSyncRaf = null;
+    // While a LinkedIn modal is open (Easy Apply, share, etc.) hide EVERY chip.
+    // Chips are position:fixed with a near-max z-index, so otherwise they bleed
+    // over the modal's form fields and look like stray "Auto Apply" buttons.
+    const modalOpen = !!document.querySelector(
+      "div.jobs-easy-apply-modal, div[data-test-modal][role='dialog'], " +
+      "div[role='dialog'], [role='alertdialog'], .artdeco-modal[role='dialog']"
+    );
     for (const [url, wrap] of injectedJobChips.entries()) {
+      if (modalOpen) {
+        if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
+        continue;
+      }
       const card = _jobChipCards.get(url);
       if (!wrap || !card || !document.body.contains(card)) {
         if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
