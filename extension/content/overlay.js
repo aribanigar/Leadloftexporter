@@ -18,6 +18,12 @@
   const Api = globalThis.__lcApi;
   const Storage = globalThis.__lcStorage;
 
+  // Live build version — stamped into the toolbar so the user can confirm which
+  // overlay.js is actually running on the tab (updating an unpacked extension
+  // does NOT re-inject scripts into already-open tabs; you must reload the tab).
+  let _LC_VERSION = "?";
+  try { _LC_VERSION = chrome.runtime.getManifest().version; } catch {}
+
   // chrome.runtime.openOptionsPage is only callable from extension pages and
   // the service worker — not from content scripts. Route through the SW.
   function openOptions() {
@@ -86,6 +92,36 @@
       state.connectError = e?.message || String(e);
     }
     return state.options;
+  }
+
+  // Self-contained on-page toast — does NOT depend on the toolbar being
+  // rendered, so it works as a live signal that the auto-confirm watcher (which
+  // can fire on any page state) actually executed. This is the user-visible
+  // proof that the freshly-loaded build is running on the tab.
+  let _lcToastEl = null;
+  let _lcToastTimer = null;
+  function _lcToast(msg, ms = 2600) {
+    try {
+      if (!_lcToastEl || !document.documentElement.contains(_lcToastEl)) {
+        _lcToastEl = document.createElement("div");
+        _lcToastEl.id = "lc-toast";
+        _lcToastEl.style.cssText = [
+          "position:fixed", "left:50%", "bottom:84px", "transform:translateX(-50%)",
+          "z-index:2147483647", "background:#0a66c2", "color:#fff",
+          "padding:10px 18px", "border-radius:24px",
+          "font:600 13px/1.4 -apple-system,system-ui,sans-serif",
+          "box-shadow:0 6px 24px rgba(0,0,0,.28)", "pointer-events:none",
+          "max-width:80vw", "text-align:center",
+        ].join(";");
+        document.documentElement.appendChild(_lcToastEl);
+      }
+      _lcToastEl.textContent = msg;
+      _lcToastEl.style.opacity = "1";
+      clearTimeout(_lcToastTimer);
+      _lcToastTimer = setTimeout(() => {
+        if (_lcToastEl) _lcToastEl.style.opacity = "0";
+      }, ms);
+    } catch {}
   }
 
   function flashStatus(msg, level = "info") {
@@ -791,7 +827,7 @@
       root.append(
         el("div", { class: "lc-toolbar-inner" },
           el("span", { class: "lc-logo" }, "L"),
-          el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+          el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
           el("span", { class: "lc-flex" }),
           el("span", { class: "lc-muted" }, "Not connected — "),
           el(
@@ -815,7 +851,7 @@
         "div",
         { class: "lc-toolbar-inner" },
         el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
         dropdown("Segment", segmentName, opts.segments, (s) => {
           state.selection.segmentId = s.id;
           renderToolbar();
@@ -3663,33 +3699,36 @@
   async function _autoConfirmInviteModal() {
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) return;
-    const btn = _findSendWithoutNoteButton();
+    let btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
-      console.log("[LeadCaptura] auto-confirm: clicking Send without a note");
+      // Let the modal finish its mount/animation so LinkedIn (Ember) has bound
+      // the button's click handler — clicking mid-animation is a no-op. ~250ms
+      // is below human reaction time floor and well within the modal's lifetime.
+      await sleep(250);
+      btn = _findSendWithoutNoteButton();
+      if (!btn || !_invitationModalOpen()) return;
+      console.log("[LeadCaptura] auto-confirm: clicking Send without a note", btn);
+      _lcToast("LeadCaptura: sending invitation…");
       _forceClick(btn);
-      // Give LinkedIn's backend 3s to process the send before checking.
-      // The button typically becomes disabled (loading) while the API call runs.
-      for (let i = 0; i < 12; i++) {
+      // Give LinkedIn's backend up to ~4.5s to process and close the modal.
+      for (let i = 0; i < 18; i++) {
         await sleep(250);
         if (!_invitationModalOpen()) {
           console.log("[LeadCaptura] auto-confirm: modal closed ✓");
+          _lcToast("LeadCaptura: invitation sent ✓");
           return;
         }
-        // If button gone but modal still there, keep waiting for API response.
+        // Re-click periodically while the modal is still up (in case the first
+        // attempt landed during the animation and was swallowed).
         const stillBtn = _findSendWithoutNoteButton();
-        if (!stillBtn) continue;
-        // Button still visible and enabled — another click attempt.
-        if (i >= 4) _forceClick(stillBtn);
+        if (stillBtn && !stillBtn.disabled && i % 3 === 2) _forceClick(stillBtn);
       }
-      if (_invitationModalOpen()) {
-        const again = _findSendWithoutNoteButton();
-        if (again) _forceClick(again);
-      }
-    } catch {
-      /* never let the watcher throw */
+      console.log("[LeadCaptura] auto-confirm: modal still open after retries");
+    } catch (e) {
+      console.warn("[LeadCaptura] auto-confirm error", e);
     } finally {
       _inviteAutoBusy = false;
     }
