@@ -1203,8 +1203,65 @@
     return b && document.body.contains(b) ? b : null;
   }
 
+  // True while the "Add a note to your invitation?" modal is on screen.
+  function _invitationModalOpen() {
+    const dlgs = document.querySelectorAll(
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+    );
+    for (const d of dlgs) {
+      const t = (d.textContent || "").toLowerCase();
+      if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
+        return true;
+    }
+    return false;
+  }
+
+  // Find the "Send without a note" primary button of the invitation modal,
+  // scanning the WHOLE document (the modal renders in a portal at <body> end,
+  // not inside the card). Preference: exact "Send without a note" → "Send now"
+  // → any "Send" → the modal's primary button.
+  function _findSendWithoutNoteButton() {
+    const all = Array.from(document.querySelectorAll("button, [role='button']")).filter(
+      (b) => !b.classList?.contains("lc-inline-save")
+    );
+    const match = (re) =>
+      all.find((b) => {
+        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+        const a = (b.getAttribute("aria-label") || "").trim();
+        return re.test(t) || re.test(a);
+      });
+    return (
+      match(/^send without a note$/i) ||
+      match(/send without a note/i) ||
+      match(/^send now$/i) ||
+      match(/^send( invitation)?$/i) ||
+      document.querySelector(
+        "div[role='dialog'] button.artdeco-button--primary, " +
+          ".artdeco-modal button.artdeco-button--primary, " +
+          "[role='alertdialog'] button.artdeco-button--primary"
+      ) ||
+      null
+    );
+  }
+
+  // Close any open dialog (close button, else Escape) so a lingering modal
+  // can't block the next card.
+  function _closeAnyDialog() {
+    const close = document.querySelector(
+      "button[aria-label='Dismiss'], button[aria-label*='Dismiss' i], " +
+        "button[aria-label*='Close' i], div[role='dialog'] button[aria-label*='close' i]"
+    );
+    if (close) {
+      try { close.click(); } catch {}
+    } else {
+      try {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      } catch {}
+    }
+  }
+
   async function _sendConnectOnCard(card, presetBtn) {
-    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
+    const { dispatchHumanClick } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
     const btn =
       presetBtn && document.body.contains(presetBtn)
@@ -1212,44 +1269,43 @@
         : _findConnectButtonInCard(card);
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
-    await sleep(700 + Math.random() * 500);
-    // The "Add a note to your invitation?" modal appears with a
-    // "Send without a note" primary button — that's the one we want (the user
-    // asked to send WITHOUT a note). aria-label first, then a text fallback for
-    // when LinkedIn omits the aria-label. Poll a few times: a backgrounded tab
-    // can defer modal rendering.
-    const sendSel = [
-      "button[aria-label*='Send without a note' i]",
-      "button[aria-label='Send now']",
-      "button[aria-label*='Send invitation' i]",
-      "div[role='dialog'] button.artdeco-button--primary",
-      "button[aria-label*='Send' i]",
-    ];
-    const findSendByText = () =>
-      Array.from(
-        document.querySelectorAll(
-          "div[role='dialog'] button, .artdeco-modal button, [role='alertdialog'] button"
-        )
-      ).find((b) => {
-        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-        return /^send(\s+(without a note|now|invitation))?$/i.test(t);
-      }) || null;
 
+    // Poll up to ~6s for the invitation modal's "Send without a note" button.
+    // Bounded loop — it can never hang the run.
     let sendBtn = null;
-    for (let attempt = 0; attempt < 4 && !sendBtn; attempt++) {
-      sendBtn = await waitFor(sendSel, { timeout: 2500 });
-      if (!sendBtn) sendBtn = findSendByText();
-      if (!sendBtn) await sleep(600);
+    for (let i = 0; i < 24 && !sendBtn; i++) {
+      await sleep(250);
+      sendBtn = _findSendWithoutNoteButton();
     }
+
     if (sendBtn) {
-      await dispatchHumanClick(sendBtn);
-      await sleep(500 + Math.random() * 400); // modal dismiss animation
+      console.log(
+        "[LeadCaptura] clicking send button:",
+        `"${(sendBtn.textContent || "").replace(/\s+/g, " ").trim()}"`
+      );
+      // Human-paced click first. Some LinkedIn React handlers ignore a
+      // synthetic-only click, so if the modal is still open after, fall back to
+      // a direct native .click(). Retry a couple of times.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await dispatchHumanClick(sendBtn);
+        await sleep(450);
+        if (!_invitationModalOpen()) break;
+        try { sendBtn.click(); } catch {}
+        await sleep(450);
+        if (!_invitationModalOpen()) break;
+        // Re-resolve the button in case the modal re-rendered.
+        const again = _findSendWithoutNoteButton();
+        if (again) sendBtn = again;
+      }
+      // Make sure nothing is left blocking the next card.
+      if (_invitationModalOpen()) _closeAnyDialog();
+      await sleep(300 + Math.random() * 300);
       return { ok: true };
     }
-    // No modal — LinkedIn may have sent directly, OR an email-verify wall
-    // surfaced. Dismiss any lingering dialog so the next card isn't blocked.
-    const dismiss = document.querySelector("button[aria-label='Dismiss']");
-    if (dismiss) { try { dismiss.click(); } catch {} }
+
+    // No modal appeared — LinkedIn may have sent directly, OR a different wall
+    // surfaced. Clean up any dialog so the next card isn't blocked.
+    if (_invitationModalOpen()) _closeAnyDialog();
     return { ok: true, note: "no_modal" };
   }
 
