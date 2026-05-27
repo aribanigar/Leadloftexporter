@@ -1570,218 +1570,74 @@
     try { decorateSearchCards(); } catch {}
   }
 
-  // Bulk connect, AUTO-ADVANCING across result pages. After every card on a
-  // page is invited it clicks "Next", waits for the new page, and continues —
-  // until the last page, the safety cap, or the user clicks Stop.
+  // Bulk connect via profile-page navigation.
   //
-  // SAFETY CAP: LinkedIn restricts accounts that exceed ~100-200 invites/week.
-  // We hard-stop a single run at MAX_INVITES_PER_RUN so the auto-advance can't
-  // silently blow past the weekly budget across 100 pages.
+  // Each profile is opened in the SAME tab. The actual connect flow runs in
+  // main.js (maybeRunConnectQueue) which picks up from chrome.storage.local
+  // after each navigation and drives the "click Connect → Send without a note"
+  // sequence on the profile page. When all profiles are done, main.js
+  // navigates back to this search URL automatically.
+  //
+  // Why profile pages instead of inline search-card buttons? The search-card
+  // "Connect" button is a simplified control that does NOT always open the
+  // "Add a note?" modal reliably. The full-page profile button is the one
+  // LinkedIn's own UX always uses, and it consistently triggers the modal.
   async function connectAllVisible() {
     const { sleep } = globalThis.__lcHuman;
-    const MAX_INVITES_PER_RUN = 100;
 
-    // Page 1 honours an explicit selection (if any). Later pages process every
-    // visible card — the page-1 ticks don't apply to other pages.
     const page1Selection =
       state.selectedUrls.size > 0 ? new Set(state.selectedUrls) : null;
 
+    let urls = (
+      page1Selection
+        ? Array.from(page1Selection)
+        : _allChipUrls()
+    ).filter((u) => u && u.includes("/in/"));
+
+    if (!urls.length) {
+      flashStatus("No profiles selected to connect with", "warn");
+      return;
+    }
+
+    // Normalize to absolute LinkedIn URLs
+    urls = urls.map((u) => {
+      try { return new URL(u, "https://www.linkedin.com").href; }
+      catch { return u; }
+    });
+
     state.connectActive = true;
     state.connectCancel = false;
-    state.connectProgress = { current: 0, total: MAX_INVITES_PER_RUN, name: "" };
     unmountSelectAllHeader();
     renderToolbar();
 
-    let sent = 0;
-    let skipped = 0;
-    let alreadyDone = 0; // already invited / already connected — skipped
-    let pageNum = 1;
-    let cancelled = false;
-    let hitCap = false;
-    // Periodic micro-break counter: every 12-16 actual invites, insert a
-    // longer pause (22-42s) to break any detectable rhythmic pattern.
-    let invitesSinceBreak = 0;
-    let nextBreakAt = 12 + Math.floor(Math.random() * 5);
+    const queue = {
+      urls,
+      returnUrl: location.href,
+      total: urls.length,
+      sent: 0,
+      failed: 0,
+      results: {},
+      startedAt: Date.now(),
+    };
 
-    while (!state.connectCancel) {
-      // Render all cards on this page, then read them.
-      await _scrollLoadPage();
-      if (state.connectCancel) { cancelled = true; break; }
-
-      // Targets from the CHIPS (single source of truth). Page 1 honours the
-      // user's tick selection; later pages take every chip on the page.
-      let urls =
-        pageNum === 1 && page1Selection
-          ? Array.from(page1Selection).filter((u) => u && u.includes("/in/"))
-          : _allChipUrls();
-
-      for (let i = 0; i < urls.length; i++) {
-        if (state.connectCancel) { cancelled = true; break; }
-        if (sent >= MAX_INVITES_PER_RUN) { hitCap = true; break; }
-        const url = urls[i];
-        state.connectProgress = {
-          current: sent + 1,
-          total: MAX_INVITES_PER_RUN,
-          name: `p${pageNum}: ${_labelFromUrl(url)}`,
-        };
-        _setChipState(url, "saving", "Connecting…");
-        renderToolbar();
-
-        const card = _cardForUrl(url);
-        // The exact native button this chip sits beside is the source of truth.
-        // Fall back to a card scan only if that button is gone (re-render).
-        const actionBtn = _actionBtnForUrl(url);
-        if (!card && !actionBtn) { skipped++; continue; }
-
-        // SKIP people we've already contacted or are already connected to —
-        // don't waste the daily invite quota. Classify from the precise button
-        // first (no neighbour-row bleed); otherwise scan the card.
-        const cstate = actionBtn ? _classifyButton(actionBtn) : _cardConnectState(card);
-        try {
-          const _b = actionBtn || (card && _findConnectButtonInCard(card));
-          console.log(
-            "[LeadCaptura] connect-all:",
-            _labelFromUrl(url),
-            "→ state =", cstate,
-            "| btn =", _b ? `"${(_b.textContent || "").replace(/\s+/g, " ").trim()}"` : "none"
-          );
-        } catch {}
-        if (cstate === "pending") {
-          alreadyDone++;
-          _setChipState(url, "saved", "Already sent ✓");
-          continue;
-        }
-        if (cstate === "connected") {
-          alreadyDone++;
-          _setChipState(url, "saved", "Connected ✓");
-          continue;
-        }
-        // Decide the action: a real Connect button → send an invitation; a
-        // Follow-only row → follow. Both count as a completed action. Anything
-        // else (no recognised button) is skipped.
-        if (cstate !== "connect" && cstate !== "follow") {
-          skipped++;
-          _setChipState(url, "error", "No action");
-          continue;
-        }
-
-        // Instant (not "smooth") — smooth scroll relies on the rendering
-        // pipeline which Chrome pauses in a backgrounded tab; instant keeps
-        // the run working when the user switches to another tab.
-        try { (actionBtn || card).scrollIntoView({ block: "center" }); } catch {}
-        // Variable reading pause: glance at the card before clicking.
-        // 15% chance of a longer "reconsidering" pause (reads the headline).
-        const readMs = 600 + Math.random() * 800;
-        const readBonus = Math.random() < 0.15 ? 900 + Math.random() * 1100 : 0;
-        await sleep(readMs + readBonus);
-
-        const isFollow = cstate === "follow";
-        let res;
-        try {
-          res = isFollow
-            ? await _sendFollowOnCard(card, actionBtn)
-            : await _sendConnectOnCard(card, actionBtn);
-        } catch (e) {
-          res = { ok: false, reason: String(e) };
-        }
-
-        // Safety net: _sendConnectOnCard already confirms the dialog closed on
-        // success, but if it failed with the dialog still up, dismiss it so the
-        // next card's Connect isn't blocked by a leftover modal.
-        if (_invitationModalOpen()) {
-          _closeAnyDialog();
-          await sleep(600);
-          if (_invitationModalOpen()) _closeAnyDialog();
-        }
-
-        if (res.ok) {
-          sent++;
-          invitesSinceBreak++;
-          _setChipState(url, "saved", isFollow ? "Followed ✓" : "Invited ✓");
-        } else {
-          skipped++;
-          // Truthful failure label — never show "Invited" when nothing was sent.
-          let why = isFollow ? "Follow failed" : "Send failed";
-          if (res.reason === "no_connect_button") why = "No Connect";
-          else if (res.reason === "no_send_button") why = "No modal";
-          _setChipState(url, "error", why);
-        }
-
-        // Pace only after an ACTUAL invite — skipped/already-done cards cost
-        // no quota, so don't burn the human-pacing delay on them.
-        if (res.ok && i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
-          let gap;
-          // Micro-break: every 12-16 invites take a genuine longer pause.
-          // Breaks any statistical fingerprint across a session.
-          if (invitesSinceBreak >= nextBreakAt) {
-            invitesSinceBreak = 0;
-            nextBreakAt = 12 + Math.floor(Math.random() * 5);
-            gap = 22000 + Math.random() * 20000; // 22-42s break
-            flashStatus(`Short break… (${sent} invites sent)`);
-          } else {
-            // 4-tier smooth distribution — avoids the detectable bimodal pattern
-            // of a fixed base + occasional long-tail that ML can fingerprint.
-            const r = Math.random();
-            if (r < 0.60) {
-              gap = 4000 + Math.random() * 4500;    // 4-8.5s  (60%)
-            } else if (r < 0.82) {
-              gap = 9000 + Math.random() * 8000;    // 9-17s   (22%)
-            } else if (r < 0.93) {
-              gap = 19000 + Math.random() * 13000;  // 19-32s  (11%)
-            } else {
-              gap = 38000 + Math.random() * 22000;  // 38-60s  (7%)
-            }
-          }
-          await sleep(gap);
-        }
-      }
-
-      if (state.connectCancel) { cancelled = true; break; }
-      if (hitCap) break;
-
-      // Advance to the next page.
-      const nextBtn = _findNextPageButton();
-      if (!nextBtn) break; // last page reached
-      flashStatus(`Page ${pageNum} done — ${sent} sent. Moving to next page…`);
-      const sig = _pageSignature();
-      // Inter-page pause: variable base + occasional "deciding if it's worth
-      // continuing" hesitation. Breaks the always-same-gap-between-pages pattern.
-      const pageGapBase = 8000 + Math.random() * 12000; // 8-20s
-      const pageGapBonus = Math.random() < 0.25 ? 12000 + Math.random() * 18000 : 0; // 25% → +12-30s
-      await sleep(pageGapBase + pageGapBonus);
-      if (state.connectCancel) { cancelled = true; break; }
-      try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
-      await sleep(600);
-      try {
-        await globalThis.__lcDom.dispatchHumanClick(nextBtn);
-      } catch {
-        try { nextBtn.click(); } catch {}
-      }
-      const changed = await _waitForPageChange(sig);
-      if (!changed) break; // page didn't advance — stop cleanly
-      pageNum++;
+    try {
+      await new Promise((res) =>
+        chrome.storage.local.set({ lc_connect_queue: queue }, res)
+      );
+    } catch (e) {
+      flashStatus("Could not save queue: " + String(e), "err");
+      state.connectActive = false;
+      mountSelectAllHeader();
+      renderToolbar();
+      return;
     }
 
-    state.connectActive = false;
-    state.connectProgress = null;
-    state.selectedUrls.clear();
-    mountSelectAllHeader();
-    renderToolbar();
-
-    const extra = [
-      alreadyDone ? `${alreadyDone} already contacted` : "",
-      skipped ? `${skipped} skipped` : "",
-    ].filter(Boolean).join(", ");
-    const tail = extra ? ` (${extra})` : "";
-    let msg;
-    if (cancelled) {
-      msg = `Stopped: ${sent} invites sent across ${pageNum} page(s)${tail}`;
-    } else if (hitCap) {
-      msg = `Reached ${MAX_INVITES_PER_RUN}-invite cap: ${sent} sent${tail}. Run again later.`;
-    } else {
-      msg = `Done: ${sent} invites sent across ${pageNum} page(s)${tail} ✓`;
-    }
-    flashStatus(msg, hitCap ? "warn" : "ok");
+    flashStatus(`Connect All: visiting ${urls.length} profile(s) one by one…`);
+    await sleep(800 + Math.random() * 600);
+    // Mark chips as "pending navigation"
+    for (const url of urls) _setChipState(url, "saving", "Queued…");
+    // Navigate to first profile — main.js takes over from here
+    location.href = urls[0];
   }
 
   // ====================================================================
@@ -3731,6 +3587,29 @@
   }
   _startInviteAutoConfirm();
 
+  // Apply per-URL connect results when returning to the search page after
+  // a Connect All run. Updates chip states and resets the toolbar.
+  function applyConnectResults(results) {
+    for (const [url, status] of Object.entries(results || {})) {
+      if (status === "sent") {
+        _setChipState(url, "saved", "Connected ✓");
+      } else if (
+        status === "already_connected" ||
+        status === "already_pending" ||
+        status === "already_done"
+      ) {
+        _setChipState(url, "saved", "Already done ✓");
+      } else {
+        _setChipState(url, "error", "Skipped");
+      }
+    }
+    state.connectActive = false;
+    state.connectProgress = null;
+    state.selectedUrls?.clear();
+    try { mountSelectAllHeader(); } catch {}
+    renderToolbar();
+  }
+
   globalThis.__lcOverlay = {
     renderProfilePanel,
     renderToolbar,
@@ -3742,5 +3621,7 @@
     triggerAutoSave,
     mountSelectAllHeader,
     unmountSelectAllHeader,
+    toast: _lcToast,
+    applyConnectResults,
   };
 })();
