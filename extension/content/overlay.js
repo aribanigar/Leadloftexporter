@@ -1191,20 +1191,14 @@
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
-    // Sales Navigator hides Connect under the "…" overflow menu, so a card may
-    // show only Message + "…". Don't write those off as already-connected:
-    // if an overflow trigger exists and we're not pending, treat as a connect
-    // candidate (the actual Connect item is resolved when we open the menu).
+    // Sales Navigator EVERY lead shows a Message button and the Connect action
+    // lives inside the "…" overflow menu — so "Message present" must NOT be
+    // read as already-connected (that was skipping everyone). On Sales Nav we
+    // always attempt Connect unless pending; _openOverflowConnect returns null
+    // for genuine 1st-degree leads (no Connect item) and they're skipped then.
     let isSalesNav = false;
     try { isSalesNav = Scraper.pageType() === "salesnav-search"; } catch {}
-    if (isSalesNav) {
-      const hasMore = Array.from(card.querySelectorAll("button, [role='button']")).some((b) => {
-        if (b.classList?.contains("lc-inline-save")) return false;
-        const a = (b.getAttribute("aria-label") || "").toLowerCase();
-        return /\bmore\b|overflow|more actions|other actions/.test(a) || b.classList?.contains("artdeco-dropdown__trigger");
-      });
-      if (hasMore) return "connect";
-    }
+    if (isSalesNav) return "connect";
     if (hasMessage) return "connected";
     if (hasFollow) return "follow";
     return "unknown";
@@ -1266,13 +1260,25 @@
       "div[role='dialog'] button.artdeco-button--primary",
     ];
     let sendBtn = null;
-    for (let attempt = 0; attempt < 3 && !sendBtn; attempt++) {
-      sendBtn = await waitFor(sendSel, { timeout: 3000 });
-      if (!sendBtn) await sleep(700);
+    for (let attempt = 0; attempt < 4 && !sendBtn; attempt++) {
+      sendBtn = await waitFor(sendSel, { timeout: 2500 });
+      // Text fallback: Sales Nav's confirm button is "Send Invitation" with no
+      // matching aria-label, so the selector list above misses it.
+      if (!sendBtn) {
+        sendBtn = Array.from(
+          document.querySelectorAll(
+            "div[role='dialog'] button, .artdeco-modal button, [role='alertdialog'] button"
+          )
+        ).find((b) => {
+          const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+          return /^send( invitation| now| without a note)?$/i.test(t);
+        }) || null;
+      }
+      if (!sendBtn) await sleep(600);
     }
     if (sendBtn) {
       await dispatchHumanClick(sendBtn);
-      await sleep(500 + Math.random() * 400); // 500-900ms — modal dismiss animation
+      await sleep(600 + Math.random() * 500); // modal dismiss animation
       return { ok: true };
     }
     // No modal — LinkedIn may have sent directly, OR an email-verify wall
@@ -2910,7 +2916,10 @@
     // appeared to have a chip. Inline placement is immune to that.
     const actionBtn = Array.from(card.querySelectorAll("button")).find(_isActionButton);
     if (actionBtn && actionBtn.parentElement) {
-      actionBtn.parentElement.insertBefore(wrap, actionBtn);
+      // Place the Save chip at the LEFT of the action-button row (the open
+      // space before Connect/Message), not crammed against the button.
+      const container = actionBtn.parentElement;
+      container.insertBefore(wrap, container.firstChild);
     } else {
       // No native action button (e.g. some Sales Nav rows) — fall back to a
       // pinned top-right placement inside the card.
