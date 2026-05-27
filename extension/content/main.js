@@ -183,10 +183,40 @@
     return r.width > 0 && r.height > 0;
   }
 
+  // Returns true if a Contact Info modal or overlay is currently open/loading.
+  // We check this before and during the connect flow so we never fire into
+  // a page that's mid-contact-info scrape.
+  function _contactInfoModalOpen() {
+    // The SPA pushes /overlay/contact-info into the URL while the modal animates
+    if (location.pathname.includes("/overlay/contact-info")) return true;
+    // The actual modal dialog contains "Contact info" header text
+    for (const d of document.querySelectorAll("div[role='dialog'], .artdeco-modal")) {
+      const rect = d.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) continue;
+      if (/contact info/i.test(d.textContent || "")) return true;
+    }
+    return false;
+  }
+
   // Full connect flow on the current profile page. Returns { ok, reason }.
   async function _ccConnectOnProfile() {
     const { sleep, readingPause, scrollLikeHuman, simulateCursorMove } = Human;
     const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
+
+    // If a Contact Info modal is still open from auto-save enrichment, wait for
+    // it to close before attempting to interact. It should close within ~4s.
+    if (_contactInfoModalOpen()) {
+      console.log("[LeadCaptura] connect-queue: waiting for Contact Info modal to close…");
+      for (let i = 0; i < 16; i++) {
+        await sleep(300);
+        if (!_contactInfoModalOpen()) break;
+      }
+      if (_contactInfoModalOpen()) {
+        // Still open — dismiss it by restoring the URL so LinkedIn closes it.
+        try { history.replaceState({}, "", location.pathname.split("/overlay/")[0] + "/"); } catch {}
+        await sleep(600);
+      }
+    }
 
     // Human-like reading before touching anything
     await sleep(readingPause());
@@ -202,28 +232,39 @@
       }
     }
 
-    // Find Connect button — direct selectors first
+    // Helper: returns true for a button that is a genuine Connect action —
+    // has "connect" in its text or aria-label and does NOT reference
+    // "contact", "pending", "following", "message", or "withdraw".
+    const _isConnectBtn = (el) => {
+      if (!el || el.disabled) return false;
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+      const hay = txt + " " + aria;
+      if (!/\bconnect\b/.test(hay)) return false;
+      if (/\bcontact\b|\bpending\b|\bfollowing\b|\bmessage\b|\bwithdraw\b/.test(hay)) return false;
+      return true;
+    };
+
+    // Find Connect button — direct selectors first (profile action area only)
     let connectBtn = null;
     const directSels = [
-      "button[aria-label*='Invite'][aria-label*='connect' i]",
-      "button[aria-label*='Connect' i]:not([aria-label*='Pending' i]):not([aria-label*='Following' i])",
-      ".pvs-profile-actions__action[aria-label*='Connect' i]",
+      // Primary: aria-label "Invite X to connect" (LinkedIn's standard label)
+      "main .pvs-profile-actions button[aria-label*='connect' i]",
+      "main .pvs-profile-actions__action[aria-label*='connect' i]",
+      // Broader fallback scoped to the top-card / actions strip
+      "main button[aria-label*='Invite'][aria-label*='connect' i]",
+      "main button[aria-label*='Connect' i]",
     ];
     for (const sel of directSels) {
       try {
-        const el = document.querySelector(sel);
-        if (el && !el.disabled) {
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
-          const aria = el.getAttribute("aria-label") || "";
-          if (/\bconnect\b/i.test(txt) || /\bconnect\b/i.test(aria)) {
-            connectBtn = el;
-            break;
-          }
+        for (const el of document.querySelectorAll(sel)) {
+          if (_isConnectBtn(el)) { connectBtn = el; break; }
         }
+        if (connectBtn) break;
       } catch {}
     }
 
-    // Try "More actions" dropdown fallback
+    // Try "More actions" dropdown fallback (Connect hidden behind "More" on some profiles)
     if (!connectBtn) {
       const moreBtn =
         document.querySelector("main button[aria-label*='More actions' i]") ||
@@ -233,24 +274,39 @@
         await sleep(400 + Math.random() * 400);
         await dispatchHumanClick(moreBtn);
         await sleep(700 + Math.random() * 500);
-        connectBtn = await waitFor(
-          [
-            "div[role='menu'] [aria-label*='Connect' i]",
-            "div.artdeco-dropdown__content [aria-label*='Connect' i]",
-            "li.artdeco-dropdown__item [aria-label*='Connect' i]",
-          ],
-          { timeout: 3000 }
+        const dropdownItems = document.querySelectorAll(
+          "div[role='menu'] [aria-label*='Connect' i]," +
+          "div.artdeco-dropdown__content [aria-label*='Connect' i]," +
+          "li.artdeco-dropdown__item [aria-label*='Connect' i]"
         );
+        for (const el of dropdownItems) {
+          if (_isConnectBtn(el)) { connectBtn = el; break; }
+        }
+        if (!connectBtn) {
+          connectBtn = await waitFor(
+            [
+              "div[role='menu'] [aria-label*='Connect' i]",
+              "div.artdeco-dropdown__content [aria-label*='Connect' i]",
+              "li.artdeco-dropdown__item [aria-label*='Connect' i]",
+            ],
+            { timeout: 3000 }
+          );
+          if (connectBtn && !_isConnectBtn(connectBtn)) connectBtn = null;
+        }
       }
     }
 
-    // Text-content fallback
+    // Text-content fallback — match ONLY "Connect" (exact, case-insensitive),
+    // scoped to the profile actions area to avoid touching sidebar cards.
     if (!connectBtn) {
-      for (const b of document.querySelectorAll("main button, main [role='button']")) {
-        const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-        if (/^connect$/i.test(txt) && !b.disabled) {
-          connectBtn = b;
-          break;
+      const scope = document.querySelector("main .pvs-profile-actions") || document.querySelector("main");
+      if (scope) {
+        for (const b of scope.querySelectorAll("button, [role='button']")) {
+          const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+          if (/^connect$/i.test(txt) && _isConnectBtn(b)) {
+            connectBtn = b;
+            break;
+          }
         }
       }
     }
@@ -497,14 +553,29 @@
     // profile URL loads. The overlay watches the h1 for name mutations and
     // re-renders as soon as LinkedIn hydrates the correct person's name.
     if (isProfile) {
-      setTimeout(() => {
-        Overlay.renderProfilePanel();
-        Overlay.triggerAutoSave?.();
-        // Connect All queue: run connect flow if a queue is pending
-        maybeRunConnectQueue().catch((e) =>
-          console.warn("[LeadCaptura] connect queue error", e?.message || e)
-        );
-      }, 50);
+      // Check for an active Connect All queue BEFORE deciding to auto-save.
+      // triggerAutoSave() → saveCurrentProfile() → scrapeContactInfo() CLICKS
+      // the "Contact info" link. If a connect queue is running that click races
+      // with _ccConnectOnProfile() trying to click the Connect button, causing
+      // the extension to hit "Contact info" instead. Suppress auto-save for the
+      // entire duration of any connect queue run.
+      const _launchProfile = (inConnectQueue) => {
+        setTimeout(() => {
+          Overlay.renderProfilePanel();
+          if (!inConnectQueue) Overlay.triggerAutoSave?.();
+          maybeRunConnectQueue().catch((e) =>
+            console.warn("[LeadCaptura] connect queue error", e?.message || e)
+          );
+        }, 50);
+      };
+      try {
+        chrome.storage.local.get("lc_connect_queue", (qData) => {
+          _launchProfile(!!(qData?.lc_connect_queue?.urls?.length > 0));
+        });
+      } catch {
+        // Storage unavailable (stale context) — assume no queue, normal flow.
+        _launchProfile(false);
+      }
     }
 
     if (isJobs) {
