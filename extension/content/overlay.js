@@ -1938,6 +1938,16 @@
         const key = _jobCardKey(card);
         if (!key) continue;
 
+        // Prevent DUPLICATE chips on one card: if a live chip is already
+        // anchored to this exact card element (under this OR a changed key —
+        // e.g. the open card gains a /jobs/view link mid-session and its key
+        // flips from "card:title" to "job:id"), don't create a second one.
+        let dup = false;
+        for (const [k] of injectedJobChips) {
+          if (_jobChipCards.get(k) === card) { dup = true; break; }
+        }
+        if (dup) continue;
+
         // Keep our tracking pointed at the freshest card element for this key
         // (LinkedIn recycles card nodes on scroll/pagination).
         _jobChipCards.set(key, card);
