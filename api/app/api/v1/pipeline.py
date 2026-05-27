@@ -22,6 +22,27 @@ def list_stages(ctx: AuthContext = Depends(get_workspace_context), db: Session =
         .order_by(PipelineStage.position.asc())
         .all()
     )
+    # Self-heal: seed defaults if this workspace has no stages yet.
+    if not stages:
+        from app.services.bootstrap import seed_workspace_defaults
+
+        seed_workspace_defaults(db, ctx.workspace_id)
+        db.commit()
+        stages = (
+            db.query(PipelineStage)
+            .filter(PipelineStage.workspace_id == ctx.workspace_id)
+            .order_by(PipelineStage.position.asc())
+            .all()
+        )
+    # Self-heal: any lead with no stage_id (saved before a default stage
+    # existed) gets parked on the first stage so it shows in the Pipeline.
+    if stages:
+        first_stage_id = stages[0].id
+        db.query(Lead).filter(
+            Lead.workspace_id == ctx.workspace_id,
+            Lead.stage_id.is_(None),
+        ).update({Lead.stage_id: first_stage_id}, synchronize_session=False)
+        db.commit()
     counts = dict(
         db.query(Lead.stage_id, func.count(Lead.id))
         .filter(Lead.workspace_id == ctx.workspace_id)

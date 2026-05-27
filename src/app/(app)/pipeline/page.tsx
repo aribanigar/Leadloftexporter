@@ -51,10 +51,14 @@ export default function PipelinePage() {
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
     queryFn: () => api("/pipeline/stages"),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
   const { data: leads } = useQuery<LeadList>({
     queryKey: ["leads", "all"],
     queryFn: () => api("/leads?page=1&page_size=500"),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   const updateStage = useMutation({
@@ -64,6 +68,15 @@ export default function PipelinePage() {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["stages"] });
     },
+  });
+
+  const addStage = useMutation({
+    mutationFn: (name: string) =>
+      api("/pipeline/stages", {
+        method: "POST",
+        body: { name, color: "#64748b", is_won: false, is_lost: false },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stages"] }),
   });
 
   const saveView = useMutation({
@@ -86,20 +99,31 @@ export default function PipelinePage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
+  // Leads saved before a default stage existed have stage_id === null. Park
+  // them on the first stage so they always appear (matches the backend
+  // self-heal in pipeline.list_stages).
+  const firstStageId = stages?.[0]?.id;
+  const stageOf = (l: Lead): string | undefined =>
+    l.stage_id && stages?.some((s) => s.id === l.stage_id)
+      ? l.stage_id
+      : firstStageId;
+
   const countsByStage = useMemo(() => {
     const m = new Map<string, number>();
     leads?.items.forEach((l) => {
-      if (!l.stage_id) return;
-      m.set(l.stage_id, (m.get(l.stage_id) || 0) + 1);
+      const sid = stageOf(l);
+      if (!sid) return;
+      m.set(sid, (m.get(sid) || 0) + 1);
     });
     return m;
-  }, [leads]);
+  }, [leads, stages]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Lead[]>();
     stages?.forEach((s) => map.set(s.id, []));
     leads?.items.forEach((l) => {
-      if (l.stage_id && map.has(l.stage_id)) map.get(l.stage_id)!.push(l);
+      const sid = stageOf(l);
+      if (sid && map.has(sid)) map.get(sid)!.push(l);
     });
     return map;
   }, [stages, leads]);
@@ -107,7 +131,7 @@ export default function PipelinePage() {
   const filteredLeads = useMemo(() => {
     const sort = SORT_OPTIONS[sortIdx];
     let list = leads?.items ?? [];
-    if (stageFilter) list = list.filter((l) => l.stage_id === stageFilter);
+    if (stageFilter) list = list.filter((l) => stageOf(l) === stageFilter);
     if (ownerFilter === "me") list = list.filter((l) => l.owner_id);
     list = [...list].sort((a, b) => {
       const av = (a[sort.key] as string | null | undefined) ?? "";
@@ -117,7 +141,7 @@ export default function PipelinePage() {
       return sort.dir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [leads, stageFilter, ownerFilter, sortIdx]);
+  }, [leads, stages, stageFilter, ownerFilter, sortIdx]);
 
   function onDragEnd(e: DragEndEvent) {
     const leadId = String(e.active.id);
@@ -143,12 +167,22 @@ export default function PipelinePage() {
         "X-Workspace-Id": ws || "",
       },
     })
-      .then((r) => r.blob())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Export failed (${r.status})`);
+        return r.blob();
+      })
       .then((blob) => {
+        const href = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
+        a.href = href;
         a.download = "pipeline.csv";
+        document.body.appendChild(a);
         a.click();
+        a.remove();
+        URL.revokeObjectURL(href);
+      })
+      .catch((err) => {
+        window.alert(err instanceof Error ? err.message : "Export failed");
       });
   }
 
@@ -185,8 +219,15 @@ export default function PipelinePage() {
           <button className="btn-secondary" onClick={exportCsv}>
             <Download className="h-4 w-4" /> Export
           </button>
-          <button className="btn-secondary">
-            <Plus className="h-4 w-4" /> Add stage
+          <button
+            className="btn-secondary disabled:opacity-50"
+            disabled={addStage.isPending}
+            onClick={() => {
+              const name = window.prompt("New stage name:");
+              if (name && name.trim()) addStage.mutate(name.trim());
+            }}
+          >
+            <Plus className="h-4 w-4" /> {addStage.isPending ? "Adding…" : "Add stage"}
           </button>
         </div>
       </div>
