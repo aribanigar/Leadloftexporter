@@ -116,6 +116,355 @@
   let lastPath = null;
   let autopilotInterval = null;
 
+  // ─── Connect All: profile-page navigation queue ───────────────────────────
+  // When the user clicks "Connect All", overlay.js saves a queue of profile
+  // URLs to chrome.storage.local and navigates to the first profile. On each
+  // profile-page load this function picks up the queue, runs the connect flow,
+  // then advances to the next URL. When the queue is empty it returns to the
+  // original search URL.
+
+  function _ccDetectChallenge() {
+    return [
+      "form#captcha", "form[action*='checkpoint']",
+      "div[data-test-id='challenge']", "div.cp-multi-step-flow", "input[name='pin']",
+    ].some((s) => { try { return !!document.querySelector(s); } catch { return false; } });
+  }
+
+  function _ccFindInviteModal() {
+    for (const d of document.querySelectorAll(
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+    )) {
+      const rect = d.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) continue;
+      const cs = getComputedStyle(d);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      if (
+        /add a note to your invitation|send without a note|personalize your invitation/i.test(
+          d.textContent || ""
+        )
+      )
+        return d;
+    }
+    return null;
+  }
+
+  function _ccFindSendBtn() {
+    const all = Array.from(document.querySelectorAll("button, [role='button']"));
+    const label = (b) => ({
+      t: (b.textContent || "").replace(/\s+/g, " ").trim(),
+      a: b.getAttribute("aria-label") || "",
+    });
+    const tests = [
+      (s) => /^send without a note$/i.test(s),
+      (s) => /\bsend without a note\b/i.test(s),
+      (s) => /^send now$/i.test(s),
+      (s) => /^send( invitation)?$/i.test(s),
+    ];
+    for (const test of tests) {
+      const matches = all.filter((b) => {
+        const { t, a } = label(b);
+        return test(t) || test(a);
+      });
+      if (!matches.length) continue;
+      const vis = matches.filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && !b.disabled;
+      });
+      return vis[0] || matches.find((b) => !b.disabled) || matches[0];
+    }
+    return null;
+  }
+
+  function _ccInviteModalOpen() {
+    if (_ccFindInviteModal()) return true;
+    const b = _ccFindSendBtn();
+    if (!b) return false;
+    const r = b.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+
+  // Full connect flow on the current profile page. Returns { ok, reason }.
+  async function _ccConnectOnProfile() {
+    const { sleep, readingPause, scrollLikeHuman, simulateCursorMove } = Human;
+    const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
+
+    // Human-like reading before touching anything
+    await sleep(readingPause());
+    await scrollLikeHuman(160 + Math.random() * 120);
+    await sleep(500 + Math.random() * 800);
+
+    // Glance at the h1 name (cursor movement is an anti-bot signal)
+    if (simulateCursorMove) {
+      const h1 = document.querySelector("main h1");
+      if (h1) {
+        await simulateCursorMove(h1);
+        await sleep(250 + Math.random() * 350);
+      }
+    }
+
+    // Find Connect button — direct selectors first
+    let connectBtn = null;
+    const directSels = [
+      "button[aria-label*='Invite'][aria-label*='connect' i]",
+      "button[aria-label*='Connect' i]:not([aria-label*='Pending' i]):not([aria-label*='Following' i])",
+      ".pvs-profile-actions__action[aria-label*='Connect' i]",
+    ];
+    for (const sel of directSels) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && !el.disabled) {
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+          const aria = el.getAttribute("aria-label") || "";
+          if (/\bconnect\b/i.test(txt) || /\bconnect\b/i.test(aria)) {
+            connectBtn = el;
+            break;
+          }
+        }
+      } catch {}
+    }
+
+    // Try "More actions" dropdown fallback
+    if (!connectBtn) {
+      const moreBtn =
+        document.querySelector("main button[aria-label*='More actions' i]") ||
+        document.querySelector(".pvs-profile-actions button[aria-label*='More' i]");
+      if (moreBtn) {
+        if (simulateCursorMove) await simulateCursorMove(moreBtn);
+        await sleep(400 + Math.random() * 400);
+        await dispatchHumanClick(moreBtn);
+        await sleep(700 + Math.random() * 500);
+        connectBtn = await waitFor(
+          [
+            "div[role='menu'] [aria-label*='Connect' i]",
+            "div.artdeco-dropdown__content [aria-label*='Connect' i]",
+            "li.artdeco-dropdown__item [aria-label*='Connect' i]",
+          ],
+          { timeout: 3000 }
+        );
+      }
+    }
+
+    // Text-content fallback
+    if (!connectBtn) {
+      for (const b of document.querySelectorAll("main button, main [role='button']")) {
+        const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+        if (/^connect$/i.test(txt) && !b.disabled) {
+          connectBtn = b;
+          break;
+        }
+      }
+    }
+
+    if (!connectBtn) return { ok: false, reason: "no_connect_button" };
+
+    // Skip if already pending / following
+    const hay = (
+      (connectBtn.textContent || "") +
+      " " +
+      (connectBtn.getAttribute("aria-label") || "")
+    ).toLowerCase();
+    if (/\bpending\b|\bfollowing\b/.test(hay))
+      return { ok: false, reason: "already_pending" };
+    if (/\bmessage\b/.test(hay) && !/\bconnect\b/.test(hay))
+      return { ok: false, reason: "already_connected" };
+
+    console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname);
+
+    // Cursor movement + dwell before click (anti-bot)
+    if (simulateCursorMove) await simulateCursorMove(connectBtn);
+    await sleep(80 + Math.random() * 120);
+    await dispatchHumanClick(connectBtn);
+
+    // Wait for invitation modal (up to 10 s)
+    let dialogOpen = false;
+    for (let i = 0; i < 40; i++) {
+      await sleep(250);
+      if (_ccInviteModalOpen()) {
+        dialogOpen = true;
+        break;
+      }
+    }
+
+    if (!dialogOpen) {
+      // Some profiles skip the modal when the invite completes immediately
+      if (
+        document.querySelector(
+          "button[aria-label*='Pending' i], button[aria-label*='Message' i]"
+        )
+      )
+        return { ok: true };
+      console.log("[LeadCaptura] connect-queue: no modal after click");
+      return { ok: false, reason: "no_dialog_appeared" };
+    }
+
+    console.log("[LeadCaptura] connect-queue: modal open → clicking Send without a note");
+
+    // Click "Send without a note"
+    for (let attempt = 0; attempt < 6 && _ccInviteModalOpen(); attempt++) {
+      const sendBtn = _ccFindSendBtn();
+      if (!sendBtn) {
+        await sleep(300);
+        continue;
+      }
+      if (simulateCursorMove) await simulateCursorMove(sendBtn);
+      await sleep(60 + Math.random() * 80);
+      // Multi-strategy click for reliability
+      try { sendBtn.click(); } catch {}
+      try {
+        const rect = sendBtn.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const opts = {
+          bubbles: true, cancelable: true, view: window,
+          clientX: cx, clientY: cy, button: 0,
+        };
+        sendBtn.dispatchEvent(new PointerEvent("pointerdown", opts));
+        sendBtn.dispatchEvent(new MouseEvent("mousedown", opts));
+        sendBtn.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0 }));
+        sendBtn.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+        sendBtn.dispatchEvent(new MouseEvent("click", { ...opts, buttons: 0 }));
+      } catch {}
+      // Wait for dialog to close (= invitation sent)
+      for (let w = 0; w < 20; w++) {
+        await sleep(250);
+        if (!_ccInviteModalOpen()) {
+          console.log("[LeadCaptura] connect-queue: invitation sent ✓");
+          return { ok: true };
+        }
+      }
+    }
+
+    if (!_ccInviteModalOpen()) return { ok: true };
+    console.log("[LeadCaptura] connect-queue: could not dismiss modal");
+    return { ok: false, reason: "send_failed" };
+  }
+
+  // Called on every profile page. If there is a pending connect queue in
+  // chrome.storage.local, runs the connect flow and advances to the next URL.
+  async function maybeRunConnectQueue() {
+    let queueData;
+    try {
+      queueData = await new Promise((r) =>
+        chrome.storage.local.get("lc_connect_queue", r)
+      );
+    } catch {
+      return;
+    }
+    const queue = queueData?.lc_connect_queue;
+    if (!queue || !queue.urls?.length) return;
+
+    // Only run on profile pages
+    if (!location.pathname.startsWith("/in/")) return;
+
+    // Let the page settle before interacting
+    await Human.sleep(1800 + Math.random() * 1200);
+
+    // Bail on security challenge
+    if (_ccDetectChallenge()) {
+      await new Promise((r) => chrome.storage.local.remove("lc_connect_queue", r)).catch(() => {});
+      Overlay.toast?.(
+        "⚠️ LinkedIn security check detected — Connect All stopped. Please complete the challenge.",
+        9000
+      );
+      return;
+    }
+
+    // Run the connect flow
+    let result;
+    try {
+      result = await _ccConnectOnProfile();
+    } catch (e) {
+      result = { ok: false, reason: String(e) };
+    }
+
+    // Update persistent queue state
+    const [, ...remaining] = queue.urls;
+    const updatedQueue = {
+      ...queue,
+      urls: remaining,
+      sent: queue.sent + (result.ok ? 1 : 0),
+      failed: queue.failed + (result.ok ? 0 : 1),
+      results: {
+        ...(queue.results || {}),
+        [queue.urls[0]]: result.ok ? "sent" : (result.reason || "failed"),
+      },
+    };
+
+    // Show brief progress toast on the profile page
+    const done = updatedQueue.sent + updatedQueue.failed;
+    Overlay.toast?.(
+      result.ok
+        ? `Connected ✓  ${done}/${updatedQueue.total}`
+        : `Skipped (${result.reason || "failed"})  ${done}/${updatedQueue.total}`,
+      2800
+    );
+
+    if (remaining.length > 0) {
+      // Human-paced gap between profiles — 4-tier distribution, same as
+      // the old inline approach so the rhythm is statistically consistent.
+      const r = Math.random();
+      const gap =
+        r < 0.60 ? 5000 + Math.random() * 5000   // 5-10s  (60 %)
+        : r < 0.82 ? 11000 + Math.random() * 8000 // 11-19s (22 %)
+        : r < 0.93 ? 21000 + Math.random() * 12000 // 21-33s (11 %)
+        : 38000 + Math.random() * 22000;            // 38-60s  (7 %)
+
+      await new Promise((res) =>
+        chrome.storage.local.set({ lc_connect_queue: updatedQueue }, res)
+      ).catch(() => {});
+      await Human.sleep(gap);
+      location.href = remaining[0];
+    } else {
+      // Queue exhausted — clear storage and navigate back to search
+      await new Promise((r) => chrome.storage.local.remove("lc_connect_queue", r)).catch(() => {});
+      // Store a summary so the search page can show a toast when it loads
+      await new Promise((res) =>
+        chrome.storage.local.set({
+          lc_connect_summary: {
+            sent: updatedQueue.sent,
+            failed: updatedQueue.failed,
+            total: updatedQueue.total,
+            results: updatedQueue.results,
+          },
+        }, res)
+      ).catch(() => {});
+      Overlay.toast?.("All done! Returning to results…", 3000);
+      await Human.sleep(1500 + Math.random() * 1000);
+      if (updatedQueue.returnUrl) location.href = updatedQueue.returnUrl;
+    }
+  }
+
+  // Called on search/list pages to pick up a completed connect summary.
+  async function maybeShowConnectSummary() {
+    try {
+      const data = await new Promise((r) =>
+        chrome.storage.local.get(["lc_connect_summary", "lc_connect_queue"], r)
+      );
+      if (data.lc_connect_summary) {
+        const s = data.lc_connect_summary;
+        const msg =
+          `Connect All done: ${s.sent} sent, ${s.failed} skipped out of ${s.total} ✓`;
+        Overlay.toast?.(msg, 7000);
+        Overlay.applyConnectResults?.(s.results || {});
+        await new Promise((r) =>
+          chrome.storage.local.remove("lc_connect_summary", r)
+        ).catch(() => {});
+      }
+      // Stale queue left over (e.g. extension reloaded mid-run)
+      if (data.lc_connect_queue && data.lc_connect_queue.urls?.length === 0) {
+        const q = data.lc_connect_queue;
+        Overlay.toast?.(
+          `Connect All: ${q.sent} sent, ${q.failed} skipped ✓`, 5000
+        );
+        Overlay.applyConnectResults?.(q.results || {});
+        await new Promise((r) =>
+          chrome.storage.local.remove("lc_connect_queue", r)
+        ).catch(() => {});
+      }
+    } catch {}
+  }
+  // ─── end Connect All queue ─────────────────────────────────────────────────
+
   function onPathChange() {
     // Skip the /overlay/contact-info/ sub-route that scrapeContactInfo
     // navigates to temporarily via pushState. We don't want to unmount
@@ -151,6 +500,10 @@
       setTimeout(() => {
         Overlay.renderProfilePanel();
         Overlay.triggerAutoSave?.();
+        // Connect All queue: run connect flow if a queue is pending
+        maybeRunConnectQueue().catch((e) =>
+          console.warn("[LeadCaptura] connect queue error", e?.message || e)
+        );
       }, 50);
     }
 
@@ -173,6 +526,8 @@
           Overlay.renderToolbar();
           Overlay.mountSelectAllHeader?.();
           document.body.classList.add("lc-toolbar-mounted");
+          // Show Connect All summary toast if we just returned from a run
+          maybeShowConnectSummary().catch(() => {});
         }
         Overlay.decorateSearchCards();
       }, 600);

@@ -64,7 +64,7 @@ python3 -c "import json; json.load(open('extension/manifest.json'))"
 zip -r leadcaptura-extension.zip extension
 ```
 
-After editing content scripts, also reload the LinkedIn tab — Chrome only re-injects on tab reload.
+After editing content scripts, reload the extension (`chrome://extensions` → 🔄) **and** hard-reload the LinkedIn tab (Ctrl+R) — Chrome only injects content scripts on tab load, so an open tab keeps the old code. Confirm the new build is live by checking the `LeadCaptura v<version>` badge in the bottom toolbar.
 
 ## Backend architecture (`/api`)
 
@@ -138,24 +138,15 @@ Two-column screen. Left rail is profile + stage selector + tasks + lead-info fie
 
 ## Extension architecture (`/extension`)
 
-> **🔒 LOCKED STABLE BASELINE — `extension-v1.0.34-stable` (commit `bdc96af`).**
-> The per-card Save-chip detection and the bulk-Connect anti-bot timing are
-> confirmed working as of v1.0.34 and **must not regress** while new features
-> are added. Do **not** modify the following without an explicit request to
-> change *that specific behavior*:
+> **Anti-bot timing is load-bearing — do not regress it.** `connectAllVisible`
+> and `_scrollLoadPage` in `overlay.js` use a 4-tier gap distribution + periodic
+> micro-breaks and incremental (not jump-to-bottom) scrolling. Keep those
+> distributions; see "Bot-detection avoidance" below. The `main.js` cadence
+> (1.5s decorate interval, `location.search` watcher, scroll-stop re-decorate)
+> is what keeps chips appearing on lazily-rendered/paginated cards — leave it.
 >
-> - `overlay.js` → `decorateSearchCards`, `climbToCard`/`ownerCount` (card
->   detection), `_isActionButton`, `_resolveCardOwnerLink`, `injectInlineSave`,
->   `profileFromCard` (incl. the slug-label fallback that injects a chip even
->   when the name can't be resolved).
-> - `overlay.js` → `connectAllVisible`, `_scrollLoadPage`, `_sendConnectOnCard`
->   and their timing distributions (4-tier gaps + micro-breaks).
-> - `main.js` → the `location.search` watcher, scroll-stop re-decorate, and the
->   1.5s decorate interval.
->
-> If a new feature seems to require touching these, prefer adding alongside
-> rather than editing in place. To restore the baseline: `git checkout bdc96af`
-> (or the `extension-v1.0.34-stable` tag in the local clone).
+> The version is bumped in `manifest.json` on every shippable change and the
+> zip is named with it (`leadcaptura-extension-v<ver>.zip`).
 
 ```
 manifest.json                MV3, host: linkedin.com only (backend host requested at runtime)
@@ -178,6 +169,87 @@ options/                     API key + capture behavior settings (incl. autoEnri
 4. **Real DOM events.** Clicks go through `dispatchHumanClick` which fires `pointerover` → `pointerdown` → `pointerup` → `click` with realistic coordinates.
 5. **Abort on challenge.** `detectChallenge()` aborts and reports failure if a captcha/checkpoint surfaces.
 6. **Daily caps live server-side.** The extension only runs what `/extension/jobs/next` hands it.
+
+### Search-card decoration + bulk Connect/Follow (regular LinkedIn people search)
+
+The hardest-won part of the extension. The model: `decorateSearchCards()`
+anchors on each **native action button** (`_isActionButton` → Connect / Follow /
+Message / Pending, matched by **whole-word** `\bconnect\b` etc. so the rendered
+"+ Connect" label matches and "Connected"/"Following" don't), climbs to the
+first ancestor that contains a profile link (`cardFromButton`) — that ancestor
+is the row — and injects the Save chip **inline before that button** (the chip
+must NOT be `position:absolute`; absolute placement collapsed every card's chip
+onto one shared positioned ancestor, so only the first profile appeared chipped).
+A link-only fallback pass covers rows with no recognised button.
+
+Three URL→element registries are the single source of truth for bulk actions:
+`injectedSaves` (url→chip wrapper), `chipCardEl` (url→row), and `chipActionBtn`
+(url→the exact native button the chip sits beside). **Bulk Connect/Follow acts
+on the stored button directly** (`_actionBtnForUrl` + `_classifyButton`) rather
+than re-scanning the row — re-scanning was unreliable and produced "No action"
+on connectable cards. `_gcInjected()` drops all three when a node leaves the DOM.
+
+`connectAllVisible()` per row: Connect → `_sendConnectOnCard` clicks Connect,
+waits for the "Add a note to your invitation?" modal, then clicks **"Send
+without a note"**; Follow-only → `_sendFollowOnCard` clicks Follow; already
+connected/pending → skipped. Critical correctness rules:
+- `_forceClick` is the click-of-last-resort and tries **four** strategies in
+  order: native `.click()`, a full pointer/mouse sequence on the button, the
+  same sequence on the button's inner `<span>` (some handlers bind to the
+  child), and an Enter keydown/keyup. LinkedIn (Ember) honours untrusted events,
+  so the first usually lands — but the send-invitation button needs the others.
+- The send button finder (`_findSendWithoutNoteButton`) scans the **whole
+  document**, not just the modal subtree. A previous version scoped it to the
+  matched modal node and broke when LinkedIn rendered the footer buttons outside
+  it — the finder returned null and the click silently never happened. Prefer a
+  visible+enabled match but fall back to any match rather than bail.
+- Report `ok:true` **only after the invitation modal actually closes** from
+  sending. Never close the modal via its X and call it success — that produced
+  fake "Invited ✓" with no invite sent. STEP 4 of `_sendConnectOnCard` is the
+  sole success signal; `connectAllVisible`'s post-call guard now only *dismisses*
+  a leftover dialog on failure — it never re-sends.
+
+### Send-invitation sequence — single owner (load-bearing)
+
+The send flow had three competing clickers (`_sendConnectOnCard`, a
+`connectAllVisible` post-call guard, and the global watcher) racing on the same
+"Send without a note" button. As of v1.0.75 there is **one owner per context**:
+
+- **During a Connect All run** (`state.connectActive === true`):
+  `_sendConnectOnCard` owns the whole thing as an explicit, logged 4-step
+  sequence — STEP 1 click Connect → STEP 2 wait for the "Add a note to your
+  invitation?" dialog (≤8s) → STEP 3 `_forceClick` "Send without a note" → STEP 4
+  confirm the dialog closed (= invite actually sent). Each step logs
+  `[LeadCaptura] step N → …`, so a stuck run is traceable from the console.
+- **Outside a run** (a manual Connect click by the user): the global watcher
+  `_startInviteAutoConfirm()` handles it — a `MutationObserver` on
+  `document.documentElement` + 600ms poll that waits ~250ms for the modal to
+  mount (Ember binds the handler late; clicking mid-animation is a no-op) then
+  `_forceClick`s the button. **It stands down (`if (state.connectActive) return`)
+  during a Connect All run** so it never double-clicks. Keep this guard.
+
+The watcher is **pure DOM — no `chrome.*` calls** — so it survives an
+orphaned/stale content-script context. `_invitationModalOpen()` returns true if
+either a matching dialog node is visible **or** a visible "Send without a note"
+button exists, so neither owner bails when LinkedIn changes the dialog's `role`.
+
+### Stale-tab self-heal + version badge
+
+Updating an unpacked extension does **not** re-inject content scripts into
+already-open tabs — Chrome only injects on tab load. So a tab can keep running
+an old `overlay.js` indefinitely. Two mechanisms make this survivable:
+
+- **`main.js` stale detector** (`_checkRuntime` + `_killStaleUi`): when
+  `chrome.runtime?.id` flips to undefined (context invalidated by an extension
+  reload), it rips out every LeadCaptura chip/overlay, shows a red full-width
+  banner, and force-reloads the tab so fresh scripts load. This guards against
+  orphaned chip click-handlers firing with stale, wrong-profile data.
+- **Version badge**: the bottom toolbar renders `LeadCaptura v<version>` (read
+  from `chrome.runtime.getManifest().version`). When debugging "my fix isn't
+  working", check this first — if it doesn't match the installed version the tab
+  is on stale code and just needs a reload. `_lcToast()` is a toolbar-independent
+  on-page toast ("sending invitation… / sent ✓") giving live proof the current
+  build is the one executing.
 
 ### Contact Info enrichment flow
 

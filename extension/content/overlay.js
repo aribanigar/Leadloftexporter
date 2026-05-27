@@ -18,6 +18,12 @@
   const Api = globalThis.__lcApi;
   const Storage = globalThis.__lcStorage;
 
+  // Live build version — stamped into the toolbar so the user can confirm which
+  // overlay.js is actually running on the tab (updating an unpacked extension
+  // does NOT re-inject scripts into already-open tabs; you must reload the tab).
+  let _LC_VERSION = "?";
+  try { _LC_VERSION = chrome.runtime.getManifest().version; } catch {}
+
   // chrome.runtime.openOptionsPage is only callable from extension pages and
   // the service worker — not from content scripts. Route through the SW.
   function openOptions() {
@@ -86,6 +92,36 @@
       state.connectError = e?.message || String(e);
     }
     return state.options;
+  }
+
+  // Self-contained on-page toast — does NOT depend on the toolbar being
+  // rendered, so it works as a live signal that the auto-confirm watcher (which
+  // can fire on any page state) actually executed. This is the user-visible
+  // proof that the freshly-loaded build is running on the tab.
+  let _lcToastEl = null;
+  let _lcToastTimer = null;
+  function _lcToast(msg, ms = 2600) {
+    try {
+      if (!_lcToastEl || !document.documentElement.contains(_lcToastEl)) {
+        _lcToastEl = document.createElement("div");
+        _lcToastEl.id = "lc-toast";
+        _lcToastEl.style.cssText = [
+          "position:fixed", "left:50%", "bottom:84px", "transform:translateX(-50%)",
+          "z-index:2147483647", "background:#0a66c2", "color:#fff",
+          "padding:10px 18px", "border-radius:24px",
+          "font:600 13px/1.4 -apple-system,system-ui,sans-serif",
+          "box-shadow:0 6px 24px rgba(0,0,0,.28)", "pointer-events:none",
+          "max-width:80vw", "text-align:center",
+        ].join(";");
+        document.documentElement.appendChild(_lcToastEl);
+      }
+      _lcToastEl.textContent = msg;
+      _lcToastEl.style.opacity = "1";
+      clearTimeout(_lcToastTimer);
+      _lcToastTimer = setTimeout(() => {
+        if (_lcToastEl) _lcToastEl.style.opacity = "0";
+      }, ms);
+    } catch {}
   }
 
   function flashStatus(msg, level = "info") {
@@ -791,7 +827,7 @@
       root.append(
         el("div", { class: "lc-toolbar-inner" },
           el("span", { class: "lc-logo" }, "L"),
-          el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+          el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
           el("span", { class: "lc-flex" }),
           el("span", { class: "lc-muted" }, "Not connected — "),
           el(
@@ -815,7 +851,7 @@
         "div",
         { class: "lc-toolbar-inner" },
         el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
         dropdown("Segment", segmentName, opts.segments, (s) => {
           state.selection.segmentId = s.id;
           renderToolbar();
@@ -1139,15 +1175,15 @@
   // NOTE: LinkedIn caps weekly invites (~100-200). This automates the clicking;
   // it cannot bypass that cap.
   function _findConnectButtonInCard(card) {
-    const buttons = Array.from(card.querySelectorAll("button"));
+    const buttons = Array.from(card.querySelectorAll("button, a, [role='button']"));
     for (const b of buttons) {
       const aria = (b.getAttribute("aria-label") || "").trim();
       const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
       if (b.classList.contains("lc-inline-save")) continue;
-      if (/pending/i.test(aria) || /pending/i.test(txt)) continue;
-      // Match a real Connect button by visible text ("Connect") or aria-label
-      // ("Invite <Name> to connect"). Skip Follow / Message / Save.
-      if (/^connect$/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /^connect$/i.test(aria)) {
+      if (/\bpending\b/i.test(aria) || /\bpending\b/i.test(txt)) continue;
+      // Match a real Connect control by whole-word "Connect" (handles the
+      // "+ Connect" rendering) or the "Invite <Name> to connect" aria-label.
+      if (/\bconnect\b/i.test(txt) || /\binvite\b.*\bto connect\b/i.test(aria) || /\bconnect\b/i.test(aria)) {
         return b;
       }
     }
@@ -1163,61 +1199,281 @@
   //   "unknown"   → no recognisable action button
   function _cardConnectState(card) {
     let hasConnect = false, hasPending = false, hasMessage = false, hasFollow = false;
-    for (const b of card.querySelectorAll("button")) {
+    for (const b of card.querySelectorAll("button, a, [role='button']")) {
       if (b.classList.contains("lc-inline-save")) continue;
       const aria = (b.getAttribute("aria-label") || "").trim();
       const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      if (/^pending$/i.test(txt) || /\bpending\b/i.test(aria)) hasPending = true;
-      else if (
-        /^connect$/i.test(txt) ||
-        /\binvite\b.*\bto connect\b/i.test(aria) ||
-        /^connect$/i.test(aria)
-      ) hasConnect = true;
-      else if (/^message\b/i.test(txt) || /^message\b/i.test(aria)) hasMessage = true;
-      else if (/^follow$/i.test(txt) || /^follow$/i.test(aria)) hasFollow = true;
+      const hay = txt + " || " + aria;
+      if (/\bpending\b/i.test(hay)) hasPending = true;
+      else if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) hasConnect = true;
+      else if (/\bfollow\b/i.test(hay)) hasFollow = true; // \bfollow\b excludes "Following"
+      else if (/\bmessage\b/i.test(hay)) hasMessage = true;
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
-    if (hasMessage) return "connected";
     if (hasFollow) return "follow";
+    if (hasMessage) return "connected";
     return "unknown";
   }
 
-  async function _sendConnectOnCard(card) {
-    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
-    const { sleep } = globalThis.__lcHuman;
-    const btn = _findConnectButtonInCard(card);
-    if (!btn) return { ok: false, reason: "no_connect_button" };
-    await dispatchHumanClick(btn);
-    await sleep(700 + Math.random() * 500);
-    // A modal usually appears with "Send without a note" / "Send". When the
-    // tab is BACKGROUNDED, LinkedIn can defer rendering the modal, so poll a
-    // few times (longer overall) rather than a single short wait.
-    const sendSel = [
-      "button[aria-label*='Send without a note' i]",
-      "button[aria-label='Send now']",
-      "button[aria-label*='Send invitation' i]",
-      "button[aria-label*='Send' i]",
-      "div[role='dialog'] button.artdeco-button--primary",
+  // Classify a SINGLE native button (the exact one the chip sits beside). This
+  // is the authoritative signal for Connect All — no card re-scan, no chance of
+  // reading a neighbouring row's button.
+  function _classifyButton(btn) {
+    if (!btn || btn.classList?.contains("lc-inline-save")) return "unknown";
+    const aria = (btn.getAttribute("aria-label") || "").trim();
+    const txt = (btn.textContent || "").replace(/\s+/g, " ").trim();
+    const hay = txt + " || " + aria;
+    // Whole-word matching handles the "+ Connect" / "+ Follow" rendering.
+    if (/\bpending\b/i.test(hay)) return "pending";
+    if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) return "connect";
+    if (/\bfollow\b/i.test(hay)) return "follow"; // excludes "Following"
+    if (/\bmessage\b/i.test(hay)) return "connected";
+    return "unknown";
+  }
+
+  // The native action button captured for this URL at chip-injection time,
+  // only if it's still attached to the live DOM.
+  function _actionBtnForUrl(url) {
+    const b = chipActionBtn.get(url);
+    return b && document.body.contains(b) ? b : null;
+  }
+
+  // An element the user can actually see and click (rules out the stale,
+  // hidden, detached modal duplicates LinkedIn can leave in the DOM — clicking
+  // one of those does nothing while the real visible modal stays open).
+  function _isVisible(el) {
+    if (!el || !el.isConnected) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+    return true;
+  }
+
+  // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
+  function _findInvitationModal() {
+    const candidates = document.querySelectorAll(
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+    );
+    for (const d of candidates) {
+      if (!_isVisible(d)) continue;
+      const t = (d.textContent || "").toLowerCase();
+      if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
+        return d;
+    }
+    return null;
+  }
+
+  // True while the invitation modal is on screen. We consider it open if either
+  // a matching dialog node is visible OR a "Send without a note" button is
+  // visible — whichever our heuristics catch first. This prevents the watcher
+  // from bailing when the dialog's role attribute changes but the button is
+  // clearly there.
+  function _invitationModalOpen() {
+    if (_findInvitationModal()) return true;
+    const b = _findSendWithoutNoteButton();
+    return !!(b && _isVisible(b));
+  }
+
+  // Find the "Send without a note" button. Searches the WHOLE document (not
+  // scoped to the modal element — LinkedIn sometimes renders the footer buttons
+  // in a sibling node or a separate portal). Prefers a visible button but falls
+  // back to any match so we never silently bail when the button is found but our
+  // visibility heuristic is overly strict.
+  function _findSendWithoutNoteButton() {
+    const all = Array.from(
+      document.querySelectorAll("button, [role='button'], a[role='button']")
+    ).filter((b) => !b.classList?.contains("lc-inline-save"));
+    const labelOf = (b) => {
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = (b.getAttribute("aria-label") || "").trim();
+      return { t, a };
+    };
+    const tests = [
+      (s) => /^send without a note$/i.test(s),
+      (s) => /\bsend without a note\b/i.test(s),
+      (s) => /^send now$/i.test(s),
+      (s) => /^send( invitation)?$/i.test(s),
     ];
-    let sendBtn = null;
-    for (let attempt = 0; attempt < 3 && !sendBtn; attempt++) {
-      sendBtn = await waitFor(sendSel, { timeout: 3000 });
-      if (!sendBtn) await sleep(700);
+    for (const test of tests) {
+      const matches = all.filter((b) => {
+        const { t, a } = labelOf(b);
+        return test(t) || test(a);
+      });
+      if (!matches.length) continue;
+      // Prefer a visible, enabled button; otherwise take the first match.
+      const visible = matches.filter((b) => _isVisible(b) && !b.disabled);
+      const pick = visible[0] || matches.find((b) => !b.disabled) || matches[0];
+      if (pick) return pick;
     }
-    if (sendBtn) {
-      await dispatchHumanClick(sendBtn);
-      await sleep(500 + Math.random() * 400); // 500-900ms — modal dismiss animation
-      return { ok: true };
+    return null;
+  }
+
+  // Close any open invitation-modal dialog. Tries the modal's own dismiss button
+  // first (artdeco-modal__dismiss or aria-label variations), then falls back to
+  // Escape on both the modal element and document.
+  function _closeAnyDialog() {
+    const modal = _findInvitationModal();
+    const closeSelectors =
+      ".artdeco-modal__dismiss, button[aria-label='Dismiss'], " +
+      "button[aria-label*='Dismiss' i], button[aria-label*='Close' i]";
+    const close =
+      (modal && modal.querySelector(closeSelectors)) ||
+      document.querySelector(closeSelectors);
+    if (close) {
+      try { close.click(); } catch {}
     }
-    // No modal — LinkedIn may have sent directly, OR an email-verify wall
-    // surfaced. Dismiss any lingering dialog so the next card isn't blocked.
-    const dismiss = document.querySelector("button[aria-label='Dismiss']");
-    if (dismiss) { try { dismiss.click(); } catch {} }
-    return { ok: true, note: "no_modal" };
+    // Also dispatch Escape on the modal itself and on document — LinkedIn's
+    // focus-trap keydown handler usually lives on the modal container.
+    try {
+      if (modal) modal.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    } catch {}
+    try {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    } catch {}
+  }
+
+  // Fire a full pointer/mouse event sequence on a single element at its centre.
+  function _dispatchPointerSequence(el) {
+    try {
+      const r = el.getBoundingClientRect();
+      const o = {
+        bubbles: true, cancelable: true, view: window,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        button: 0, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true,
+      };
+      el.dispatchEvent(new PointerEvent("pointerover", o));
+      el.dispatchEvent(new PointerEvent("pointerenter", o));
+      el.dispatchEvent(new PointerEvent("pointerdown", o));
+      el.dispatchEvent(new MouseEvent("mousedown", o));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("mouseup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("click", { ...o, buttons: 0 }));
+    } catch {}
+  }
+
+  // Click an element as reliably as possible. LinkedIn's button handler may be
+  // bound to the <button>, to an inner <span>, or driven by keyboard activation,
+  // so we try ALL of: native .click(), a pointer/mouse sequence on the button AND
+  // its first child span, and an Enter/Space keydown — until something lands.
+  function _forceClick(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+    try { el.focus(); } catch {}
+    // 1. The simplest path React/Ember honour even for untrusted events.
+    try { el.click(); } catch {}
+    // 2. Full pointer/mouse sequence on the button itself.
+    _dispatchPointerSequence(el);
+    // 3. Same sequence on the inner label span (some handlers sit on the child).
+    try {
+      const inner = el.querySelector("span, .artdeco-button__text");
+      if (inner && inner !== el) {
+        inner.click?.();
+        _dispatchPointerSequence(inner);
+      }
+    } catch {}
+    // 4. Keyboard activation — buttons fire their action on Enter/Space too.
+    try {
+      const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      el.dispatchEvent(new KeyboardEvent("keydown", kopts));
+      el.dispatchEvent(new KeyboardEvent("keyup", kopts));
+    } catch {}
+  }
+
+  // The complete Connect flow for ONE card, as a plain linear sequence:
+  //   STEP 1 — click the card's "Connect" button.
+  //   STEP 2 — wait for the "Add a note to your invitation?" dialog to open.
+  //   STEP 3 — click "Send without a note".
+  //   STEP 4 — confirm the dialog closed (= the invite was actually sent).
+  // This function is the SINGLE owner of the sequence during a Connect All run;
+  // the global auto-confirm watcher stands down while `state.connectActive` is
+  // true (see _autoConfirmInviteModal) so nothing double-clicks.
+  async function _sendConnectOnCard(card, presetBtn) {
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // ---- STEP 1: click Connect -------------------------------------------
+    const connectBtn =
+      presetBtn && document.body.contains(presetBtn)
+        ? presetBtn
+        : _findConnectButtonInCard(card);
+    if (!connectBtn) return { ok: false, reason: "no_connect_button" };
+    console.log("[LeadCaptura] step 1 → click Connect");
+    await dispatchHumanClick(connectBtn);
+
+    // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
+    let dialogOpen = false;
+    for (let i = 0; i < 32; i++) {
+      await sleep(250);
+      if (_invitationModalOpen()) { dialogOpen = true; break; }
+    }
+    if (!dialogOpen) {
+      // No dialog appeared. Some connections (e.g. people who already follow
+      // you) complete instantly with no "add a note" step — if the row no
+      // longer offers Connect, treat it as done; otherwise report no-dialog.
+      const cls = _classifyButton(connectBtn);
+      if (cls === "pending" || cls === "connected") return { ok: true };
+      console.log("[LeadCaptura] step 2 → no dialog opened after 8s");
+      return { ok: false, reason: "no_dialog" };
+    }
+    console.log("[LeadCaptura] step 2 → dialog opened");
+
+    // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
+    // LinkedIn's backend can take 1-4s to process and close the dialog, so we
+    // click, then wait, and retry the click only while the dialog is still up.
+    for (let attempt = 0; attempt < 6 && _invitationModalOpen(); attempt++) {
+      const sendBtn = _findSendWithoutNoteButton();
+      if (!sendBtn) {
+        // Button not rendered yet (or already gone mid-close) — give it a beat.
+        await sleep(300);
+        continue;
+      }
+      console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
+      _forceClick(sendBtn);
+      // STEP 4: wait up to ~4s for the dialog to disappear = invite sent.
+      for (let w = 0; w < 16; w++) {
+        await sleep(250);
+        if (!_invitationModalOpen()) {
+          console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+          return { ok: true };
+        }
+      }
+    }
+
+    // Dialog gone by now means it was sent on a late close; still-open means
+    // the send genuinely failed.
+    if (!_invitationModalOpen()) return { ok: true };
+    console.log("[LeadCaptura] step 3/4 → could not send, giving up");
+    return { ok: false, reason: "send_failed" };
+  }
+
+  // Click a card's native "Follow" button (no modal). Used by Connect All for
+  // rows where LinkedIn offers Follow instead of Connect — the user wants those
+  // followed automatically rather than skipped.
+  async function _sendFollowOnCard(card, presetBtn) {
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const { sleep } = globalThis.__lcHuman;
+    const btn =
+      presetBtn && document.body.contains(presetBtn)
+        ? presetBtn
+        : Array.from(card ? card.querySelectorAll("button") : []).find((b) => {
+            if (b.classList.contains("lc-inline-save")) return false;
+            const aria = (b.getAttribute("aria-label") || "").trim();
+            const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+            return /^follow$/i.test(txt) || /^follow\b/i.test(aria) || /\bfollow\b/i.test(aria);
+          });
+    if (!btn) return { ok: false, reason: "no_follow_button" };
+    await dispatchHumanClick(btn);
+    await sleep(450 + Math.random() * 400);
+    return { ok: true, followed: true };
   }
 
   function _cardForUrl(url) {
+    // Prefer the exact card element captured when the chip was injected — it
+    // is the authoritative single-profile card boundary the detector resolved.
+    const exact = chipCardEl.get(url);
+    if (exact && document.body.contains(exact)) return exact;
     const wrap = injectedSaves.get(url);
     if (wrap && document.body.contains(wrap)) {
       return wrap.closest("li, article, [role='listitem'], [role='row']") || wrap.parentElement;
@@ -1314,187 +1570,74 @@
     try { decorateSearchCards(); } catch {}
   }
 
-  // Bulk connect, AUTO-ADVANCING across result pages. After every card on a
-  // page is invited it clicks "Next", waits for the new page, and continues —
-  // until the last page, the safety cap, or the user clicks Stop.
+  // Bulk connect via profile-page navigation.
   //
-  // SAFETY CAP: LinkedIn restricts accounts that exceed ~100-200 invites/week.
-  // We hard-stop a single run at MAX_INVITES_PER_RUN so the auto-advance can't
-  // silently blow past the weekly budget across 100 pages.
+  // Each profile is opened in the SAME tab. The actual connect flow runs in
+  // main.js (maybeRunConnectQueue) which picks up from chrome.storage.local
+  // after each navigation and drives the "click Connect → Send without a note"
+  // sequence on the profile page. When all profiles are done, main.js
+  // navigates back to this search URL automatically.
+  //
+  // Why profile pages instead of inline search-card buttons? The search-card
+  // "Connect" button is a simplified control that does NOT always open the
+  // "Add a note?" modal reliably. The full-page profile button is the one
+  // LinkedIn's own UX always uses, and it consistently triggers the modal.
   async function connectAllVisible() {
     const { sleep } = globalThis.__lcHuman;
-    const MAX_INVITES_PER_RUN = 100;
 
-    // Page 1 honours an explicit selection (if any). Later pages process every
-    // visible card — the page-1 ticks don't apply to other pages.
     const page1Selection =
       state.selectedUrls.size > 0 ? new Set(state.selectedUrls) : null;
 
+    let urls = (
+      page1Selection
+        ? Array.from(page1Selection)
+        : _allChipUrls()
+    ).filter((u) => u && u.includes("/in/"));
+
+    if (!urls.length) {
+      flashStatus("No profiles selected to connect with", "warn");
+      return;
+    }
+
+    // Normalize to absolute LinkedIn URLs
+    urls = urls.map((u) => {
+      try { return new URL(u, "https://www.linkedin.com").href; }
+      catch { return u; }
+    });
+
     state.connectActive = true;
     state.connectCancel = false;
-    state.connectProgress = { current: 0, total: MAX_INVITES_PER_RUN, name: "" };
     unmountSelectAllHeader();
     renderToolbar();
 
-    let sent = 0;
-    let skipped = 0;
-    let alreadyDone = 0; // already invited / already connected — skipped
-    let pageNum = 1;
-    let cancelled = false;
-    let hitCap = false;
-    // Periodic micro-break counter: every 12-16 actual invites, insert a
-    // longer pause (22-42s) to break any detectable rhythmic pattern.
-    let invitesSinceBreak = 0;
-    let nextBreakAt = 12 + Math.floor(Math.random() * 5);
+    const queue = {
+      urls,
+      returnUrl: location.href,
+      total: urls.length,
+      sent: 0,
+      failed: 0,
+      results: {},
+      startedAt: Date.now(),
+    };
 
-    while (!state.connectCancel) {
-      // Render all cards on this page, then read them.
-      await _scrollLoadPage();
-      if (state.connectCancel) { cancelled = true; break; }
-
-      // Targets from the CHIPS (single source of truth). Page 1 honours the
-      // user's tick selection; later pages take every chip on the page.
-      let urls =
-        pageNum === 1 && page1Selection
-          ? Array.from(page1Selection).filter((u) => u && u.includes("/in/"))
-          : _allChipUrls();
-
-      for (let i = 0; i < urls.length; i++) {
-        if (state.connectCancel) { cancelled = true; break; }
-        if (sent >= MAX_INVITES_PER_RUN) { hitCap = true; break; }
-        const url = urls[i];
-        state.connectProgress = {
-          current: sent + 1,
-          total: MAX_INVITES_PER_RUN,
-          name: `p${pageNum}: ${_labelFromUrl(url)}`,
-        };
-        _setChipState(url, "saving", "Connecting…");
-        renderToolbar();
-
-        const card = _cardForUrl(url);
-        if (!card) { skipped++; continue; }
-
-        // SKIP people we've already contacted or are already connected to —
-        // don't waste the daily invite quota. The native button state is the
-        // source of truth: Pending = request already sent, Message-without-
-        // Connect = already a connection, Follow-only = can't connect.
-        const cstate = _cardConnectState(card);
-        if (cstate === "pending") {
-          alreadyDone++;
-          _setChipState(url, "saved", "Already sent ✓");
-          continue;
-        }
-        if (cstate === "connected") {
-          alreadyDone++;
-          _setChipState(url, "saved", "Connected ✓");
-          continue;
-        }
-        if (cstate !== "connect") {
-          skipped++;
-          _setChipState(url, "error", cstate === "follow" ? "Follow only" : "No Connect");
-          continue;
-        }
-
-        // Instant (not "smooth") — smooth scroll relies on the rendering
-        // pipeline which Chrome pauses in a backgrounded tab; instant keeps
-        // the run working when the user switches to another tab.
-        try { card.scrollIntoView({ block: "center" }); } catch {}
-        // Variable reading pause: glance at the card before clicking.
-        // 15% chance of a longer "reconsidering" pause (reads the headline).
-        const readMs = 600 + Math.random() * 800;
-        const readBonus = Math.random() < 0.15 ? 900 + Math.random() * 1100 : 0;
-        await sleep(readMs + readBonus);
-
-        let res;
-        try {
-          res = await _sendConnectOnCard(card);
-        } catch (e) {
-          res = { ok: false, reason: String(e) };
-        }
-        if (res.ok) {
-          sent++;
-          invitesSinceBreak++;
-          _setChipState(url, "saved", "Invited ✓");
-        } else {
-          skipped++;
-          _setChipState(url, "error", "No Connect");
-        }
-
-        // Pace only after an ACTUAL invite — skipped/already-done cards cost
-        // no quota, so don't burn the human-pacing delay on them.
-        if (res.ok && i < urls.length - 1 && !state.connectCancel && sent < MAX_INVITES_PER_RUN) {
-          let gap;
-          // Micro-break: every 12-16 invites take a genuine longer pause.
-          // Breaks any statistical fingerprint across a session.
-          if (invitesSinceBreak >= nextBreakAt) {
-            invitesSinceBreak = 0;
-            nextBreakAt = 12 + Math.floor(Math.random() * 5);
-            gap = 22000 + Math.random() * 20000; // 22-42s break
-            flashStatus(`Short break… (${sent} invites sent)`);
-          } else {
-            // 4-tier smooth distribution — avoids the detectable bimodal pattern
-            // of a fixed base + occasional long-tail that ML can fingerprint.
-            const r = Math.random();
-            if (r < 0.60) {
-              gap = 4000 + Math.random() * 4500;    // 4-8.5s  (60%)
-            } else if (r < 0.82) {
-              gap = 9000 + Math.random() * 8000;    // 9-17s   (22%)
-            } else if (r < 0.93) {
-              gap = 19000 + Math.random() * 13000;  // 19-32s  (11%)
-            } else {
-              gap = 38000 + Math.random() * 22000;  // 38-60s  (7%)
-            }
-          }
-          await sleep(gap);
-        }
-      }
-
-      if (state.connectCancel) { cancelled = true; break; }
-      if (hitCap) break;
-
-      // Advance to the next page.
-      const nextBtn = _findNextPageButton();
-      if (!nextBtn) break; // last page reached
-      flashStatus(`Page ${pageNum} done — ${sent} sent. Moving to next page…`);
-      const sig = _pageSignature();
-      // Inter-page pause: variable base + occasional "deciding if it's worth
-      // continuing" hesitation. Breaks the always-same-gap-between-pages pattern.
-      const pageGapBase = 8000 + Math.random() * 12000; // 8-20s
-      const pageGapBonus = Math.random() < 0.25 ? 12000 + Math.random() * 18000 : 0; // 25% → +12-30s
-      await sleep(pageGapBase + pageGapBonus);
-      if (state.connectCancel) { cancelled = true; break; }
-      try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
-      await sleep(600);
-      try {
-        await globalThis.__lcDom.dispatchHumanClick(nextBtn);
-      } catch {
-        try { nextBtn.click(); } catch {}
-      }
-      const changed = await _waitForPageChange(sig);
-      if (!changed) break; // page didn't advance — stop cleanly
-      pageNum++;
+    try {
+      await new Promise((res) =>
+        chrome.storage.local.set({ lc_connect_queue: queue }, res)
+      );
+    } catch (e) {
+      flashStatus("Could not save queue: " + String(e), "err");
+      state.connectActive = false;
+      mountSelectAllHeader();
+      renderToolbar();
+      return;
     }
 
-    state.connectActive = false;
-    state.connectProgress = null;
-    state.selectedUrls.clear();
-    mountSelectAllHeader();
-    renderToolbar();
-
-    const extra = [
-      alreadyDone ? `${alreadyDone} already contacted` : "",
-      skipped ? `${skipped} skipped` : "",
-    ].filter(Boolean).join(", ");
-    const tail = extra ? ` (${extra})` : "";
-    let msg;
-    if (cancelled) {
-      msg = `Stopped: ${sent} invites sent across ${pageNum} page(s)${tail}`;
-    } else if (hitCap) {
-      msg = `Reached ${MAX_INVITES_PER_RUN}-invite cap: ${sent} sent${tail}. Run again later.`;
-    } else {
-      msg = `Done: ${sent} invites sent across ${pageNum} page(s)${tail} ✓`;
-    }
-    flashStatus(msg, hitCap ? "warn" : "ok");
+    flashStatus(`Connect All: visiting ${urls.length} profile(s) one by one…`);
+    await sleep(800 + Math.random() * 600);
+    // Mark chips as "pending navigation"
+    for (const url of urls) _setChipState(url, "saving", "Queued…");
+    // Navigate to first profile — main.js takes over from here
+    location.href = urls[0];
   }
 
   // ====================================================================
@@ -1626,21 +1769,41 @@
   }
 
   function _jobLabel(card) {
+    const dis = card.querySelector("button[aria-label*='Dismiss' i]");
+    const aria = (dis?.getAttribute("aria-label") || "")
+      .replace(/^dismiss\s+/i, "")
+      .replace(/\s+job$/i, "")
+      .trim();
+    if (aria) return aria.slice(0, 60);
     const t =
       card.querySelector(
-        "a.job-card-list__title, a.job-card-container__link, .artdeco-entity-lockup__title, .job-card-list__title--link"
+        "a.job-card-list__title, a.job-card-container__link, .artdeco-entity-lockup__title, " +
+        ".job-card-list__title--link, [class*='title'], a, strong, h3"
       )?.innerText ||
-      card.querySelector("strong")?.innerText ||
       "";
-    return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 48) || "Job";
+    return (t || "Job").replace(/\s+/g, " ").trim().slice(0, 60) || "Job";
   }
 
-  // ----- Card detection (markup-agnostic, currentJobId-collision-proof) -----
-  // LinkedIn's search-results cards frequently expose only ONE page-level
-  // ?currentJobId=, identical on every card link, so keying cards by job id
-  // collapsed the whole list to a single card (the bug behind "detected 1
-  // cards"). We instead detect each card STRUCTURALLY — one box per job-title
-  // link — and key it per-card, independent of ids and class names.
+  // The repeated card unit for a Dismiss "X": climb until the node's PARENT
+  // holds 2+ dismiss buttons (i.e. the parent is the list and the node is one
+  // card among siblings). Works with NO job links or data-ids on the card —
+  // which is exactly the search-results layout LinkedIn now ships.
+  function _cardFromDismiss(btn) {
+    let node = btn;
+    for (let i = 0; i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+      const parent = node.parentElement;
+      if (
+        parent &&
+        parent.querySelectorAll("button[aria-label*='Dismiss' i]").length >= 2
+      ) {
+        return node;
+      }
+      node = parent;
+    }
+    return btn.closest("li") || btn.parentElement;
+  }
+
+  // ----- Card detection -----
 
   const _TITLE_LINK_SEL =
     "a.job-card-list__title, a.job-card-container__link, " +
@@ -1687,29 +1850,63 @@
     }
   }
 
+  // Smallest ancestor of a node that encloses a job link — used to climb from
+  // a card's Dismiss "X" up to the card container.
+  function _climbToJobBox(node) {
+    let n = node.parentElement;
+    for (let i = 0; i < 10 && n && n.tagName !== "BODY" && n.tagName !== "HTML"; i++) {
+      if (n.querySelector("a[href*='/jobs/']")) return n;
+      n = n.parentElement;
+    }
+    return null;
+  }
+
   function _jobCardEls() {
-    // Ignore the detail pane entirely — only the left results list gets chips.
-    const titleLinks = Array.from(document.querySelectorAll(_TITLE_LINK_SEL)).filter(
-      (l) => !_inDetailPane(l)
-    );
-    const boxes = [];
     const seen = new Set();
-    titleLinks.forEach((link) => {
-      let box = link.closest("li");
-      if (!box || _countContained(box, titleLinks) > 1) box = _climbByLinkCount(link, titleLinks);
-      if (box && !_inDetailPane(box) && !seen.has(box)) {
+    const boxes = [];
+    // No /jobs/ anchor requirement: modern LinkedIn cards navigate via the
+    // whole-card click / data-job-id and may not expose a job <a> inside, so
+    // requiring one rejected every card but the open one. We trust the
+    // strategy selectors instead and just dedupe + exclude the detail pane.
+    const add = (box) => {
+      if (box && !seen.has(box) && !_inDetailPane(box)) {
         seen.add(box);
         boxes.push(box);
       }
+    };
+
+    // PRIMARY: one card per Dismiss "X". Robust even when cards expose no job
+    // link or data-id (the current search-results layout). Climbs to the
+    // repeated card unit via _cardFromDismiss.
+    document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
+      if (_inDetailPane(btn)) return;
+      add(_cardFromDismiss(btn));
     });
-    // Attribute-tagged cards as an extra safety net (still excluding the pane).
-    document.querySelectorAll("li[data-occludable-job-id], [data-job-id]").forEach((c) => {
-      if (_inDetailPane(c)) return;
-      if (!seen.has(c) && c.querySelector("a[href*='/jobs/']")) {
-        seen.add(c);
-        boxes.push(c);
-      }
-    });
+
+    // SUPPLEMENTS — only when no dismiss buttons exist on the surface.
+    if (boxes.length === 0) {
+      document
+        .querySelectorAll(
+          "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
+          "[data-occludable-job-id], " +
+          "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
+          "li.discovery-templates-entity-item, " +
+          "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
+          "div[class*='jobs-job-board-list__item']"
+        )
+        .forEach(add);
+      const titleLinks = Array.from(
+        document.querySelectorAll(
+          "a[href*='/jobs/view/'], a[href*='currentJobId='], a.job-card-list__title, " +
+          "a.job-card-container__link, a.job-card-job-posting-card-wrapper__card-link"
+        )
+      ).filter((l) => !_inDetailPane(l));
+      titleLinks.forEach((link) => {
+        add(link.closest("li") || _climbByLinkCount(link, titleLinks));
+      });
+    }
+
+    // Keep the innermost when a parent and child both got detected.
     return boxes.filter((c) => !boxes.some((o) => o !== c && c.contains(o)));
   }
 
@@ -1851,6 +2048,48 @@
     }
     if (cards.length || created) {
       console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+    }
+    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
+    // up in screenshots — plus the console. Only while detection looks wrong.
+    try {
+      let badge = document.getElementById("lc-jobs-diag");
+      if (cards.length < 2) {
+        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
+        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
+        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
+          li.querySelector("a[href*='/jobs/']")
+        ).length;
+        const divJob = document.querySelectorAll(
+          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
+        ).length;
+        const card1 =
+          (probeCard?.tagName || "-") +
+          "." +
+          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
+        const txt =
+          "LC diag · cards=" + cards.length +
+          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
+          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
+          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
+          " liJob=" + liJob +
+          " divJob=" + divJob +
+          " card1=" + card1;
+        console.log("[LeadCaptura] jobs-diag " + txt);
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.id = "lc-jobs-diag";
+          badge.style.cssText =
+            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
+            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
+          document.documentElement.appendChild(badge);
+        }
+        badge.textContent = txt;
+      } else if (badge) {
+        badge.remove();
+      }
+    } catch {
+      /* diag is best-effort */
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
@@ -2332,8 +2571,12 @@
   async function _openJobDetail(card, expectedId) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
+    // Prefer a real job link; otherwise click the card's title/clickable area
+    // (current search-results cards open on card click, not via a job <a>).
     const link =
       card.querySelector("a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']") ||
+      card.querySelector("a[href*='/jobs/']") ||
+      card.querySelector("a, [class*='title'], strong, h3") ||
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
@@ -2607,10 +2850,26 @@
    * scroll lets stale buttons linger on recycled <li>s. With it, we
    * guarantee exactly one Save chip per profile globally. */
   const injectedSaves = new Map(); // canonical url -> wrap element
+  // The EXACT card element each chip was injected into, captured at detection
+  // time. Connect All reads from here so it classifies (and clicks Connect on)
+  // the precise card the chip belongs to — never a re-derived `.closest()`
+  // guess that can grab an adjacent row's Follow/Message button (that mismatch
+  // was why visibly-connectable cards showed "Follow only" / "No Connect").
+  const chipCardEl = new Map(); // canonical url -> card element
+  // The EXACT native action button (Connect / Follow / Message / Pending) the
+  // chip was injected beside, captured at injection time. Connect All clicks
+  // THIS button directly rather than re-scanning the card for it — re-scanning
+  // was returning the wrong/empty match on LinkedIn's current layout, which is
+  // why connectable cards showed "No action".
+  const chipActionBtn = new Map(); // canonical url -> native action button
 
   function _gcInjected() {
     for (const [url, node] of injectedSaves.entries()) {
-      if (!node || !document.body.contains(node)) injectedSaves.delete(url);
+      if (!node || !document.body.contains(node)) {
+        injectedSaves.delete(url);
+        chipCardEl.delete(url);
+        chipActionBtn.delete(url);
+      }
     }
   }
 
@@ -2628,7 +2887,7 @@
     if (span) span.textContent = text;
   }
 
-  function injectInlineSave(card, profile) {
+  function injectInlineSave(card, profile, anchorBtn) {
     // Sales Navigator cards often expose BOTH a /sales/lead/ anchor and an
     // /in/ anchor pointing at the same person. Contact-info scraping only
     // works on /in/ pages (the modal doesn't exist on Sales Nav lead pages),
@@ -2749,18 +3008,36 @@
     const wrap = el("div", { class: "lc-save-row" }, checkSpan, btn);
     wrap.dataset.lcUrl = url;
 
-    // The chip floats absolute at the top-right of the card, just inboard of
-    // LinkedIn's Connect/Pending button. The card needs position:relative
-    // for the absolute child to anchor correctly.
-    try {
-      if (getComputedStyle(card).position === "static") {
+    // Placement: insert the chip INLINE, immediately before the card's native
+    // action button (Connect / Follow / Message), so it flows in the same row.
+    // Inline flow is immune to the absolute-position COLLAPSE that previously
+    // stacked every card's chip at one screen point (top:12px;right:130px of a
+    // shared positioned ancestor) — which is why only the first profile looked
+    // chipped. We only fall back to a pinned placement when a card has no
+    // native action button at all.
+    const anchor =
+      anchorBtn && anchorBtn.parentElement
+        ? anchorBtn
+        : Array.from(card.querySelectorAll("button")).find(_isActionButton);
+    if (anchor && anchor.parentElement) {
+      anchor.parentElement.insertBefore(wrap, anchor);
+    } else {
+      wrap.classList.add("lc-save-row-floating");
+      try {
+        if (getComputedStyle(card).position === "static") {
+          card.style.position = "relative";
+        }
+      } catch {
         card.style.position = "relative";
       }
-    } catch {
-      card.style.position = "relative";
+      card.appendChild(wrap);
     }
-    card.appendChild(wrap);
     injectedSaves.set(url, wrap);
+    chipCardEl.set(url, card);
+    // Remember the precise native button this chip sits beside (if any) so
+    // Connect All can act on it directly.
+    if (anchor && _isActionButton(anchor)) chipActionBtn.set(url, anchor);
+    else chipActionBtn.delete(url);
   }
 
   // Mirror of scraper.js _isInsightLink — must stay in lock-step. Both the
@@ -2830,12 +3107,15 @@
     if (!b || b.classList?.contains("lc-inline-save")) return false;
     const aria = b.getAttribute?.("aria-label") || "";
     const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+    // Whole-word match in EITHER the visible text or the aria-label. LinkedIn
+    // renders these as "+ Connect" / "+ Follow" (the leading icon contributes a
+    // glyph), so a strict ^connect$ anchor misses them — that was the bug that
+    // left Connect cards unrecognised. \bconnect\b matches "Connect"/"+ Connect"
+    // but NOT "Connected"/"Connections" (no trailing word boundary).
     return (
-      /^(connect|follow|message|pending)$/i.test(txt) ||
+      /\b(connect|follow|message|pending)\b/i.test(txt) ||
       /\binvite\b.*\bto connect\b/i.test(aria) ||
-      /^(connect|follow|pending)$/i.test(aria) ||
-      /^message\b/i.test(aria) ||
-      /\bfollow\b/i.test(aria)
+      /\b(connect|follow|pending|message)\b/i.test(aria)
     );
   }
 
@@ -3107,117 +3387,113 @@
 
     const linkSel = "a[href*='/in/'], a[href*='/sales/lead/']";
 
-    // How many DISTINCT profile owners does this node enclose? Used as the
-    // card boundary: a node holding ≤1 owner is still a single card; the
-    // moment it holds 2+ it has grown into a multi-card container and we stop.
-    // Insight / mutual-connection links don't count — they belong to OTHER
-    // people referenced inside a card, not the card's own owner.
-    const ownerCount = (node) => {
-      const set = new Set();
-      for (const a of node.querySelectorAll(linkSel)) {
-        if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
-        const u = globalThis.__lcDom.normalizeProfileUrl(a.href);
-        if (u) set.add(u);
-      }
-      return set.size;
-    };
+    // ---- Robust per-row detection anchored on native action buttons ----
+    // Every search result has exactly ONE action button (Connect / Follow /
+    // Message / Pending). Iterating those buttons directly — instead of the old
+    // owner/button-count climb that could collapse the whole list into a single
+    // "card" and stack every chip at one absolute point — guarantees one chip
+    // PER ROW. For each button we climb to the nearest ancestor that contains a
+    // profile link without spanning a second action button; that ancestor is
+    // the card, and the chip is injected inline right beside the button.
+    const handled = new Set(); // canonical urls chipped this pass
 
-    // Climb from a seed node (an action button or a profile link) to the
-    // LARGEST ancestor that still represents a SINGLE profile card. Tag-
-    // agnostic on purpose — LinkedIn wraps cards in <li>, <article>, <div>,
-    // <tr> etc. depending on surface, and requiring a specific tag is exactly
-    // what made earlier versions miss cards.
-    //
-    // Boundary uses BOTH signals: a container spanning two cards has 2+ native
-    // action buttons (every result has exactly one) AND/OR 2+ distinct owners.
-    // When the action-button count is still ≤1 but the owner count jumped to
-    // 2, the extra "owner" is almost always a mutual-connection link embedded
-    // inside ONE card — so we trust the button count, accept that node as the
-    // full card, then stop.
-    const climbToCard = (seed) => {
-      let node = seed.parentElement;
-      let best = null;
+    const cardFromButton = (btn) => {
+      let node = btn.parentElement;
       for (
         let i = 0;
         i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
         i++
       ) {
-        const actionBtns = Array.from(node.querySelectorAll("button")).filter(
-          _isActionButton
-        ).length;
-        const owners = ownerCount(node);
-        if (actionBtns > 1 || owners > 1) {
-          if (actionBtns <= 1 && node.querySelector(linkSel)) best = node;
-          break; // crossed into a multi-card container → stop
-        }
-        if (node.querySelector(linkSel)) best = node;
+        // The FIRST ancestor (climbing from a single button) that contains a
+        // profile link IS that button's own row — every result row has exactly
+        // one profile link of its own. Return it directly; no button-count
+        // guard needed (and the guard wrongly rejected rows once a row exposed
+        // a Message icon alongside Connect).
+        if (node.querySelector(linkSel)) return node;
         node = node.parentElement;
       }
-      return best;
+      return null;
     };
 
-    const cards = new Set();
+    const tryInject = (card, anchorBtn) => {
+      if (!card) return;
+      const ownerLink = _resolveCardOwnerLink(card, linkSel);
+      if (!ownerLink) return;
+      const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
+      if (!url || !url.includes("/in/")) return;
+      if (handled.has(url)) return;
+      handled.add(url);
 
-    // PASS 1 — anchor on the native action button (Connect/Follow/Message/
-    // Pending). Stable card boundary when present.
-    for (const b of document.querySelectorAll("button")) {
-      if (!_isActionButton(b)) continue;
-      const card = climbToCard(b);
-      if (card) cards.add(card);
+      // Live chip already present for this URL → leave it.
+      const existing = injectedSaves.get(url);
+      if (existing && document.body.contains(existing)) return;
+      if (existing) {
+        injectedSaves.delete(url);
+        chipCardEl.delete(url);
+      }
+      // Clear a stray chip on this card (recycled <li> after pagination).
+      const stray = card.querySelector(".lc-save-row");
+      if (stray) {
+        injectedSaves.delete(stray.dataset.lcUrl);
+        chipCardEl.delete(stray.dataset.lcUrl);
+        stray.remove();
+      }
+
+      // Card metadata. A missing name never blocks the chip — the canonical
+      // name is scraped on the /in/ page during enrichment; fall back to slug.
+      let profile = profileFromCard(card, ownerLink);
+      if (!profile?.linkedin_url) {
+        profile = { linkedin_url: url, full_name: _labelFromUrl(url) };
+      }
+      injectInlineSave(card, profile, anchorBtn);
+    };
+
+    // PRIMARY — one chip per native action button. Process in priority order
+    // (Connect → Follow → Pending → Message) so that if a single row exposes
+    // more than one action button, the chip anchors on the most actionable one
+    // and `handled` claims the URL before a lesser button can.
+    const rank = (b) => {
+      const c = _classifyButton(b);
+      return c === "connect" ? 0 : c === "follow" ? 1 : c === "pending" ? 2 : 3;
+    };
+    const actionButtons = Array.from(document.querySelectorAll("button"))
+      .filter(_isActionButton)
+      .sort((a, b) => rank(a) - rank(b));
+    for (const btn of actionButtons) {
+      try {
+        tryInject(cardFromButton(btn), btn);
+      } catch (e) {
+        console.warn("[LeadCaptura] decorate(btn) failed", e?.message);
+      }
     }
 
-    // PASS 2 — anchor on EVERY profile link. This is the safety net that
-    // guarantees a chip even when a card has no recognised action button
-    // (already-following rows, icon-only buttons, markup LinkedIn just
-    // changed). Insight/mutual links are skipped so we never chip a mutual-
-    // connection avatar.
+    // FALLBACK — rows with no recognised action button. Climb each owner link
+    // to the nearest ancestor that still encloses exactly one distinct owner.
     for (const a of document.querySelectorAll(linkSel)) {
       if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
-      const card = climbToCard(a);
-      if (card) cards.add(card);
-    }
-
-    // Both passes converge on the same "largest single-owner ancestor", but if
-    // any outer container slipped in, drop it in favour of the inner card it
-    // contains — one chip per profile row, never a wrapper spanning a card.
-    const cardList = Array.from(cards);
-    const finalCards = cardList.filter(
-      (c) => !cardList.some((o) => o !== c && c.contains(o))
-    );
-
-    for (const card of finalCards) {
+      const url = globalThis.__lcDom.normalizeProfileUrl(a.href);
+      if (!url || !url.includes("/in/") || handled.has(url)) continue;
+      let node = a.parentElement;
+      let card = null;
+      for (
+        let i = 0;
+        i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
+        i++
+      ) {
+        const owners = new Set();
+        for (const l of node.querySelectorAll(linkSel)) {
+          if (_isInsightLink(l) || _isMutualConnectionContext(l)) continue;
+          const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
+          if (u) owners.add(u);
+        }
+        if (owners.size > 1) break;
+        if (owners.size === 1) card = node;
+        node = node.parentElement;
+      }
       try {
-        const ownerLink = _resolveCardOwnerLink(card, linkSel);
-        if (!ownerLink) continue;
-        const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-        if (!url || !url.includes("/in/")) continue;
-
-        // Already have a live chip for this URL → nothing to do.
-        const existing = injectedSaves.get(url);
-        if (existing && document.body.contains(existing)) continue;
-
-        // A stray chip on this card (recycled <li>, or a Sales Nav card whose
-        // chip is keyed under its /in/ URL). If it's our tracked chip for the
-        // SAME url, leave it; otherwise remove and re-inject for the new owner.
-        const stray = card.querySelector(".lc-save-row");
-        if (stray) {
-          const trackedNode = injectedSaves.get(stray.dataset.lcUrl);
-          if (trackedNode === stray && stray.dataset.lcUrl === url) continue;
-          injectedSaves.delete(stray.dataset.lcUrl);
-          stray.remove();
-        }
-
-        // Build full card metadata (name/title/company/location). If the name
-        // can't be resolved we DON'T drop the card — the chip's core job is to
-        // open the profile by URL, and the canonical name is scraped on the
-        // /in/ page during enrichment anyway. Fall back to a slug-derived label.
-        let profile = profileFromCard(card, ownerLink);
-        if (!profile?.linkedin_url) {
-          profile = { linkedin_url: url, full_name: _labelFromUrl(url) };
-        }
-        injectInlineSave(card, profile);
+        tryInject(card, null);
       } catch (e) {
-        console.warn("[LeadCaptura] decorate failed", e?.message);
+        console.warn("[LeadCaptura] decorate(link) failed", e?.message);
       }
     }
   }
@@ -3248,6 +3524,92 @@
     );
   }
 
+  // ---- Global auto-confirm of the invitation modal ----------------------
+  // The "Add a note to your invitation?" dialog appears whenever Connect is
+  // clicked — by Connect All OR by the user manually. The user's rule is: never
+  // add a note, always "Send without a note". This watcher clicks that button
+  // the instant the modal appears, regardless of who triggered the Connect, so
+  // the flow never stalls on the dialog. Bot-detection note: this only fires in
+  // direct response to a Connect the user/extension already made, so it adds no
+  // new outbound action — it just completes the one already in progress.
+  let _inviteAutoBusy = false;
+  async function _autoConfirmInviteModal() {
+    // During a Connect All run, _sendConnectOnCard owns the full sequence —
+    // stand down so the two don't double-click the same dialog.
+    if (state.connectActive) return;
+    if (_inviteAutoBusy) return;
+    if (!_invitationModalOpen()) return;
+    let btn = _findSendWithoutNoteButton();
+    if (!btn) return;
+    _inviteAutoBusy = true;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      // Let the modal finish its mount/animation so LinkedIn (Ember) has bound
+      // the button's click handler — clicking mid-animation is a no-op. ~250ms
+      // is below human reaction time floor and well within the modal's lifetime.
+      await sleep(250);
+      btn = _findSendWithoutNoteButton();
+      if (!btn || !_invitationModalOpen()) return;
+      console.log("[LeadCaptura] auto-confirm: clicking Send without a note", btn);
+      _lcToast("LeadCaptura: sending invitation…");
+      _forceClick(btn);
+      // Give LinkedIn's backend up to ~4.5s to process and close the modal.
+      for (let i = 0; i < 18; i++) {
+        await sleep(250);
+        if (!_invitationModalOpen()) {
+          console.log("[LeadCaptura] auto-confirm: modal closed ✓");
+          _lcToast("LeadCaptura: invitation sent ✓");
+          return;
+        }
+        // Re-click periodically while the modal is still up (in case the first
+        // attempt landed during the animation and was swallowed).
+        const stillBtn = _findSendWithoutNoteButton();
+        if (stillBtn && !stillBtn.disabled && i % 3 === 2) _forceClick(stillBtn);
+      }
+      console.log("[LeadCaptura] auto-confirm: modal still open after retries");
+    } catch (e) {
+      console.warn("[LeadCaptura] auto-confirm error", e);
+    } finally {
+      _inviteAutoBusy = false;
+    }
+  }
+  function _startInviteAutoConfirm() {
+    try {
+      const obs = new MutationObserver(() => {
+        _autoConfirmInviteModal();
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+    } catch {
+      /* observer best-effort */
+    }
+    // Safety-net poll in case a mutation batch is missed.
+    setInterval(_autoConfirmInviteModal, 600);
+  }
+  _startInviteAutoConfirm();
+
+  // Apply per-URL connect results when returning to the search page after
+  // a Connect All run. Updates chip states and resets the toolbar.
+  function applyConnectResults(results) {
+    for (const [url, status] of Object.entries(results || {})) {
+      if (status === "sent") {
+        _setChipState(url, "saved", "Connected ✓");
+      } else if (
+        status === "already_connected" ||
+        status === "already_pending" ||
+        status === "already_done"
+      ) {
+        _setChipState(url, "saved", "Already done ✓");
+      } else {
+        _setChipState(url, "error", "Skipped");
+      }
+    }
+    state.connectActive = false;
+    state.connectProgress = null;
+    state.selectedUrls?.clear();
+    try { mountSelectAllHeader(); } catch {}
+    renderToolbar();
+  }
+
   globalThis.__lcOverlay = {
     renderProfilePanel,
     renderToolbar,
@@ -3259,5 +3621,7 @@
     triggerAutoSave,
     mountSelectAllHeader,
     unmountSelectAllHeader,
+    toast: _lcToast,
+    applyConnectResults,
   };
 })();
