@@ -64,7 +64,7 @@ python3 -c "import json; json.load(open('extension/manifest.json'))"
 zip -r leadcaptura-extension.zip extension
 ```
 
-After editing content scripts, also reload the LinkedIn tab — Chrome only re-injects on tab reload.
+After editing content scripts, reload the extension (`chrome://extensions` → 🔄) **and** hard-reload the LinkedIn tab (Ctrl+R) — Chrome only injects content scripts on tab load, so an open tab keeps the old code. Confirm the new build is live by checking the `LeadCaptura v<version>` badge in the bottom toolbar.
 
 ## Backend architecture (`/api`)
 
@@ -193,15 +193,55 @@ on connectable cards. `_gcInjected()` drops all three when a node leaves the DOM
 waits for the "Add a note to your invitation?" modal, then clicks **"Send
 without a note"**; Follow-only → `_sendFollowOnCard` clicks Follow; already
 connected/pending → skipped. Critical correctness rules:
-- Only ever target a **visible** element (`_isVisible` gates
-  `_findSendWithoutNoteButton` / `_invitationModalOpen`) — LinkedIn leaves
-  stale hidden modal duplicates in the DOM; clicking those does nothing.
-- `_forceClick` uses native `.click()` (React/Ember honour untrusted clicks)
-  **plus** a full pointer/mouse event sequence.
+- `_forceClick` is the click-of-last-resort and tries **four** strategies in
+  order: native `.click()`, a full pointer/mouse sequence on the button, the
+  same sequence on the button's inner `<span>` (some handlers bind to the
+  child), and an Enter keydown/keyup. LinkedIn (Ember) honours untrusted events,
+  so the first usually lands — but the send-invitation button needs the others.
+- The send button finder (`_findSendWithoutNoteButton`) scans the **whole
+  document**, not just the modal subtree. A previous version scoped it to the
+  matched modal node and broke when LinkedIn rendered the footer buttons outside
+  it — the finder returned null and the click silently never happened. Prefer a
+  visible+enabled match but fall back to any match rather than bail.
 - Report `ok:true` **only after the invitation modal actually closes** from
   sending. Never close the modal via its X and call it success — that produced
-  fake "Invited ✓" with no invite sent. Failures surface as "Send failed" /
-  "No modal" on the chip.
+  fake "Invited ✓" with no invite sent. `connectAllVisible` adds a hard
+  "wait until `_invitationModalOpen()` is false" guard (up to ~10s) before
+  advancing to the next card, so card N fully completes before card N+1 starts.
+
+### Auto-confirm invitation modal (global watcher — load-bearing)
+
+`_startInviteAutoConfirm()` (bottom of the `overlay.js` IIFE) runs a
+`MutationObserver` on `document.documentElement` **plus** a 600ms safety-net
+poll. Whenever the "Add a note to your invitation?" modal appears — whether the
+user clicked Connect manually or `connectAllVisible` did — `_autoConfirmInviteModal()`
+waits ~250ms for the modal to finish mounting (so Ember has bound the click
+handler; clicking mid-animation is a silent no-op), then `_forceClick`s "Send
+without a note" and waits up to ~4.5s for the modal to close, re-clicking
+periodically. This watcher is **pure DOM — no `chrome.*` calls** — so it keeps
+working even in an orphaned/stale content-script context. Keep it that way.
+
+`_invitationModalOpen()` returns true if either a matching dialog node is
+visible **or** a visible "Send without a note" button exists, so the watcher
+doesn't bail when LinkedIn changes the dialog's `role` attribute.
+
+### Stale-tab self-heal + version badge
+
+Updating an unpacked extension does **not** re-inject content scripts into
+already-open tabs — Chrome only injects on tab load. So a tab can keep running
+an old `overlay.js` indefinitely. Two mechanisms make this survivable:
+
+- **`main.js` stale detector** (`_checkRuntime` + `_killStaleUi`): when
+  `chrome.runtime?.id` flips to undefined (context invalidated by an extension
+  reload), it rips out every LeadCaptura chip/overlay, shows a red full-width
+  banner, and force-reloads the tab so fresh scripts load. This guards against
+  orphaned chip click-handlers firing with stale, wrong-profile data.
+- **Version badge**: the bottom toolbar renders `LeadCaptura v<version>` (read
+  from `chrome.runtime.getManifest().version`). When debugging "my fix isn't
+  working", check this first — if it doesn't match the installed version the tab
+  is on stale code and just needs a reload. `_lcToast()` is a toolbar-independent
+  on-page toast the auto-confirm watcher uses ("sending invitation… / sent ✓")
+  to give live proof the current build is the one executing.
 
 ### Contact Info enrichment flow
 
