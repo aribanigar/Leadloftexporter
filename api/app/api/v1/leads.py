@@ -1,10 +1,11 @@
 import csv
 import io
+import json
 import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -200,6 +201,153 @@ def bulk_message(
         "skipped_pending": skipped_pending,
         "total": len(leads),
     }
+
+
+@router.post("/import-csv/preview")
+async def preview_csv_import(
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(get_workspace_context),
+):
+    """Parse a CSV and return its column names + first 5 rows, no import yet."""
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = csv.reader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "empty_file")
+
+    headers = [h.strip() for h in rows[0]]
+    data_rows = rows[1:]
+    preview = [dict(zip(headers, [c.strip() for c in row])) for row in data_rows[:5]]
+    return {"columns": headers, "preview": preview, "total_rows": len(data_rows)}
+
+
+@router.post("/import-csv")
+async def import_csv_leads(
+    file: UploadFile = File(...),
+    mapping: str = Form(...),
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Import leads from a CSV file with a column→field mapping.
+
+    `mapping` is a JSON object: { lead_field: csv_column }.
+    Supported fields: full_name, first_name, last_name, email, phone,
+    linkedin_url, title, company_name, location, stage_name.
+    Deduplicates by linkedin_url first, then email.
+    """
+    try:
+        col_map: dict = json.loads(mapping)
+    except json.JSONDecodeError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_mapping")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    stages_by_name = {
+        s.name.lower().strip(): s.id
+        for s in db.query(PipelineStage)
+        .filter(PipelineStage.workspace_id == ctx.workspace_id)
+        .all()
+    }
+    default = default_stage(db, ctx.workspace_id)
+    default_stage_id = default.id if default else None
+
+    reader = csv.DictReader(io.StringIO(text))
+    imported = updated = skipped = 0
+    errors: list[str] = []
+
+    for i, row in enumerate(reader):
+        if len(errors) >= 20:
+            break
+        try:
+            def _get(field: str) -> Optional[str]:
+                col = col_map.get(field)
+                if not col:
+                    return None
+                return (row.get(col) or "").strip() or None
+
+            full_name = _get("full_name")
+            first_name = _get("first_name")
+            last_name = _get("last_name")
+            email = _get("email")
+            li_url = normalize_linkedin(_get("linkedin_url"))
+
+            if not full_name and (first_name or last_name):
+                full_name = " ".join(filter(None, [first_name, last_name])) or None
+
+            if not (full_name or email or li_url):
+                skipped += 1
+                continue
+
+            # Dedup
+            existing: Optional[Lead] = None
+            if li_url:
+                existing = (
+                    db.query(Lead)
+                    .filter(Lead.workspace_id == ctx.workspace_id, Lead.linkedin_url == li_url)
+                    .first()
+                )
+            if not existing and email:
+                existing = (
+                    db.query(Lead)
+                    .filter(Lead.workspace_id == ctx.workspace_id, Lead.email == email)
+                    .first()
+                )
+
+            company = upsert_company(db, ctx.workspace_id, name=_get("company_name"))
+
+            sn = _get("stage_name")
+            stage_id = stages_by_name.get(sn.lower()) if sn else None
+            if not stage_id:
+                stage_id = default_stage_id
+
+            if existing:
+                if full_name and not existing.full_name:
+                    existing.full_name = full_name
+                if email and not existing.email:
+                    existing.email = email
+                if _get("phone") and not existing.phone:
+                    existing.phone = _get("phone")
+                if _get("title") and not existing.title:
+                    existing.title = _get("title")
+                if _get("location") and not existing.location:
+                    existing.location = _get("location")
+                if company and not existing.company_id:
+                    existing.company_id = company.id
+                if li_url and not existing.linkedin_url:
+                    existing.linkedin_url = li_url
+                updated += 1
+            else:
+                lead = Lead(
+                    workspace_id=ctx.workspace_id,
+                    owner_id=ctx.user_id,
+                    stage_id=stage_id,
+                    company_id=company.id if company else None,
+                    full_name=full_name,
+                    first_name=first_name,
+                    last_name=last_name,
+                    title=_get("title"),
+                    email=email,
+                    phone=_get("phone"),
+                    linkedin_url=li_url,
+                    location=_get("location"),
+                    source="import",
+                )
+                db.add(lead)
+                imported += 1
+        except Exception as exc:
+            errors.append(f"Row {i + 2}: {str(exc)[:120]}")
+
+    db.commit()
+    return {"imported": imported, "updated": updated, "skipped": skipped, "errors": errors}
 
 
 @router.post("", response_model=LeadOut, status_code=status.HTTP_201_CREATED)
