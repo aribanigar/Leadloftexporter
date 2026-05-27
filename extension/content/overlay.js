@@ -1204,40 +1204,67 @@
     return "unknown";
   }
 
-  // Sales Navigator tucks "Connect" inside the "…" overflow menu. Open it and
-  // return the Connect item so the normal send flow can click it.
+  // Find a "Connect" item in ANY currently-open dropdown/menu/overlay. Sales
+  // Navigator renders its overflow menu in a portal at the end of <body>, often
+  // WITHOUT the `--is-open` class the old code keyed on — so scan broadly for a
+  // freshly-rendered clickable whose label is exactly "Connect".
+  function _findConnectMenuItem() {
+    const scopeSel =
+      "div[role='menu'] *, ul[role='menu'] *, [role='menu'] *, " +
+      ".artdeco-dropdown__content *, .artdeco-dropdown__content--is-open *, " +
+      "div[data-test-modal] *";
+    const hit = Array.from(document.querySelectorAll(scopeSel)).find((el) => {
+      const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      const a = el.getAttribute("aria-label") || "";
+      return /^connect$/i.test(t) || /\binvite\b.*\bto connect\b/i.test(a) || /^connect$/i.test(a);
+    });
+    if (!hit) return null;
+    return hit.closest("[role='menuitem'], [role='button'], button, a, li") || hit;
+  }
+
+  // Sales Navigator tucks "Connect" inside the "…" overflow menu. Try each
+  // plausible overflow trigger on the card (there can be several icon buttons),
+  // click it, poll for the menu to render a Connect item, and return that item
+  // so the normal send flow can click it. Closes a wrong menu before the next.
   async function _openOverflowConnect(card) {
     const { dispatchHumanClick } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
-    const moreBtn = Array.from(card.querySelectorAll("button, [role='button']")).find((b) => {
+
+    const triggers = Array.from(
+      card.querySelectorAll("button, [role='button'], [aria-haspopup]")
+    ).filter((b) => {
       if (b.classList?.contains("lc-inline-save")) return false;
       const a = (b.getAttribute("aria-label") || "").toLowerCase();
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      // Never treat the explicit Save/Message/Connect/Follow buttons as the
+      // overflow trigger — they don't reveal the Connect menu.
+      if (/^(save|saved|message|connect|follow|pending)\b/.test(t)) return false;
+      if (/^(save|saved|message|connect|follow|pending)\b/.test(a)) return false;
       return (
-        /\bmore\b|overflow|more actions|other actions/.test(a) ||
-        b.classList?.contains("artdeco-dropdown__trigger")
+        /\bmore\b|overflow|more actions|other actions|menu|options|actions/.test(a) ||
+        b.classList?.contains("artdeco-dropdown__trigger") ||
+        b.getAttribute("aria-haspopup") === "true" ||
+        /^[.…⋯·\s]+$/.test(t) // "...", "…", "⋯", "·" (icon-only)
       );
     });
-    if (!moreBtn) return null;
-    try { await dispatchHumanClick(moreBtn); } catch { try { moreBtn.click(); } catch {} }
-    await sleep(450 + Math.random() * 400);
-    // Menu items render in an open dropdown/portal, often outside the card.
-    const items = Array.from(
-      document.querySelectorAll(
-        "div.artdeco-dropdown__content--is-open [role='button'], " +
-        "div.artdeco-dropdown__content--is-open button, " +
-        "div.artdeco-dropdown__content--is-open li, " +
-        "div[role='menu'] [role='menuitem'], div[role='menu'] [role='button'], " +
-        "div[role='menu'] button, ul[role='menu'] li, " +
-        ".artdeco-dropdown__content button, .artdeco-dropdown__content [role='button']"
-      )
-    );
-    return (
-      items.find((el) => {
-        const t = (el.textContent || "").replace(/\s+/g, " ").trim();
-        const a = el.getAttribute("aria-label") || "";
-        return /^connect\b/i.test(t) || /\binvite\b.*\bto connect\b/i.test(a) || /^connect$/i.test(a);
-      }) || null
-    );
+
+    for (const trigger of triggers) {
+      try { await dispatchHumanClick(trigger); } catch { try { trigger.click(); } catch {} }
+      // Poll up to ~2s — backgrounded tabs defer menu rendering.
+      for (let i = 0; i < 10; i++) {
+        await sleep(160 + Math.random() * 160);
+        const item = _findConnectMenuItem();
+        if (item) return item;
+      }
+      // Wrong menu — dismiss it before trying the next trigger.
+      try {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+        );
+      } catch {}
+      await sleep(180);
+    }
+    return null;
   }
 
   async function _sendConnectOnCard(card) {
