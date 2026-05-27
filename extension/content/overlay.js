@@ -1229,33 +1229,49 @@
     return null;
   }
 
-  // True while a VISIBLE "Add a note to your invitation?" modal is on screen.
+  // True while the invitation modal is on screen. We consider it open if either
+  // a matching dialog node is visible OR a "Send without a note" button is
+  // visible — whichever our heuristics catch first. This prevents the watcher
+  // from bailing when the dialog's role attribute changes but the button is
+  // clearly there.
   function _invitationModalOpen() {
-    return !!_findInvitationModal();
+    if (_findInvitationModal()) return true;
+    const b = _findSendWithoutNoteButton();
+    return !!(b && _isVisible(b));
   }
 
-  // Find the VISIBLE "Send without a note" button, scoped to the invitation modal
-  // so we never accidentally match a LinkedIn messaging "Send" button or any other
-  // button elsewhere on the page.
+  // Find the "Send without a note" button. Searches the WHOLE document (not
+  // scoped to the modal element — LinkedIn sometimes renders the footer buttons
+  // in a sibling node or a separate portal). Prefers a visible button but falls
+  // back to any match so we never silently bail when the button is found but our
+  // visibility heuristic is overly strict.
   function _findSendWithoutNoteButton() {
-    const modal = _findInvitationModal();
-    const root = modal || document;
-    const all = Array.from(root.querySelectorAll("button, [role='button']")).filter(
-      (b) => !b.classList?.contains("lc-inline-save") && _isVisible(b) && !b.disabled
-    );
-    const match = (re) =>
-      all.find((b) => {
-        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-        const a = (b.getAttribute("aria-label") || "").trim();
-        return re.test(t) || re.test(a);
+    const all = Array.from(
+      document.querySelectorAll("button, [role='button'], a[role='button']")
+    ).filter((b) => !b.classList?.contains("lc-inline-save"));
+    const labelOf = (b) => {
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = (b.getAttribute("aria-label") || "").trim();
+      return { t, a };
+    };
+    const tests = [
+      (s) => /^send without a note$/i.test(s),
+      (s) => /\bsend without a note\b/i.test(s),
+      (s) => /^send now$/i.test(s),
+      (s) => /^send( invitation)?$/i.test(s),
+    ];
+    for (const test of tests) {
+      const matches = all.filter((b) => {
+        const { t, a } = labelOf(b);
+        return test(t) || test(a);
       });
-    return (
-      match(/^send without a note$/i) ||
-      match(/\bsend without a note\b/i) ||
-      match(/^send now$/i) ||
-      match(/^send( invitation)?$/i) ||
-      null
-    );
+      if (!matches.length) continue;
+      // Prefer a visible, enabled button; otherwise take the first match.
+      const visible = matches.filter((b) => _isVisible(b) && !b.disabled);
+      const pick = visible[0] || matches.find((b) => !b.disabled) || matches[0];
+      if (pick) return pick;
+    }
+    return null;
   }
 
   // Close any open invitation-modal dialog. Tries the modal's own dismiss button
@@ -1282,26 +1298,50 @@
     } catch {}
   }
 
-  // Click an element as reliably as possible: native .click() (React/Ember
-  // action handlers fire on this — they don't require a trusted event), plus a
-  // full pointer/mouse event sequence as a belt-and-braces backup.
-  function _forceClick(el) {
-    if (!el) return;
-    try { el.scrollIntoView({ block: "center" }); } catch {}
-    try { el.focus(); } catch {}
-    try { el.click(); } catch {}
+  // Fire a full pointer/mouse event sequence on a single element at its centre.
+  function _dispatchPointerSequence(el) {
     try {
       const r = el.getBoundingClientRect();
       const o = {
         bubbles: true, cancelable: true, view: window,
-        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        button: 0, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true,
       };
       el.dispatchEvent(new PointerEvent("pointerover", o));
+      el.dispatchEvent(new PointerEvent("pointerenter", o));
       el.dispatchEvent(new PointerEvent("pointerdown", o));
       el.dispatchEvent(new MouseEvent("mousedown", o));
-      el.dispatchEvent(new PointerEvent("pointerup", o));
-      el.dispatchEvent(new MouseEvent("mouseup", o));
-      el.dispatchEvent(new MouseEvent("click", o));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("mouseup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("click", { ...o, buttons: 0 }));
+    } catch {}
+  }
+
+  // Click an element as reliably as possible. LinkedIn's button handler may be
+  // bound to the <button>, to an inner <span>, or driven by keyboard activation,
+  // so we try ALL of: native .click(), a pointer/mouse sequence on the button AND
+  // its first child span, and an Enter/Space keydown — until something lands.
+  function _forceClick(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+    try { el.focus(); } catch {}
+    // 1. The simplest path React/Ember honour even for untrusted events.
+    try { el.click(); } catch {}
+    // 2. Full pointer/mouse sequence on the button itself.
+    _dispatchPointerSequence(el);
+    // 3. Same sequence on the inner label span (some handlers sit on the child).
+    try {
+      const inner = el.querySelector("span, .artdeco-button__text");
+      if (inner && inner !== el) {
+        inner.click?.();
+        _dispatchPointerSequence(inner);
+      }
+    } catch {}
+    // 4. Keyboard activation — buttons fire their action on Enter/Space too.
+    try {
+      const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      el.dispatchEvent(new KeyboardEvent("keydown", kopts));
+      el.dispatchEvent(new KeyboardEvent("keyup", kopts));
     } catch {}
   }
 
