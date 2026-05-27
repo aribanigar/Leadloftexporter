@@ -114,13 +114,7 @@
   // ---------- Profile panel (compact top-right card on /in/ pages) ----------
 
   async function mountProfilePanel() {
-    // Re-use the panel only if it's still attached. If a previous reference is
-    // detached (SPA churn), fall through and mount a fresh one — otherwise we'd
-    // render into an orphan node and the user would see nothing.
-    if (state.profilePanel && document.documentElement.contains(state.profilePanel)) {
-      return state.profilePanel;
-    }
-    state.profilePanel = null;
+    if (state.profilePanel) return state.profilePanel;
     const settings = await Storage.getSettings();
     if (!settings.showOverlay) return null;
     const root = el("div", { id: "lc-profile-panel", class: "lc-card" });
@@ -636,17 +630,10 @@
   // Save All and Connect All all read from here, so they can never diverge
   // from what the user actually sees. (The old approach re-ran the scraper
   // independently, which under-counted real-photo cards.)
-  // A capture-able profile URL — regular LinkedIn (/in/) OR Sales Navigator
-  // (/sales/lead/). Both configurations must flow through Save / Save All /
-  // Connect All identically.
-  function _isCapUrl(u) {
-    return !!u && (u.includes("/in/") || u.includes("/sales/lead/"));
-  }
-
   function _allChipUrls() {
     const urls = [];
     for (const [url, wrap] of injectedSaves.entries()) {
-      if (_isCapUrl(url) && wrap && document.body.contains(wrap)) {
+      if (url && url.includes("/in/") && wrap && document.body.contains(wrap)) {
         urls.push(url);
       }
     }
@@ -1013,7 +1000,7 @@
     try { decorateSearchCards(); } catch {}
     const urls =
       state.selectedUrls.size > 0
-        ? Array.from(state.selectedUrls).filter(_isCapUrl)
+        ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
         : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
@@ -1191,88 +1178,15 @@
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
-    // Sales Navigator EVERY lead shows a Message button and the Connect action
-    // lives inside the "…" overflow menu — so "Message present" must NOT be
-    // read as already-connected (that was skipping everyone). On Sales Nav we
-    // always attempt Connect unless pending; _openOverflowConnect returns null
-    // for genuine 1st-degree leads (no Connect item) and they're skipped then.
-    let isSalesNav = false;
-    try { isSalesNav = Scraper.pageType() === "salesnav-search"; } catch {}
-    if (isSalesNav) return "connect";
     if (hasMessage) return "connected";
     if (hasFollow) return "follow";
     return "unknown";
   }
 
-  // Find a "Connect" item in ANY currently-open dropdown/menu/overlay. Sales
-  // Navigator renders its overflow menu in a portal at the end of <body>, often
-  // WITHOUT the `--is-open` class the old code keyed on — so scan broadly for a
-  // freshly-rendered clickable whose label is exactly "Connect".
-  function _findConnectMenuItem() {
-    const scopeSel =
-      "div[role='menu'] *, ul[role='menu'] *, [role='menu'] *, " +
-      ".artdeco-dropdown__content *, .artdeco-dropdown__content--is-open *, " +
-      "div[data-test-modal] *";
-    const hit = Array.from(document.querySelectorAll(scopeSel)).find((el) => {
-      const t = (el.textContent || "").replace(/\s+/g, " ").trim();
-      const a = el.getAttribute("aria-label") || "";
-      return /^connect$/i.test(t) || /\binvite\b.*\bto connect\b/i.test(a) || /^connect$/i.test(a);
-    });
-    if (!hit) return null;
-    return hit.closest("[role='menuitem'], [role='button'], button, a, li") || hit;
-  }
-
-  // Sales Navigator tucks "Connect" inside the "…" overflow menu. Try each
-  // plausible overflow trigger on the card (there can be several icon buttons),
-  // click it, poll for the menu to render a Connect item, and return that item
-  // so the normal send flow can click it. Closes a wrong menu before the next.
-  async function _openOverflowConnect(card) {
-    const { dispatchHumanClick } = globalThis.__lcDom;
-    const { sleep } = globalThis.__lcHuman;
-
-    const triggers = Array.from(
-      card.querySelectorAll("button, [role='button'], [aria-haspopup]")
-    ).filter((b) => {
-      if (b.classList?.contains("lc-inline-save")) return false;
-      const a = (b.getAttribute("aria-label") || "").toLowerCase();
-      const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      // Never treat the explicit Save/Message/Connect/Follow buttons as the
-      // overflow trigger — they don't reveal the Connect menu.
-      if (/^(save|saved|message|connect|follow|pending)\b/.test(t)) return false;
-      if (/^(save|saved|message|connect|follow|pending)\b/.test(a)) return false;
-      return (
-        /\bmore\b|overflow|more actions|other actions|menu|options|actions/.test(a) ||
-        b.classList?.contains("artdeco-dropdown__trigger") ||
-        b.getAttribute("aria-haspopup") === "true" ||
-        /^[.…⋯·\s]+$/.test(t) // "...", "…", "⋯", "·" (icon-only)
-      );
-    });
-
-    for (const trigger of triggers) {
-      try { await dispatchHumanClick(trigger); } catch { try { trigger.click(); } catch {} }
-      // Poll up to ~2s — backgrounded tabs defer menu rendering.
-      for (let i = 0; i < 10; i++) {
-        await sleep(160 + Math.random() * 160);
-        const item = _findConnectMenuItem();
-        if (item) return item;
-      }
-      // Wrong menu — dismiss it before trying the next trigger.
-      try {
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
-        );
-      } catch {}
-      await sleep(180);
-    }
-    return null;
-  }
-
   async function _sendConnectOnCard(card) {
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
-    let btn = _findConnectButtonInCard(card);
-    // Sales Nav: Connect lives behind the "…" menu — open it and grab Connect.
-    if (!btn) btn = await _openOverflowConnect(card);
+    const btn = _findConnectButtonInCard(card);
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
     await sleep(700 + Math.random() * 500);
@@ -1287,25 +1201,13 @@
       "div[role='dialog'] button.artdeco-button--primary",
     ];
     let sendBtn = null;
-    for (let attempt = 0; attempt < 4 && !sendBtn; attempt++) {
-      sendBtn = await waitFor(sendSel, { timeout: 2500 });
-      // Text fallback: Sales Nav's confirm button is "Send Invitation" with no
-      // matching aria-label, so the selector list above misses it.
-      if (!sendBtn) {
-        sendBtn = Array.from(
-          document.querySelectorAll(
-            "div[role='dialog'] button, .artdeco-modal button, [role='alertdialog'] button"
-          )
-        ).find((b) => {
-          const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-          return /^send( invitation| now| without a note)?$/i.test(t);
-        }) || null;
-      }
-      if (!sendBtn) await sleep(600);
+    for (let attempt = 0; attempt < 3 && !sendBtn; attempt++) {
+      sendBtn = await waitFor(sendSel, { timeout: 3000 });
+      if (!sendBtn) await sleep(700);
     }
     if (sendBtn) {
       await dispatchHumanClick(sendBtn);
-      await sleep(600 + Math.random() * 500); // modal dismiss animation
+      await sleep(500 + Math.random() * 400); // 500-900ms — modal dismiss animation
       return { ok: true };
     }
     // No modal — LinkedIn may have sent directly, OR an email-verify wall
@@ -1316,6 +1218,10 @@
   }
 
   function _cardForUrl(url) {
+    // Prefer the exact card element captured when the chip was injected — it
+    // is the authoritative single-profile card boundary the detector resolved.
+    const exact = chipCardEl.get(url);
+    if (exact && document.body.contains(exact)) return exact;
     const wrap = injectedSaves.get(url);
     if (wrap && document.body.contains(wrap)) {
       return wrap.closest("li, article, [role='listitem'], [role='row']") || wrap.parentElement;
@@ -1353,7 +1259,7 @@
     const active = document.querySelector(
       "li.artdeco-pagination__indicator--number.active button, button[aria-current='true'], .artdeco-pagination__indicator.active"
     );
-    const firstLink = document.querySelector("a[href*='/in/'], a[href*='/sales/lead/']");
+    const firstLink = document.querySelector("a[href*='/in/']");
     return [pageParam, active?.textContent?.trim() || "", firstLink?.href || ""].join("|");
   }
 
@@ -1389,7 +1295,7 @@
       pos = Math.min(pageH - 40, pos + stepPx);
       window.scrollTo(0, pos);
       await sleep(260 + Math.random() * 420); // 260-680ms between steps
-      const count = document.querySelectorAll("a[href*='/in/'], a[href*='/sales/lead/']").length;
+      const count = document.querySelectorAll("a[href*='/in/']").length;
       if (count === prevCount) {
         stableRounds++;
         if (stableRounds >= 2 && pos >= pageH * 0.88) break;
@@ -1454,7 +1360,7 @@
       // user's tick selection; later pages take every chip on the page.
       let urls =
         pageNum === 1 && page1Selection
-          ? Array.from(page1Selection).filter(_isCapUrl)
+          ? Array.from(page1Selection).filter((u) => u && u.includes("/in/"))
           : _allChipUrls();
 
       for (let i = 0; i < urls.length; i++) {
@@ -1638,41 +1544,20 @@
   let _jobChipSyncRaf = null;
   function _syncJobChipPositions() {
     _jobChipSyncRaf = null;
-    // While a LinkedIn modal is open (Easy Apply, share, etc.) hide EVERY chip.
-    // Chips are position:fixed with a near-max z-index, so otherwise they bleed
-    // over the modal's form fields and look like stray "Auto Apply" buttons.
-    const modalOpen = !!document.querySelector(
-      "div.jobs-easy-apply-modal, div[data-test-modal][role='dialog'], " +
-      "div[role='dialog'], [role='alertdialog'], .artdeco-modal[role='dialog']"
-    );
     for (const [url, wrap] of injectedJobChips.entries()) {
-      if (modalOpen) {
-        if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
-        continue;
-      }
       const card = _jobChipCards.get(url);
       if (!wrap || !card || !document.body.contains(card)) {
         if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
         continue;
       }
-      // Anchor to the always-visible Dismiss "X". The card box returned by
-      // _cardFromDismiss can be a zero-size wrapper on the search-results
-      // layout, which (with the old width<2 guard) hid EVERY chip. The X is a
-      // real, painted button with a stable rect, so we anchor to it and place
-      // the chip just to its left — i.e. the card's top-right, like screen 1.
-      const dismiss = card.querySelector("button[aria-label*='Dismiss' i]");
-      const anchor = dismiss || card;
-      const r = anchor.getBoundingClientRect();
-      if (r.bottom <= 0 || r.top >= window.innerHeight || (r.width < 2 && r.height < 2)) {
+      const r = card.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= window.innerHeight || r.width < 2 || r.height < 2) {
         wrap.style.setProperty("visibility", "hidden", "important");
         continue;
       }
-      const chipW = wrap.getBoundingClientRect().width || 150;
-      const top = Math.max(4, r.top + 1);
-      // If anchored on the X, sit to its left; if on the card box, bottom-right.
-      const left = dismiss
-        ? Math.max(4, r.left - chipW - 8)
-        : Math.max(4, r.right - 184);
+      // Anchor bottom-right of the card, 46px above bottom edge
+      const top = Math.max(4, r.bottom - 46);
+      const left = Math.max(4, r.right - 184);
       wrap.style.setProperty("top", `${top}px`, "important");
       wrap.style.setProperty("left", `${left}px`, "important");
       wrap.style.setProperty("visibility", "visible", "important");
@@ -1971,16 +1856,6 @@
         const key = _jobCardKey(card);
         if (!key) continue;
 
-        // Prevent DUPLICATE chips on one card: if a live chip is already
-        // anchored to this exact card element (under this OR a changed key —
-        // e.g. the open card gains a /jobs/view link mid-session and its key
-        // flips from "card:title" to "job:id"), don't create a second one.
-        let dup = false;
-        for (const [k] of injectedJobChips) {
-          if (_jobChipCards.get(k) === card) { dup = true; break; }
-        }
-        if (dup) continue;
-
         // Keep our tracking pointed at the freshest card element for this key
         // (LinkedIn recycles card nodes on scroll/pagination).
         _jobChipCards.set(key, card);
@@ -2033,7 +1908,49 @@
       }
     }
     if (cards.length || created) {
-      console.log(`[LeadCaptura] jobs: ${cards.length} cards, ${injectedJobChips.size} chips (+${created} new)`);
+      console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+    }
+    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
+    // up in screenshots — plus the console. Only while detection looks wrong.
+    try {
+      let badge = document.getElementById("lc-jobs-diag");
+      if (cards.length < 2) {
+        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
+        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
+        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
+          li.querySelector("a[href*='/jobs/']")
+        ).length;
+        const divJob = document.querySelectorAll(
+          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
+        ).length;
+        const card1 =
+          (probeCard?.tagName || "-") +
+          "." +
+          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
+        const txt =
+          "LC diag · cards=" + cards.length +
+          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
+          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
+          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
+          " liJob=" + liJob +
+          " divJob=" + divJob +
+          " card1=" + card1;
+        console.log("[LeadCaptura] jobs-diag " + txt);
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.id = "lc-jobs-diag";
+          badge.style.cssText =
+            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
+            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
+          document.documentElement.appendChild(badge);
+        }
+        badge.textContent = txt;
+      } else if (badge) {
+        badge.remove();
+      }
+    } catch {
+      /* diag is best-effort */
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
@@ -2794,10 +2711,19 @@
    * scroll lets stale buttons linger on recycled <li>s. With it, we
    * guarantee exactly one Save chip per profile globally. */
   const injectedSaves = new Map(); // canonical url -> wrap element
+  // The EXACT card element each chip was injected into, captured at detection
+  // time. Connect All reads from here so it classifies (and clicks Connect on)
+  // the precise card the chip belongs to — never a re-derived `.closest()`
+  // guess that can grab an adjacent row's Follow/Message button (that mismatch
+  // was why visibly-connectable cards showed "Follow only" / "No Connect").
+  const chipCardEl = new Map(); // canonical url -> card element
 
   function _gcInjected() {
     for (const [url, node] of injectedSaves.entries()) {
-      if (!node || !document.body.contains(node)) injectedSaves.delete(url);
+      if (!node || !document.body.contains(node)) {
+        injectedSaves.delete(url);
+        chipCardEl.delete(url);
+      }
     }
   }
 
@@ -2892,9 +2818,9 @@
         profile.linkedin_url
       );
       try {
-        if (!_isCapUrl(profile.linkedin_url)) {
+        if (!profile.linkedin_url?.includes("/in/")) {
           btn.dataset.state = "error";
-          textSpan.textContent = "Need profile URL";
+          textSpan.textContent = "Need /in/ URL";
           return;
         }
         await new Promise((resolve) => {
@@ -2936,34 +2862,19 @@
     const wrap = el("div", { class: "lc-save-row" }, checkSpan, btn);
     wrap.dataset.lcUrl = url;
 
-    // Insert the chip INLINE, right before the card's native action button
-    // (Message / Connect / Follow), so it flows next to them in normal layout.
-    // The previous absolute-positioned approach stacked every chip at one spot
-    // (or got clipped) on LinkedIn's newer card markup — only the first card
-    // appeared to have a chip. Inline placement is immune to that.
-    const actionBtn = Array.from(card.querySelectorAll("button")).find(_isActionButton);
-    if (actionBtn && actionBtn.parentElement) {
-      // Place the Save chip at the LEFT of the action-button row (the open
-      // space before Connect/Message), not crammed against the button.
-      const container = actionBtn.parentElement;
-      container.insertBefore(wrap, container.firstChild);
-    } else {
-      // No native action button (e.g. some Sales Nav rows) — fall back to a
-      // pinned top-right placement inside the card.
-      try {
-        if (getComputedStyle(card).position === "static") {
-          card.style.setProperty("position", "relative", "important");
-        }
-        card.style.setProperty("overflow", "visible", "important");
-      } catch {
+    // The chip floats absolute at the top-right of the card, just inboard of
+    // LinkedIn's Connect/Pending button. The card needs position:relative
+    // for the absolute child to anchor correctly.
+    try {
+      if (getComputedStyle(card).position === "static") {
         card.style.position = "relative";
       }
-      wrap.style.setProperty("position", "absolute", "important");
-      wrap.style.setProperty("top", "12px", "important");
-      wrap.style.setProperty("right", "12px", "important");
-      card.appendChild(wrap);
+    } catch {
+      card.style.position = "relative";
     }
+    card.appendChild(wrap);
     injectedSaves.set(url, wrap);
+    chipCardEl.set(url, card);
   }
 
   // Mirror of scraper.js _isInsightLink — must stay in lock-step. Both the
@@ -3380,20 +3291,29 @@
       if (card) cards.add(card);
     }
 
-    // PASS 3 — repeated-unit detection (robust to LinkedIn's 2026 layout where
-    // the owner/button-count boundary in climbToCard can miss cards). For each
-    // native action button, climb to the element whose PARENT holds 2+ action
-    // buttons — that element is one card among sibling cards. This is the same
-    // proven technique used for job cards (parent-holds-2+-of-the-signal).
-    const _allActionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton);
+    // PASS 3 — repeated-unit detection. LinkedIn's current people-search layout
+    // can defeat climbToCard's owner/button-count boundary (mutual-connection
+    // avatars + nested links push the owner count past 1 before the real card
+    // root is reached, so PASS 1/2 silently drop those cards — that's why a chip
+    // appeared on SOME but not ALL profiles). For each native action button,
+    // climb to the element whose PARENT holds 2+ action buttons: that element
+    // is one card among sibling cards. Tag-agnostic, boundary-robust.
+    const _allActionBtns = Array.from(document.querySelectorAll("button")).filter(
+      _isActionButton
+    );
     if (_allActionBtns.length >= 2) {
       for (const b of _allActionBtns) {
         let node = b;
-        for (let i = 0; i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+        for (
+          let i = 0;
+          i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
+          i++
+        ) {
           const parent = node.parentElement;
           if (
             parent &&
-            Array.from(parent.querySelectorAll("button")).filter(_isActionButton).length >= 2
+            Array.from(parent.querySelectorAll("button")).filter(_isActionButton)
+              .length >= 2
           ) {
             if (node.querySelector(linkSel)) cards.add(node);
             break;
@@ -3416,7 +3336,7 @@
         const ownerLink = _resolveCardOwnerLink(card, linkSel);
         if (!ownerLink) continue;
         const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-        if (!_isCapUrl(url)) continue; // accept /in/ AND Sales Nav /sales/lead/
+        if (!url || !url.includes("/in/")) continue;
 
         // Already have a live chip for this URL → nothing to do.
         const existing = injectedSaves.get(url);
@@ -3445,34 +3365,6 @@
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
-    }
-
-    // Self-hiding diagnostic: only shows if detection is failing (fewer than 2
-    // chips). Disappears the moment it's working, so no clutter when healthy.
-    try {
-      const liveChips = _allChipUrls().length;
-      let badge = document.getElementById("lc-search-diag");
-      if (liveChips < 2 && (type.includes("search") || type.includes("sales"))) {
-        const txt =
-          "LeadCaptura: " + liveChips + " chip(s) · " + finalCards.length + " cards · " +
-          Array.from(document.querySelectorAll("button")).filter(_isActionButton).length + " action-btns · " +
-          document.querySelectorAll("a[href*='/in/']").length + " in · " +
-          document.querySelectorAll("a[href*='/sales/lead/']").length + " sales";
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.id = "lc-search-diag";
-          badge.style.cssText =
-            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-            "font:11px/1.4 monospace;padding:5px 8px;border-radius:6px;max-width:92vw;" +
-            "white-space:pre-wrap;pointer-events:none;opacity:.85";
-          document.documentElement.appendChild(badge);
-        }
-        badge.textContent = txt;
-      } else if (badge) {
-        badge.remove();
-      }
-    } catch {
-      /* diag best-effort */
     }
   }
 

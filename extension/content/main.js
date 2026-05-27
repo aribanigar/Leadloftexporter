@@ -203,23 +203,6 @@
     else Overlay.decorateSearchCards?.();
   }
 
-  // Safety net for the profile panel. onPathChange mounts it on navigation, but
-  // LinkedIn's SPA sometimes swaps profiles without a History API event our
-  // hooks catch — so the panel only appeared after a hard reload. This ensures
-  // it's present on any /in/ (or Sales Nav lead) page within a tick, no reload
-  // needed. Cheap: it no-ops when the panel is already mounted.
-  function _ensureProfilePanel() {
-    const type = Scraper.pageType();
-    if (type !== "profile" && type !== "salesnav-profile") return;
-    if (location.pathname.includes("/overlay/")) return;
-    if (new URLSearchParams(location.search).has("lc_enrich")) return;
-    if (document.getElementById("lc-profile-panel")) return;
-    try {
-      Overlay.renderProfilePanel();
-      Overlay.triggerAutoSave?.();
-    } catch {}
-  }
-
   // Pagination (and most LinkedIn search filters) change only the QUERY
   // STRING, not the pathname — so onPathChange early-returns and never
   // re-decorates. Watch location.search separately and re-decorate hard when
@@ -244,7 +227,6 @@
   setInterval(() => {
     _onSearchMaybeChanged();
     _decorateCurrent();
-    _ensureProfilePanel();
   }, 1500);
 
   // Re-decorate shortly after the user stops scrolling — catches lazily
@@ -490,7 +472,4 @@
   onPathChange();
   startAutopilot();
   maybeRunEnrichmentTrigger();
-  // Snappy initial profile-panel checks so it shows without waiting for the
-  // 1.5s interval (and without needing a hard reload).
-  [200, 600, 1200, 2500].forEach((ms) => setTimeout(_ensureProfilePanel, ms));
 })();
