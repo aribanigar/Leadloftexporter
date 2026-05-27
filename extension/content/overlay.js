@@ -1260,6 +1260,29 @@
     }
   }
 
+  // Click an element as reliably as possible: native .click() (React/Ember
+  // action handlers fire on this — they don't require a trusted event), plus a
+  // full pointer/mouse event sequence as a belt-and-braces backup.
+  function _forceClick(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center" }); } catch {}
+    try { el.focus(); } catch {}
+    try { el.click(); } catch {}
+    try {
+      const r = el.getBoundingClientRect();
+      const o = {
+        bubbles: true, cancelable: true, view: window,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0,
+      };
+      el.dispatchEvent(new PointerEvent("pointerover", o));
+      el.dispatchEvent(new PointerEvent("pointerdown", o));
+      el.dispatchEvent(new MouseEvent("mousedown", o));
+      el.dispatchEvent(new PointerEvent("pointerup", o));
+      el.dispatchEvent(new MouseEvent("mouseup", o));
+      el.dispatchEvent(new MouseEvent("click", o));
+    } catch {}
+  }
+
   async function _sendConnectOnCard(card, presetBtn) {
     const { dispatchHumanClick } = globalThis.__lcDom;
     const { sleep } = globalThis.__lcHuman;
@@ -1270,37 +1293,31 @@
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
 
-    // Poll up to ~6s for the invitation modal's "Send without a note" button.
+    // Poll up to ~8s for the invitation modal's "Send without a note" button.
     // Bounded loop — it can never hang the run.
     let sendBtn = null;
-    for (let i = 0; i < 24 && !sendBtn; i++) {
+    for (let i = 0; i < 32 && !sendBtn; i++) {
       await sleep(250);
       sendBtn = _findSendWithoutNoteButton();
     }
 
     if (sendBtn) {
-      console.log(
-        "[LeadCaptura] clicking send button:",
-        `"${(sendBtn.textContent || "").replace(/\s+/g, " ").trim()}"`
-      );
-      // Human-paced click first. Some LinkedIn React handlers ignore a
-      // synthetic-only click, so if the modal is still open after, fall back to
-      // a direct native .click(). Retry a couple of times.
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await dispatchHumanClick(sendBtn);
-        await sleep(450);
-        if (!_invitationModalOpen()) break;
-        try { sendBtn.click(); } catch {}
-        await sleep(450);
-        if (!_invitationModalOpen()) break;
-        // Re-resolve the button in case the modal re-rendered.
-        const again = _findSendWithoutNoteButton();
-        if (again) sendBtn = again;
+      // Click and verify the modal actually closes. Re-find + re-click up to a
+      // few times — native .click() is the workhorse (React/Ember honour it).
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const target = _findSendWithoutNoteButton() || sendBtn;
+        console.log(
+          "[LeadCaptura] send-without-note click attempt", attempt + 1,
+          "→", `"${(target.textContent || "").replace(/\s+/g, " ").trim()}"`
+        );
+        _forceClick(target);
+        await sleep(500);
+        if (!_invitationModalOpen()) return { ok: true };
       }
-      // Make sure nothing is left blocking the next card.
-      if (_invitationModalOpen()) _closeAnyDialog();
-      await sleep(300 + Math.random() * 300);
-      return { ok: true };
+      // Modal still up after retries — close it so the next card isn't blocked.
+      _closeAnyDialog();
+      await sleep(300);
+      return _invitationModalOpen() ? { ok: false, reason: "send_failed" } : { ok: true };
     }
 
     // No modal appeared — LinkedIn may have sent directly, OR a different wall
