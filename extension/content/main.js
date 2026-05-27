@@ -296,17 +296,43 @@
       }
     }
 
-    // Text-content fallback — match ONLY "Connect" (exact, case-insensitive),
-    // scoped to the profile actions area to avoid touching sidebar cards.
+    // Text-content fallback — LinkedIn 2025 buttons often have NO aria-label.
+    // The button contains two spans: <span aria-hidden>Connect</span> and
+    // <span class="visually-hidden">Invite X to connect</span>, so
+    // button.textContent = "ConnectInvite X to connect". Use _isConnectBtn()
+    // which does \bconnect\b matching instead of the broken ^connect$ check.
     if (!connectBtn) {
-      const scope = document.querySelector("main .pvs-profile-actions") || document.querySelector("main");
-      if (scope) {
+      const scopes = [
+        document.querySelector("main .pvs-profile-actions"),
+        document.querySelector(".pv-top-card-v2-ctas"),
+        document.querySelector("main"),
+      ].filter(Boolean);
+      outer: for (const scope of scopes) {
         for (const b of scope.querySelectorAll("button, [role='button']")) {
-          const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-          if (/^connect$/i.test(txt) && _isConnectBtn(b)) {
-            connectBtn = b;
-            break;
-          }
+          if (_isConnectBtn(b)) { connectBtn = b; break outer; }
+        }
+      }
+    }
+
+    // waitFor: LinkedIn SPA injects action buttons after profile hydrates — wait up to 5s
+    if (!connectBtn) {
+      const found = await waitFor(
+        [
+          "main button[aria-label*='connect' i]",
+          "main button[aria-label*='Invite' i]",
+        ],
+        { timeout: 5000 }
+      );
+      if (found && _isConnectBtn(found)) connectBtn = found;
+    }
+
+    // Final poll: scan every 500ms for up to 5s to catch no-aria-label buttons
+    if (!connectBtn) {
+      for (let w = 0; w < 10 && !connectBtn; w++) {
+        await sleep(500);
+        const root = document.querySelector("main") || document.body;
+        for (const b of root.querySelectorAll("button, [role='button']")) {
+          if (_isConnectBtn(b)) { connectBtn = b; break; }
         }
       }
     }
