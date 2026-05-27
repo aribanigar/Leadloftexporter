@@ -255,16 +255,15 @@
  * at inject time, so our absolute position is relative to the card.
  */
 .lc-save-row {
-  position: absolute !important;
-  top: 12px !important;
-  right: 130px !important;
+  position: static !important;
   z-index: 2147483630 !important;
-  margin: 0 !important;
+  margin: 0 8px 0 0 !important;
   padding: 0 !important;
   width: auto !important;
   height: auto !important;
   display: inline-flex !important;
   align-items: center !important;
+  vertical-align: middle !important;
   gap: 6px !important;
   pointer-events: auto !important;
 }

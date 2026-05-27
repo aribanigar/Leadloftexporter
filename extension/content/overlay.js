@@ -2928,29 +2928,30 @@
     const wrap = el("div", { class: "lc-save-row" }, checkSpan, btn);
     wrap.dataset.lcUrl = url;
 
-    // The chip floats absolute at the top-right of the card, just inboard of
-    // LinkedIn's Connect/Pending button. The card needs position:relative for
-    // the absolute child to anchor correctly, and overflow:visible so a
-    // clipping ancestor can't hide the chip (LinkedIn's newer card markup wraps
-    // rows in overflow:hidden containers — that was hiding every Save chip).
-    try {
-      if (getComputedStyle(card).position === "static") {
-        card.style.setProperty("position", "relative", "important");
+    // Insert the chip INLINE, right before the card's native action button
+    // (Message / Connect / Follow), so it flows next to them in normal layout.
+    // The previous absolute-positioned approach stacked every chip at one spot
+    // (or got clipped) on LinkedIn's newer card markup — only the first card
+    // appeared to have a chip. Inline placement is immune to that.
+    const actionBtn = Array.from(card.querySelectorAll("button")).find(_isActionButton);
+    if (actionBtn && actionBtn.parentElement) {
+      actionBtn.parentElement.insertBefore(wrap, actionBtn);
+    } else {
+      // No native action button (e.g. some Sales Nav rows) — fall back to a
+      // pinned top-right placement inside the card.
+      try {
+        if (getComputedStyle(card).position === "static") {
+          card.style.setProperty("position", "relative", "important");
+        }
+        card.style.setProperty("overflow", "visible", "important");
+      } catch {
+        card.style.position = "relative";
       }
-      card.style.setProperty("overflow", "visible", "important");
-      let p = card.parentElement;
-      for (let i = 0; i < 3 && p; i++) {
-        try {
-          if (getComputedStyle(p).overflow !== "visible") {
-            p.style.setProperty("overflow", "visible", "important");
-          }
-        } catch {}
-        p = p.parentElement;
-      }
-    } catch {
-      card.style.position = "relative";
+      wrap.style.setProperty("position", "absolute", "important");
+      wrap.style.setProperty("top", "12px", "important");
+      wrap.style.setProperty("right", "12px", "important");
+      card.appendChild(wrap);
     }
-    card.appendChild(wrap);
     injectedSaves.set(url, wrap);
   }
 
@@ -3412,37 +3413,32 @@
       }
     }
 
-    // On-page diagnostic (people / Sales Nav search) so the detection state is
-    // captured in a screenshot. Shows when no chips got injected — the exact
-    // signal counts tell us whether detection or rendering is the problem.
+    // On-page diagnostic (people / Sales Nav search). Always shown on these
+    // pages for now so the detection state is captured in a screenshot:
+    // "cards" = rows detected, "chips" = Save chips live. If cards>chips the
+    // problem is injection/visibility; if cards is low it's detection.
     try {
       const liveChips = _allChipUrls().length;
+      const actionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton).length;
+      const inLinks = document.querySelectorAll("a[href*='/in/']").length;
+      const txt =
+        "LC search-diag · type=" + type +
+        " cards=" + finalCards.length +
+        " chips=" + liveChips +
+        " actionBtns=" + actionBtns +
+        " inLinks=" + inLinks;
+      console.log("[LeadCaptura] " + txt);
       let badge = document.getElementById("lc-search-diag");
-      if (liveChips < 1) {
-        const actionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton).length;
-        const inLinks = document.querySelectorAll("a[href*='/in/']").length;
-        const salesLinks = document.querySelectorAll("a[href*='/sales/lead/']").length;
-        const txt =
-          "LC search-diag · type=" + type +
-          " chips=" + liveChips +
-          " cards=" + finalCards.length +
-          " actionBtns=" + actionBtns +
-          " inLinks=" + inLinks +
-          " salesLinks=" + salesLinks;
-        console.log("[LeadCaptura] " + txt);
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.id = "lc-search-diag";
-          badge.style.cssText =
-            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
-            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
-          document.documentElement.appendChild(badge);
-        }
-        badge.textContent = txt;
-      } else if (badge) {
-        badge.remove();
+      if (!badge) {
+        badge = document.createElement("div");
+        badge.id = "lc-search-diag";
+        badge.style.cssText =
+          "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
+          "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
+          "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
+        document.documentElement.appendChild(badge);
       }
+      badge.textContent = txt;
     } catch {
       /* diag best-effort */
     }
