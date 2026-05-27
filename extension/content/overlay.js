@@ -1990,49 +1990,7 @@
       }
     }
     if (cards.length || created) {
-      console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
-    }
-    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
-    // up in screenshots — plus the console. Only while detection looks wrong.
-    try {
-      let badge = document.getElementById("lc-jobs-diag");
-      if (cards.length < 2) {
-        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
-        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
-        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
-          li.querySelector("a[href*='/jobs/']")
-        ).length;
-        const divJob = document.querySelectorAll(
-          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
-        ).length;
-        const card1 =
-          (probeCard?.tagName || "-") +
-          "." +
-          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
-        const txt =
-          "LC diag · cards=" + cards.length +
-          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
-          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
-          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
-          " liJob=" + liJob +
-          " divJob=" + divJob +
-          " card1=" + card1;
-        console.log("[LeadCaptura] jobs-diag " + txt);
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.id = "lc-jobs-diag";
-          badge.style.cssText =
-            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
-            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
-          document.documentElement.appendChild(badge);
-        }
-        badge.textContent = txt;
-      } else if (badge) {
-        badge.remove();
-      }
-    } catch {
-      /* diag is best-effort */
+      console.log(`[LeadCaptura] jobs: ${cards.length} cards, ${injectedJobChips.size} chips (+${created} new)`);
     }
     _bindJobChipScroll();
     // Position immediately (synchronously) so chips are visible on this frame —
@@ -3418,36 +3376,6 @@
       } catch (e) {
         console.warn("[LeadCaptura] decorate failed", e?.message);
       }
-    }
-
-    // On-page diagnostic (people / Sales Nav search). Always shown on these
-    // pages for now so the detection state is captured in a screenshot:
-    // "cards" = rows detected, "chips" = Save chips live. If cards>chips the
-    // problem is injection/visibility; if cards is low it's detection.
-    try {
-      const liveChips = _allChipUrls().length;
-      const actionBtns = Array.from(document.querySelectorAll("button")).filter(_isActionButton).length;
-      const inLinks = document.querySelectorAll("a[href*='/in/']").length;
-      const txt =
-        "LC search-diag · type=" + type +
-        " cards=" + finalCards.length +
-        " chips=" + liveChips +
-        " actionBtns=" + actionBtns +
-        " inLinks=" + inLinks;
-      console.log("[LeadCaptura] " + txt);
-      let badge = document.getElementById("lc-search-diag");
-      if (!badge) {
-        badge = document.createElement("div");
-        badge.id = "lc-search-diag";
-        badge.style.cssText =
-          "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-          "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
-          "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
-        document.documentElement.appendChild(badge);
-      }
-      badge.textContent = txt;
-    } catch {
-      /* diag best-effort */
     }
   }
 
