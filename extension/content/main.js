@@ -184,6 +184,55 @@
     return r.width > 0 && r.height > 0;
   }
 
+  // Fire a full pointer/mouse sequence on one element at its centre.
+  function _ccPointerSequence(el) {
+    try {
+      const r = el.getBoundingClientRect();
+      const o = {
+        bubbles: true, cancelable: true, view: window,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        button: 0, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true,
+      };
+      el.dispatchEvent(new PointerEvent("pointerover", o));
+      el.dispatchEvent(new PointerEvent("pointerenter", o));
+      el.dispatchEvent(new PointerEvent("pointerdown", o));
+      el.dispatchEvent(new MouseEvent("mousedown", o));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("mouseup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("click", { ...o, buttons: 0 }));
+    } catch {}
+  }
+
+  // Click an element as reliably as possible. Ports the proven _forceClick from
+  // overlay.js: LinkedIn's button handler may be bound to the <button>, to an
+  // inner <span>, or driven by keyboard activation, so we try ALL of —
+  //   1. native .click()
+  //   2. a pointer/mouse sequence on the button
+  //   3. the same sequence on the inner label <span> (handlers often sit there)
+  //   4. an Enter keydown/keyup
+  // — until something lands. The "Send without a note" button specifically
+  // needs strategies 3 and 4; .click() + a button-level sequence alone is not
+  // enough (this was the v1.0.82 send_failed cause).
+  function _ccForceClick(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+    try { el.focus(); } catch {}
+    try { el.click(); } catch {}
+    _ccPointerSequence(el);
+    try {
+      const inner = el.querySelector("span, .artdeco-button__text");
+      if (inner && inner !== el) {
+        inner.click?.();
+        _ccPointerSequence(inner);
+      }
+    } catch {}
+    try {
+      const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      el.dispatchEvent(new KeyboardEvent("keydown", kopts));
+      el.dispatchEvent(new KeyboardEvent("keyup", kopts));
+    } catch {}
+  }
+
   // Returns true if a Contact Info modal or overlay is currently open/loading.
   // We check this before and during the connect flow so we never fire into
   // a page that's mid-contact-info scrape.
@@ -387,22 +436,10 @@
       }
       if (simulateCursorMove) await simulateCursorMove(sendBtn);
       await sleep(60 + Math.random() * 80);
-      // Multi-strategy click for reliability
-      try { sendBtn.click(); } catch {}
-      try {
-        const rect = sendBtn.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const opts = {
-          bubbles: true, cancelable: true, view: window,
-          clientX: cx, clientY: cy, button: 0,
-        };
-        sendBtn.dispatchEvent(new PointerEvent("pointerdown", opts));
-        sendBtn.dispatchEvent(new MouseEvent("mousedown", opts));
-        sendBtn.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0 }));
-        sendBtn.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
-        sendBtn.dispatchEvent(new MouseEvent("click", { ...opts, buttons: 0 }));
-      } catch {}
+      console.log("[LeadCaptura] connect-queue: clicking Send without a note (try", attempt + 1, ")");
+      // Four-strategy click (.click → pointer seq → inner-span seq → Enter).
+      // The send button needs the inner-span + keyboard paths to fire.
+      _ccForceClick(sendBtn);
       // Wait for dialog to close (= invitation sent)
       for (let w = 0; w < 20; w++) {
         await sleep(250);
