@@ -1203,12 +1203,25 @@
     return b && document.body.contains(b) ? b : null;
   }
 
-  // True while the "Add a note to your invitation?" modal is on screen.
+  // An element the user can actually see and click (rules out the stale,
+  // hidden, detached modal duplicates LinkedIn can leave in the DOM — clicking
+  // one of those does nothing while the real visible modal stays open).
+  function _isVisible(el) {
+    if (!el || !el.isConnected) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+    return true;
+  }
+
+  // True while a VISIBLE "Add a note to your invitation?" modal is on screen.
   function _invitationModalOpen() {
     const dlgs = document.querySelectorAll(
       "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
     );
     for (const d of dlgs) {
+      if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
       if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
         return true;
@@ -1216,13 +1229,12 @@
     return false;
   }
 
-  // Find the "Send without a note" primary button of the invitation modal,
-  // scanning the WHOLE document (the modal renders in a portal at <body> end,
-  // not inside the card). Preference: exact "Send without a note" → "Send now"
-  // → any "Send" → the modal's primary button.
+  // Find the VISIBLE "Send without a note" button of the invitation modal.
+  // Scans the whole document (the modal renders in a body-end portal) but only
+  // returns a button the user can actually see — never a hidden duplicate.
   function _findSendWithoutNoteButton() {
     const all = Array.from(document.querySelectorAll("button, [role='button']")).filter(
-      (b) => !b.classList?.contains("lc-inline-save")
+      (b) => !b.classList?.contains("lc-inline-save") && _isVisible(b)
     );
     const match = (re) =>
       all.find((b) => {
@@ -1232,14 +1244,9 @@
       });
     return (
       match(/^send without a note$/i) ||
-      match(/send without a note/i) ||
+      match(/\bsend without a note\b/i) ||
       match(/^send now$/i) ||
       match(/^send( invitation)?$/i) ||
-      document.querySelector(
-        "div[role='dialog'] button.artdeco-button--primary, " +
-          ".artdeco-modal button.artdeco-button--primary, " +
-          "[role='alertdialog'] button.artdeco-button--primary"
-      ) ||
       null
     );
   }
@@ -1293,37 +1300,46 @@
     if (!btn) return { ok: false, reason: "no_connect_button" };
     await dispatchHumanClick(btn);
 
-    // Poll up to ~8s for the invitation modal's "Send without a note" button.
-    // Bounded loop — it can never hang the run.
+    // Poll up to ~8s for the invitation modal's VISIBLE "Send without a note"
+    // button. Bounded loop — it can never hang the run.
     let sendBtn = null;
     for (let i = 0; i < 32 && !sendBtn; i++) {
       await sleep(250);
       sendBtn = _findSendWithoutNoteButton();
     }
 
-    if (sendBtn) {
-      // Click and verify the modal actually closes. Re-find + re-click up to a
-      // few times — native .click() is the workhorse (React/Ember honour it).
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const target = _findSendWithoutNoteButton() || sendBtn;
-        console.log(
-          "[LeadCaptura] send-without-note click attempt", attempt + 1,
-          "→", `"${(target.textContent || "").replace(/\s+/g, " ").trim()}"`
-        );
-        _forceClick(target);
-        await sleep(500);
-        if (!_invitationModalOpen()) return { ok: true };
-      }
-      // Modal still up after retries — close it so the next card isn't blocked.
-      _closeAnyDialog();
-      await sleep(300);
-      return _invitationModalOpen() ? { ok: false, reason: "send_failed" } : { ok: true };
+    if (!sendBtn) {
+      // The Connect click didn't surface the invitation modal. If some other
+      // dialog is up, close it so the next card isn't blocked. Report failure —
+      // we did NOT send, so the chip must not say "Invited".
+      if (_invitationModalOpen()) _closeAnyDialog();
+      console.log("[LeadCaptura] connect: no send-without-note button appeared");
+      return { ok: false, reason: "no_send_button" };
     }
 
-    // No modal appeared — LinkedIn may have sent directly, OR a different wall
-    // surfaced. Clean up any dialog so the next card isn't blocked.
+    // Click "Send without a note" and CONFIRM the modal closed as a result of
+    // sending. We re-find the visible button each attempt and only report
+    // success once the invitation modal is gone — no fake "Invited".
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const target = _findSendWithoutNoteButton();
+      if (!target) {
+        // Button vanished and modal is gone → the send went through.
+        if (!_invitationModalOpen()) return { ok: true };
+        break;
+      }
+      console.log(
+        "[LeadCaptura] send-without-note click attempt", attempt + 1,
+        "→", `"${(target.textContent || "").replace(/\s+/g, " ").trim()}"`
+      );
+      _forceClick(target);
+      await sleep(550);
+      if (!_invitationModalOpen()) return { ok: true };
+    }
+
+    // Send genuinely failed. Close the lingering modal so the next card isn't
+    // blocked, but report failure so the chip shows the truth (not "Invited").
     if (_invitationModalOpen()) _closeAnyDialog();
-    return { ok: true, note: "no_modal" };
+    return { ok: false, reason: "send_failed" };
   }
 
   // Click a card's native "Follow" button (no modal). Used by Connect All for
@@ -1568,7 +1584,11 @@
           _setChipState(url, "saved", isFollow ? "Followed ✓" : "Invited ✓");
         } else {
           skipped++;
-          _setChipState(url, "error", isFollow ? "Follow failed" : "No Connect");
+          // Truthful failure label — never show "Invited" when nothing was sent.
+          let why = isFollow ? "Follow failed" : "Send failed";
+          if (res.reason === "no_connect_button") why = "No Connect";
+          else if (res.reason === "no_send_button") why = "No modal";
+          _setChipState(url, "error", why);
         }
 
         // Pace only after an ACTUAL invite — skipped/already-done cards cost
