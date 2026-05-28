@@ -53,7 +53,7 @@
       try { runtimeAlive = !!chrome.runtime?.id; } catch {}
       if (!runtimeAlive) {
         const err = new Error(_decorate("Extension context invalidated", action));
-        console.error("[LeadCaptura] api.call no-runtime", { action, err: err.message });
+        console.error(`[LeadCaptura] api.call no-runtime action=${action} err="${err.message}"`);
         reject(err);
         return;
       }
@@ -62,28 +62,28 @@
           const elapsed = Date.now() - t0;
           if (chrome.runtime.lastError) {
             const err = new Error(_decorate(chrome.runtime.lastError.message, action));
-            console.warn("[LeadCaptura] api.call lastError", { action, elapsed, raw: chrome.runtime.lastError.message, decorated: err.message });
+            console.warn(`[LeadCaptura] api.call lastError action=${action} elapsed=${elapsed}ms raw="${chrome.runtime.lastError.message}" decorated="${err.message}"`);
             reject(err);
             return;
           }
           if (!response) {
             const err = new Error(_decorate("No response from background", action));
-            console.warn("[LeadCaptura] api.call no-response", { action, elapsed });
+            console.warn(`[LeadCaptura] api.call no-response action=${action} elapsed=${elapsed}ms`);
             reject(err);
             return;
           }
           if (response.error) {
             const err = new Error(_decorate(response.error, action));
-            console.warn("[LeadCaptura] api.call backend-error", { action, elapsed, raw: response.error, decorated: err.message });
+            console.warn(`[LeadCaptura] api.call backend-error action=${action} elapsed=${elapsed}ms raw="${typeof response.error === "string" ? response.error : JSON.stringify(response.error)}" decorated="${err.message}"`);
             reject(err);
             return;
           }
-          console.log("[LeadCaptura] api.call ok", { action, elapsed });
+          console.log(`[LeadCaptura] api.call ok action=${action} elapsed=${elapsed}ms`);
           resolve(response.data);
         });
       } catch (e) {
         const err = new Error(_decorate(e?.message || String(e), action));
-        console.warn("[LeadCaptura] api.call threw", { action, raw: e, decorated: err.message });
+        console.warn(`[LeadCaptura] api.call threw action=${action} raw="${e?.message || String(e)}" decorated="${err.message}"`);
         reject(err);
       }
     });
