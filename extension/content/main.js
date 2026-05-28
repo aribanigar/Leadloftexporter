@@ -440,66 +440,82 @@
       await dispatchHumanClick(connectBtn);
     }
 
-    // Wait for invitation modal (up to ~20s — slow/janky profiles render the
-    // modal late, and we never want to give up before it actually appears).
-    let dialogOpen = false;
-    for (let i = 0; i < 80; i++) {
-      await sleep(250);
-      if (_ccInviteModalOpen()) {
-        dialogOpen = true;
-        break;
-      }
-      // If the invite completed without a modal (already-1st-degree edge cases),
-      // bail early as success.
+    // ── Integrated wait-and-send loop ───────────────────────────────────────
+    // After clicking Connect, the "Add a note to your invitation?" modal opens.
+    // We must click "Send without a note". Two things can complete the invite:
+    //   (a) our own _ccForceClick on the button below, and
+    //   (b) the global overlay.js auto-confirm watcher, which ALSO fires on this
+    //       modal (its stand-down guard only triggers during a SEARCH-page run,
+    //       not this profile queue).
+    // We drive (a) ourselves so we never depend on the watcher, and we accept
+    // EITHER outcome. The authoritative success signal is the profile flipping
+    // to a "Pending" state (or the modal we saw closing) — NOT merely catching
+    // the transient modal, which made earlier versions mis-report when the modal
+    // opened/closed between polls.
+    const _pendingVisible = () => {
       if (
         document.querySelector(
-          "main button[aria-label*='Pending' i], main a[aria-label*='Pending' i]"
-        )
-      ) {
-        return { ok: true };
-      }
-    }
-
-    if (!dialogOpen) {
-      // Some profiles skip the modal when the invite completes immediately
-      if (
-        document.querySelector(
-          "button[aria-label*='Pending' i], button[aria-label*='Message' i]"
+          "main button[aria-label*='Pending' i], main a[aria-label*='Pending' i], " +
+            ".pvs-profile-actions button[aria-label*='Pending' i]"
         )
       )
+        return true;
+      for (const b of document.querySelectorAll(
+        "main button, main a, .pvs-profile-actions button"
+      )) {
+        if (/^pending$/i.test((b.textContent || "").replace(/\s+/g, " ").trim()))
+          return true;
+      }
+      return false;
+    };
+
+    let sawModal = false;
+    let firstClickDone = false;
+    const deadline = Date.now() + 25000;
+    while (Date.now() < deadline) {
+      // Strongest success signal: LinkedIn accepted the invite and the button
+      // flipped to "Pending".
+      if (_pendingVisible()) {
+        console.log("[LeadCaptura] connect-queue: Pending detected → invitation sent ✓");
         return { ok: true };
-      console.log("[LeadCaptura] connect-queue: no modal after click");
-      return { ok: false, reason: "no_dialog_appeared" };
-    }
-
-    console.log("[LeadCaptura] connect-queue: modal open → clicking Send without a note");
-
-    // Click "Send without a note"
-    for (let attempt = 0; attempt < 6 && _ccInviteModalOpen(); attempt++) {
-      const sendBtn = _ccFindSendBtn();
-      if (!sendBtn) {
-        await sleep(300);
-        continue;
       }
-      if (simulateCursorMove) await simulateCursorMove(sendBtn);
-      await sleep(60 + Math.random() * 80);
-      console.log("[LeadCaptura] connect-queue: clicking Send without a note (try", attempt + 1, ")");
-      // Four-strategy click (.click → pointer seq → inner-span seq → Enter).
-      // The send button needs the inner-span + keyboard paths to fire.
-      _ccForceClick(sendBtn);
-      // Wait for dialog to close (= invitation sent)
-      for (let w = 0; w < 20; w++) {
-        await sleep(250);
-        if (!_ccInviteModalOpen()) {
-          console.log("[LeadCaptura] connect-queue: invitation sent ✓");
-          return { ok: true };
+
+      if (_ccInviteModalOpen()) {
+        if (!sawModal) {
+          sawModal = true;
+          // Let Ember finish mounting/binding the button handler before the
+          // first click — clicking mid-animation is a silent no-op.
+          await sleep(320);
         }
+        const sendBtn = _ccFindSendBtn();
+        if (sendBtn) {
+          if (!firstClickDone) {
+            firstClickDone = true;
+            if (simulateCursorMove) {
+              try { await simulateCursorMove(sendBtn); } catch {}
+            }
+          }
+          console.log("[LeadCaptura] connect-queue: invite modal open → clicking 'Send without a note'", sendBtn);
+          _ccForceClick(sendBtn);
+        }
+      } else if (sawModal) {
+        // The modal we saw is gone and no error surfaced → invite was sent
+        // (by us or by the global watcher). This mirrors overlay.js STEP 4.
+        console.log("[LeadCaptura] connect-queue: modal closed after send → invitation sent ✓");
+        return { ok: true };
       }
+
+      await sleep(250);
     }
 
-    if (!_ccInviteModalOpen()) return { ok: true };
-    console.log("[LeadCaptura] connect-queue: could not dismiss modal");
-    return { ok: false, reason: "send_failed" };
+    // Timed out. Final authoritative checks before declaring failure.
+    if (_pendingVisible()) return { ok: true };
+    if (sawModal) {
+      console.log("[LeadCaptura] connect-queue: modal stayed open, send did not complete");
+      return { ok: false, reason: "send_failed" };
+    }
+    console.log("[LeadCaptura] connect-queue: no modal appeared after Connect click");
+    return { ok: false, reason: "no_dialog_appeared" };
   }
 
   // Called on every profile page. If there is a pending connect queue in
