@@ -200,8 +200,8 @@ def bulk_message(
             not_before=now + timedelta(minutes=delay_min),
         )
         queued += 1
-        # 1.5–4 min between consecutive sends — paced, never a burst.
-        delay_min += random.uniform(1.5, 4.0)
+        # 1–2.5 min between consecutive sends — paced, never a burst.
+        delay_min += random.uniform(1.0, 2.5)
     db.commit()
     return {
         "queued": queued,

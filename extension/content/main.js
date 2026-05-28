@@ -115,6 +115,7 @@
 
   let lastPath = null;
   let autopilotInterval = null;
+  let _visibilityListenerAdded = false;
 
   // ─── Connect All: profile-page navigation queue ───────────────────────────
   // When the user clicks "Connect All", overlay.js saves a queue of profile
@@ -1032,6 +1033,12 @@
   // of undefined (reading 'get')" errors forever.
   function startAutopilot() {
     if (autopilotInterval) return;
+
+    // Fire one tick immediately so queued jobs (e.g. bulk LinkedIn messages)
+    // start executing within seconds of autopilot being active, rather than
+    // waiting up to 15s for the first interval tick.
+    Automate.tick().catch(() => {});
+
     autopilotInterval = setInterval(async () => {
       let runtimeAlive = false;
       try { runtimeAlive = !!chrome.runtime?.id; } catch { runtimeAlive = false; }
@@ -1046,7 +1053,21 @@
       } catch (e) {
         console.warn("[LeadCaptura] autopilot tick failed", e?.message || e);
       }
-    }, 60_000);
+    }, 15_000);
+
+    // When the user brings this LinkedIn tab to the foreground, immediately
+    // check for waiting jobs instead of waiting for the next 15s tick. This
+    // ensures bulk-message jobs start as soon as the user switches to LinkedIn.
+    if (!_visibilityListenerAdded) {
+      _visibilityListenerAdded = true;
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+        let runtimeAlive = false;
+        try { runtimeAlive = !!chrome.runtime?.id; } catch {}
+        if (!runtimeAlive) return;
+        Automate.tick().catch(() => {});
+      }, { passive: true });
+    }
   }
 
   // Listen for settings changes (autopilot toggle from popup/options)
