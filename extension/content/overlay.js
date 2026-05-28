@@ -2337,26 +2337,32 @@
       }
     };
 
-    // PRIMARY: one card per Dismiss "X". Robust even when cards expose no job
-    // link or data-id (the current search-results layout). Climbs to the
-    // repeated card unit via _cardFromDismiss.
+    // STRATEGY A — explicit job-id attributes + known card containers. This is
+    // the most reliable detector and works identically on the collections
+    // ("see all") page AND the search-box results page (origin=JOB_COLLECTION_PAGE),
+    // since both set data-occludable-job-id on the list <li>. Run it ALWAYS, not
+    // just as a fallback — the Dismiss-button climb below doesn't resolve the
+    // card unit on every layout, so id-based detection must always participate.
+    document
+      .querySelectorAll(
+        "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
+        "[data-occludable-job-id], " +
+        "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
+        "li.discovery-templates-entity-item, " +
+        "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
+        "div[class*='jobs-job-board-list__item']"
+      )
+      .forEach((c) => { if (!_inDetailPane(c)) add(c); });
+
+    // STRATEGY B — one card per Dismiss "X". Catches layouts where a card
+    // exposes no job link or data-id. Climbs to the repeated card unit.
     document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
       if (_inDetailPane(btn)) return;
       add(_cardFromDismiss(btn));
     });
 
-    // SUPPLEMENTS — only when no dismiss buttons exist on the surface.
+    // STRATEGY C — title links, as a last supplement for sparse layouts.
     if (boxes.length === 0) {
-      document
-        .querySelectorAll(
-          "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
-          "[data-occludable-job-id], " +
-          "li.scaffold-layout__list-item, li.jobs-search-results__list-item, " +
-          "li.discovery-templates-entity-item, " +
-          "div[class*='job-card-container'], div[class*='job-card-job-posting-card'], " +
-          "div[class*='jobs-job-board-list__item']"
-        )
-        .forEach(add);
       const titleLinks = Array.from(
         document.querySelectorAll(
           "a[href*='/jobs/view/'], a[href*='currentJobId='], a.job-card-list__title, " +
