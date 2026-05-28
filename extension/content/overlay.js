@@ -1965,66 +1965,6 @@
   const _jobChipCards = new Map();      // cardKey -> source card element
   const _jobChipApplyUrls = new Map();  // cardKey -> apply url (or null = click card)
 
-  // Portal root — chips appended here as position:fixed, bypassing LinkedIn's
-  // overflow:hidden scroll containers. Mounted on <html> (not <body>) with an
-  // explicit max z-index so it layers ABOVE LinkedIn's positioned content —
-  // the same pattern the visible toolbar + Select-All pill already use. A
-  // position:fixed element creates its own stacking context, so WITHOUT a high
-  // z-index the chips get trapped at body level and painted under the page.
-  let _portalRoot = null;
-  function _ensurePortalRoot() {
-    if (_portalRoot && document.documentElement.contains(_portalRoot)) return _portalRoot;
-    _portalRoot = document.createElement("div");
-    _portalRoot.id = "lc-job-portal";
-    _portalRoot.style.cssText =
-      "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483640;pointer-events:none;";
-    document.documentElement.appendChild(_portalRoot);
-    return _portalRoot;
-  }
-
-  // RAF-throttled position sync — recalculates each chip's fixed coords from
-  // its source card's getBoundingClientRect(). Fires on scroll + resize.
-  let _jobChipSyncRaf = null;
-  function _syncJobChipPositions() {
-    _jobChipSyncRaf = null;
-    for (const [url, wrap] of injectedJobChips.entries()) {
-      const card = _jobChipCards.get(url);
-      if (!wrap || !card || !document.body.contains(card)) {
-        if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
-        continue;
-      }
-      const r = card.getBoundingClientRect();
-      if (r.bottom <= 0 || r.top >= window.innerHeight || r.width < 2 || r.height < 2) {
-        wrap.style.setProperty("visibility", "hidden", "important");
-        continue;
-      }
-      // Anchor bottom-right of the card, 46px above bottom edge
-      const top = Math.max(4, r.bottom - 46);
-      const left = Math.max(4, r.right - 184);
-      wrap.style.setProperty("top", `${top}px`, "important");
-      wrap.style.setProperty("left", `${left}px`, "important");
-      wrap.style.setProperty("visibility", "visible", "important");
-    }
-  }
-  function _scheduleJobChipSync() {
-    if (!_jobChipSyncRaf) _jobChipSyncRaf = requestAnimationFrame(_syncJobChipPositions);
-  }
-
-  let _jobChipScrollBound = false;
-  function _bindJobChipScroll() {
-    if (_jobChipScrollBound) return;
-    // capture:true catches scroll on LinkedIn's inner results container (the
-    // jobs list scrolls independently of the window), not just window scroll.
-    window.addEventListener("scroll", _scheduleJobChipSync, { passive: true, capture: true });
-    window.addEventListener("resize", _scheduleJobChipSync, { passive: true });
-    // Safety-net poll: cards reflow as LinkedIn lazily hydrates / the detail
-    // pane resizes the list column. A cheap 400ms reposition keeps every chip
-    // glued to its card even if a scroll/resize event is missed.
-    setInterval(() => {
-      if (injectedJobChips.size) _syncJobChipPositions();
-    }, 400);
-    _jobChipScrollBound = true;
-  }
 
   function _isVisible(el) {
     if (!el) return false;

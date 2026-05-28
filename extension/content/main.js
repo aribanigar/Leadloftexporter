@@ -592,7 +592,7 @@
         }
         console.log("[LeadCaptura] connect-queue: found 'Send without a note' → clicking", sendBtn);
         _ccForceClick(sendBtn);
-        _ccMainWorldClick(sendBtn);
+        _ccMainWorldClick();
         // Re-fire SW main-world click every ~2s while stuck
         if (!swClickFired || Date.now() % 2000 < 200) {
           _ccSwMainWorldClick();
@@ -1086,6 +1086,10 @@
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
       if (contact.address) profile.location = contact.address.slice(0, 200);
+      // Stash all linked websites so the website scraper can try each one.
+      if (contact.websites?.length) {
+        profile.raw = { ...(profile.raw || {}), websites: contact.websites };
+      }
       // Text-scan fallback for emails/phones the user wrote into their About
       // or Experience. This catches public contact info even when LinkedIn's
       // Contact-Info modal is empty (non-1st-degree connections).
@@ -1108,16 +1112,21 @@
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
 
-      // Website scraping: if we have a company URL but still no email/phone,
-      // ask the service worker to fetch the company website for contact info.
-      if (profile.company_url && (!profile.email || !profile.phone)) {
+      // Website scraping: if still no email/phone, scrape all linked websites.
+      // Uses the primary company_url plus any extra sites captured from the
+      // Contact Info modal (personal site, portfolio, etc.).
+      const _wsUrl = profile.company_url;
+      const _wsExtra = (profile.raw?.websites || []).filter(u => u && u !== _wsUrl);
+      const _wsPrimary = _wsUrl || _wsExtra[0] || null;
+      const _wsAdditional = _wsUrl ? _wsExtra : _wsExtra.slice(1);
+      if (_wsPrimary && (!profile.email || !profile.phone)) {
         try {
           const wsSettings = await globalThis.__lcStorage.getSettings();
           if (wsSettings.webScrapeEnabled) {
             const wsResult = await new Promise((resolve) => {
               try {
                 chrome.runtime.sendMessage(
-                  { type: "lc:scrapeWebsite", url: profile.company_url },
+                  { type: "lc:scrapeWebsite", url: _wsPrimary, extraUrls: _wsAdditional },
                   (r) => resolve(r || {})
                 );
               } catch { resolve({}); }
@@ -1126,7 +1135,12 @@
               const merged = { ...profile };
               if (wsResult.emails?.[0] && !merged.email) merged.email = wsResult.emails[0];
               if (wsResult.phones?.[0] && !merged.phone) merged.phone = wsResult.phones[0];
-              merged.raw = { ...(merged.raw || {}), contact_source: "website_scrape" };
+              merged.raw = {
+                ...(merged.raw || {}),
+                contact_source: "website_scrape",
+                scraped_emails: wsResult.emails,
+                scraped_phones: wsResult.phones,
+              };
               try { await globalThis.__lcApi.syncProfile(merged); } catch {}
             }
           }
