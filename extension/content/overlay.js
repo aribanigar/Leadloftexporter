@@ -2653,10 +2653,14 @@
       const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
       const a = b.getAttribute("aria-label") || "";
       if (/easy apply|linkedin apply/i.test(t) || /easy apply|linkedin apply/i.test(a)) return true;
+      const href = b.getAttribute("href") || "";
       const isApplyWord = /^apply$/i.test(t) || /^apply\b/i.test(a) || /^apply to /i.test(a);
       const isInApp =
         b.classList.contains("jobs-apply-button") ||
         !!b.closest(".jobs-apply-button__container, [class*='jobs-apply']") ||
+        // The renamed in-app control is an <a> pointing at LinkedIn's own
+        // /jobs/view/<id>/apply/ URL — a reliable in-app (not external) signal.
+        /(^|linkedin\.com)\/jobs\/view\/\d+\/apply/i.test(href) ||
         _hasLinkedInIcon(b);
       return isApplyWord && isInApp;
     };
@@ -2667,16 +2671,27 @@
     };
 
     // Fast path: specific selectors for known LinkedIn container class names.
+    // NOTE: the 2026 rename makes the in-app apply control an <a> anchor
+    // (e.g. <a href=".../apply/" aria-label="LinkedIn Apply to this job">), not
+    // a <button> — so every selector below covers BOTH button and a.
     const cands = Array.from(
       document.querySelectorAll(
-        "button.jobs-apply-button, button[aria-label*='Easy Apply' i], " +
-        "button[data-control-name*='apply' i], " +
-        ".jobs-apply-button--top-card button, .jobs-s-apply button, " +
-        ".jobs-unified-top-card button, .jobs-details-top-card button, " +
-        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button, " +
+        "button.jobs-apply-button, a.jobs-apply-button, " +
+        "button[aria-label*='Easy Apply' i], a[aria-label*='Easy Apply' i], " +
+        "button[aria-label*='LinkedIn Apply' i], a[aria-label*='LinkedIn Apply' i], " +
+        "a[href*='/jobs/view/'][href*='/apply'], a[href*='/apply/'][aria-label*='apply' i], " +
+        "button[data-control-name*='apply' i], a[data-control-name*='apply' i], " +
+        ".jobs-apply-button--top-card button, .jobs-apply-button--top-card a, " +
+        ".jobs-s-apply button, .jobs-s-apply a, " +
+        ".jobs-unified-top-card button, .jobs-unified-top-card a, " +
+        ".jobs-details-top-card button, .jobs-details-top-card a, " +
+        "div[class*='jobs-apply'] button, div[class*='jobs-apply'] a, " +
+        "div[class*='top-card-layout'] button, div[class*='top-card-layout'] a, " +
         ".job-details-jobs-unified-top-card__container--two-pane button, " +
+        ".job-details-jobs-unified-top-card__container--two-pane a, " +
         ".jobs-unified-top-card__content--two-pane button, " +
-        ".jobs-apply-button__container button"
+        ".jobs-unified-top-card__content--two-pane a, " +
+        ".jobs-apply-button__container button, .jobs-apply-button__container a"
       )
     ).filter(_isVisible);
 
@@ -2688,9 +2703,13 @@
       if (_isExternalBtn(b)) return { status: "external", btn: null };
     }
 
-    // Broad fallback: scan EVERY visible button in the document.
-    // LinkedIn renames container classes often; the button text is stable.
-    const allBtns = Array.from(document.querySelectorAll("button")).filter(_isVisible);
+    // Broad fallback: scan EVERY visible button AND anchor in the document.
+    // LinkedIn renames container classes often and moved the in-app apply
+    // control from <button> to <a>; the label text is the stable signal.
+    const allBtns = Array.from(document.querySelectorAll(
+      "button, a[role='button'], a.jobs-apply-button, " +
+      "a[aria-label*='apply' i], a[href*='/jobs/view/'][href*='/apply'], a[href*='/apply/']"
+    )).filter(_isVisible);
     for (const b of allBtns) {
       if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
     }
