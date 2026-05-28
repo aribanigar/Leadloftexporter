@@ -419,35 +419,70 @@
     // (just <span>Connect</span>), and for many profiles it is an
     // <a href="/preload/custom-invite/..."> anchor styled to look like a button
     // — the status-bar URL proves this (hover shows the /preload/custom-invite/ href).
-    // We scan buttons AND anchors with connect/invite in their href, exclude the
-    // right-rail <aside> (recommendation cards), exclude open dropdown menus,
-    // and use CSS visibility (not getBoundingClientRect) so partially-hydrated
-    // buttons aren't filtered out.
+    // We scan ALL buttons AND anchors, exclude only open dropdown menus,
+    // prefer the profile action strip, and fall back to the "More actions" menu.
     const _findConnect = () => {
       const candidates = [];
       const seen = new Set();
       const q = (sel) => { try { return document.querySelectorAll(sel); } catch { return []; } };
+
+      // Phase 1: broad scan — buttons, role=button, and invite/connect anchors
       for (const b of [
         ...q("button, [role='button']"),
-        ...q("a[href*='invite' i], a[href*='connect' i]"),
+        ...q("a[href*='invite' i], a[href*='connect' i], a[href*='/mynetwork/' i]"),
       ]) {
         if (seen.has(b)) continue; seen.add(b);
-        if (b.closest("aside")) continue;
+        // Exclude items inside open dropdown menus only (not aside — LinkedIn 2025
+        // sometimes renders the action strip inside an aside container)
         if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
         if (!_isConnectBtn(b)) continue;
         const cs = window.getComputedStyle(b);
         if (cs.display === "none" || cs.visibility === "hidden") continue;
         candidates.push(b);
       }
+
       if (!candidates.length) return null;
-      // Prefer a match inside the profile action strip; else first in document order.
+
+      // Phase 2: prefer match inside the profile action strip
+      const ACTION_STRIP =
+        ".pvs-profile-actions, .pv-top-card-v2-ctas, .pv-top-card-v3-ctas, " +
+        ".ph5, .pv-top-card, [class*='top-card'][class*='ctas'], " +
+        "[class*='profile-actions'], .scaffold-layout__main";
       const inActions = candidates.find(
-        (b) =>
-          b.closest(
-            ".pvs-profile-actions, .pv-top-card-v2-ctas, .ph5, .pv-top-card, .scaffold-layout__main"
-          ) && b.closest("main")
+        (b) => b.closest(ACTION_STRIP) && b.closest("main")
       );
-      return inActions || candidates[0];
+      if (inActions) return inActions;
+
+      // Phase 3: any candidate inside <main>
+      const inMain = candidates.find((b) => b.closest("main"));
+      if (inMain) return inMain;
+
+      // Phase 4: absolute fallback — first candidate regardless of container
+      return candidates[0];
+    };
+
+    // Phase 5: nuclear document-wide text scan used when _findConnect returns null
+    const _findConnectNuclear = () => {
+      const seen = new Set();
+      // Walk every element with a click handler — covers custom components
+      for (const el of document.querySelectorAll(
+        "button, [role='button'], a[href], [data-control-name*='connect' i]"
+      )) {
+        if (seen.has(el)) continue; seen.add(el);
+        if (el.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+        const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+        const hay = txt + " " + aria;
+        if (!/\bconnect\b/.test(hay)) continue;
+        if (/\bcontact\b|\bpending\b|\bfollowing\b|\bmessage\b|\bwithdraw\b/.test(hay)) continue;
+        if (el.disabled) continue;
+        const cs = window.getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) continue;
+        return el;
+      }
+      return null;
     };
 
     let connectBtn = _findConnect();
@@ -457,7 +492,7 @@
     if (!connectBtn) {
       for (let w = 0; w < 16 && !connectBtn; w++) {
         await sleep(500);
-        connectBtn = _findConnect();
+        connectBtn = _findConnect() || _findConnectNuclear();
       }
     }
 
@@ -466,21 +501,49 @@
     if (!connectBtn) {
       const moreBtn =
         document.querySelector("main button[aria-label*='More actions' i]") ||
-        document.querySelector(".pvs-profile-actions button[aria-label*='More' i]");
+        document.querySelector("main button[aria-label*='More' i]") ||
+        document.querySelector(".pvs-profile-actions button[aria-label*='More' i]") ||
+        (() => {
+          // text-content fallback for "More" button
+          for (const b of document.querySelectorAll("main button")) {
+            const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+            if (/^more$/i.test(txt) && !b.disabled) return b;
+          }
+          return null;
+        })();
       if (moreBtn) {
         if (simulateCursorMove) await simulateCursorMove(moreBtn);
         await sleep(400 + Math.random() * 400);
         await dispatchHumanClick(moreBtn);
         await sleep(700 + Math.random() * 500);
-        const found = await waitFor(
-          [
-            "div[role='menu'] [aria-label*='Connect' i]",
-            "div.artdeco-dropdown__content [aria-label*='Connect' i]",
-            "li.artdeco-dropdown__item [aria-label*='Connect' i]",
-          ],
-          { timeout: 3000 }
+        // Search dropdown by aria-label AND by text content
+        const dropdownItems = document.querySelectorAll(
+          "div[role='menu'] li, div[role='menu'] [role='menuitem'], " +
+          "div.artdeco-dropdown__content li, li.artdeco-dropdown__item"
         );
-        if (found && _isConnectBtn(found)) connectBtn = found;
+        for (const item of dropdownItems) {
+          const txt = (item.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const aria = (item.getAttribute("aria-label") || "").toLowerCase();
+          if (/\bconnect\b/.test(txt + " " + aria) && !/\bpending\b|\bwithdraw\b/.test(txt + " " + aria)) {
+            const clickable = item.querySelector("button, a") || item;
+            if (_isConnectBtn(clickable) || /\bconnect\b/.test(txt)) {
+              connectBtn = clickable;
+              break;
+            }
+          }
+        }
+        // Also try waitFor as secondary
+        if (!connectBtn) {
+          const found = await waitFor(
+            [
+              "div[role='menu'] [aria-label*='Connect' i]",
+              "div.artdeco-dropdown__content [aria-label*='Connect' i]",
+              "li.artdeco-dropdown__item [aria-label*='Connect' i]",
+            ],
+            { timeout: 2000 }
+          );
+          if (found && _isConnectBtn(found)) connectBtn = found;
+        }
       }
     }
 
