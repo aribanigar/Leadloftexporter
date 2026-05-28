@@ -262,6 +262,39 @@
     } catch {}
   }
 
+  // Inject code into the PAGE's MAIN world to click "Send without a note".
+  // Content scripts run in an isolated world; a <script> tag appended to the DOM
+  // runs in the page's own JS context where window.jQuery and other page globals
+  // are accessible, giving us one more click channel against LinkedIn's handler.
+  function _ccMainWorldClick() {
+    try {
+      const code =
+        "(function(){" +
+        "var all=Array.from(document.querySelectorAll('button,[role=\"button\"]'));" +
+        "var b=all.find(function(x){" +
+        "  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();" +
+        "  var a=(x.getAttribute('aria-label')||'').toLowerCase();" +
+        "  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';" +
+        "});" +
+        "if(!b)return;" +
+        "if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}" +
+        "HTMLElement.prototype.click.call(b);" +
+        "var f=b.closest('form');" +
+        "if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}" +
+        "})();";
+      const s = document.createElement("script");
+      s.textContent = code;
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch {}
+  }
+
+  // Request the service worker to executeScript with world:"MAIN" — the most
+  // authoritative injection path available from a content script.
+  function _ccSwMainWorldClick() {
+    try { chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {}); } catch {}
+  }
+
   // Click an element as reliably as possible. Ports the proven _forceClick from
   // overlay.js: LinkedIn's button handler may be bound to the <button>, to an
   // inner <span>, or driven by keyboard activation, so we try ALL of —
@@ -534,10 +567,9 @@
     // One matcher, used for both detection and the click target.
     let sawSendBtn = false;
     let firstClickDone = false;
+    let swClickFired = false;
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
-      // Strongest success signal: LinkedIn accepted the invite and the button
-      // flipped to "Pending".
       if (_pendingVisible()) {
         console.log("[LeadCaptura] connect-queue: Pending detected → invitation sent ✓");
         return { ok: true };
@@ -547,29 +579,33 @@
       if (sendBtn) {
         if (!sawSendBtn) {
           sawSendBtn = true;
-          // Let Ember finish mounting/binding the button handler before the
-          // first click — clicking mid-animation is a silent no-op.
-          await sleep(320);
+          await sleep(280);  // let modal fully mount
         }
         if (!firstClickDone) {
           firstClickDone = true;
           if (simulateCursorMove) {
             try { await simulateCursorMove(sendBtn); } catch {}
           }
+          // First click: use all nuclear strategies simultaneously
+          _ccSwMainWorldClick();
+          swClickFired = true;
         }
         console.log("[LeadCaptura] connect-queue: found 'Send without a note' → clicking", sendBtn);
         _ccForceClick(sendBtn);
+        _ccMainWorldClick(sendBtn);
+        // Re-fire SW main-world click every ~2s while stuck
+        if (!swClickFired || Date.now() % 2000 < 200) {
+          _ccSwMainWorldClick();
+          swClickFired = true;
+        }
       } else if (sawSendBtn) {
-        // The button we saw is gone and no error surfaced → invite was sent
-        // (by us or by the global overlay.js watcher).
         console.log("[LeadCaptura] connect-queue: send button gone → invitation sent ✓");
         return { ok: true };
       }
 
-      await sleep(250);
+      await sleep(200);
     }
 
-    // Timed out. Final authoritative checks before declaring failure.
     if (_pendingVisible()) return { ok: true };
     if (sawSendBtn) {
       console.log("[LeadCaptura] connect-queue: button stayed visible, send did not complete");

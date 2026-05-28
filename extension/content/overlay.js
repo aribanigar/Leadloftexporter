@@ -1683,29 +1683,32 @@
     console.log("[LeadCaptura] step 2 → dialog opened");
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
-    // LinkedIn's backend can take 1-4s to process and close the dialog, so we
-    // click, then wait, and retry the click only while the dialog is still up.
-    for (let attempt = 0; attempt < 6 && _invitationModalOpen(); attempt++) {
+    // Nuclear approach: highlight the button visually, try every 200ms using
+    // all click strategies including MAIN-world injection and SW executeScript.
+    for (let attempt = 0; attempt < 18 && _invitationModalOpen(); attempt++) {
       const sendBtn = _findSendWithoutNoteButton();
       if (!sendBtn) {
-        // Button not rendered yet (or already gone mid-close) — give it a beat.
-        await sleep(300);
+        await sleep(200);
         continue;
+      }
+      if (attempt === 0) {
+        _highlightSendBtn(sendBtn);
+        _tryServiceWorkerMainWorldClick();
       }
       console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
       _forceClick(sendBtn);
-      // STEP 4: wait up to ~4s for the dialog to disappear = invite sent.
-      for (let w = 0; w < 16; w++) {
-        await sleep(250);
+      if (attempt % 2 === 0) _tryMainWorldClick(sendBtn);
+      for (let w = 0; w < 10; w++) {
+        await sleep(200);
         if (!_invitationModalOpen()) {
           console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+          _removeSendBtnHighlight();
           return { ok: true };
         }
       }
     }
 
-    // Dialog gone by now means it was sent on a late close; still-open means
-    // the send genuinely failed.
+    _removeSendBtnHighlight();
     if (!_invitationModalOpen()) return { ok: true };
     console.log("[LeadCaptura] step 3/4 → could not send, giving up");
     return { ok: false, reason: "send_failed" };
@@ -3846,66 +3849,179 @@
     );
   }
 
+  // ── Visual overlay: glowing highlight + arrow on "Send without a note" ──
+  let _sendBtnHighlightTimer = null;
+  let _sendBtnArrowEl = null;
+
+  function _highlightSendBtn(btn) {
+    if (!btn) return;
+    // Pulsing glow on the button itself
+    try {
+      btn.style.setProperty("outline", "3px solid #0a66c2", "important");
+      btn.style.setProperty("outline-offset", "3px", "important");
+      btn.style.setProperty("animation", "lc-pulse-ring 0.9s ease-in-out infinite", "important");
+      btn.setAttribute("data-lc-highlighted", "true");
+    } catch {}
+    // Floating arrow panel above the button
+    if (!_sendBtnArrowEl || !document.body.contains(_sendBtnArrowEl)) {
+      const arrow = document.createElement("div");
+      arrow.id = "lc-send-btn-arrow";
+      arrow.innerHTML =
+        '<div class="lc-arrow-inner">' +
+        '<span class="lc-arrow-emoji">👆</span>' +
+        '<span>LeadCaptura: Click &ldquo;Send without a note&rdquo;</span>' +
+        "</div>" +
+        '<div class="lc-arrow-tail"></div>';
+      document.body.appendChild(arrow);
+      _sendBtnArrowEl = arrow;
+    }
+    // Position arrow above the button and keep updating
+    clearInterval(_sendBtnHighlightTimer);
+    _sendBtnHighlightTimer = setInterval(() => {
+      if (!_sendBtnArrowEl || !document.body.contains(_sendBtnArrowEl)) return;
+      const target = _findSendWithoutNoteButton();
+      if (!target) return;
+      const r = target.getBoundingClientRect();
+      if (r.width === 0) return;
+      const aw = _sendBtnArrowEl.offsetWidth || 280;
+      _sendBtnArrowEl.style.left =
+        Math.max(8, Math.min(window.innerWidth - aw - 8, r.left + r.width / 2 - aw / 2)) + "px";
+      _sendBtnArrowEl.style.top =
+        Math.max(8, r.top - (_sendBtnArrowEl.offsetHeight || 56) - 12) + "px";
+    }, 100);
+  }
+
+  function _removeSendBtnHighlight() {
+    clearInterval(_sendBtnHighlightTimer);
+    _sendBtnHighlightTimer = null;
+    if (_sendBtnArrowEl) {
+      try { _sendBtnArrowEl.remove(); } catch {}
+      _sendBtnArrowEl = null;
+    }
+    try {
+      const el = document.querySelector('[data-lc-highlighted="true"]');
+      if (el) {
+        el.style.removeProperty("outline");
+        el.style.removeProperty("outline-offset");
+        el.style.removeProperty("animation");
+        el.removeAttribute("data-lc-highlighted");
+      }
+    } catch {}
+  }
+
+  // Inject a <script> tag that runs in the PAGE's MAIN world, not the extension's
+  // isolated world. In MAIN world the code has access to window.jQuery and can
+  // call HTMLElement.prototype methods in the same origin as the page handler —
+  // the single most reliable bypass for frameworks that bind to document-level
+  // listeners rather than the button element itself.
+  function _tryMainWorldClick(btn) {
+    try {
+      const code =
+        "(function(){" +
+        "var all=Array.from(document.querySelectorAll('button,[role=\"button\"]'));" +
+        "var b=all.find(function(x){" +
+        "  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();" +
+        "  var a=(x.getAttribute('aria-label')||'').toLowerCase();" +
+        "  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';" +
+        "});" +
+        "if(!b)return;" +
+        "if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}" +
+        "HTMLElement.prototype.click.call(b);" +
+        "var f=b.closest('form');" +
+        "if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}" +
+        "b.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));" +
+        "})();";
+      const s = document.createElement("script");
+      s.textContent = code;
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch {}
+  }
+
+  // Ask the service worker to run chrome.scripting.executeScript with world:"MAIN"
+  // on the current tab — the most authoritative way to fire page-context code.
+  function _tryServiceWorkerMainWorldClick() {
+    try {
+      chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {});
+    } catch {}
+  }
+
   // ---- Global auto-confirm of the invitation modal ----------------------
-  // The "Add a note to your invitation?" dialog appears whenever Connect is
-  // clicked — by Connect All OR by the user manually. The user's rule is: never
-  // add a note, always "Send without a note". This watcher clicks that button
-  // the instant the modal appears, regardless of who triggered the Connect, so
-  // the flow never stalls on the dialog. Bot-detection note: this only fires in
-  // direct response to a Connect the user/extension already made, so it adds no
-  // new outbound action — it just completes the one already in progress.
+  // Fires whenever the "Add a note?" modal appears, regardless of who triggered
+  // it. Nuclear strategy: visual highlight, MAIN-world injection, aggressive
+  // 200ms retry, and a user-assist prompt after 5s if still stuck.
   let _inviteAutoBusy = false;
+  let _inviteHighlightShown = false;
+
   async function _autoConfirmInviteModal() {
-    // During a Connect All run, _sendConnectOnCard owns the full sequence —
-    // stand down so the two don't double-click the same dialog.
-    if (state.connectActive) return;
+    if (state.connectActive) return;  // _sendConnectOnCard owns the sequence
     if (_inviteAutoBusy) return;
-    if (!_invitationModalOpen()) return;
+    if (!_invitationModalOpen()) {
+      if (_inviteHighlightShown) { _removeSendBtnHighlight(); _inviteHighlightShown = false; }
+      return;
+    }
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
-      // Let the modal finish its mount/animation so LinkedIn (Ember) has bound
-      // the button's click handler — clicking mid-animation is a no-op. ~250ms
-      // is below human reaction time floor and well within the modal's lifetime.
-      await sleep(250);
+      await sleep(180);  // let the modal animation finish
       btn = _findSendWithoutNoteButton();
       if (!btn || !_invitationModalOpen()) return;
-      console.log("[LeadCaptura] auto-confirm: clicking Send without a note", btn);
+
+      // Immediately show the visual overlay so user can see what we're targeting
+      if (!_inviteHighlightShown) {
+        _inviteHighlightShown = true;
+        _highlightSendBtn(btn);
+      }
       _lcToast("LeadCaptura: sending invitation…");
+      console.log("[LeadCaptura] auto-confirm: found Send without a note", btn);
+
+      // First volley: all strategies at once
       _forceClick(btn);
-      // Give LinkedIn's backend up to ~4.5s to process and close the modal.
-      for (let i = 0; i < 18; i++) {
-        await sleep(250);
+      _tryMainWorldClick(btn);
+      _tryServiceWorkerMainWorldClick();
+
+      // Aggressive retry: every 200ms for up to 5s (25 attempts)
+      for (let i = 0; i < 25; i++) {
+        await sleep(200);
         if (!_invitationModalOpen()) {
           console.log("[LeadCaptura] auto-confirm: modal closed ✓");
           _lcToast("LeadCaptura: invitation sent ✓");
+          _removeSendBtnHighlight();
+          _inviteHighlightShown = false;
           return;
         }
-        // Re-click periodically while the modal is still up (in case the first
-        // attempt landed during the animation and was swallowed).
         const stillBtn = _findSendWithoutNoteButton();
-        if (stillBtn && !stillBtn.disabled && i % 3 === 2) _forceClick(stillBtn);
+        if (stillBtn && !stillBtn.disabled) {
+          _forceClick(stillBtn);
+          if (i % 4 === 0) _tryMainWorldClick(stillBtn);
+          if (i % 8 === 0) _tryServiceWorkerMainWorldClick();
+        }
       }
-      console.log("[LeadCaptura] auto-confirm: modal still open after retries");
+
+      // After 5s still stuck — show persistent "please click" prompt
+      if (_invitationModalOpen()) {
+        _lcToast('⚠️ Please click the highlighted "Send without a note" button');
+        console.log("[LeadCaptura] auto-confirm: prompting user — auto-click blocked by LinkedIn");
+        // Keep the highlight active; the MutationObserver will catch the modal
+        // closing when the user manually clicks it, and the next iteration of
+        // this function will clean up.
+      }
     } catch (e) {
       console.warn("[LeadCaptura] auto-confirm error", e);
     } finally {
       _inviteAutoBusy = false;
     }
   }
+
   function _startInviteAutoConfirm() {
     try {
-      const obs = new MutationObserver(() => {
-        _autoConfirmInviteModal();
-      });
+      const obs = new MutationObserver(() => { _autoConfirmInviteModal(); });
       obs.observe(document.documentElement, { childList: true, subtree: true });
-    } catch {
-      /* observer best-effort */
-    }
-    // Safety-net poll in case a mutation batch is missed.
-    setInterval(_autoConfirmInviteModal, 600);
+    } catch {}
+    // Faster safety-net poll (200ms vs old 600ms) to catch any missed mutations.
+    setInterval(_autoConfirmInviteModal, 200);
   }
   _startInviteAutoConfirm();
 

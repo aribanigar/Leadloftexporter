@@ -143,6 +143,52 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
     return true;
   }
+  // Run a click on "Send without a note" inside the PAGE's MAIN world.
+  // Content scripts live in an isolated world; code injected via executeScript
+  // with world:"MAIN" runs in the actual page context and can reach window.jQuery
+  // and fire events that page-level handlers see as same-origin synthetic events.
+  if (msg?.type === "lc:clickMainWorldSend") {
+    const tabId = _sender?.tab?.id;
+    if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    chrome.scripting.executeScript(
+      {
+        target: { tabId },
+        world: "MAIN",
+        func: () => {
+          const all = Array.from(document.querySelectorAll("button,[role='button']"));
+          const btn = all.find((b) => {
+            const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+            const a = (b.getAttribute("aria-label") || "").toLowerCase();
+            return (
+              /send without a note/i.test(t) ||
+              /send without a note/i.test(a) ||
+              t === "send now" ||
+              t === "send"
+            );
+          });
+          if (!btn) return { found: false };
+          // jQuery path — LinkedIn still ships jQuery in many page bundles
+          if (window.jQuery || window.$) {
+            try { (window.jQuery || window.$)(btn).trigger("click"); } catch (_) {}
+          }
+          // Direct prototype call — bypasses any "click" override on the element
+          HTMLElement.prototype.click.call(btn);
+          // Form submission fallback
+          const form = btn.closest("form");
+          if (form) {
+            try { form.requestSubmit(btn); } catch (_) {
+              try { form.submit(); } catch (_2) {}
+            }
+          }
+          return { found: true };
+        },
+      },
+      (results) => {
+        sendResponse({ ok: true, result: results?.[0]?.result });
+      }
+    );
+    return true;
+  }
   // Open a profile in a background tab for contact-info enrichment.
   // Key improvements vs the old approach:
   //   1. Navigate directly to /overlay/contact-info/ so LinkedIn's SPA router

@@ -1,3 +1,46 @@
+/* ── Send-button highlight (nuclear auto-confirm overlay) ──────────────── */
+@keyframes lc-pulse-ring {
+  0%   { box-shadow: 0 0 0 4px rgba(10,102,194,0.6), 0 0 16px rgba(10,102,194,0.4); }
+  50%  { box-shadow: 0 0 0 8px rgba(10,102,194,0.3), 0 0 28px rgba(10,102,194,0.6); }
+  100% { box-shadow: 0 0 0 4px rgba(10,102,194,0.6), 0 0 16px rgba(10,102,194,0.4); }
+}
+@keyframes lc-arrow-bounce {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+#lc-send-btn-arrow {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  transition: top 0.1s, left 0.1s !important;
+}
+#lc-send-btn-arrow .lc-arrow-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #0a66c2 !important;
+  color: #fff !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  box-shadow: 0 4px 20px rgba(10,102,194,0.5) !important;
+  white-space: nowrap !important;
+}
+#lc-send-btn-arrow .lc-arrow-emoji {
+  font-size: 18px !important;
+  display: inline-block !important;
+  animation: lc-arrow-bounce 0.6s ease-in-out infinite !important;
+}
+#lc-send-btn-arrow .lc-arrow-tail {
+  width: 0 !important;
+  height: 0 !important;
+  border-left: 10px solid transparent !important;
+  border-right: 10px solid transparent !important;
+  border-top: 10px solid #0a66c2 !important;
+  margin: 0 auto !important;
+}
+
 /* LeadCaptura overlay — three surfaces:
  *   #lc-profile-panel   compact card top-right on /in/<handle>
  *   #lc-toolbar         persistent bottom bar on search / sales nav
