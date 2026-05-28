@@ -3094,23 +3094,29 @@
         return { ok: false, reason: "no_action_button" };
       }
 
-      if (action.type === "submit") {
-        // React-aware submit click.
-        _forceClick(action.btn);
-        await sleep(2000 + Math.random() * 1500);
+      // Snapshot helper — used to tell whether a click actually moved the modal.
+      const snap = (m) => ({
+        progress: _modalProgress(m),
+        heading: _modalHeading(m),
+        html: m?.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 300) || "",
+      });
 
-        const modalAfter = _easyApplyModal();
-        if (!modalAfter) {
-          // Modal closed on its own = successful submission.
-          return { ok: true };
+      if (action.type === "submit") {
+        // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
+        // handlers reliably honour. Escalate to _forceClick only if it didn't land.
+        await dispatchHumanClick(action.btn);
+        await sleep(1800 + Math.random() * 1200);
+        let after = _easyApplyModal();
+        if (after && _modalActionButton(after)?.type === "submit") {
+          _forceClick(action.btn);
+          await sleep(1800 + Math.random() * 1200);
+          after = _easyApplyModal();
         }
-        // Modal still open — check whether it transitioned to a success screen.
-        // LinkedIn shows "Your application was sent" / "Application submitted" etc.
-        // inside the same modal element after submission.
-        const modalText = (modalAfter.innerText || modalAfter.textContent || "").toLowerCase();
+        if (!after) return { ok: true }; // modal closed = submitted
+        const txt = (after.innerText || after.textContent || "").toLowerCase();
         const isSuccess =
-          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(modalText) ||
-          !!modalAfter.querySelector(
+          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(txt) ||
+          !!after.querySelector(
             ".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], " +
             "[class*='success-banner'], progress[value='100']"
           );
@@ -3118,43 +3124,53 @@
         return isSuccess ? { ok: true } : { ok: false, reason: "submit_failed" };
       }
 
-      // Snapshot state before advancing so we can detect if the modal moved on.
-      const before = {
-        progress: _modalProgress(modal),
-        heading: _modalHeading(modal),
-        html: modal.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "",
-      };
+      // Advance (next / review). Snapshot first so we can detect movement.
+      const before = snap(modal);
       // Reading pause before clicking.
-      await sleep(700 + Math.random() * 800);
-      // Use _forceClick (5 strategies) for reliable step advancement.
-      _forceClick(action.btn);
-      await sleep(1500 + Math.random() * 1000);
+      await sleep(600 + Math.random() * 700);
 
-      const after = _easyApplyModal();
+      // Did the modal move past `before`?
+      const progressed = (m) => {
+        if (!m) return true; // modal gone = advanced/closed
+        const act = _modalActionButton(m);
+        const movedToSubmit = act && (act.type === "submit" || act.type === "review") && action.type === "next";
+        const cur = snap(m);
+        return (
+          movedToSubmit ||
+          (before.progress != null && cur.progress != null && cur.progress > before.progress) ||
+          (before.heading && cur.heading && cur.heading !== before.heading) ||
+          (cur.html !== before.html)
+        );
+      };
+
+      // Primary: human-paced click (v1.0.47 behavior).
+      await dispatchHumanClick(action.btn);
+      await sleep(1300 + Math.random() * 900);
+      let after = _easyApplyModal();
       if (!after) return { ok: false, reason: "modal_vanished" };
-      const act2 = _modalActionButton(after);
-      const progAfter = _modalProgress(after);
-      const headAfter = _modalHeading(after);
-      const htmlAfter = after.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "";
+
+      // Fallback: if it didn't move, escalate to the 5-strategy force click.
+      if (!progressed(after)) {
+        _forceClick(action.btn);
+        await sleep(1300 + Math.random() * 900);
+        after = _easyApplyModal();
+        if (!after) return { ok: false, reason: "modal_vanished" };
+      }
+
       const errorShown = !!after.querySelector(
         ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
         ".jobs-easy-apply-form-element__error, [class*='error-text']"
       );
 
-      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
-      const progressBarMoved = before.progress != null && progAfter != null && progAfter > before.progress;
-      const headingChanged = before.heading && headAfter && headAfter !== before.heading;
-      const contentChanged = htmlAfter !== before.html;
-      const progressed = progressedByButton || progressBarMoved || headingChanged || contentChanged;
-
-      if (!progressed && errorShown) {
-        // Explicit validation error — this step needs manual input we can't provide.
+      if (!progressed(after)) {
+        // Still on the same page after both click attempts. If LinkedIn is
+        // showing a validation error, or we've been stuck several times, this
+        // job needs input we can't safely provide — discard and move on.
         consecutiveStuck++;
-        if (consecutiveStuck >= 2) {
+        if (errorShown || consecutiveStuck >= 3) {
           await _dismissEasyApplyModal();
           return { ok: false, reason: "needs_manual_input" };
         }
-        // Give it one more attempt (maybe the click landed too early).
         await sleep(1000);
         continue;
       }
