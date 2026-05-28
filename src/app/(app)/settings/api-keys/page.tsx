@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Trash2 } from "lucide-react";
+import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { copyToClipboard } from "@/lib/utils";
 
 interface ApiKeyRow {
   id: string;
@@ -22,6 +23,7 @@ export default function ApiKeysPage() {
   });
 
   const [created, setCreated] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const create = useMutation({
     mutationFn: (name: string) =>
@@ -57,11 +59,23 @@ export default function ApiKeysPage() {
             <code className="flex-1 break-all rounded bg-white px-2 py-1 font-mono text-xs">{created}</code>
             <button
               className="btn-secondary"
-              onClick={() => {
-                void navigator.clipboard.writeText(created);
+              onClick={async () => {
+                const ok = await copyToClipboard(created);
+                if (ok) {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
               }}
             >
-              <Copy className="h-4 w-4" /> Copy
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-emerald-600" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> Copy
+                </>
+              )}
             </button>
           </div>
           <button className="mt-2 text-amber-700 underline" onClick={() => setCreated(null)}>
