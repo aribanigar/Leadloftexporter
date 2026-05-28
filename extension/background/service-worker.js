@@ -492,11 +492,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           answer = (data?.content?.[0]?.text || "").trim();
         } else {
           if (!s.geminiApiKey) { sendResponse({ ok: false, error: "no_gemini_key" }); return; }
-          const model = s.geminiModel || "gemini-2.0-flash";
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(s.geminiApiKey)}`;
-          let res;
-          try {
-            res = await fetch(url, {
+          const _geminiCall = async (m) => {
+            const u = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(s.geminiApiKey)}`;
+            return fetch(u, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -504,6 +502,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 generationConfig: { temperature: 0.2, maxOutputTokens: 80 },
               }),
             });
+          };
+          let usedModel = s.geminiModel || "gemini-1.5-flash";
+          let res;
+          try {
+            res = await _geminiCall(usedModel);
+            // Auto-fallback: gemini-2.0-flash has limited free-tier quota in many
+            // regions; retry with gemini-1.5-flash which has broader availability.
+            if (!res.ok && res.status === 429 && usedModel !== "gemini-1.5-flash") {
+              usedModel = "gemini-1.5-flash";
+              res = await _geminiCall(usedModel);
+            }
           } catch (e) {
             sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
             return;

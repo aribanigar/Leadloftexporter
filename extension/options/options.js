@@ -69,7 +69,7 @@ const DEFAULTS = {
   aiEnabled: false,
   aiProvider: "gemini", // "gemini" | "claude"
   geminiApiKey: "",
-  geminiModel: "gemini-2.0-flash",
+  geminiModel: "gemini-1.5-flash",
   claudeApiKey: "",
   claudeModel: "claude-haiku-4-5-20251001",
   cvText: DEFAULT_CV,
@@ -193,25 +193,46 @@ async function testGemini() {
       setGeminiStatus(reply ? `Claude connected ✓ (replied: ${reply.slice(0, 40)})` : "Claude connected ✓", "ok");
     } else {
       const key = $("#geminiApiKey").value.trim();
-      const model = $("#geminiModel").value.trim() || "gemini-2.0-flash";
+      let model = $("#geminiModel").value.trim() || "gemini-1.5-flash";
       if (!key) { setGeminiStatus("Add a Gemini API key first.", "err"); return; }
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: "Reply with the single word: OK" }] }],
-          generationConfig: { maxOutputTokens: 10, temperature: 0 },
-        }),
-      });
+
+      const _callGemini = async (m) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(key)}`;
+        return fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "Reply with the single word: OK" }] }],
+            generationConfig: { maxOutputTokens: 10, temperature: 0 },
+          }),
+        });
+      };
+
+      let res = await _callGemini(model);
+
+      // gemini-1.5-flash has very limited free-tier quota in many regions.
+      // Auto-retry with gemini-1.5-flash which has broader global availability.
+      if (!res.ok && res.status === 429 && model !== "gemini-1.5-flash") {
+        setGeminiStatus(`${model} quota exceeded — trying gemini-1.5-flash…`);
+        res = await _callGemini("gemini-1.5-flash");
+        if (res.ok) {
+          model = "gemini-1.5-flash";
+          $("#geminiModel").value = model;
+        }
+      }
+
       if (!res.ok) {
         const t = await res.text().catch(() => "");
-        setGeminiStatus(`Gemini rejected (${res.status}). ${t.slice(0, 160)}`, "err");
+        const is429 = res.status === 429;
+        const hint = is429
+          ? `Quota exceeded for ${model}. Try switching to gemini-1.5-flash, or enable billing on your Google Cloud project at console.cloud.google.com.`
+          : `Gemini rejected (${res.status}). ${t.slice(0, 120)}`;
+        setGeminiStatus(hint, "err");
         return;
       }
       const data = await res.json();
       const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      setGeminiStatus(reply ? `Gemini connected ✓ (replied: ${reply.slice(0, 40)})` : "Gemini connected ✓", "ok");
+      setGeminiStatus(reply ? `Gemini connected ✓ using ${model} (replied: ${reply.slice(0, 40)})` : `Gemini connected ✓ using ${model}`, "ok");
     }
   } catch (err) {
     setGeminiStatus(err.message || "Failed to reach the AI provider.", "err");
@@ -252,7 +273,7 @@ async function onSave() {
     aiEnabled: $("#aiEnabled").checked,
     aiProvider: $("#aiProvider").value,
     geminiApiKey: $("#geminiApiKey").value.trim(),
-    geminiModel: $("#geminiModel").value.trim() || "gemini-2.0-flash",
+    geminiModel: $("#geminiModel").value.trim() || "gemini-1.5-flash",
     claudeApiKey: $("#claudeApiKey").value.trim(),
     claudeModel: $("#claudeModel").value.trim() || "claude-haiku-4-5-20251001",
     cvText: $("#cvText").value,
@@ -318,7 +339,7 @@ async function init() {
   $("#aiEnabled").checked = !!settings.aiEnabled;
   $("#aiProvider").value = settings.aiProvider || "gemini";
   $("#geminiApiKey").value = settings.geminiApiKey || "";
-  $("#geminiModel").value = settings.geminiModel || "gemini-2.0-flash";
+  $("#geminiModel").value = settings.geminiModel || "gemini-1.5-flash";
   $("#claudeApiKey").value = settings.claudeApiKey || "";
   $("#claudeModel").value = settings.claudeModel || "claude-haiku-4-5-20251001";
   $("#cvText").value = settings.cvText || "";
