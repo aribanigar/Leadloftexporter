@@ -75,6 +75,25 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Close a tab safely. chrome.tabs.remove reports failures via
+// chrome.runtime.lastError (NOT by throwing), so a bare try/catch never
+// catches them — leaving "Unchecked runtime.lastError" in the extension
+// Errors panel. The common failure is "Tabs cannot be edited right now
+// (user may be dragging a tab)", which is transient: we retry a few times
+// with a short backoff, reading lastError each time so it's never unchecked.
+function safeRemoveTab(tabId, done, attempt = 0) {
+  if (tabId == null) { done?.(); return; }
+  chrome.tabs.remove(tabId, () => {
+    const err = chrome.runtime.lastError; // read to mark as handled
+    if (err && attempt < 5 && /dragging|cannot be edited/i.test(err.message || "")) {
+      setTimeout(() => safeRemoveTab(tabId, done, attempt + 1), 400 + attempt * 300);
+      return;
+    }
+    done?.();
+  });
+}
+
+
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   return Object.assign({}, DEFAULT_SETTINGS, settings || {});
@@ -376,7 +395,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             // (8s h1 + 1s read + 8.5s contact-info polling + 4s margin) so
             // genuinely slow profiles don't report "Timed out", but short
             // enough that a single stuck profile can't stall the bulk run.
-            try { chrome.tabs.remove(tabId); } catch {}
+            safeRemoveTab(tabId);
             finish({ timedOut: true });
           }, 22_000);
         });
@@ -390,7 +409,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "lc:closeMe") {
     const tabId = _sender?.tab?.id;
     if (tabId != null) {
-      chrome.tabs.remove(tabId, () => sendResponse({ ok: true }));
+      safeRemoveTab(tabId, () => sendResponse({ ok: true }));
     } else {
       sendResponse({ ok: false });
     }
@@ -534,6 +553,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         function _parseHtml(html) {
           const emails = new Set();
           const phones = new Set();
+          const addresses = new Set();
+          let companyName = null;
           const _addEmail = (e) => {
             e = (e || "").toLowerCase().trim();
             if (!e || /\.(png|jpg|gif|svg|css|js|woff|eot|ttf|otf)$/i.test(e)) return;
@@ -545,8 +566,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             const digits = (p || "").replace(/\D/g, "");
             if (digits.length >= 7 && digits.length <= 15) phones.add(p.trim());
           };
+          const _addAddress = (a) => {
+            a = (a || "").replace(/\s+/g, " ").trim();
+            if (a.length >= 8 && a.length <= 200) addresses.add(a);
+          };
+          // Flatten a schema.org PostalAddress object into one line.
+          const _addrFromObj = (a) => {
+            if (!a) return;
+            if (typeof a === "string") { _addAddress(a); return; }
+            if (typeof a !== "object") return;
+            const parts = [
+              a.streetAddress, a.addressLocality, a.addressRegion,
+              a.postalCode, a.addressCountry?.name || a.addressCountry,
+            ].filter((x) => x && typeof x === "string");
+            if (parts.length) _addAddress(parts.join(", "));
+          };
 
-          // 1. JSON-LD schema.org — most structured
+          // 1. JSON-LD schema.org — most structured (email, phone, address, name)
           const jlRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
           let jm;
           while ((jm = jlRe.exec(html)) !== null) {
@@ -555,6 +591,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 if (!obj || typeof obj !== "object") return;
                 if (obj.email) _addEmail(obj.email);
                 if (obj.telephone) _addPhone(obj.telephone);
+                if (obj.address) _addrFromObj(obj.address);
+                // Organization / LocalBusiness name = the company name
+                if (!companyName && obj.name && typeof obj.name === "string" &&
+                    /Organization|LocalBusiness|Corporation|Company/i.test(String(obj["@type"] || ""))) {
+                  companyName = obj.name.trim();
+                }
                 if (Array.isArray(obj)) obj.forEach(walk);
                 else Object.values(obj).forEach(walk);
               };
@@ -569,12 +611,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const tlRe = /href=["']tel:([+\d\s\-().]+)/gi;
           while ((mm = tlRe.exec(html)) !== null) _addPhone(mm[1]);
 
-          // 3. Meta tags
+          // 3. Meta tags (email/phone + og:site_name for company name)
           const metaRe = /<meta[^>]+(?:property|name)=["'](?:og:email|og:phone_number|email)["'][^>]+content=["']([^"']+)["']/gi;
           while ((mm = metaRe.exec(html)) !== null) {
             const v = mm[1].trim();
             if (v.includes("@")) _addEmail(v);
             else _addPhone(v);
+          }
+          if (!companyName) {
+            const siteName = /<meta[^>]+(?:property|name)=["']og:site_name["'][^>]+content=["']([^"']+)["']/i.exec(html);
+            if (siteName) companyName = siteName[1].trim();
+          }
+          if (!companyName) {
+            const title = /<title[^>]*>([^<]{2,80})<\/title>/i.exec(html);
+            if (title) companyName = title[1].split(/[|\-–—:]/)[0].trim() || null;
           }
 
           // 4. Regex fallback over full HTML
@@ -588,11 +638,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const phIntlRe = /\+\d{1,3}[\s\-]?\(?\d{2,4}\)?[\s\-]?\d{2,4}[\s\-]?\d{2,4}[\s\-]?\d{0,4}\b/g;
           while ((mm = phIntlRe.exec(html)) !== null) _addPhone(mm[0]);
 
-          return { emails: [...emails], phones: [...phones] };
+          // Contextual address: text following an "Address"/"Location"/"Find us" label.
+          const addrCtxRe = /(?:address|location|find us|visit us|our office|headquarters|head office)[\s:–\-]*<?[^>]*>?\s*([A-Za-z0-9][^<\n]{10,160}?\d{3,}[^<\n]{0,40})/gi;
+          while ((mm = addrCtxRe.exec(html)) !== null) {
+            _addAddress(mm[1].replace(/<[^>]+>/g, " "));
+          }
+
+          return {
+            emails: [...emails],
+            phones: [...phones],
+            addresses: [...addresses],
+            name: companyName || null,
+          };
         }
 
         const allEmails = new Set();
         const allPhones = new Set();
+        const allAddresses = new Set();
+        let scrapedName = null;
 
         // Collect distinct origins: primary URL + any extra URLs from LinkedIn profile
         const origins = [];
@@ -621,13 +684,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               });
               if (!res.ok) continue;
               const html = await res.text();
-              const { emails, phones } = _parseHtml(html);
+              const { emails, phones, addresses, name } = _parseHtml(html);
               emails.forEach((e) => allEmails.add(e));
               phones.forEach((p2) => allPhones.add(p2));
+              addresses.forEach((a) => allAddresses.add(a));
+              if (!scrapedName && name) scrapedName = name;
             } catch { continue; }
-            if (allEmails.size >= 3) break outer; // enough personal emails
+            // Stop once we have enough emails AND at least one address — we want
+            // location too now, not just contact emails.
+            if (allEmails.size >= 3 && allAddresses.size >= 1) break outer;
           }
-          if (allEmails.size >= 3) break;
+          if (allEmails.size >= 3 && allAddresses.size >= 1) break;
         }
 
         // Sort: personal emails (with a name in the local part) before generic ones
@@ -636,8 +703,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           .sort((a, b) => (isGeneric.test(a) ? 1 : 0) - (isGeneric.test(b) ? 1 : 0))
           .slice(0, 5);
         const phoneArr = [...allPhones].slice(0, 3);
+        const addressArr = [...allAddresses].slice(0, 3);
 
-        sendResponse({ ok: true, emails: emailArr, phones: phoneArr });
+        sendResponse({
+          ok: true,
+          emails: emailArr,
+          phones: phoneArr,
+          addresses: addressArr,
+          location: addressArr[0] || null,
+          name: scrapedName || null,
+        });
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });
       }

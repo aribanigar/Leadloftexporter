@@ -653,7 +653,9 @@
     const extraWebsites = (enriched.raw?.websites || []).filter(
       (u) => u && u !== websiteUrl
     );
-    if (websiteUrl && (!enriched.email || !enriched.phone)) {
+    // Run when ANY of email / phone / location is still missing — we now pull
+    // company location and name from the website too, not just contact emails.
+    if (websiteUrl && (!enriched.email || !enriched.phone || !enriched.location)) {
       try {
         const wsSettings = await Storage.getSettings();
         if (wsSettings.webScrapeEnabled !== false) {
@@ -668,7 +670,7 @@
           });
           if (wsResult.error === "needs_permission") {
             _lcToast("Enable website scraping in LeadCaptura Options to auto-find emails");
-          } else if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+          } else if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length || wsResult.location || wsResult.name)) {
             const merged = { ...enriched };
             const added = [];
             if (wsResult.emails?.[0] && !merged.email) {
@@ -679,12 +681,22 @@
               merged.phone = wsResult.phones[0];
               added.push("phone");
             }
+            if (wsResult.location && !merged.location) {
+              merged.location = wsResult.location.slice(0, 200);
+              added.push("location");
+            }
+            if (wsResult.name && !merged.company_name) {
+              merged.company_name = wsResult.name;
+              added.push("company");
+            }
             // Store the full list in raw for later reference
             merged.raw = {
               ...(merged.raw || {}),
               contact_source: "website_scrape",
               scraped_emails: wsResult.emails,
               scraped_phones: wsResult.phones,
+              scraped_addresses: wsResult.addresses,
+              scraped_company_name: wsResult.name,
             };
             if (added.length) {
               try {

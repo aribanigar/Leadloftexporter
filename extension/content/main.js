@@ -1246,14 +1246,17 @@
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
 
-      // Website scraping: if still no email/phone, scrape all linked websites.
-      // Uses the primary company_url plus any extra sites captured from the
-      // Contact Info modal (personal site, portfolio, etc.).
+      // Website scraping: fill any missing email / phone / location from the
+      // company website. Uses the primary company_url plus any extra sites
+      // captured from the Contact Info modal (personal site, portfolio, etc.).
       const _wsUrl = profile.company_url;
       const _wsExtra = (profile.raw?.websites || []).filter(u => u && u !== _wsUrl);
       const _wsPrimary = _wsUrl || _wsExtra[0] || null;
       const _wsAdditional = _wsUrl ? _wsExtra : _wsExtra.slice(1);
-      if (_wsPrimary && (!profile.email || !profile.phone)) {
+      // Run whenever we have a site AND are still missing ANY of the three
+      // fields the user wants populated (email / phone / location).
+      const _needsMore = !profile.email || !profile.phone || !profile.location;
+      if (_wsPrimary && _needsMore) {
         try {
           const wsSettings = await globalThis.__lcStorage.getSettings();
           if (wsSettings.webScrapeEnabled) {
@@ -1265,15 +1268,28 @@
                 );
               } catch { resolve({}); }
             });
-            if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+            // Surface the one common silent failure: the broad host permission
+            // for website scraping was never granted (it lives behind the
+            // Options toggle). Tell the user instead of failing invisibly.
+            if (!wsResult.ok && wsResult.error === "needs_permission") {
+              console.warn(
+                "[LeadCaptura] Website scraping is ON but the host permission " +
+                "isn't granted. Open the extension Options and re-save to grant it."
+              );
+            }
+            if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length || wsResult.location || wsResult.name)) {
               const merged = { ...profile };
               if (wsResult.emails?.[0] && !merged.email) merged.email = wsResult.emails[0];
               if (wsResult.phones?.[0] && !merged.phone) merged.phone = wsResult.phones[0];
+              if (wsResult.location && !merged.location) merged.location = wsResult.location.slice(0, 200);
+              if (wsResult.name && !merged.company_name) merged.company_name = wsResult.name;
               merged.raw = {
                 ...(merged.raw || {}),
                 contact_source: "website_scrape",
                 scraped_emails: wsResult.emails,
                 scraped_phones: wsResult.phones,
+                scraped_addresses: wsResult.addresses,
+                scraped_company_name: wsResult.name,
               };
               try { await globalThis.__lcApi.syncProfile(merged); } catch {}
             }
