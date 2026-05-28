@@ -125,6 +125,8 @@ async function fetchJson(path, opts = {}) {
 const handlers = {
   me: () => fetchJson("/extension/me"),
   options: () => fetchJson("/extension/options"),
+  createSegment: ({ name }) =>
+    fetchJson("/extension/segments", { method: "POST", body: { name } }),
   syncProfile: ({ profile }) =>
     fetchJson("/extension/sync/profile", { method: "POST", body: profile }),
   syncSearch: (body) => fetchJson("/extension/sync/search", { method: "POST", body }),
@@ -133,12 +135,105 @@ const handlers = {
   nextJobs: ({ limit }) => fetchJson(`/extension/jobs/next?limit=${limit || 1}`),
   submitJobResult: ({ jobId, result }) =>
     fetchJson(`/extension/jobs/${jobId}/result`, { method: "POST", body: result }),
+  connectResult: ({ linkedin_url, action }) =>
+    fetchJson("/extension/connect-result", { method: "POST", body: { linkedin_url, action } }),
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // Content scripts cannot call chrome.runtime.openOptionsPage; proxy it here.
   if (msg?.type === "lc:openOptions") {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
+    return true;
+  }
+  // Run a click on "Send without a note" inside the PAGE's MAIN world.
+  // Content scripts live in an isolated world; code injected via executeScript
+  // with world:"MAIN" runs in the actual page context and can reach window.jQuery
+  // and fire events that page-level handlers see as same-origin synthetic events.
+  if (msg?.type === "lc:clickMainWorldSend") {
+    const tabId = _sender?.tab?.id;
+    if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    chrome.scripting.executeScript(
+      {
+        target: { tabId },
+        world: "MAIN",
+        func: () => {
+          const all = Array.from(document.querySelectorAll("button,[role='button']"));
+          const btn = all.find((b) => {
+            const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+            const a = (b.getAttribute("aria-label") || "").toLowerCase();
+            return (
+              /send without a note/i.test(t) ||
+              /send without a note/i.test(a) ||
+              t === "send now" || t === "send"
+            );
+          });
+          if (!btn) return { found: false };
+
+          // 1. React fiber traversal — defer via queueMicrotask so React's
+          //    concurrent renderer doesn't throw error #418 ("component
+          //    suspended while responding to synchronous input").
+          try {
+            const fKey = Object.keys(btn).find(
+              (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+            );
+            if (fKey) {
+              let fiber = btn[fKey];
+              for (let d = 0; fiber && d < 12; fiber = fiber.return, d++) {
+                const onClick = fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+                if (typeof onClick === "function") {
+                  const _oc = onClick, _btn = btn;
+                  queueMicrotask(() => {
+                    try {
+                      _oc({
+                        type: "click", bubbles: true, cancelable: true,
+                        isTrusted: true, target: _btn, currentTarget: _btn,
+                        preventDefault() {}, stopPropagation() {},
+                        nativeEvent: { isTrusted: true },
+                      });
+                    } catch (_) {}
+                  });
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+
+          // 2. jQuery — LinkedIn may still use it for some interactions.
+          if (window.jQuery || window.$) {
+            try { (window.jQuery || window.$)(btn).trigger("click"); } catch (_) {}
+          }
+
+          // 3. Native prototype click — bypasses overridden element.click.
+          HTMLElement.prototype.click.call(btn);
+
+          // 4. Full pointer event sequence — closest to a real user click.
+          try {
+            const r = btn.getBoundingClientRect();
+            const cx = Math.round(r.left + r.width / 2);
+            const cy = Math.round(r.top + r.height / 2);
+            const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, buttons: 1 };
+            btn.dispatchEvent(new PointerEvent("pointerover", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+            btn.dispatchEvent(new PointerEvent("pointerdown", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+            btn.dispatchEvent(new MouseEvent("mousedown", opts));
+            btn.dispatchEvent(new PointerEvent("pointerup", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse", buttons: 0 }));
+            btn.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+            btn.dispatchEvent(new MouseEvent("click", { ...opts, buttons: 0 }));
+          } catch (_) {}
+
+          // 5. Form submission fallback.
+          const form = btn.closest("form");
+          if (form) {
+            try { form.requestSubmit(btn); } catch (_) {
+              try { form.submit(); } catch (_2) {}
+            }
+          }
+          return { found: true };
+        },
+      },
+      (results) => {
+        sendResponse({ ok: true, result: results?.[0]?.result });
+      }
+    );
     return true;
   }
   // Open a profile in a background tab for contact-info enrichment.
@@ -244,12 +339,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await sleep(jitter(80, 300));
         let openUrl = target;
         if (includeEnrichFlag) {
+          const seg = msg.segment ? String(msg.segment) : "";
           try {
             const u = new URL(target);
             u.searchParams.set("lc_enrich", "1");
+            if (seg) u.searchParams.set("lc_segment", seg);
             openUrl = u.toString();
           } catch {
-            openUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
+            openUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1" +
+              (seg ? "&lc_segment=" + encodeURIComponent(seg) : "");
           }
         }
         chrome.tabs.create({ url: openUrl, active }, (tab) => {
@@ -408,6 +506,145 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+  // Fetch company website(s) and extract contact info (emails, phones) from
+  // the raw HTML. Strategies in priority order:
+  //   1. JSON-LD schema.org (structured, most reliable)
+  //   2. mailto: / tel: anchor href attributes
+  //   3. <meta> og:email / og:phone_number
+  //   4. Regex scan over full HTML text
+  // Tries root URL, then /contact, /contact-us, /about, /about-us, /team,
+  // /people, /our-team, /staff — stopping when ≥2 personal emails found.
+  // Accepts an optional `extraUrls` array to scan additional origins (e.g.
+  // when a LinkedIn profile links both a personal site and a company site).
+  if (msg?.type === "lc:scrapeWebsite") {
+    const rawUrl = String(msg.url || "").trim();
+    const extraUrls = Array.isArray(msg.extraUrls)
+      ? msg.extraUrls.map((u) => String(u || "").trim()).filter(Boolean)
+      : [];
+    if (!rawUrl) { sendResponse({ ok: false, error: "url_required" }); return true; }
+    (async () => {
+      try {
+        const granted = await chrome.permissions.contains({
+          origins: ["http://*/*", "https://*/*"],
+        });
+        if (!granted) { sendResponse({ ok: false, error: "needs_permission" }); return; }
+
+        // Parse a raw HTML string and return { emails, phones } using the
+        // highest-fidelity extraction methods available without a DOM parser.
+        function _parseHtml(html) {
+          const emails = new Set();
+          const phones = new Set();
+          const _addEmail = (e) => {
+            e = (e || "").toLowerCase().trim();
+            if (!e || /\.(png|jpg|gif|svg|css|js|woff|eot|ttf|otf)$/i.test(e)) return;
+            if (/@(2x|webpack|babel|example\.|sentry|rollup)/i.test(e)) return;
+            if (/noreply|no-reply|donotreply|unsubscribe/i.test(e)) return;
+            emails.add(e);
+          };
+          const _addPhone = (p) => {
+            const digits = (p || "").replace(/\D/g, "");
+            if (digits.length >= 7 && digits.length <= 15) phones.add(p.trim());
+          };
+
+          // 1. JSON-LD schema.org — most structured
+          const jlRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+          let jm;
+          while ((jm = jlRe.exec(html)) !== null) {
+            try {
+              const walk = (obj) => {
+                if (!obj || typeof obj !== "object") return;
+                if (obj.email) _addEmail(obj.email);
+                if (obj.telephone) _addPhone(obj.telephone);
+                if (Array.isArray(obj)) obj.forEach(walk);
+                else Object.values(obj).forEach(walk);
+              };
+              walk(JSON.parse(jm[1]));
+            } catch {}
+          }
+
+          // 2. mailto: and tel: anchors — explicit, author-provided
+          const mlRe = /href=["']mailto:([^"'?&#\s]+)/gi;
+          let mm;
+          while ((mm = mlRe.exec(html)) !== null) _addEmail(mm[1]);
+          const tlRe = /href=["']tel:([+\d\s\-().]+)/gi;
+          while ((mm = tlRe.exec(html)) !== null) _addPhone(mm[1]);
+
+          // 3. Meta tags
+          const metaRe = /<meta[^>]+(?:property|name)=["'](?:og:email|og:phone_number|email)["'][^>]+content=["']([^"']+)["']/gi;
+          while ((mm = metaRe.exec(html)) !== null) {
+            const v = mm[1].trim();
+            if (v.includes("@")) _addEmail(v);
+            else _addPhone(v);
+          }
+
+          // 4. Regex fallback over full HTML
+          const emailRe = /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/g;
+          while ((mm = emailRe.exec(html)) !== null) _addEmail(mm[1]);
+
+          // Contextual phone: digits following a phone-label word
+          const phCtxRe = /(?:phone|tel|call|mobile|mob|ph|fax)[\s:–\-]+([+]?[\d][\d\s\-\(\).]{5,18}[\d])/gi;
+          while ((mm = phCtxRe.exec(html)) !== null) _addPhone(mm[1]);
+          // International bare format: +CC digits
+          const phIntlRe = /\+\d{1,3}[\s\-]?\(?\d{2,4}\)?[\s\-]?\d{2,4}[\s\-]?\d{2,4}[\s\-]?\d{0,4}\b/g;
+          while ((mm = phIntlRe.exec(html)) !== null) _addPhone(mm[0]);
+
+          return { emails: [...emails], phones: [...phones] };
+        }
+
+        const allEmails = new Set();
+        const allPhones = new Set();
+
+        // Collect distinct origins: primary URL + any extra URLs from LinkedIn profile
+        const origins = [];
+        const seenOrigins = new Set();
+        for (const u of [rawUrl, ...extraUrls]) {
+          try {
+            const orig = new URL(u).origin;
+            if (!seenOrigins.has(orig)) { seenOrigins.add(orig); origins.push(orig); }
+          } catch {}
+        }
+
+        const paths = [
+          "", "/contact", "/contact-us", "/about", "/about-us",
+          "/team", "/people", "/our-team", "/staff", "/directory",
+        ];
+
+        outer: for (const orig of origins) {
+          for (const p of paths) {
+            try {
+              const res = await fetch(orig + p, {
+                headers: {
+                  Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+                  "User-Agent": "Mozilla/5.0 (compatible; LeadCapturaBot/1.0)",
+                },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (!res.ok) continue;
+              const html = await res.text();
+              const { emails, phones } = _parseHtml(html);
+              emails.forEach((e) => allEmails.add(e));
+              phones.forEach((p2) => allPhones.add(p2));
+            } catch { continue; }
+            if (allEmails.size >= 3) break outer; // enough personal emails
+          }
+          if (allEmails.size >= 3) break;
+        }
+
+        // Sort: personal emails (with a name in the local part) before generic ones
+        const isGeneric = /^(info|hello|contact|support|admin|sales|team|help|enquir|enqui|hr|office|mail|web|media|press|pr|marketing|jobs|career|recruit)@/i;
+        const emailArr = [...allEmails]
+          .sort((a, b) => (isGeneric.test(a) ? 1 : 0) - (isGeneric.test(b) ? 1 : 0))
+          .slice(0, 5);
+        const phoneArr = [...allPhones].slice(0, 3);
+
+        sendResponse({ ok: true, emails: emailArr, phones: phoneArr });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
   if (msg?.type !== "lc:api") return;
   const handler = handlers[msg.action];
   if (!handler) {

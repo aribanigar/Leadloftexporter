@@ -62,19 +62,19 @@
           const elapsed = Date.now() - t0;
           if (chrome.runtime.lastError) {
             const err = new Error(_decorate(chrome.runtime.lastError.message, action));
-            console.error("[LeadCaptura] api.call lastError", { action, elapsed, raw: chrome.runtime.lastError.message, decorated: err.message });
+            console.warn("[LeadCaptura] api.call lastError", { action, elapsed, raw: chrome.runtime.lastError.message, decorated: err.message });
             reject(err);
             return;
           }
           if (!response) {
             const err = new Error(_decorate("No response from background", action));
-            console.error("[LeadCaptura] api.call no-response", { action, elapsed });
+            console.warn("[LeadCaptura] api.call no-response", { action, elapsed });
             reject(err);
             return;
           }
           if (response.error) {
             const err = new Error(_decorate(response.error, action));
-            console.error("[LeadCaptura] api.call backend-error", { action, elapsed, raw: response.error, decorated: err.message });
+            console.warn("[LeadCaptura] api.call backend-error", { action, elapsed, raw: response.error, decorated: err.message });
             reject(err);
             return;
           }
@@ -83,7 +83,7 @@
         });
       } catch (e) {
         const err = new Error(_decorate(e?.message || String(e), action));
-        console.error("[LeadCaptura] api.call threw", { action, raw: e, decorated: err.message });
+        console.warn("[LeadCaptura] api.call threw", { action, raw: e, decorated: err.message });
         reject(err);
       }
     });
@@ -92,6 +92,7 @@
   globalThis.__lcApi = {
     me: () => call("me"),
     options: () => call("options"),
+    createSegment: (name) => call("createSegment", { name }),
     syncProfile: (profile) => call("syncProfile", { profile }),
     syncSearch: (data) => call("syncSearch", data),
     enrollBatch: (playbook_id, lead_ids) => call("enrollBatch", { playbook_id, lead_ids }),
@@ -100,6 +101,10 @@
     // AI answer (Gemini or Claude, per the user's chosen provider) for an
     // Easy-Apply form question. Resolves to { ok, answer } or { ok:false,
     // error }. Never throws — the caller treats any failure as "leave blank".
+    // Notify the CRM that a Connect or Follow action was completed for a profile.
+    // Called after each successful queue step so Pipeline/Prospecting stay in sync.
+    connectResult: (linkedin_url, action) =>
+      call("connectResult", { linkedin_url, action }),
     geminiAnswer: ({ question, kind, options }) =>
       new Promise((resolve) => {
         try {

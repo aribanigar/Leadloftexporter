@@ -38,7 +38,7 @@
     profilePanel: null,
     toolbar: null,
     options: null, // { workspace, user, playbooks, segments, users }
-    selection: { segmentId: null, playbookId: null, userId: null },
+    selection: { segmentId: null, segmentName: null, playbookId: null, userId: null },
     lastSavedLeadIds: [],
     statusTimer: null,
     me: null,
@@ -61,7 +61,52 @@
     applyActive: false,
     applyCancel: false,
     applyProgress: null,
+    avoidDuplicates: true, // "Avoid Duplicate Outreach" toggle
+    toolbarCollapsed: false, // pill ↑/↓ collapse state
   };
+
+  // ── Contacted-URL registry ──────────────────────────────────────────────────
+  // Persistent set of LinkedIn profile URLs already saved or connected.
+  // Stored in chrome.storage.local so it survives tab reloads.
+  // Format: { [normalizedUrl]: timestamp }
+  const _contacted = new Map(); // normalized url → timestamp (in-memory mirror)
+
+  async function _loadContacted() {
+    try {
+      const { lc_contacted_urls } = await new Promise((r) =>
+        chrome.storage.local.get("lc_contacted_urls", r)
+      );
+      if (lc_contacted_urls && typeof lc_contacted_urls === "object") {
+        for (const [u, t] of Object.entries(lc_contacted_urls)) {
+          _contacted.set(u, t);
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
+  function _markContacted(url) {
+    if (!url) return;
+    const norm = (url.split("?")[0].split("#")[0].replace(/\/$/, "")).toLowerCase();
+    if (_contacted.has(norm)) return; // already recorded
+    _contacted.set(norm, Date.now());
+    // Persist fire-and-forget
+    try {
+      const patch = Object.fromEntries(_contacted);
+      chrome.storage.local.set({ lc_contacted_urls: patch }).catch(() => {});
+    } catch {}
+  }
+
+  function _isContacted(url) {
+    if (!url) return false;
+    const norm = (url.split("?")[0].split("#")[0].replace(/\/$/, "")).toLowerCase();
+    return _contacted.has(norm);
+  }
+
+  // Load on boot
+  _loadContacted();
+  Storage.getSettings().then((s) => {
+    state.avoidDuplicates = s.avoidDuplicates !== false; // default ON
+  }).catch(() => {});
 
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -464,6 +509,10 @@
         if (contact.address && (!enriched.location || enriched.location.length < 4)) {
           enriched.location = contact.address.slice(0, 200);
         }
+        // Store all linked websites for the multi-URL website scraper (Step 7)
+        if (contact.websites?.length) {
+          enriched.raw = { ...(enriched.raw || {}), websites: contact.websites };
+        }
       } catch (e) {
         console.warn("[LeadCaptura] auto-open Contact info failed", e?.message || e);
       }
@@ -525,6 +574,8 @@
       name_authority: "profile_page",
       scraped_from: "h1",
     };
+    // Tag with the segment the user picked in the toolbar, if any.
+    if (state.selection.segmentName) enriched.segment = state.selection.segmentName;
     flashStatus("Saving…");
     let result;
     try {
@@ -540,6 +591,7 @@
         "ok"
       );
       if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
+      _markContacted(enriched.linkedin_url || profile.linkedin_url);
       maybeAutoEnroll();
     } catch (e) {
       flashStatus(`Failed: ${e.message}`, "err");
@@ -591,6 +643,60 @@
       } catch {
         /* enrichment is best-effort */
       }
+    }
+
+    // Step 7: Website scraping — visit all websites linked on the LinkedIn
+    // profile and extract emails/phones when still missing after all LinkedIn
+    // enrichment. Collects multiple URLs from the Contact Info modal (personal
+    // site + company site + portfolio, etc.) and passes them all to the SW.
+    const websiteUrl = enriched.company_url;
+    const extraWebsites = (enriched.raw?.websites || []).filter(
+      (u) => u && u !== websiteUrl
+    );
+    if (websiteUrl && (!enriched.email || !enriched.phone)) {
+      try {
+        const wsSettings = await Storage.getSettings();
+        if (wsSettings.webScrapeEnabled !== false) {
+          _lcToast("LeadCaptura: scanning website for contact info…");
+          const wsResult = await new Promise((resolve) => {
+            try {
+              chrome.runtime.sendMessage(
+                { type: "lc:scrapeWebsite", url: websiteUrl, extraUrls: extraWebsites },
+                (resp) => resolve(resp || {})
+              );
+            } catch { resolve({}); }
+          });
+          if (wsResult.error === "needs_permission") {
+            _lcToast("Enable website scraping in LeadCaptura Options to auto-find emails");
+          } else if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+            const merged = { ...enriched };
+            const added = [];
+            if (wsResult.emails?.[0] && !merged.email) {
+              merged.email = wsResult.emails[0];
+              added.push("email");
+            }
+            if (wsResult.phones?.[0] && !merged.phone) {
+              merged.phone = wsResult.phones[0];
+              added.push("phone");
+            }
+            // Store the full list in raw for later reference
+            merged.raw = {
+              ...(merged.raw || {}),
+              contact_source: "website_scrape",
+              scraped_emails: wsResult.emails,
+              scraped_phones: wsResult.phones,
+            };
+            if (added.length) {
+              try {
+                await Api.syncProfile(merged);
+                flashStatus(`Website scraped ✓ (${added.join(" + ")})`, "ok");
+              } catch { /* best-effort */ }
+            } else {
+              _lcToast("Website scanned — no new contact info found");
+            }
+          }
+        }
+      } catch { /* best-effort */ }
     }
   }
 
@@ -651,6 +757,7 @@
     const root = el("div", { id: "lc-toolbar" });
     document.documentElement.appendChild(root);
     state.toolbar = root;
+    _mountAvoidDupPanel();
     return root;
   }
 
@@ -659,6 +766,73 @@
       state.toolbar.remove();
       state.toolbar = null;
     }
+    const p = document.getElementById("lc-avoid-dup-panel");
+    if (p) p.remove();
+  }
+
+  // ── "Avoid Duplicate Outreach" floating panel ──────────────────────────────
+  // Exposed so decorateSearchCards() can refresh the live skip-count whenever
+  // new cards render or the contacted registry changes.
+  let _renderAvoidDupPanel = () => {};
+
+  function _mountAvoidDupPanel() {
+    if (document.getElementById("lc-avoid-dup-panel")) return;
+    const panel = el("div", { id: "lc-avoid-dup-panel" });
+
+    function _persist(on) {
+      Storage.getSettings().then((s) =>
+        chrome.storage.local.set({ settings: { ...s, avoidDuplicates: on } })
+      ).catch(() => {});
+    }
+
+    function _setOn(on) {
+      if (state.avoidDuplicates === on) return;
+      state.avoidDuplicates = on;
+      _persist(on);
+      // Realtime: re-mark every visible chip and refresh the count immediately.
+      _refreshContactedVisuals();
+      _render();
+    }
+
+    function _render() {
+      panel.textContent = "";
+      const on = state.avoidDuplicates;
+      const skip = on ? _countContactedVisible() : 0;
+      panel.classList.toggle("lc-ado-on", on);
+      panel.append(
+        el("div", { class: "lc-ado-textcol" },
+          el("span", { class: "lc-ado-label" },
+            "Avoid Duplicate Outreach",
+            el("span", {
+              class: "lc-ado-info",
+              title:
+                "When ON, Save All and Connect All skip profiles you have already " +
+                "saved or connected with. Already-contacted cards are marked live. " +
+                "The contacted list is persisted locally.",
+            }, " ⓘ")
+          ),
+          el("span", { class: "lc-ado-count" },
+            on
+              ? (skip > 0
+                  ? `${skip} duplicate${skip > 1 ? "s" : ""} on this page will be skipped`
+                  : "No duplicates on this page")
+              : "Duplicate filtering is off")
+        ),
+        el("div", { class: "lc-ado-btns" },
+          el("button", {
+            class: "lc-ado-btn" + (on ? " lc-ado-active" : ""),
+            onclick: () => _setOn(true),
+          }, "On"),
+          el("button", {
+            class: "lc-ado-btn" + (!on ? " lc-ado-active" : ""),
+            onclick: () => _setOn(false),
+          }, "Off")
+        )
+      );
+    }
+    _renderAvoidDupPanel = _render;
+    _render();
+    document.documentElement.appendChild(panel);
   }
 
   // Every /in/ URL that currently has a LIVE chip on the page. The injected
@@ -669,7 +843,7 @@
   function _allChipUrls() {
     const urls = [];
     for (const [url, wrap] of injectedSaves.entries()) {
-      if (url && url.includes("/in/") && wrap && document.body.contains(wrap)) {
+      if (url && (url.includes("/in/") || url.includes("/sales/lead/")) && wrap && document.body.contains(wrap)) {
         urls.push(url);
       }
     }
@@ -818,22 +992,59 @@
     return wrap;
   }
 
+  // "+ New Segment" → prompt for a name, create it server-side, select it.
+  async function createNewSegment() {
+    const name = (window.prompt("Name your new segment (lead list):") || "").trim();
+    if (!name) return;
+    try {
+      const seg = await Api.createSegment(name);
+      // Refresh options so the new segment appears in the dropdown.
+      state.options = null;
+      await ensureOptions();
+      if (seg?.id) {
+        state.selection.segmentId = seg.id;
+        state.selection.segmentName = seg.name || name;
+      }
+      flashStatus(`Segment "${seg?.name || name}" created ✓`, "ok");
+    } catch (e) {
+      flashStatus(`Couldn't create segment: ${e.message || e}`, "err");
+    }
+    renderToolbar();
+  }
+
   async function renderToolbar() {
     const root = await mountToolbar();
     if (!root) return;
+
+    // Always-visible branded pill handle — clicking toggles the body open/closed.
+    const _toggleToolbar = () => {
+      state.toolbarCollapsed = !state.toolbarCollapsed;
+      renderToolbar();
+    };
+    const _makeHandle = () =>
+      el("div", { class: "lc-toolbar-handle", onclick: _toggleToolbar },
+        el("span", { class: "lc-logo" }, "L"),
+        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-toolbar-arrow" }, state.toolbarCollapsed ? "↑" : "↓")
+      );
+
     const opts = await ensureOptions();
+
+    root.textContent = "";
+    root.classList.toggle("lc-collapsed", !!state.toolbarCollapsed);
+
     if (!opts) {
-      root.textContent = "";
       root.append(
-        el("div", { class: "lc-toolbar-inner" },
-          el("span", { class: "lc-logo" }, "L"),
-          el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
-          el("span", { class: "lc-flex" }),
-          el("span", { class: "lc-muted" }, "Not connected — "),
-          el(
-            "button",
-            { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => openOptions() },
-            "Connect workspace"
+        _makeHandle(),
+        el("div", { class: "lc-toolbar-body" },
+          el("div", { class: "lc-toolbar-inner" },
+            el("span", { class: "lc-flex" }),
+            el("span", { class: "lc-muted" }, "Not connected — "),
+            el(
+              "button",
+              { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => openOptions() },
+              "Connect workspace"
+            )
           )
         )
       );
@@ -845,171 +1056,179 @@
     const userName =
       (opts.users.find((u) => u.id === state.selection.userId) || { name: "Me" }).name;
 
-    root.textContent = "";
     root.append(
-      el(
-        "div",
-        { class: "lc-toolbar-inner" },
-        el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
-        dropdown("Segment", segmentName, opts.segments, (s) => {
-          state.selection.segmentId = s.id;
-          renderToolbar();
-        }),
-        dropdown("Playbook", playbookName, opts.playbooks, (p) => {
-          state.selection.playbookId = p.id;
-          renderToolbar();
-        }),
-        dropdown(
-          "User",
-          userName,
-          opts.users.map((u) => ({ id: u.id, name: u.name })),
-          (u) => {
-            state.selection.userId = u.id;
-            renderToolbar();
-          },
-          { includeNone: false }
-        ),
-        // Select-all toggle: when no cards are selected, click ticks every
-        // visible card; when ANY are selected, click clears the set. The label
-        // flips so the user always sees the action that'll happen next. On Jobs
-        // pages it operates on the job selection instead of the people set.
-        (state.bulkActive || state.connectActive || state.applyActive)
-          ? null
-          : el(
-              "button",
-              {
-                class: "lc-btn lc-btn-ghost",
-                onclick: toggleSelectAllCurrent,
-                title: _isJobsPage()
-                  ? "Tick every visible job so Apply All processes them"
-                  : "Tick every visible /in/ card so Save All processes them",
-              },
-              (() => {
-                const n = _isJobsPage()
-                  ? state.selectedJobUrls.size
-                  : state.selectedUrls.size;
-                return n > 0 ? `Clear (${n})` : "Select All";
-              })()
-            ),
-        el("span", { class: "lc-flex" }),
-        // Realtime bulk progress: shown only during a Save-All run. Always
-        // names the profile currently being scraped so the user can verify
-        // automation is alive and on-track. The hidden .lc-status-slot child
-        // keeps flashStatus() working (e.g. "Stopping after current profile…"
-        // when the user clicks Stop mid-run).
-        (state.bulkActive && state.bulkProgress) ||
-        (state.connectActive && state.connectProgress) ||
-        (state.applyActive && state.applyProgress)
-          ? el(
-              "div",
-              { class: "lc-bulk-progress" },
-              el("span", { class: "lc-bulk-spinner" }, "⏳"),
-              el(
-                "span",
-                { class: "lc-bulk-progress-text" },
-                (() => {
-                  const p =
-                    state.applyProgress ||
-                    state.connectProgress ||
-                    state.bulkProgress;
-                  const verb = state.applyActive
-                    ? "Applying"
-                    : state.connectActive
-                    ? "Connecting"
-                    : "Enriching";
-                  return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
-                })()
-              ),
-              el("span", { class: "lc-status-slot lc-status-slot-inline" })
-            )
-          : el("div", { class: "lc-status-slot" }),
-        // Connect Selected — people pages only, hidden during any active run.
-        _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
-          ? null
-          : el(
-              "button",
-              {
-                class: "lc-btn lc-btn-connect",
-                onclick: connectAllVisible,
-                title:
-                  "Send connection requests to selected (or all visible) profiles. Auto-advances pages, skips already-sent/connected. Human-paced; LinkedIn weekly invite caps still apply.",
-              },
-              state.selectedUrls.size > 0
-                ? `Connect ${state.selectedUrls.size}`
-                : "Connect All"
-            ),
-        // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
-        // pages, Save All Leads on people pages.
-        state.bulkActive || state.connectActive || state.applyActive
-          ? el(
-              "button",
-              {
-                class: "lc-btn lc-btn-stop",
-                onclick: () => {
-                  if (state.bulkActive) state.bulkCancel = true;
-                  if (state.connectActive) state.connectCancel = true;
-                  if (state.applyActive) state.applyCancel = true;
-                  flashStatus("Stopping after current item…");
-                },
-              },
-              "Stop"
-            )
-          : _isJobsPage()
-          ? el(
-              "button",
-              {
-                class: "lc-btn lc-btn-primary",
-                onclick: applyAllJobs,
-                title:
-                  "Auto-apply to selected (or all visible) Easy Apply jobs. Human-paced; skips external-apply jobs, already-applied jobs, and any that need extra screening answers.",
-              },
-              state.selectedJobUrls.size > 0
-                ? `Apply ${state.selectedJobUrls.size}`
-                : `Apply All (${_allJobUrls().length})`
-            )
-          : el(
-              "button",
-              { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
-              state.selectedUrls.size > 0
-                ? `Save ${state.selectedUrls.size} Selected`
-                : "Save All Leads"
-            ),
-        el(
-          "button",
-          {
-            class: "lc-icon-btn lc-icon-btn-light",
-            onclick: (e) => {
-              e.stopPropagation();
-              const m = root.querySelector(".lc-overflow");
-              m.classList.toggle("lc-open");
-            },
-            title: "More",
-          },
-          "⋮"
-        ),
+      _makeHandle(),
+      el("div", { class: "lc-toolbar-body" },
         el(
           "div",
-          { class: "lc-overflow lc-dd-menu" },
+          { class: "lc-toolbar-inner" },
+          // Unread LinkedIn message count badge (data from interceptor.js)
+          (() => {
+            const counts = window.__lcMsgCounts || {};
+            const unread = (counts.INBOX || 0) + (counts.MESSAGE_REQUEST_PENDING || 0);
+            if (!unread) return el("span");
+            const badge = el("span", {
+              class: "lc-msg-badge",
+              title: `${unread} unread LinkedIn message${unread > 1 ? "s" : ""}`,
+              onclick: () => { location.href = "https://www.linkedin.com/messaging/"; },
+            }, `✉ ${unread}`);
+            return badge;
+          })(),
+          dropdown(
+            "Segment",
+            segmentName,
+            [...opts.segments, { id: "__new__", name: "+ New Segment", icon: "✚" }],
+            (s) => {
+              if (s.id === "__new__") { createNewSegment(); return; }
+              state.selection.segmentId = s.id;
+              state.selection.segmentName = s.id ? s.name : null;
+              renderToolbar();
+            }
+          ),
+          dropdown("Playbook", playbookName, opts.playbooks, (p) => {
+            state.selection.playbookId = p.id;
+            renderToolbar();
+          }),
+          dropdown(
+            "User",
+            userName,
+            opts.users.map((u) => ({ id: u.id, name: u.name })),
+            (u) => {
+              state.selection.userId = u.id;
+              renderToolbar();
+            },
+            { includeNone: false }
+          ),
+          // Select-all toggle: when no cards are selected, click ticks every
+          // visible card; when ANY are selected, click clears the set. The label
+          // flips so the user always sees the action that'll happen next. On Jobs
+          // pages it operates on the job selection instead of the people set.
+          (state.bulkActive || state.connectActive || state.applyActive)
+            ? null
+            : el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-ghost",
+                  onclick: toggleSelectAllCurrent,
+                  title: _isJobsPage()
+                    ? "Tick every visible job so Apply All processes them"
+                    : "Tick every visible /in/ card so Save All processes them",
+                },
+                (() => {
+                  const n = _isJobsPage()
+                    ? state.selectedJobUrls.size
+                    : state.selectedUrls.size;
+                  return n > 0 ? `Clear (${n})` : "Select All";
+                })()
+              ),
+          el("span", { class: "lc-flex" }),
+          // Realtime bulk progress: shown only during a Save-All run. Always
+          // names the profile currently being scraped so the user can verify
+          // automation is alive and on-track. The hidden .lc-status-slot child
+          // keeps flashStatus() working (e.g. "Stopping after current profile…"
+          // when the user clicks Stop mid-run).
+          (state.bulkActive && state.bulkProgress) ||
+          (state.connectActive && state.connectProgress) ||
+          (state.applyActive && state.applyProgress)
+            ? el(
+                "div",
+                { class: "lc-bulk-progress" },
+                el("span", { class: "lc-bulk-spinner" }, "⏳"),
+                el(
+                  "span",
+                  { class: "lc-bulk-progress-text" },
+                  (() => {
+                    const p =
+                      state.applyProgress ||
+                      state.connectProgress ||
+                      state.bulkProgress;
+                    const verb = state.applyActive
+                      ? "Applying"
+                      : state.connectActive
+                      ? "Connecting"
+                      : "Enriching";
+                    return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
+                  })()
+                ),
+                el("span", { class: "lc-status-slot lc-status-slot-inline" })
+              )
+            : el("div", { class: "lc-status-slot" }),
+          // Connect Selected — people pages only, hidden during any active run.
+          _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
+            ? null
+            : el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-connect",
+                  onclick: connectAllVisible,
+                  title:
+                    "Send connection requests to selected (or all visible) profiles. Auto-advances pages, skips already-sent/connected. Human-paced; LinkedIn weekly invite caps still apply.",
+                },
+                state.selectedUrls.size > 0
+                  ? `Connect ${state.selectedUrls.size}`
+                  : "Connect All"
+              ),
+          // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
+          // pages, Save All Leads on people pages.
+          state.bulkActive || state.connectActive || state.applyActive
+            ? el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-stop",
+                  onclick: () => {
+                    if (state.bulkActive) state.bulkCancel = true;
+                    if (state.connectActive) state.connectCancel = true;
+                    if (state.applyActive) state.applyCancel = true;
+                    flashStatus("Stopping after current item…");
+                  },
+                },
+                "Stop"
+              )
+            : _isJobsPage()
+            ? el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-primary",
+                  onclick: applyAllJobs,
+                  title:
+                    "Auto-apply to selected (or all visible) Easy Apply jobs. Human-paced; skips external-apply jobs, already-applied jobs, and any that need extra screening answers.",
+                },
+                state.selectedJobUrls.size > 0
+                  ? `Apply ${state.selectedJobUrls.size}`
+                  : `Apply All (${_allJobUrls().length})`
+              )
+            : el(
+                "button",
+                { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
+                state.selectedUrls.size > 0
+                  ? `Save ${state.selectedUrls.size} Selected`
+                  : "Save All Leads"
+              ),
           el(
             "button",
             {
-              class: "lc-dd-item",
-              type: "button",
-              onclick: () => openOptions(),
+              class: "lc-icon-btn lc-icon-btn-light",
+              onclick: (e) => {
+                e.stopPropagation();
+                const m = root.querySelector(".lc-overflow");
+                m.classList.toggle("lc-open");
+              },
+              title: "More",
             },
-            "Settings"
+            "⋮"
           ),
           el(
-            "button",
-            {
-              class: "lc-dd-item",
-              type: "button",
-              onclick: () => {
-                state.toolbar.classList.toggle("lc-collapsed");
+            "div",
+            { class: "lc-overflow lc-dd-menu" },
+            el(
+              "button",
+              {
+                class: "lc-dd-item",
+                type: "button",
+                onclick: () => openOptions(),
               },
-            },
-            "Hide toolbar"
+              "Settings"
+            )
           )
         )
       )
@@ -1034,13 +1253,27 @@
     // Driving off the chips (not a fresh scrape) guarantees Save All covers
     // every card the user sees — no divergence on real-photo cards.
     try { decorateSearchCards(); } catch {}
-    const urls =
+    let urls =
       state.selectedUrls.size > 0
-        ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
+        ? Array.from(state.selectedUrls).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
         : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
       return;
+    }
+
+    // Avoid Duplicate Outreach: skip profiles already saved/contacted.
+    if (state.avoidDuplicates) {
+      const before = urls.length;
+      urls = urls.filter((u) => !_isContacted(u));
+      const skipped = before - urls.length;
+      if (skipped > 0) {
+        flashStatus(`Skipped ${skipped} already-saved profile${skipped > 1 ? "s" : ""} (Avoid Duplicate Outreach)`, "ok");
+      }
+      if (!urls.length) {
+        flashStatus("All selected profiles already saved — nothing new to enrich.", "warn");
+        return;
+      }
     }
 
     // INTENTIONAL: no syncSearch pre-save. Card-level scrapes can pick up
@@ -1103,6 +1336,7 @@
               active: false,        // background tab — silent automation
               awaitClose: true,     // resolve only when the tab self-closes
               enrichFlag: true,     // adds ?lc_enrich=1 → triggers enrichment
+              segment: state.selection.segmentName || null,
             },
             (r) => {
               if (chrome.runtime.lastError) {
@@ -1307,6 +1541,29 @@
       const pick = visible[0] || matches.find((b) => !b.disabled) || matches[0];
       if (pick) return pick;
     }
+    // Fallback for redesigned modal (bare "send" CTA, primary button in modal).
+    const modal = _findInvitationModal();
+    if (modal) {
+      for (const sel of [
+        ".artdeco-button--primary",
+        ".artdeco-modal__actionbar .artdeco-button",
+        "[data-test-dialog-primary-btn]",
+      ]) {
+        try {
+          const btn = modal.querySelector(sel);
+          if (btn && _isVisible(btn) && !btn.disabled) {
+            const { t } = labelOf(btn);
+            if (!/(cancel|close|dismiss|back|add.*note|note)/i.test(t)) return btn;
+          }
+        } catch {}
+      }
+      // Bare "send" in document — only safe after confirming invite modal is open.
+      const sendBtn = all.find((b) => {
+        const { t, a } = labelOf(b);
+        return (/^send$/i.test(t) || /^send$/i.test(a)) && _isVisible(b) && !b.disabled;
+      });
+      if (sendBtn) return sendBtn;
+    }
     return null;
   }
 
@@ -1379,6 +1636,32 @@
       el.dispatchEvent(new KeyboardEvent("keydown", kopts));
       el.dispatchEvent(new KeyboardEvent("keyup", kopts));
     } catch {}
+    // 5. Direct React fiber call — bypasses the DOM event system. When LinkedIn
+    // checks event.isTrusted, synthetic DOM events always fail (isTrusted=false).
+    // Calling the React onClick prop directly with isTrusted=true in a plain
+    // object passes that check. Walk up the fiber tree to find the handler even
+    // when it's on a parent wrapper component.
+    try {
+      const fKey = Object.keys(el).find(
+        (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+      );
+      if (fKey) {
+        let fiber = el[fKey];
+        for (let depth = 0; fiber && depth < 8; fiber = fiber.return, depth++) {
+          const onClick =
+            fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+          if (typeof onClick === "function") {
+            onClick({
+              type: "click", bubbles: true, cancelable: true,
+              isTrusted: true, target: el, currentTarget: el,
+              preventDefault: () => {}, stopPropagation: () => {},
+              nativeEvent: { isTrusted: true },
+            });
+            break;
+          }
+        }
+      }
+    } catch {}
   }
 
   // The complete Connect flow for ONE card, as a plain linear sequence:
@@ -1420,29 +1703,32 @@
     console.log("[LeadCaptura] step 2 → dialog opened");
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
-    // LinkedIn's backend can take 1-4s to process and close the dialog, so we
-    // click, then wait, and retry the click only while the dialog is still up.
-    for (let attempt = 0; attempt < 6 && _invitationModalOpen(); attempt++) {
+    // Nuclear approach: highlight the button visually, try every 200ms using
+    // all click strategies including MAIN-world injection and SW executeScript.
+    for (let attempt = 0; attempt < 18 && _invitationModalOpen(); attempt++) {
       const sendBtn = _findSendWithoutNoteButton();
       if (!sendBtn) {
-        // Button not rendered yet (or already gone mid-close) — give it a beat.
-        await sleep(300);
+        await sleep(200);
         continue;
+      }
+      if (attempt === 0) {
+        _highlightSendBtn(sendBtn);
+        _tryServiceWorkerMainWorldClick();
       }
       console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
       _forceClick(sendBtn);
-      // STEP 4: wait up to ~4s for the dialog to disappear = invite sent.
-      for (let w = 0; w < 16; w++) {
-        await sleep(250);
+      if (attempt % 2 === 0) _tryMainWorldClick(sendBtn);
+      for (let w = 0; w < 10; w++) {
+        await sleep(200);
         if (!_invitationModalOpen()) {
           console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+          _removeSendBtnHighlight();
           return { ok: true };
         }
       }
     }
 
-    // Dialog gone by now means it was sent on a late close; still-open means
-    // the send genuinely failed.
+    _removeSendBtnHighlight();
     if (!_invitationModalOpen()) return { ok: true };
     console.log("[LeadCaptura] step 3/4 → could not send, giving up");
     return { ok: false, reason: "send_failed" };
@@ -1592,7 +1878,7 @@
       page1Selection
         ? Array.from(page1Selection)
         : _allChipUrls()
-    ).filter((u) => u && u.includes("/in/"));
+    ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
 
     if (!urls.length) {
       flashStatus("No profiles selected to connect with", "warn");
@@ -1604,6 +1890,24 @@
       try { return new URL(u, "https://www.linkedin.com").href; }
       catch { return u; }
     });
+
+    // Avoid Duplicate Outreach: if enabled, skip profiles already contacted
+    if (state.avoidDuplicates) {
+      const before = urls.length;
+      urls = urls.filter((u) => !_isContacted(u));
+      const skipped = before - urls.length;
+      if (skipped > 0) {
+        flashStatus(`Duplicate Outreach filter: skipped ${skipped} already-contacted profile${skipped > 1 ? "s" : ""}`, "ok");
+        await sleep(1200);
+      }
+      if (!urls.length) {
+        flashStatus("All selected profiles already contacted — no new connections to send.", "warn");
+        state.connectActive = false;
+        mountSelectAllHeader();
+        renderToolbar();
+        return;
+      }
+    }
 
     state.connectActive = true;
     state.connectCancel = false;
@@ -1661,66 +1965,6 @@
   const _jobChipCards = new Map();      // cardKey -> source card element
   const _jobChipApplyUrls = new Map();  // cardKey -> apply url (or null = click card)
 
-  // Portal root — chips appended here as position:fixed, bypassing LinkedIn's
-  // overflow:hidden scroll containers. Mounted on <html> (not <body>) with an
-  // explicit max z-index so it layers ABOVE LinkedIn's positioned content —
-  // the same pattern the visible toolbar + Select-All pill already use. A
-  // position:fixed element creates its own stacking context, so WITHOUT a high
-  // z-index the chips get trapped at body level and painted under the page.
-  let _portalRoot = null;
-  function _ensurePortalRoot() {
-    if (_portalRoot && document.documentElement.contains(_portalRoot)) return _portalRoot;
-    _portalRoot = document.createElement("div");
-    _portalRoot.id = "lc-job-portal";
-    _portalRoot.style.cssText =
-      "position:fixed;top:0;left:0;width:0;height:0;z-index:2147483640;pointer-events:none;";
-    document.documentElement.appendChild(_portalRoot);
-    return _portalRoot;
-  }
-
-  // RAF-throttled position sync — recalculates each chip's fixed coords from
-  // its source card's getBoundingClientRect(). Fires on scroll + resize.
-  let _jobChipSyncRaf = null;
-  function _syncJobChipPositions() {
-    _jobChipSyncRaf = null;
-    for (const [url, wrap] of injectedJobChips.entries()) {
-      const card = _jobChipCards.get(url);
-      if (!wrap || !card || !document.body.contains(card)) {
-        if (wrap) wrap.style.setProperty("visibility", "hidden", "important");
-        continue;
-      }
-      const r = card.getBoundingClientRect();
-      if (r.bottom <= 0 || r.top >= window.innerHeight || r.width < 2 || r.height < 2) {
-        wrap.style.setProperty("visibility", "hidden", "important");
-        continue;
-      }
-      // Anchor bottom-right of the card, 46px above bottom edge
-      const top = Math.max(4, r.bottom - 46);
-      const left = Math.max(4, r.right - 184);
-      wrap.style.setProperty("top", `${top}px`, "important");
-      wrap.style.setProperty("left", `${left}px`, "important");
-      wrap.style.setProperty("visibility", "visible", "important");
-    }
-  }
-  function _scheduleJobChipSync() {
-    if (!_jobChipSyncRaf) _jobChipSyncRaf = requestAnimationFrame(_syncJobChipPositions);
-  }
-
-  let _jobChipScrollBound = false;
-  function _bindJobChipScroll() {
-    if (_jobChipScrollBound) return;
-    // capture:true catches scroll on LinkedIn's inner results container (the
-    // jobs list scrolls independently of the window), not just window scroll.
-    window.addEventListener("scroll", _scheduleJobChipSync, { passive: true, capture: true });
-    window.addEventListener("resize", _scheduleJobChipSync, { passive: true });
-    // Safety-net poll: cards reflow as LinkedIn lazily hydrates / the detail
-    // pane resizes the list column. A cheap 400ms reposition keeps every chip
-    // glued to its card even if a scroll/resize event is missed.
-    setInterval(() => {
-      if (injectedJobChips.size) _syncJobChipPositions();
-    }, 400);
-    _jobChipScrollBound = true;
-  }
 
   function _isVisible(el) {
     if (!el) return false;
@@ -1942,11 +2186,18 @@
   function _gcJobChips() {
     for (const [key, node] of injectedJobChips.entries()) {
       const card = _jobChipCards.get(key);
-      if (!node || !card || !document.body.contains(card) || _inDetailPane(card)) {
+      // Clean up when: node missing, card missing, card left DOM, card is in
+      // the detail pane, OR the node is no longer inside the tracked card
+      // (e.g. LinkedIn re-rendered the card's inner DOM).
+      if (!node || !card || !document.body.contains(card) || _inDetailPane(card) || !card.contains(node)) {
         injectedJobChips.delete(key);
         _jobChipCards.delete(key);
         _jobChipApplyUrls.delete(key);
         try { if (node) node.remove(); } catch {}
+        // Also sweep any orphan chips that may have been left in the card DOM.
+        if (card && document.body.contains(card)) {
+          card.querySelectorAll(".lc-job-apply-row").forEach(n => { try { n.remove(); } catch {} });
+        }
       }
     }
   }
@@ -1981,13 +2232,12 @@
   }
 
   // Inject a select-tick + Apply chip onto every visible job card.
-  // Chips are mounted in a fixed-position portal on document.body, completely
-  // bypassing LinkedIn's overflow:hidden scroll containers. Positions are
-  // recalculated each animation frame via _syncJobChipPositions().
+  // Chips are injected INLINE directly into the card DOM (same pattern as the
+  // people-search Save chip) rather than a fixed-position portal — this is more
+  // reliable across LinkedIn's many card layouts and requires no coordinate sync.
   function decorateJobCards() {
     if (!_isJobsPage()) return;
     _gcJobChips();
-    const portal = _ensurePortalRoot();
     const cards = _jobCardEls();
     let created = 0;
     for (const card of cards) {
@@ -1995,18 +2245,21 @@
         const key = _jobCardKey(card);
         if (!key) continue;
 
-        // Keep our tracking pointed at the freshest card element for this key
-        // (LinkedIn recycles card nodes on scroll/pagination).
         _jobChipCards.set(key, card);
         _jobChipApplyUrls.set(key, _jobApplyUrlFromCard(card));
         if (injectedJobChips.has(key)) continue;
+        // Hard-remove any orphan chips already in the card DOM before injecting
+        // a fresh one — guards against LinkedIn re-rendering card internals while
+        // the map entry was still live.
+        card.querySelectorAll(".lc-job-apply-row").forEach(n => { try { n.remove(); } catch {} });
 
+        const isSelected = state.selectedJobUrls.has(key);
         const checkSpan = el(
           "span",
-          { class: "lc-inline-check", title: "Select this job for Apply All" },
-          state.selectedJobUrls.has(key) ? "☑" : "☐"
+          { class: "lc-inline-check" + (isSelected ? " lc-inline-check-on" : ""),
+            title: "Select this job for Apply All" },
+          isSelected ? "☑" : "☐"
         );
-        if (state.selectedJobUrls.has(key)) checkSpan.classList.add("lc-inline-check-on");
         checkSpan.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -2037,9 +2290,27 @@
           await applyAllJobs([key]);
         });
 
-        const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
+        const wrap = el("div", { class: "lc-job-apply-row" }, checkSpan, btn);
         wrap.dataset.lcKey = key;
-        portal.appendChild(wrap);
+
+        // Best injection point (in priority order):
+        //   1. Just after the card's metadata/footer row (time posted + Easy Apply badge)
+        //   2. Before the Dismiss "X" button (always present, most reliable fallback)
+        //   3. Append to card as last resort
+        const metaRow = card.querySelector(
+          ".job-card-container__footer-wrapper, .job-card-list__footer-wrapper, " +
+          ".job-card-container__metadata-wrapper, .artdeco-entity-lockup__metadata, " +
+          "[class*='footer'], [class*='metadata'], .jobs-unified-top-card__job-insight"
+        );
+        const dismissBtn = card.querySelector("button[aria-label*='Dismiss' i]");
+        if (metaRow && metaRow.parentElement) {
+          metaRow.parentElement.insertBefore(wrap, metaRow.nextSibling || null);
+        } else if (dismissBtn && dismissBtn.parentElement) {
+          dismissBtn.parentElement.insertBefore(wrap, dismissBtn);
+        } else {
+          card.appendChild(wrap);
+        }
+
         injectedJobChips.set(key, wrap);
         created++;
       } catch (e) {
@@ -2047,57 +2318,8 @@
       }
     }
     if (cards.length || created) {
-      console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+      console.log(`[LeadCaptura] jobs: ${cards.length} cards detected, ${injectedJobChips.size} chips live (+${created} new)`);
     }
-    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
-    // up in screenshots — plus the console. Only while detection looks wrong.
-    try {
-      let badge = document.getElementById("lc-jobs-diag");
-      if (cards.length < 2) {
-        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
-        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
-        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
-          li.querySelector("a[href*='/jobs/']")
-        ).length;
-        const divJob = document.querySelectorAll(
-          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
-        ).length;
-        const card1 =
-          (probeCard?.tagName || "-") +
-          "." +
-          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
-        const txt =
-          "LC diag · cards=" + cards.length +
-          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
-          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
-          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
-          " liJob=" + liJob +
-          " divJob=" + divJob +
-          " card1=" + card1;
-        console.log("[LeadCaptura] jobs-diag " + txt);
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.id = "lc-jobs-diag";
-          badge.style.cssText =
-            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
-            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
-          document.documentElement.appendChild(badge);
-        }
-        badge.textContent = txt;
-      } else if (badge) {
-        badge.remove();
-      }
-    } catch {
-      /* diag is best-effort */
-    }
-    _bindJobChipScroll();
-    // Position immediately (synchronously) so chips are visible on this frame —
-    // not only on the next requestAnimationFrame, which can be delayed.
-    try { _syncJobChipPositions(); } catch {}
-    _scheduleJobChipSync();
-    // Surface the live count on the toolbar's Apply button the moment new
-    // chips appear, so the user can confirm detection at a glance.
     if (created > 0) { try { renderToolbar(); } catch {} }
   }
 
@@ -2165,34 +2387,70 @@
 
   // The job detail's apply control + its classification.
   function _classifyJobDetail() {
+    // Helper: text-based Easy Apply check on any button.
+    const _isEasyApplyBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /easy apply/i.test(t) || /easy apply/i.test(a);
+    };
+    const _isAppliedBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /\bapplied\b/i.test(t) || /\bapplied\b/i.test(a);
+    };
+    const _isExternalBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /company website|apply on company website/i.test(t) || /company website/i.test(a);
+    };
+
+    // Fast path: specific selectors for known LinkedIn container class names.
     const cands = Array.from(
       document.querySelectorAll(
         "button.jobs-apply-button, button[aria-label*='Easy Apply' i], " +
         "button[data-control-name*='apply' i], " +
         ".jobs-apply-button--top-card button, .jobs-s-apply button, " +
         ".jobs-unified-top-card button, .jobs-details-top-card button, " +
-        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button"
+        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button, " +
+        ".job-details-jobs-unified-top-card__container--two-pane button, " +
+        ".jobs-unified-top-card__content--two-pane button, " +
+        ".jobs-apply-button__container button"
       )
     ).filter(_isVisible);
+
     for (const b of cands) {
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      if (/easy apply/i.test(t) || /easy apply/i.test(a)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
     }
-    // Check for "Applied" badge / button (already submitted)
+    for (const b of cands) {
+      if (_isAppliedBtn(b)) return { status: "applied", btn: null };
+      if (_isExternalBtn(b)) return { status: "external", btn: null };
+    }
+
+    // Broad fallback: scan EVERY visible button in the document.
+    // LinkedIn renames container classes often; the button text is stable.
+    const allBtns = Array.from(document.querySelectorAll("button")).filter(_isVisible);
+    for (const b of allBtns) {
+      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+    }
+
+    // Also check static "Applied" and "External" badges that aren't buttons.
     const applied = Array.from(document.querySelectorAll(
-      "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied"
+      "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied, " +
+      "[aria-label*='Applied' i], .jobs-apply-button--applied-state"
     )).filter(_isVisible);
     if (applied.length) return { status: "applied", btn: null };
-    const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout")?.innerText || "");
-    if (/\bapplied\b/i.test(bodyTxt) && !cands.length) return { status: "applied", btn: null };
-    for (const b of cands) {
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      if (/company website|apply\b/i.test(t) || /company website/i.test(a)) {
-        return { status: "external", btn: null };
-      }
+
+    const bodyTxt = (document.querySelector(
+      ".jobs-s-apply, .jobs-details, .job-view-layout, " +
+      ".job-details-jobs-unified-top-card__container--two-pane"
+    )?.innerText || "");
+    if (/\bapplied\b/i.test(bodyTxt) && !allBtns.some(_isEasyApplyBtn)) {
+      return { status: "applied", btn: null };
     }
+    for (const b of allBtns) {
+      if (_isExternalBtn(b)) return { status: "external", btn: null };
+    }
+
     return { status: "none", btn: null };
   }
 
@@ -2215,7 +2473,10 @@
   function _modalActionButton(modal) {
     if (!modal) return null;
     // Prefer footer buttons but fall back to all visible buttons
-    const footer = modal.querySelector("footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer']");
+    const footer = modal.querySelector(
+      "footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer'], " +
+      ".artdeco-modal__actionbar, [data-test-modal-footer]"
+    );
     const btns = Array.from((footer || modal).querySelectorAll("button")).filter(_isVisible);
     const match = (b, re) =>
       re.test((b.getAttribute("aria-label") || "")) ||
@@ -2223,13 +2484,21 @@
     let b;
     if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
     if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$/i)))) return { type: "next", btn: b };
-    // Last resort: any non-dismiss, non-back primary button in the modal footer
-    const primaryBtn = btns.find((x) => {
+    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
+    // Prioritise any artdeco primary button not on the exclusion list
+    const SKIP = new Set(["back", "dismiss", "discard", "cancel", "close", "previous"]);
+    const primary = btns.find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !["back", "dismiss", "discard", "cancel", "close"].includes(t) && t.length > 0;
+      if (!t || SKIP.has(t)) return false;
+      return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
     });
-    if (primaryBtn) return { type: "next", btn: primaryBtn };
+    if (primary) return { type: "next", btn: primary };
+    // Last resort: any non-dismiss, non-back button
+    const fallback = btns.find((x) => {
+      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      return !!t && !SKIP.has(t);
+    });
+    if (fallback) return { type: "next", btn: fallback };
     return null;
   }
 
@@ -2490,6 +2759,61 @@
         }
       }
     }
+
+    // LinkedIn ARIA combobox / custom dropdowns (not native <select>).
+    // These render as [role='combobox'] or .artdeco-dropdown wrappers; clicking
+    // the trigger opens a [role='listbox'] and each option is [role='option'].
+    const combos = Array.from(modal.querySelectorAll(
+      "[role='combobox']:not([type='text']):not([type='search']), " +
+      ".artdeco-dropdown__trigger, [data-test-text-entity-list-form-select]"
+    )).filter((el) => _isVisible(el) && !el.disabled);
+    for (const trigger of combos) {
+      const wrap = trigger.closest(
+        ".artdeco-dropdown, [data-test-form-element], .fb-dash-form-element, " +
+        ".jobs-easy-apply-form-element"
+      ) || trigger.parentElement;
+      const label = _fieldLabelFor(trigger) || _fieldLabelFor(wrap);
+      const currentVal = (trigger.getAttribute("aria-activedescendant") ? "" :
+        trigger.textContent || trigger.value || "").trim();
+      const isPlaceholder = !currentVal || /^(select|choose|please|--)/.test(currentVal);
+      if (!isPlaceholder) continue;
+      // Collect options from any open or triggerable listbox.
+      const getOptions = () => {
+        const lb = document.querySelector("[role='listbox']") ||
+          wrap?.querySelector("[role='listbox']");
+        if (!lb) return [];
+        return Array.from(lb.querySelectorAll("[role='option']"))
+          .map((o) => (o.innerText || o.textContent || "").trim())
+          .filter(Boolean);
+      };
+      try { trigger.click(); } catch {}
+      await sleep(400 + Math.random() * 300);
+      let opts = getOptions();
+      if (!opts.length) {
+        _forceClick(trigger);
+        await sleep(500);
+        opts = getOptions();
+      }
+      if (!opts.length) continue;
+      let ans = _matchProfileAnswer(label, profile, "select", opts);
+      if (ans == null) ans = await askGemini(label, "select", opts);
+      const pick = ans ? _pickOption(opts, ans) : null;
+      if (pick) {
+        const lb = document.querySelector("[role='listbox']") || wrap?.querySelector("[role='listbox']");
+        if (lb) {
+          const opt = Array.from(lb.querySelectorAll("[role='option']"))
+            .find((o) => (o.innerText || o.textContent || "").trim() === pick);
+          if (opt) {
+            try { opt.click(); } catch {}
+            await sleep(200 + Math.random() * 200);
+          }
+        }
+      } else {
+        // Close the dropdown without selecting anything (press Escape).
+        try { trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); } catch {}
+        await sleep(200);
+      }
+    }
   }
 
   // Step through the open Easy Apply modal. Returns {ok, reason}.
@@ -2497,14 +2821,19 @@
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
 
+    // Wait up to 10s for the modal — LinkedIn can be slow to open it.
     let modal = await waitFor(
-      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']", "div[role='dialog']"],
-      { timeout: 6000 }
+      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']",
+       ".artdeco-modal[role='dialog']", "div[role='dialog']"],
+      { timeout: 10000 }
     );
     modal = _easyApplyModal() || modal;
     if (!modal) return { ok: false, reason: "modal_not_found" };
+    // Extra settle time — LinkedIn animates the modal in.
+    await sleep(600 + Math.random() * 400);
 
-    const MAX_STEPS = 14;
+    const MAX_STEPS = 20;
+    let consecutiveStuck = 0;
     for (let step = 0; step < MAX_STEPS; step++) {
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
       if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
@@ -2514,8 +2843,7 @@
       // Keep a resume selected + don't auto-follow companies.
       _ensureResumeSelected(modal);
       _uncheckFollow(modal);
-      // Auto-fill this step's questions (profile answers + Gemini fallback)
-      // before trying to advance.
+      // Auto-fill this step's questions.
       try { await _answerModalQuestions(modal); }
       catch (e) { console.warn("[LeadCaptura] question auto-fill failed", e?.message); }
       await sleep(500 + Math.random() * 500);
@@ -2527,39 +2855,70 @@
       }
 
       if (action.type === "submit") {
-        await dispatchHumanClick(action.btn);
-        await sleep(1400 + Math.random() * 1200);
-        // Close the "application sent" confirmation.
+        // React-aware submit click.
+        _forceClick(action.btn);
+        await sleep(2000 + Math.random() * 1500);
+
+        const modalAfter = _easyApplyModal();
+        if (!modalAfter) {
+          // Modal closed on its own = successful submission.
+          return { ok: true };
+        }
+        // Modal still open — check whether it transitioned to a success screen.
+        // LinkedIn shows "Your application was sent" / "Application submitted" etc.
+        // inside the same modal element after submission.
+        const modalText = (modalAfter.innerText || modalAfter.textContent || "").toLowerCase();
+        const isSuccess =
+          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(modalText) ||
+          !!modalAfter.querySelector(
+            ".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], " +
+            "[class*='success-banner'], progress[value='100']"
+          );
         await _dismissEasyApplyModal();
-        return { ok: true };
+        return isSuccess ? { ok: true } : { ok: false, reason: "submit_failed" };
       }
 
-      // Advance (next / review) and verify the modal actually moved on.
-      const before = { progress: _modalProgress(modal), heading: _modalHeading(modal) };
-      // Reading pause before clicking — looks like a human checking the form.
-      await sleep(600 + Math.random() * 900);
-      await dispatchHumanClick(action.btn);
-      await sleep(1100 + Math.random() * 1000);
+      // Snapshot state before advancing so we can detect if the modal moved on.
+      const before = {
+        progress: _modalProgress(modal),
+        heading: _modalHeading(modal),
+        html: modal.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "",
+      };
+      // Reading pause before clicking.
+      await sleep(700 + Math.random() * 800);
+      // Use _forceClick (5 strategies) for reliable step advancement.
+      _forceClick(action.btn);
+      await sleep(1500 + Math.random() * 1000);
 
       const after = _easyApplyModal();
-      if (!after) return { ok: false, reason: "modal_vanished" }; // unexpected
+      if (!after) return { ok: false, reason: "modal_vanished" };
       const act2 = _modalActionButton(after);
-      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
       const progAfter = _modalProgress(after);
       const headAfter = _modalHeading(after);
+      const htmlAfter = after.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "";
       const errorShown = !!after.querySelector(
-        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text"
+        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
+        ".jobs-easy-apply-form-element__error, [class*='error-text']"
       );
-      const progressed =
-        progressedByButton ||
-        (before.progress != null && progAfter != null && progAfter > before.progress) ||
-        (before.heading && headAfter && headAfter !== before.heading);
 
-      if (!progressed && (errorShown || (progAfter === before.progress && headAfter === before.heading))) {
-        // Stuck — this job needs answers we can't safely fill. Discard.
-        await _dismissEasyApplyModal();
-        return { ok: false, reason: "needs_manual_input" };
+      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
+      const progressBarMoved = before.progress != null && progAfter != null && progAfter > before.progress;
+      const headingChanged = before.heading && headAfter && headAfter !== before.heading;
+      const contentChanged = htmlAfter !== before.html;
+      const progressed = progressedByButton || progressBarMoved || headingChanged || contentChanged;
+
+      if (!progressed && errorShown) {
+        // Explicit validation error — this step needs manual input we can't provide.
+        consecutiveStuck++;
+        if (consecutiveStuck >= 2) {
+          await _dismissEasyApplyModal();
+          return { ok: false, reason: "needs_manual_input" };
+        }
+        // Give it one more attempt (maybe the click landed too early).
+        await sleep(1000);
+        continue;
       }
+      consecutiveStuck = 0;
     }
     await _dismissEasyApplyModal();
     return { ok: false, reason: "too_many_steps" };
@@ -2571,8 +2930,7 @@
   async function _openJobDetail(card, expectedId) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
-    // Prefer a real job link; otherwise click the card's title/clickable area
-    // (current search-results cards open on card click, not via a job <a>).
+    // Prefer a real job link; otherwise click the card's title/clickable area.
     const link =
       card.querySelector("a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']") ||
       card.querySelector("a[href*='/jobs/']") ||
@@ -2580,17 +2938,22 @@
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
+    // Single controlled click — do NOT double-click (dispatchHumanClick + _forceClick)
+    // because two rapid clicks confuse LinkedIn's SPA router and may close the pane.
     try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
 
-    // When we know the job's real id, wait until the detail pane reflects THIS
-    // job before clicking Easy Apply (so a slow pane swap can't apply to the
-    // previously-open job). When we don't (cards expose only a shared
-    // currentJobId), just give the pane time to settle after the click.
-    if (!expectedId) {
-      await sleep(1400 + Math.random() * 1000);
-      return true;
-    }
-    const matches = () => {
+    // Broad check: any visible "Easy Apply" button anywhere in the document.
+    // Don't restrict to specific containers — LinkedIn renames them constantly.
+    const _anyEasyApplyVisible = () =>
+      Array.from(document.querySelectorAll("button")).some((b) => {
+        if (!_isVisible(b)) return false;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        const a = b.getAttribute("aria-label") || "";
+        return /easy apply/i.test(t) || /easy apply/i.test(a);
+      });
+
+    const _urlMatchesJob = () => {
+      if (!expectedId) return false;
       try {
         const u = new URL(location.href);
         if (u.searchParams.get("currentJobId") === expectedId) return true;
@@ -2599,35 +2962,47 @@
       } catch {}
       return false;
     };
+
     const start = Date.now();
-    while (Date.now() - start < 6000 && !matches()) {
+    // Wait up to 8s for EITHER: URL reflects this job OR Easy Apply button appears.
+    while (Date.now() - start < 8000) {
       if (state.applyCancel) return false;
+      if (_urlMatchesJob() || _anyEasyApplyVisible()) break;
       await sleep(300);
     }
-    // Let the detail pane finish hydrating its apply button.
-    await sleep(900 + Math.random() * 1000);
-    // Even if the URL never matched (LinkedIn sometimes doesn't reflect the id
-    // for search-results cards), proceed — the click opened the pane.
+    // Extra settle buffer for React to finish rendering.
+    await sleep(600 + Math.random() * 600);
     return true;
   }
 
   // Apply to one job (its card is already in the list). Returns {ok, reason}.
   async function _applyToJob(card) {
     const { sleep } = globalThis.__lcHuman;
-    const { dispatchHumanClick } = globalThis.__lcDom;
     const id = _realJobId(card);
     const onRightJob = await _openJobDetail(card, id);
     if (state.applyCancel) return { ok: false, reason: "cancelled" };
     if (!onRightJob) return { ok: false, reason: "detail_mismatch" };
     if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
 
-    const detail = _classifyJobDetail();
+    // Retry classification — the detail pane may still be hydrating.
+    let detail = _classifyJobDetail();
+    if (detail.status === "none") {
+      for (let t = 0; t < 5; t++) {
+        await sleep(800);
+        if (state.applyCancel) return { ok: false, reason: "cancelled" };
+        detail = _classifyJobDetail();
+        if (detail.status !== "none") break;
+      }
+    }
+
     if (detail.status === "applied") return { ok: false, reason: "already_applied" };
     if (detail.status === "external") return { ok: false, reason: "external_apply" };
     if (detail.status !== "easy" || !detail.btn) return { ok: false, reason: "no_easy_apply" };
 
     await sleep(500 + Math.random() * 700);
-    await dispatchHumanClick(detail.btn);
+    // Use _forceClick for the Easy Apply button — LinkedIn's primary buttons are
+    // React-controlled and may silently swallow dispatchHumanClick events.
+    _forceClick(detail.btn);
     return await _runEasyApplyModal();
   }
 
@@ -2784,7 +3159,7 @@
         // Make sure any leftover dialog is gone before the next job.
         await _dismissEasyApplyModal();
 
-        const last = i >= urls.length - 1;
+        const last = i >= keys.length - 1;
         if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
           let gap;
           if (sinceBreak >= nextBreakAt) {
@@ -2885,6 +3260,40 @@
     const span = wrap.querySelector(".lc-inline-save-text");
     if (btn) btn.dataset.state = lcState;
     if (span) span.textContent = text;
+  }
+
+  // ── Avoid Duplicate Outreach: live chip visuals ─────────────────────────────
+  // When the toggle is ON, every already-contacted card's Save chip flips to a
+  // muted "Contacted" state so the user sees, in realtime, which profiles will
+  // be skipped. Toggling OFF restores them to the normal "Save" state.
+  function _applyContactedVisual(url) {
+    const wrap = injectedSaves.get(url);
+    if (!wrap || !document.body.contains(wrap)) return;
+    const btn = wrap.querySelector(".lc-inline-save");
+    const span = wrap.querySelector(".lc-inline-save-text");
+    if (!btn) return;
+    // Never override an in-flight or terminal save/error state.
+    if (btn.dataset.state === "saving" || btn.dataset.state === "saved" || btn.dataset.state === "error") return;
+    if (state.avoidDuplicates && _isContacted(url)) {
+      btn.dataset.state = "contacted";
+      if (span) span.textContent = "Contacted";
+      btn.title = "Already contacted — skipped by Avoid Duplicate Outreach";
+    } else if (btn.dataset.state === "contacted") {
+      btn.dataset.state = "ready";
+      if (span) span.textContent = "Save";
+      btn.title = "Open this profile and auto-enrich";
+    }
+  }
+
+  function _refreshContactedVisuals() {
+    for (const url of injectedSaves.keys()) _applyContactedVisual(url);
+  }
+
+  // How many currently-visible cards are already contacted (= would be skipped).
+  function _countContactedVisible() {
+    let n = 0;
+    for (const url of _allChipUrls()) if (_isContacted(url)) n++;
+    return n;
   }
 
   function injectInlineSave(card, profile, anchorBtn) {
@@ -2996,6 +3405,7 @@
         });
         btn.dataset.state = "saved";
         textSpan.textContent = "Opened ✓";
+        _markContacted(url); // record as contacted so duplicate check knows
       } catch (err) {
         btn.dataset.state = "error";
         const msg = err?.message || String(err);
@@ -3034,6 +3444,8 @@
     }
     injectedSaves.set(url, wrap);
     chipCardEl.set(url, card);
+    // Reflect Avoid-Duplicate state immediately on the freshly-injected chip.
+    _applyContactedVisual(url);
     // Remember the precise native button this chip sits beside (if any) so
     // Connect All can act on it directly.
     if (anchor && _isActionButton(anchor)) chipActionBtn.set(url, anchor);
@@ -3496,6 +3908,10 @@
         console.warn("[LeadCaptura] decorate(link) failed", e?.message);
       }
     }
+
+    // Refresh the Avoid-Duplicate panel's live skip-count for the cards now
+    // on screen (new cards may have rendered via scroll/pagination).
+    try { _renderAvoidDupPanel(); } catch {}
   }
 
   // Resolve the canonical profile-owner link for a card. Preference order:
@@ -3524,66 +3940,222 @@
     );
   }
 
+  // ── Visual overlay: glowing highlight + arrow on "Send without a note" ──
+  let _sendBtnHighlightTimer = null;
+  let _sendBtnArrowEl = null;
+
+  function _highlightSendBtn(btn) {
+    if (!btn) return;
+    // Pulsing glow on the button itself
+    try {
+      btn.style.setProperty("outline", "3px solid #0a66c2", "important");
+      btn.style.setProperty("outline-offset", "3px", "important");
+      btn.style.setProperty("animation", "lc-pulse-ring 0.9s ease-in-out infinite", "important");
+      btn.setAttribute("data-lc-highlighted", "true");
+    } catch {}
+    // Floating arrow panel above the button
+    if (!_sendBtnArrowEl || !document.body.contains(_sendBtnArrowEl)) {
+      const arrow = document.createElement("div");
+      arrow.id = "lc-send-btn-arrow";
+      arrow.innerHTML =
+        '<div class="lc-arrow-inner">' +
+        '<span class="lc-arrow-emoji">👆</span>' +
+        '<span>LeadCaptura: Click &ldquo;Send without a note&rdquo;</span>' +
+        "</div>" +
+        '<div class="lc-arrow-tail"></div>';
+      document.body.appendChild(arrow);
+      _sendBtnArrowEl = arrow;
+    }
+    // Position arrow above the button and keep updating
+    clearInterval(_sendBtnHighlightTimer);
+    _sendBtnHighlightTimer = setInterval(() => {
+      if (!_sendBtnArrowEl || !document.body.contains(_sendBtnArrowEl)) return;
+      const target = _findSendWithoutNoteButton();
+      if (!target) return;
+      const r = target.getBoundingClientRect();
+      if (r.width === 0) return;
+      const aw = _sendBtnArrowEl.offsetWidth || 280;
+      _sendBtnArrowEl.style.left =
+        Math.max(8, Math.min(window.innerWidth - aw - 8, r.left + r.width / 2 - aw / 2)) + "px";
+      _sendBtnArrowEl.style.top =
+        Math.max(8, r.top - (_sendBtnArrowEl.offsetHeight || 56) - 12) + "px";
+    }, 100);
+  }
+
+  function _removeSendBtnHighlight() {
+    clearInterval(_sendBtnHighlightTimer);
+    _sendBtnHighlightTimer = null;
+    if (_sendBtnArrowEl) {
+      try { _sendBtnArrowEl.remove(); } catch {}
+      _sendBtnArrowEl = null;
+    }
+    try {
+      const el = document.querySelector('[data-lc-highlighted="true"]');
+      if (el) {
+        el.style.removeProperty("outline");
+        el.style.removeProperty("outline-offset");
+        el.style.removeProperty("animation");
+        el.removeAttribute("data-lc-highlighted");
+      }
+    } catch {}
+  }
+
+  // Inject a <script> tag that runs in the PAGE's MAIN world, not the extension's
+  // isolated world. In MAIN world the code has access to window.jQuery and can
+  // call HTMLElement.prototype methods in the same origin as the page handler —
+  // the single most reliable bypass for frameworks that bind to document-level
+  // listeners rather than the button element itself.
+  function _tryMainWorldClick(btn) {
+    try {
+      // Inject into the page's MAIN world via a script tag. This is the only
+      // way to reach LinkedIn's React fiber tree from a content script, since
+      // React stores internal state as DOM properties set in the MAIN world.
+      const code = `(function(){
+var all=Array.from(document.querySelectorAll('button,[role="button"]'));
+var b=all.find(function(x){
+  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+  var a=(x.getAttribute('aria-label')||'').toLowerCase();
+  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';
+});
+if(!b)return;
+// React fiber traversal — defer via queueMicrotask so React's concurrent
+// renderer processes the update asynchronously (avoids error #418 "component
+// suspended while responding to synchronous input").
+try{
+  var fk=Object.keys(b).find(function(k){return k.startsWith('__reactFiber$')||k.startsWith('__reactInternalInstance$');});
+  if(fk){
+    var fiber=b[fk];
+    for(var d=0;fiber&&d<12;fiber=fiber.return,d++){
+      var oc=fiber.memoizedProps&&fiber.memoizedProps.onClick||fiber.pendingProps&&fiber.pendingProps.onClick;
+      if(typeof oc==='function'){
+        var _oc=oc,_b=b;
+        queueMicrotask(function(){try{_oc({type:'click',bubbles:true,cancelable:true,
+            isTrusted:true,target:_b,currentTarget:_b,
+            preventDefault:function(){},stopPropagation:function(){},
+            nativeEvent:{isTrusted:true}});}catch(e){}});
+        break;
+      }
+    }
+  }
+}catch(e){}
+if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}
+HTMLElement.prototype.click.call(b);
+try{
+  var r=b.getBoundingClientRect();
+  var cx=Math.round(r.left+r.width/2),cy=Math.round(r.top+r.height/2);
+  var opts={bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy,button:0,buttons:1};
+  b.dispatchEvent(new MouseEvent('mousedown',opts));
+  b.dispatchEvent(new MouseEvent('mouseup',{...opts,buttons:0}));
+  b.dispatchEvent(new MouseEvent('click',{...opts,buttons:0}));
+}catch(e){}
+var f=b.closest('form');
+if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
+})();`;
+      const s = document.createElement("script");
+      s.textContent = code;
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch {}
+  }
+
+  // Ask the service worker to run chrome.scripting.executeScript with world:"MAIN"
+  // on the current tab — the most authoritative way to fire page-context code.
+  function _tryServiceWorkerMainWorldClick() {
+    try {
+      chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {});
+    } catch {}
+  }
+
   // ---- Global auto-confirm of the invitation modal ----------------------
-  // The "Add a note to your invitation?" dialog appears whenever Connect is
-  // clicked — by Connect All OR by the user manually. The user's rule is: never
-  // add a note, always "Send without a note". This watcher clicks that button
-  // the instant the modal appears, regardless of who triggered the Connect, so
-  // the flow never stalls on the dialog. Bot-detection note: this only fires in
-  // direct response to a Connect the user/extension already made, so it adds no
-  // new outbound action — it just completes the one already in progress.
+  // Fires whenever the "Add a note?" modal appears, regardless of who triggered
+  // it. Nuclear strategy: visual highlight, MAIN-world injection, aggressive
+  // 200ms retry, and a user-assist prompt after 5s if still stuck.
   let _inviteAutoBusy = false;
+  let _inviteHighlightShown = false;
+
   async function _autoConfirmInviteModal() {
-    // During a Connect All run, _sendConnectOnCard owns the full sequence —
-    // stand down so the two don't double-click the same dialog.
-    if (state.connectActive) return;
+    if (state.connectActive) return;  // _sendConnectOnCard owns the sequence
     if (_inviteAutoBusy) return;
-    if (!_invitationModalOpen()) return;
+    if (!_invitationModalOpen()) {
+      if (_inviteHighlightShown) { _removeSendBtnHighlight(); _inviteHighlightShown = false; }
+      return;
+    }
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
-      // Let the modal finish its mount/animation so LinkedIn (Ember) has bound
-      // the button's click handler — clicking mid-animation is a no-op. ~250ms
-      // is below human reaction time floor and well within the modal's lifetime.
-      await sleep(250);
+      // Wait for the modal animation to finish before clicking.
+      // LinkedIn's Ember/React mounts button handlers ~250-350ms after the dialog appears.
+      await sleep(350);
       btn = _findSendWithoutNoteButton();
       if (!btn || !_invitationModalOpen()) return;
-      console.log("[LeadCaptura] auto-confirm: clicking Send without a note", btn);
+
+      // Show visual highlight so the user can see which button we're targeting.
+      if (!_inviteHighlightShown) {
+        _inviteHighlightShown = true;
+        _highlightSendBtn(btn);
+      }
       _lcToast("LeadCaptura: sending invitation…");
+      console.log("[LeadCaptura] auto-confirm: found Send without a note", btn);
+
+      // Fire all click strategies simultaneously on the first attempt.
+      // The MAIN-world strategies (script injection + service worker executeScript)
+      // have React fiber access and are the most reliable for LinkedIn's buttons.
       _forceClick(btn);
-      // Give LinkedIn's backend up to ~4.5s to process and close the modal.
-      for (let i = 0; i < 18; i++) {
-        await sleep(250);
+      _tryMainWorldClick(btn);
+      _tryServiceWorkerMainWorldClick();
+
+      // Aggressive retry loop: check every 300ms for up to 9s.
+      // MAIN world click fires every attempt; isolated-world forceClick fires
+      // on alternating attempts to avoid overwhelming LinkedIn's event queue.
+      for (let i = 0; i < 30; i++) {
+        await sleep(300);
         if (!_invitationModalOpen()) {
-          console.log("[LeadCaptura] auto-confirm: modal closed ✓");
+          console.log("[LeadCaptura] auto-confirm: modal closed ✓ (attempt", i + 1, ")");
           _lcToast("LeadCaptura: invitation sent ✓");
+          _removeSendBtnHighlight();
+          _inviteHighlightShown = false;
           return;
         }
-        // Re-click periodically while the modal is still up (in case the first
-        // attempt landed during the animation and was swallowed).
         const stillBtn = _findSendWithoutNoteButton();
-        if (stillBtn && !stillBtn.disabled && i % 3 === 2) _forceClick(stillBtn);
+        if (!stillBtn || stillBtn.disabled) continue;
+        // Always fire the MAIN world path — it calls React fiber directly.
+        _tryMainWorldClick(stillBtn);
+        _tryServiceWorkerMainWorldClick();
+        // Also fire isolated-world click on every other attempt.
+        if (i % 2 === 0) _forceClick(stillBtn);
       }
-      console.log("[LeadCaptura] auto-confirm: modal still open after retries");
+
+      // 9s elapsed — still open. Prompt the user.
+      if (_invitationModalOpen()) {
+        _lcToast('⚠️ Please click "Send without a note" manually');
+        console.log("[LeadCaptura] auto-confirm: prompting user — click blocked by LinkedIn");
+      }
     } catch (e) {
       console.warn("[LeadCaptura] auto-confirm error", e);
     } finally {
       _inviteAutoBusy = false;
     }
   }
+
   function _startInviteAutoConfirm() {
+    // Debounce the MutationObserver — LinkedIn's React app fires hundreds of
+    // DOM mutations per second on a search page. Without debouncing, every
+    // mutation runs a full button scan. A 120ms debounce keeps response time
+    // under 200ms while eliminating the CPU spike.
+    let _mutDebounce = null;
+    const _debouncedAutoConfirm = () => {
+      if (_mutDebounce) return;
+      _mutDebounce = setTimeout(() => { _mutDebounce = null; _autoConfirmInviteModal(); }, 120);
+    };
     try {
-      const obs = new MutationObserver(() => {
-        _autoConfirmInviteModal();
-      });
+      const obs = new MutationObserver(_debouncedAutoConfirm);
       obs.observe(document.documentElement, { childList: true, subtree: true });
-    } catch {
-      /* observer best-effort */
-    }
-    // Safety-net poll in case a mutation batch is missed.
-    setInterval(_autoConfirmInviteModal, 600);
+    } catch {}
+    // Safety-net poll every 400ms (was 200ms — the debounced observer already
+    // catches real-time modal appearances; the poll is a fallback for missed mutations).
+    setInterval(_autoConfirmInviteModal, 400);
   }
   _startInviteAutoConfirm();
 
@@ -3591,14 +4163,19 @@
   // a Connect All run. Updates chip states and resets the toolbar.
   function applyConnectResults(results) {
     for (const [url, status] of Object.entries(results || {})) {
-      if (status === "sent") {
+      if (status === "sent" || status === "connected") {
         _setChipState(url, "saved", "Connected ✓");
+        _markContacted(url);
+      } else if (status === "followed") {
+        _setChipState(url, "saved", "Followed ✓");
+        _markContacted(url);
       } else if (
         status === "already_connected" ||
         status === "already_pending" ||
         status === "already_done"
       ) {
         _setChipState(url, "saved", "Already done ✓");
+        _markContacted(url);
       } else {
         _setChipState(url, "error", "Skipped");
       }

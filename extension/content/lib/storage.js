@@ -20,6 +20,7 @@
     enabled: true,
     autopilot: false,
     showOverlay: true,
+    webScrapeEnabled: true,
   };
 
   function _runtimeAlive() {

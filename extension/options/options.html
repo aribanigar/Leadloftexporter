@@ -8,122 +8,189 @@
   </head>
   <body>
     <main class="page">
+
+      <!-- Header -->
       <header class="hd">
         <div class="logo">L</div>
-        <div class="title">LeadCaptura</div>
-        <span class="sub">Extension options</span>
+        <div>
+          <span class="title">LeadCaptura</span>
+          <span class="sub">Extension options</span>
+        </div>
       </header>
 
+      <!-- Workspace connection -->
       <section class="card">
-        <h2>Workspace connection</h2>
-        <p class="muted">
-          Generate an API key in your workspace at <a id="docs-link" href="http://localhost:3000/settings/api-keys" target="_blank">Settings → API Keys</a> and paste it below.
+        <div class="card-header">
+          <div class="card-icon blue">🔗</div>
+          <h2>Workspace connection</h2>
+        </div>
+        <p class="card-desc">
+          Generate an API key in your workspace at
+          <a id="docs-link" href="http://localhost:3000/settings/api-keys" target="_blank">Settings → API Keys</a>
+          and paste it below.
         </p>
 
-        <label class="lbl">Backend URL</label>
-        <input id="apiUrl" class="inp" type="url" placeholder="https://api.leadcaptura.com" />
+        <div class="field">
+          <label class="lbl" for="apiUrl">Backend URL</label>
+          <input id="apiUrl" class="inp" type="url" placeholder="https://api.leadcaptura.com" />
+        </div>
 
-        <label class="lbl">API key</label>
-        <div class="row">
-          <input id="apiKey" class="inp" type="password" placeholder="lcx_…" autocomplete="off" />
-          <button class="btn ghost" id="toggle-show">Show</button>
+        <div class="field">
+          <label class="lbl" for="apiKey">API key</label>
+          <div class="inp-row">
+            <input id="apiKey" class="inp" type="password" placeholder="lcx_…" autocomplete="off" />
+            <button class="btn icon" id="toggle-show" type="button">Show</button>
+          </div>
         </div>
 
         <div class="actions">
-          <button class="btn primary" id="save">Save &amp; verify</button>
-          <button class="btn ghost" id="test">Test connection</button>
+          <button class="btn primary" id="save" type="button">Save &amp; verify</button>
+          <button class="btn ghost" id="test" type="button">Test connection</button>
         </div>
         <div id="status" class="status"></div>
       </section>
 
+      <!-- Capture behaviour -->
       <section class="card">
-        <h2>Capture behavior</h2>
-        <label class="row checkbox">
-          <input type="checkbox" id="enabled" /> <span>Extension enabled on LinkedIn</span>
+        <div class="card-header">
+          <div class="card-icon green">⚡</div>
+          <h2>Capture behaviour</h2>
+        </div>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="enabled" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Extension enabled on LinkedIn</span>
+            <span class="toggle-hint">Master switch — disabling this stops all extension activity.</span>
+          </span>
         </label>
-        <label class="row checkbox">
-          <input type="checkbox" id="showOverlay" /> <span>Show floating capture panel</span>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="showOverlay" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Show floating capture panel</span>
+            <span class="toggle-hint">Displays the save/enrich panel on LinkedIn profile pages.</span>
+          </span>
         </label>
-        <label class="row checkbox">
-          <input type="checkbox" id="autopilot" /> <span>Autopilot: run queued LinkedIn actions in the background tab</span>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="autopilot" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Autopilot — run queued actions in background</span>
+            <span class="toggle-hint">Runs at human pace (~45–180 s between actions), pauses when hidden, aborts on captchas.</span>
+          </span>
         </label>
-        <p class="muted small">
-          Autopilot runs at a human pace (~45–180s between actions), pauses when the tab is hidden, and aborts on captchas. Daily caps are enforced server-side from your workspace outreach settings.
-        </p>
-        <label class="row checkbox">
-          <input type="checkbox" id="autoSaveOnOpen" /> <span>Auto-save &amp; enrich when opening a profile</span>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="autoSaveOnOpen" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Auto-save &amp; enrich when opening a profile</span>
+            <span class="toggle-hint">Saves and enriches name, title, company, location, email and phone automatically.</span>
+          </span>
         </label>
-        <p class="muted small">
-          When you open any LinkedIn profile, LeadCaptura automatically saves the lead and enriches their name, title, company, location, email, and phone &mdash; no clicking required.
-        </p>
-        <label class="row checkbox">
-          <input type="checkbox" id="autoEnrichOnSave" /> <span>Auto-enrich emails &amp; phones when saving from search results</span>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="autoEnrichOnSave" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Auto-enrich emails &amp; phones from search results</span>
+            <span class="toggle-hint">Opens the profile in a background tab, reads Contact info, then closes automatically.</span>
+          </span>
         </label>
-        <p class="muted small">
-          When you save a lead from a search result, opens the profile in a background tab, reads the &ldquo;Contact info&rdquo; overlay, and updates the lead. The tab closes itself when done.
-        </p>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="syncLinkedInMessages" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Auto-save leads from LinkedIn messages</span>
+            <span class="toggle-hint">Reads the conversation list LinkedIn already fetches — no extra requests made.</span>
+          </span>
+        </label>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="webScrapeEnabled" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Scrape company websites for contact info</span>
+            <span class="toggle-hint">Fetches Contact/About pages when email or phone is missing. Requires access to all websites.</span>
+          </span>
+        </label>
+
+        <div id="web-scrape-status" class="status"></div>
       </section>
 
+      <!-- Auto-Apply profile -->
       <section class="card">
-        <h2>Auto-Apply — Application profile</h2>
-        <p class="muted small">
-          Used to auto-fill the standard questions on LinkedIn Easy Apply forms (phone, location, years of experience, salary, etc.). Leave a field blank to skip it.
+        <div class="card-header">
+          <div class="card-icon purple">📋</div>
+          <h2>Auto-Apply — Application profile</h2>
+        </div>
+        <p class="card-desc">
+          Used to auto-fill standard fields on LinkedIn Easy Apply forms. Leave a field blank to skip it.
         </p>
+
         <div class="grid2">
-          <div>
-            <label class="lbl">Full name</label>
+          <div class="field">
+            <label class="lbl" for="ap_fullName">Full name</label>
             <input id="ap_fullName" class="inp" type="text" placeholder="Todd Santner" />
           </div>
-          <div>
-            <label class="lbl">Email</label>
+          <div class="field">
+            <label class="lbl" for="ap_email">Email</label>
             <input id="ap_email" class="inp" type="email" placeholder="you@example.com" />
           </div>
-          <div>
-            <label class="lbl">Phone (with country code)</label>
+          <div class="field">
+            <label class="lbl" for="ap_phone">Phone (with country code)</label>
             <input id="ap_phone" class="inp" type="tel" placeholder="+966 5x xxx xxxx" />
           </div>
-          <div>
-            <label class="lbl">City</label>
+          <div class="field">
+            <label class="lbl" for="ap_city">City</label>
             <input id="ap_city" class="inp" type="text" placeholder="Riyadh" />
           </div>
-          <div>
-            <label class="lbl">Country</label>
+          <div class="field">
+            <label class="lbl" for="ap_country">Country</label>
             <input id="ap_country" class="inp" type="text" placeholder="Saudi Arabia" />
           </div>
-          <div>
-            <label class="lbl">Years of experience</label>
+          <div class="field">
+            <label class="lbl" for="ap_years">Years of experience</label>
             <input id="ap_years" class="inp" type="text" placeholder="9" />
           </div>
-          <div>
-            <label class="lbl">Notice period / availability</label>
+          <div class="field">
+            <label class="lbl" for="ap_notice">Notice period / availability</label>
             <input id="ap_notice" class="inp" type="text" placeholder="1 month" />
           </div>
-          <div>
-            <label class="lbl">Expected salary</label>
-            <input id="ap_expectedSalary" class="inp" type="text" placeholder="e.g. 25000" />
+          <div class="field">
+            <label class="lbl" for="ap_expectedSalary">Expected salary</label>
+            <input id="ap_expectedSalary" class="inp" type="text" placeholder="25 000" />
           </div>
-          <div>
-            <label class="lbl">Current salary</label>
-            <input id="ap_currentSalary" class="inp" type="text" placeholder="e.g. 20000" />
+          <div class="field">
+            <label class="lbl" for="ap_currentSalary">Current salary</label>
+            <input id="ap_currentSalary" class="inp" type="text" placeholder="20 000" />
           </div>
         </div>
-        <div class="grid3" style="margin-top:10px">
-          <div>
-            <label class="lbl">Authorized to work?</label>
+
+        <div class="divider"></div>
+
+        <div class="grid3">
+          <div class="field">
+            <label class="lbl" for="ap_workAuth">Authorized to work?</label>
             <select id="ap_workAuth" class="inp">
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
           </div>
-          <div>
-            <label class="lbl">Need sponsorship?</label>
+          <div class="field">
+            <label class="lbl" for="ap_sponsorship">Need sponsorship?</label>
             <select id="ap_sponsorship" class="inp">
               <option value="No">No</option>
               <option value="Yes">Yes</option>
             </select>
           </div>
-          <div>
-            <label class="lbl">Willing to relocate?</label>
+          <div class="field">
+            <label class="lbl" for="ap_relocate">Willing to relocate?</label>
             <select id="ap_relocate" class="inp">
               <option value="Yes">Yes</option>
               <option value="No">No</option>
@@ -132,69 +199,96 @@
         </div>
       </section>
 
+      <!-- AI answers -->
       <section class="card">
-        <h2>Auto-Apply — AI answers</h2>
-        <p class="muted small">
-          For questions the profile above can't answer, LeadCaptura asks an AI to answer using your CV.
-          Choose your provider below and paste that provider's key.
+        <div class="card-header">
+          <div class="card-icon amber">🤖</div>
+          <h2>Auto-Apply — AI answers <span class="badge">AI</span></h2>
+        </div>
+        <p class="card-desc">
+          For questions the profile above can't answer, LeadCaptura asks an AI using your CV text.
         </p>
-        <label class="row checkbox">
-          <input type="checkbox" id="aiEnabled" /> <span>Use AI to answer unmatched questions from my CV</span>
+
+        <label class="toggle-row" style="margin-bottom:14px">
+          <input type="checkbox" id="aiEnabled" />
+          <span class="toggle"><span class="toggle-track"></span><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-label">Use AI to answer unmatched questions</span>
+            <span class="toggle-hint">AI answers are best-effort — jobs with tricky required questions are skipped rather than guessed.</span>
+          </span>
         </label>
 
-        <label class="lbl">AI provider</label>
-        <select id="aiProvider" class="inp">
-          <option value="gemini">Google Gemini (free tier)</option>
-          <option value="claude">Anthropic Claude (paid, higher quality)</option>
-        </select>
+        <div class="field">
+          <label class="lbl" for="aiProvider">AI provider</label>
+          <select id="aiProvider" class="inp">
+            <option value="gemini">Google Gemini (free tier)</option>
+            <option value="claude">Anthropic Claude (paid, higher quality)</option>
+          </select>
+        </div>
 
         <div id="gemini-fields">
-          <p class="muted small">
-            Free key: <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a>
+          <p class="card-desc" style="margin-bottom:8px">
+            Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a>
           </p>
-          <label class="lbl">Gemini API key</label>
-          <div class="row">
-            <input id="geminiApiKey" class="inp" type="password" placeholder="AIza…" autocomplete="off" />
-            <button class="btn ghost" id="toggle-gemini" type="button">Show</button>
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl" for="geminiApiKey">Gemini API key</label>
+              <div class="inp-row">
+                <input id="geminiApiKey" class="inp" type="password" placeholder="AIza…" autocomplete="off" />
+                <button class="btn icon" id="toggle-gemini" type="button">Show</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="geminiModel">Gemini model</label>
+              <input id="geminiModel" class="inp" type="text" placeholder="gemini-2.0-flash" />
+            </div>
           </div>
-          <label class="lbl">Gemini model</label>
-          <input id="geminiModel" class="inp" type="text" placeholder="gemini-2.0-flash" />
         </div>
 
         <div id="claude-fields">
-          <p class="muted small">
-            Key: <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a>
-            — paste it here, never into a chat.
+          <p class="card-desc" style="margin-bottom:8px">
+            Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a>
           </p>
-          <label class="lbl">Claude API key</label>
-          <div class="row">
-            <input id="claudeApiKey" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" />
-            <button class="btn ghost" id="toggle-claude" type="button">Show</button>
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl" for="claudeApiKey">Claude API key</label>
+              <div class="inp-row">
+                <input id="claudeApiKey" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" />
+                <button class="btn icon" id="toggle-claude" type="button">Show</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="claudeModel">Claude model</label>
+              <input id="claudeModel" class="inp" type="text" placeholder="claude-haiku-4-5-20251001" />
+            </div>
           </div>
-          <label class="lbl">Claude model</label>
-          <input id="claudeModel" class="inp" type="text" placeholder="claude-haiku-4-5-20251001" />
         </div>
 
-        <label class="lbl">Your CV / résumé text (the AI reads this to answer)</label>
-        <textarea id="cvText" class="inp" rows="10" placeholder="Paste your full CV here…"></textarea>
+        <div class="field">
+          <label class="lbl" for="cvText">Your CV / résumé text</label>
+          <textarea id="cvText" class="inp" rows="10" placeholder="Paste your full CV here — the AI reads this to answer application questions…"></textarea>
+        </div>
 
         <div class="actions">
           <button class="btn ghost" id="test-gemini" type="button">Test AI key</button>
         </div>
         <div id="gemini-status" class="status"></div>
-        <p class="muted small">
-          AI answers are best-effort. Review applications you care about — for tricky/required questions LeadCaptura skips the job rather than guessing wrong.
-        </p>
       </section>
 
+      <!-- Privacy -->
       <section class="card">
-        <h2>Privacy</h2>
-        <p class="muted small">
-          This extension reads only the DOM of LinkedIn pages you're already viewing. It never calls LinkedIn's internal APIs, never spawns headless sessions, and never reads any other site. Scraped data is sent only to your configured backend URL.
+        <div class="card-header">
+          <div class="card-icon slate">🔒</div>
+          <h2>Privacy</h2>
+        </div>
+        <p class="card-desc" style="margin:0">
+          This extension reads only the DOM of LinkedIn pages you're already viewing.
+          It never calls LinkedIn's internal APIs, never spawns headless sessions, and never reads any other site.
+          Scraped data is sent only to your configured backend URL.
         </p>
       </section>
-    </main>
 
+    </main>
     <script src="options.js"></script>
   </body>
 </html>

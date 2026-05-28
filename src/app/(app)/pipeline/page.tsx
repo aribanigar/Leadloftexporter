@@ -64,11 +64,13 @@ export default function PipelinePage() {
     refetchOnWindowFocus: true,
   });
 
-  const { data: leads, isLoading: leadsLoading } = useQuery<LeadList>({
-    queryKey: ["leads", "all"],
-    queryFn: () => api("/leads?page=1&page_size=500"),
-    refetchInterval: 15000,
+  const { data: leads, isLoading: leadsLoading, isError: leadsError, refetch: refetchLeads } = useQuery<LeadList>({
+    queryKey: ["leads", "pipeline"],
+    queryFn: () => api("/leads?page=1&page_size=200&sort=created_at&direction=desc"),
+    refetchInterval: 8000,
     refetchOnWindowFocus: true,
+    retry: 2,
+    staleTime: 0,
   });
 
   const loading = stagesLoading || leadsLoading;
@@ -79,6 +81,7 @@ export default function PipelinePage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["stages"] });
+      refetchLeads();
     },
   });
 
@@ -485,9 +488,21 @@ export default function PipelinePage() {
                 {!loading && filteredLeads.length === 0 && (
                   <tr>
                     <td colSpan={10} className="px-4 py-16 text-center text-sm text-slate-400">
-                      {leads?.items.length
-                        ? "No leads match the current filters."
-                        : "No leads yet. Capture them from LinkedIn using the extension, or import a CSV from Settings."}
+                      {leadsError ? (
+                        <span>
+                          Could not load leads.{" "}
+                          <button
+                            className="text-brand-600 underline hover:text-brand-800"
+                            onClick={() => refetchLeads()}
+                          >
+                            Retry
+                          </button>
+                        </span>
+                      ) : leads?.items.length ? (
+                        "No leads match the current filters."
+                      ) : (
+                        "No leads yet. Capture them from LinkedIn using the extension, or import a CSV from Settings."
+                      )}
                     </td>
                   </tr>
                 )}

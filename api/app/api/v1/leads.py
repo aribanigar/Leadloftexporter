@@ -55,6 +55,7 @@ def list_leads(
     q: Optional[str] = None,
     stage_id: Optional[str] = None,
     owner_id: Optional[str] = None,
+    segment: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     sort: str = "created_at",
@@ -79,6 +80,8 @@ def list_leads(
         base = base.filter(Lead.stage_id == stage_id)
     if owner_id:
         base = base.filter(Lead.owner_id == owner_id)
+    if segment:
+        base = base.filter(Lead.custom["segment"].astext == segment)
 
     total = base.count()
     sort_col = getattr(Lead, sort, Lead.created_at)

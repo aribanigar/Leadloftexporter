@@ -65,6 +65,8 @@ export default function ProspectingPage() {
       api(
         `/leads?page=${page}&page_size=50${stageFilter ? `&stage_id=${stageFilter}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`
       ),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   // A Saved View opened from the sidebar ("/prospecting?view=<id>") applies its
@@ -91,7 +93,7 @@ export default function ProspectingPage() {
     () =>
       views?.[0]?.columns?.length
         ? views[0].columns
-        : ["full_name", "title", "company", "email", "stage", "owner", "close_date"],
+        : ["full_name", "title", "company", "email", "phone", "stage", "owner", "close_date"],
     [views]
   );
   const visibleColumns = columns ?? defaultCols;

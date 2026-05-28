@@ -103,6 +103,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     },
   });
 
+  // Generic field patcher used by the inline-editable Lead Info / Company tabs.
+  const patchLead = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api(`/leads/${id}`, { method: "PATCH", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["lead", id] }),
+  });
+
   const stageById = useMemo(() => {
     const m = new Map<string, PipelineStage>();
     stages?.forEach((s) => m.set(s.id, s));
@@ -215,18 +222,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           <TaskList leadId={id} tasks={tasks || []} />
 
-          <div className="mt-4 border-t border-slate-200 pt-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Lead Info
-            </h3>
-            <Field label="Email" value={lead.email} />
-            <Field label="Phone" value={lead.phone} />
-            <Field label="LinkedIn" value={lead.linkedin_url} link />
-            <Field label="Location" value={lead.location} />
-            <Field label="Title" value={lead.title} />
-            <Field label="Company" value={lead.company?.name} />
-            <Field label="Headline" value={lead.headline} />
-          </div>
+          <InfoTabs
+            lead={lead}
+            onSaveField={(body) => patchLead.mutate(body)}
+            onSaveCustom={(key, value) =>
+              patchLead.mutate({
+                custom: { ...(lead.custom || {}), [key]: value },
+              })
+            }
+          />
         </div>
       </aside>
 
@@ -281,33 +285,167 @@ function ActionBtn({
   );
 }
 
-function Field({
+// Tabbed Lead Info / Company panel, mirroring LeadLoft's clean inline-editable
+// fields. Core lead columns save directly; everything else lands in lead.custom.
+function InfoTabs({
+  lead,
+  onSaveField,
+  onSaveCustom,
+}: {
+  lead: Lead;
+  onSaveField: (body: Record<string, unknown>) => void;
+  onSaveCustom: (key: string, value: string) => void;
+}) {
+  const [tab, setTab] = useState<"info" | "company">("info");
+  const custom = (lead.custom || {}) as Record<string, unknown>;
+  const cs = (k: string) => {
+    const v = custom[k];
+    return v == null ? "" : String(v);
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-3">
+      <div className="mb-2 flex gap-4 border-b border-slate-100">
+        <TabButton active={tab === "info"} onClick={() => setTab("info")}>
+          Lead Info
+        </TabButton>
+        <TabButton active={tab === "company"} onClick={() => setTab("company")}>
+          Company
+        </TabButton>
+      </div>
+
+      {tab === "info" ? (
+        <div>
+          <EditableField label="Email" value={lead.email} onSave={(v) => onSaveField({ email: v })} />
+          <EditableField label="Phone" value={lead.phone} onSave={(v) => onSaveField({ phone: v })} />
+          <EditableField label="LinkedIn URL" value={lead.linkedin_url} link onSave={(v) => onSaveField({ linkedin_url: v })} />
+          <EditableField label="Location" value={lead.location} onSave={(v) => onSaveField({ location: v })} />
+          <EditableField label="Title" value={lead.title} onSave={(v) => onSaveField({ title: v })} />
+          <EditableField label="Segment" value={cs("segment")} onSave={(v) => onSaveCustom("segment", v)} />
+          <EditableField label="UTM Campaign" value={cs("utm_campaign")} onSave={(v) => onSaveCustom("utm_campaign", v)} />
+          <EditableField label="UTM Medium" value={cs("utm_medium")} onSave={(v) => onSaveCustom("utm_medium", v)} />
+          <EditableField label="UTM Source" value={cs("utm_source")} onSave={(v) => onSaveCustom("utm_source", v)} />
+          <EditableField label="Google Click ID" value={cs("gclid")} onSave={(v) => onSaveCustom("gclid", v)} />
+          <EditableField label="Facebook Click ID" value={cs("fbclid")} onSave={(v) => onSaveCustom("fbclid", v)} />
+        </div>
+      ) : (
+        <div>
+          <EditableField label="Company Name" value={lead.company?.name || cs("company_name")} onSave={(v) => onSaveCustom("company_name", v)} />
+          <EditableField label="Website" value={lead.company?.website || cs("company_website")} link onSave={(v) => onSaveCustom("company_website", v)} />
+          <EditableField label="Description" value={lead.company?.description || cs("company_description")} onSave={(v) => onSaveCustom("company_description", v)} />
+          <EditableField label="Phone Number" value={lead.company?.phone || cs("company_phone")} onSave={(v) => onSaveCustom("company_phone", v)} />
+          <EditableField label="Headcount" value={lead.company?.headcount != null ? String(lead.company.headcount) : cs("company_headcount")} onSave={(v) => onSaveCustom("company_headcount", v)} />
+          <EditableField label="Industry" value={cs("company_industry")} onSave={(v) => onSaveCustom("company_industry", v)} />
+          <EditableField label="Location" value={cs("company_location")} onSave={(v) => onSaveCustom("company_location", v)} />
+          <EditableField label="LinkedIn URL" value={cs("company_linkedin")} link onSave={(v) => onSaveCustom("company_linkedin", v)} />
+          <EditableField label="Twitter URL" value={cs("company_twitter")} link onSave={(v) => onSaveCustom("company_twitter", v)} />
+          <EditableField label="Revenue" value={cs("company_revenue")} onSave={(v) => onSaveCustom("company_revenue", v)} />
+          <EditableField label="Technologies" value={cs("company_technologies")} onSave={(v) => onSaveCustom("company_technologies", v)} />
+          <EditableField label="Type" value={cs("company_type")} onSave={(v) => onSaveCustom("company_type", v)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "relative pb-2 text-sm font-medium transition-colors " +
+        (active
+          ? "text-brand-700 after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-brand-600"
+          : "text-slate-500 hover:text-slate-700")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+// Inline-editable field: shows the value (or a muted placeholder); click to edit,
+// Enter or blur saves, Escape cancels. Matches LeadLoft's "click anywhere to edit".
+function EditableField({
   label,
   value,
   link,
+  onSave,
 }: {
   label: string;
   value?: string | null;
   link?: boolean;
+  onSave: (value: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed !== (value || "")) onSave(trimmed);
+  }
+
   return (
-    <div className="mb-2 text-sm">
+    <div className="mb-2.5 text-sm">
       <div className="text-xs text-slate-500">{label}</div>
-      {value ? (
-        link ? (
-          <a
-            href={value}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="break-all text-brand-600 hover:underline"
+      {editing ? (
+        <input
+          autoFocus
+          className="input mt-0.5 w-full py-1 text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setDraft(value || "");
+              setEditing(false);
+            }
+          }}
+        />
+      ) : value ? (
+        <div className="flex items-center justify-between gap-2">
+          {link ? (
+            <a
+              href={value.startsWith("http") ? value : `https://${value}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all text-brand-600 hover:underline"
+            >
+              {value}
+            </a>
+          ) : (
+            <span className="break-all text-slate-800">{value}</span>
+          )}
+          <button
+            onClick={() => {
+              setDraft(value || "");
+              setEditing(true);
+            }}
+            className="shrink-0 text-xs text-slate-400 hover:text-brand-600"
           >
-            {value}
-          </a>
-        ) : (
-          <div className="break-all text-slate-800">{value}</div>
-        )
+            Edit
+          </button>
+        </div>
       ) : (
-        <div className="text-slate-400">—</div>
+        <button
+          onClick={() => {
+            setDraft("");
+            setEditing(true);
+          }}
+          className="text-slate-400 hover:text-slate-600"
+        >
+          Please input {label}
+        </button>
       )}
     </div>
   );

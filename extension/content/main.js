@@ -132,33 +132,56 @@
 
   function _ccFindInviteModal() {
     for (const d of document.querySelectorAll(
-      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog'], [data-test-modal]"
     )) {
       const rect = d.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) continue;
       const cs = getComputedStyle(d);
-      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
-      if (
-        /add a note to your invitation|send without a note|personalize your invitation/i.test(
-          d.textContent || ""
-        )
-      )
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      const txt = d.textContent || "";
+      const heading = d.querySelector("h2, h3, h4, [role='heading']");
+      const headingTxt = (heading?.textContent || "").toLowerCase();
+      // Must NOT be LinkedIn's "Send [Name]'s Post" share/DM modal
+      if (heading && /send .+['']s post/i.test(headingTxt)) continue;
+      // Classic invite modal: contains invite-specific body phrases
+      if (/add a note|send without a note|personalize your invitation|note.*optional/i.test(txt))
         return d;
+      // Redesigned modal: heading references "invite" or "connect" and has a
+      // non-dismiss action button. LinkedIn removed "Send without a note" wording
+      // in 2025 and now shows a plain "Send" CTA inside an "Invite … to connect" modal.
+      if (/invite|connect.*request|connection request/i.test(headingTxt)) {
+        const actionBtn = d.querySelector(
+          "button:not([aria-label*='close' i]):not([aria-label*='dismiss' i]):not([aria-label*='back' i])"
+        );
+        if (actionBtn) return d;
+      }
     }
     return null;
   }
 
   function _ccFindSendBtn() {
-    const all = Array.from(document.querySelectorAll("button, [role='button']"));
+    // ALWAYS scan the whole document — never scope to the modal element.
+    // LinkedIn renders the invite modal's action buttons ("Send without a note")
+    // in a portal sibling OUTSIDE the div[role='dialog'] element on many
+    // profiles. Scoping to modal.querySelectorAll() silently returns null and
+    // the button is never clicked.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a")).filter(
+      (b) => !(b.classList && b.classList.contains("lc-inline-save")) && !b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")
+    );
     const label = (b) => ({
-      t: (b.textContent || "").replace(/\s+/g, " ").trim(),
-      a: b.getAttribute("aria-label") || "",
+      t: (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase(),
+      a: (b.getAttribute("aria-label") || "").trim().toLowerCase(),
     });
+    const isVisible = (b) => {
+      const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && !b.disabled;
+    };
+    // Progressive passes, strictest first.
     const tests = [
-      (s) => /^send without a note$/i.test(s),
-      (s) => /\bsend without a note\b/i.test(s),
-      (s) => /^send now$/i.test(s),
-      (s) => /^send( invitation)?$/i.test(s),
+      (s) => s === "send without a note",
+      (s) => /\bsend without a note\b/.test(s),
+      (s) => s === "send now" || s === "send invitation",
+      (s) => s.includes("send without a note"),
     ];
     for (const test of tests) {
       const matches = all.filter((b) => {
@@ -166,21 +189,167 @@
         return test(t) || test(a);
       });
       if (!matches.length) continue;
-      const vis = matches.filter((b) => {
-        const r = b.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && !b.disabled;
-      });
+      const vis = matches.filter(isVisible);
       return vis[0] || matches.find((b) => !b.disabled) || matches[0];
+    }
+    // Fallback for redesigned modal: bare "send" is safe when inside a confirmed
+    // invite modal (no share modal can be open on a /in/ profile page mid-connect).
+    const modal = _ccFindInviteModal();
+    if (modal) {
+      // Primary action button in the modal (artdeco primary style = the "Send" CTA).
+      for (const sel of [
+        ".artdeco-button--primary",
+        ".artdeco-modal__actionbar .artdeco-button",
+        "[data-test-dialog-primary-btn]",
+        "[data-test-modal-action-primary]",
+      ]) {
+        try {
+          const btn = modal.querySelector(sel);
+          if (btn && !btn.disabled && isVisible(btn)) {
+            const { t } = label(btn);
+            if (!/(cancel|close|dismiss|back|add.*note|note)/i.test(t)) return btn;
+          }
+        } catch {}
+      }
+      // Bare "send" button anywhere in the document — safe because we verified
+      // the invite modal is open and we are on a /in/ profile page.
+      const sendBtn = all.find((b) => {
+        const { t, a } = label(b);
+        return (t === "send" || a === "send") && isVisible(b);
+      });
+      if (sendBtn) return sendBtn;
     }
     return null;
   }
 
   function _ccInviteModalOpen() {
+    // Primary: the invite modal itself is visible.
     if (_ccFindInviteModal()) return true;
-    const b = _ccFindSendBtn();
-    if (!b) return false;
-    const r = b.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
+    // Fallback: a specific "Send without a note" or "Send now" button is visible.
+    // Intentionally excludes bare "Send" — that phrase matches LinkedIn's
+    // "Send [Name]'s Post" share modal submit button and causes false positives.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
+    for (const b of all) {
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (
+        /^send without a note$/i.test(t) || /^send without a note$/i.test(a) ||
+        /^send now$/i.test(t) || /^send now$/i.test(a)
+      ) {
+        const r = b.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return true;
+      }
+    }
+    return false;
+  }
+
+  // Fire a full pointer/mouse sequence on one element at its centre.
+  function _ccPointerSequence(el) {
+    try {
+      const r = el.getBoundingClientRect();
+      const o = {
+        bubbles: true, cancelable: true, view: window,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        button: 0, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true,
+      };
+      el.dispatchEvent(new PointerEvent("pointerover", o));
+      el.dispatchEvent(new PointerEvent("pointerenter", o));
+      el.dispatchEvent(new PointerEvent("pointerdown", o));
+      el.dispatchEvent(new MouseEvent("mousedown", o));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("mouseup", { ...o, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("click", { ...o, buttons: 0 }));
+    } catch {}
+  }
+
+  // Inject code into the PAGE's MAIN world to click "Send without a note".
+  // Content scripts run in an isolated world; a <script> tag appended to the DOM
+  // runs in the page's own JS context where window.jQuery and other page globals
+  // are accessible, giving us one more click channel against LinkedIn's handler.
+  function _ccMainWorldClick() {
+    try {
+      const code =
+        "(function(){" +
+        "var all=Array.from(document.querySelectorAll('button,[role=\"button\"]'));" +
+        "var b=all.find(function(x){" +
+        "  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();" +
+        "  var a=(x.getAttribute('aria-label')||'').toLowerCase();" +
+        "  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';" +
+        "});" +
+        "if(!b)return;" +
+        "if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}" +
+        "HTMLElement.prototype.click.call(b);" +
+        "var f=b.closest('form');" +
+        "if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}" +
+        "})();";
+      const s = document.createElement("script");
+      s.textContent = code;
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch {}
+  }
+
+  // Request the service worker to executeScript with world:"MAIN" — the most
+  // authoritative injection path available from a content script.
+  function _ccSwMainWorldClick() {
+    try { chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {}); } catch {}
+  }
+
+  // Click an element as reliably as possible. Ports the proven _forceClick from
+  // overlay.js: LinkedIn's button handler may be bound to the <button>, to an
+  // inner <span>, or driven by keyboard activation, so we try ALL of —
+  //   1. native .click()
+  //   2. a pointer/mouse sequence on the button
+  //   3. the same sequence on the inner label <span> (handlers often sit there)
+  //   4. an Enter keydown/keyup
+  // — until something lands. The "Send without a note" button specifically
+  // needs strategies 3 and 4; .click() + a button-level sequence alone is not
+  // enough (this was the v1.0.82 send_failed cause).
+  function _ccForceClick(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+    try { el.focus(); } catch {}
+    try { el.click(); } catch {}
+    _ccPointerSequence(el);
+    try {
+      const inner = el.querySelector("span, .artdeco-button__text");
+      if (inner && inner !== el) {
+        inner.click?.();
+        _ccPointerSequence(inner);
+      }
+    } catch {}
+    try {
+      const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      el.dispatchEvent(new KeyboardEvent("keydown", kopts));
+      el.dispatchEvent(new KeyboardEvent("keyup", kopts));
+    } catch {}
+    // Direct React fiber call — bypasses the DOM event system entirely.
+    // When LinkedIn's button handler checks event.isTrusted, synthetic DOM
+    // events fail (isTrusted is always false for programmatic events). Calling
+    // the React onClick prop directly with a plain object where isTrusted=true
+    // passes that check. Walk up the fiber tree so we find the onClick even if
+    // it is attached to a parent wrapper component.
+    try {
+      const fKey = Object.keys(el).find(
+        (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+      );
+      if (fKey) {
+        let fiber = el[fKey];
+        for (let depth = 0; fiber && depth < 8; fiber = fiber.return, depth++) {
+          const onClick =
+            fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+          if (typeof onClick === "function") {
+            onClick({
+              type: "click", bubbles: true, cancelable: true,
+              isTrusted: true, target: el, currentTarget: el,
+              preventDefault: () => {}, stopPropagation: () => {},
+              nativeEvent: { isTrusted: true },
+            });
+            break;
+          }
+        }
+      }
+    } catch {}
   }
 
   // Returns true if a Contact Info modal or overlay is currently open/loading.
@@ -245,73 +414,197 @@
       return true;
     };
 
-    // Find Connect button — direct selectors first (profile action area only)
-    let connectBtn = null;
-    const directSels = [
-      // Primary: aria-label "Invite X to connect" (LinkedIn's standard label)
-      "main .pvs-profile-actions button[aria-label*='connect' i]",
-      "main .pvs-profile-actions__action[aria-label*='connect' i]",
-      // Broader fallback scoped to the top-card / actions strip
-      "main button[aria-label*='Invite'][aria-label*='connect' i]",
-      "main button[aria-label*='Connect' i]",
-    ];
-    for (const sel of directSels) {
-      try {
-        for (const el of document.querySelectorAll(sel)) {
-          if (_isConnectBtn(el)) { connectBtn = el; break; }
-        }
-        if (connectBtn) break;
-      } catch {}
+    // Scan for the profile's primary Connect button. LinkedIn's 2025 markup is
+    // inconsistent: the button is sometimes <button>, sometimes NO aria-label
+    // (just <span>Connect</span>), and for many profiles it is an
+    // <a href="/preload/custom-invite/..."> anchor styled to look like a button
+    // — the status-bar URL proves this (hover shows the /preload/custom-invite/ href).
+    // We scan ALL buttons AND anchors, exclude only open dropdown menus,
+    // prefer the profile action strip, and fall back to the "More actions" menu.
+    const _findConnect = () => {
+      const candidates = [];
+      const seen = new Set();
+      const q = (sel) => { try { return document.querySelectorAll(sel); } catch { return []; } };
+
+      // Phase 1: broad scan — buttons, role=button, and invite/connect anchors
+      for (const b of [
+        ...q("button, [role='button']"),
+        ...q("a[href*='invite' i], a[href*='connect' i], a[href*='/mynetwork/' i]"),
+      ]) {
+        if (seen.has(b)) continue; seen.add(b);
+        // Exclude items inside open dropdown menus only (not aside — LinkedIn 2025
+        // sometimes renders the action strip inside an aside container)
+        if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+        if (!_isConnectBtn(b)) continue;
+        const cs = window.getComputedStyle(b);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        candidates.push(b);
+      }
+
+      if (!candidates.length) return null;
+
+      // Phase 2: prefer match inside the profile action strip
+      const ACTION_STRIP =
+        ".pvs-profile-actions, .pv-top-card-v2-ctas, .pv-top-card-v3-ctas, " +
+        ".ph5, .pv-top-card, [class*='top-card'][class*='ctas'], " +
+        "[class*='profile-actions'], .scaffold-layout__main";
+      const inActions = candidates.find(
+        (b) => b.closest(ACTION_STRIP) && b.closest("main")
+      );
+      if (inActions) return inActions;
+
+      // Phase 3: any candidate inside <main>
+      const inMain = candidates.find((b) => b.closest("main"));
+      if (inMain) return inMain;
+
+      // Phase 4: absolute fallback — first candidate regardless of container
+      return candidates[0];
+    };
+
+    // Phase 5: nuclear document-wide text scan used when _findConnect returns null
+    const _findConnectNuclear = () => {
+      const seen = new Set();
+      // Walk every element with a click handler — covers custom components
+      for (const el of document.querySelectorAll(
+        "button, [role='button'], a[href], [data-control-name*='connect' i]"
+      )) {
+        if (seen.has(el)) continue; seen.add(el);
+        if (el.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+        const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+        const hay = txt + " " + aria;
+        if (!/\bconnect\b/.test(hay)) continue;
+        if (/\bcontact\b|\bpending\b|\bfollowing\b|\bmessage\b|\bwithdraw\b/.test(hay)) continue;
+        if (el.disabled) continue;
+        const cs = window.getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) continue;
+        return el;
+      }
+      return null;
+    };
+
+    let connectBtn = _findConnect();
+
+    // SPA hydration: LinkedIn injects the action buttons a beat after the
+    // profile shell mounts. Poll every 500ms for up to ~8s before giving up.
+    if (!connectBtn) {
+      for (let w = 0; w < 16 && !connectBtn; w++) {
+        await sleep(500);
+        connectBtn = _findConnect() || _findConnectNuclear();
+      }
     }
 
-    // Try "More actions" dropdown fallback (Connect hidden behind "More" on some profiles)
+    // Last resort (has a side effect — opens a menu): "More actions" dropdown,
+    // for the rare profile that hides Connect behind "More".
     if (!connectBtn) {
       const moreBtn =
         document.querySelector("main button[aria-label*='More actions' i]") ||
-        document.querySelector(".pvs-profile-actions button[aria-label*='More' i]");
+        document.querySelector("main button[aria-label*='More' i]") ||
+        document.querySelector(".pvs-profile-actions button[aria-label*='More' i]") ||
+        (() => {
+          // text-content fallback for "More" button
+          for (const b of document.querySelectorAll("main button")) {
+            const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+            if (/^more$/i.test(txt) && !b.disabled) return b;
+          }
+          return null;
+        })();
       if (moreBtn) {
         if (simulateCursorMove) await simulateCursorMove(moreBtn);
         await sleep(400 + Math.random() * 400);
         await dispatchHumanClick(moreBtn);
         await sleep(700 + Math.random() * 500);
+        // Search dropdown by aria-label AND by text content
         const dropdownItems = document.querySelectorAll(
-          "div[role='menu'] [aria-label*='Connect' i]," +
-          "div.artdeco-dropdown__content [aria-label*='Connect' i]," +
-          "li.artdeco-dropdown__item [aria-label*='Connect' i]"
+          "div[role='menu'] li, div[role='menu'] [role='menuitem'], " +
+          "div.artdeco-dropdown__content li, li.artdeco-dropdown__item"
         );
-        for (const el of dropdownItems) {
-          if (_isConnectBtn(el)) { connectBtn = el; break; }
+        for (const item of dropdownItems) {
+          const txt = (item.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const aria = (item.getAttribute("aria-label") || "").toLowerCase();
+          if (/\bconnect\b/.test(txt + " " + aria) && !/\bpending\b|\bwithdraw\b/.test(txt + " " + aria)) {
+            const clickable = item.querySelector("button, a") || item;
+            if (_isConnectBtn(clickable) || /\bconnect\b/.test(txt)) {
+              connectBtn = clickable;
+              break;
+            }
+          }
         }
+        // Also try waitFor as secondary
         if (!connectBtn) {
-          connectBtn = await waitFor(
+          const found = await waitFor(
             [
               "div[role='menu'] [aria-label*='Connect' i]",
               "div.artdeco-dropdown__content [aria-label*='Connect' i]",
               "li.artdeco-dropdown__item [aria-label*='Connect' i]",
             ],
-            { timeout: 3000 }
+            { timeout: 2000 }
           );
-          if (connectBtn && !_isConnectBtn(connectBtn)) connectBtn = null;
+          if (found && _isConnectBtn(found)) connectBtn = found;
         }
       }
     }
 
-    // Text-content fallback — match ONLY "Connect" (exact, case-insensitive),
-    // scoped to the profile actions area to avoid touching sidebar cards.
     if (!connectBtn) {
-      const scope = document.querySelector("main .pvs-profile-actions") || document.querySelector("main");
-      if (scope) {
-        for (const b of scope.querySelectorAll("button, [role='button']")) {
-          const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-          if (/^connect$/i.test(txt) && _isConnectBtn(b)) {
-            connectBtn = b;
-            break;
-          }
+      // ── Follow fallback ──────────────────────────────────────────────────
+      // Some profiles only offer "Follow" (e.g. LinkedIn celebrities, pages,
+      // or accounts where Connect has been withdrawn). If Connect is absent
+      // after exhausting all searches, find a Follow button and follow instead.
+      const _findFollow = () => {
+        for (const b of document.querySelectorAll("button, [role='button']")) {
+          if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+          const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+          const hay = txt + " " + aria;
+          if (!/\bfollow\b/.test(hay)) continue;
+          if (/\bfollowing\b|\bunfollow\b|\bcontact\b/.test(hay)) continue;
+          if (b.disabled) continue;
+          const cs = window.getComputedStyle(b);
+          if (cs.display === "none" || cs.visibility === "hidden") continue;
+          const rect = b.getBoundingClientRect();
+          if (rect.width < 1 || rect.height < 1) continue;
+          return b;
+        }
+        return null;
+      };
+
+      let followBtn = _findFollow();
+      if (!followBtn) {
+        for (let w = 0; w < 8 && !followBtn; w++) {
+          await sleep(500);
+          followBtn = _findFollow();
         }
       }
-    }
 
-    if (!connectBtn) return { ok: false, reason: "no_connect_button" };
+      if (followBtn) {
+        console.log("[LeadCaptura] connect-queue: no Connect button — falling back to Follow");
+        try { followBtn.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch {}
+        await sleep(300 + Math.random() * 200);
+        if (simulateCursorMove) await simulateCursorMove(followBtn);
+        await sleep(80 + Math.random() * 120);
+        await dispatchHumanClick(followBtn);
+        // Wait for "Following" state to appear (no modal for Follow)
+        const _followingVisible = () => {
+          for (const b of document.querySelectorAll(
+            "main button, main a, .pvs-profile-actions button, [class*='profile-actions'] button"
+          )) {
+            const hay = ((b.textContent || "") + " " + (b.getAttribute("aria-label") || "")).toLowerCase();
+            if (/\bfollowing\b/.test(hay)) return true;
+          }
+          return false;
+        };
+        for (let w = 0; w < 10; w++) {
+          await sleep(300);
+          if (_followingVisible()) break;
+        }
+        console.log("[LeadCaptura] connect-queue: Follow clicked ✓");
+        return { ok: true, action: "followed" };
+      }
+
+      return { ok: false, reason: "no_connect_button" };
+    }
 
     // Skip if already pending / following
     const hay = (
@@ -324,75 +617,122 @@
     if (/\bmessage\b/.test(hay) && !/\bconnect\b/.test(hay))
       return { ok: false, reason: "already_connected" };
 
-    console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname);
+    console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname,
+      connectBtn.tagName === "A" ? "(anchor)" : "(button)");
+
+    // Scroll the button to the centre of the viewport so its bounding rect
+    // gives valid in-viewport coordinates for the pointer events.
+    try { connectBtn.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch {}
+    await sleep(300 + Math.random() * 200);
 
     // Cursor movement + dwell before click (anti-bot)
     if (simulateCursorMove) await simulateCursorMove(connectBtn);
     await sleep(80 + Math.random() * 120);
-    await dispatchHumanClick(connectBtn);
 
-    // Wait for invitation modal (up to 10 s)
-    let dialogOpen = false;
-    for (let i = 0; i < 40; i++) {
-      await sleep(250);
-      if (_ccInviteModalOpen()) {
-        dialogOpen = true;
-        break;
+    if (connectBtn.tagName === "A") {
+      // Temporarily remove the href before clicking. When the href is present
+      // (/preload/custom-invite/…), LinkedIn's SPA router intercepts the click
+      // and — for untrusted synthetic events — routes to its Share modal rather
+      // than the invite modal. Without the href, LinkedIn's handler falls back to
+      // reading data-* attributes which correctly opens the "Add a note?" invite
+      // modal. (This is the v1.0.80 approach that proved it works; the only
+      // v1.0.80 failure was a 10s modal wait that was too short — now 20s.)
+      const savedHref = connectBtn.getAttribute("href");
+      if (savedHref) connectBtn.removeAttribute("href");
+      await dispatchHumanClick(connectBtn);
+      // Restore href so LinkedIn's UI remains consistent after the click.
+      if (savedHref) {
+        setTimeout(() => {
+          try { connectBtn.setAttribute("href", savedHref); } catch {}
+        }, 600);
       }
+    } else {
+      await dispatchHumanClick(connectBtn);
     }
 
-    if (!dialogOpen) {
-      // Some profiles skip the modal when the invite completes immediately
+    // ── Integrated wait-and-send loop ───────────────────────────────────────
+    // After clicking Connect, the "Add a note to your invitation?" modal opens.
+    // We must click "Send without a note". Two things can complete the invite:
+    //   (a) our own _ccForceClick on the button below, and
+    //   (b) the global overlay.js auto-confirm watcher, which ALSO fires on this
+    //       modal (its stand-down guard only triggers during a SEARCH-page run,
+    //       not this profile queue).
+    // We drive (a) ourselves so we never depend on the watcher, and we accept
+    // EITHER outcome. The authoritative success signal is the profile flipping
+    // to a "Pending" state (or the modal we saw closing) — NOT merely catching
+    // the transient modal, which made earlier versions mis-report when the modal
+    // opened/closed between polls.
+    const _pendingVisible = () => {
       if (
         document.querySelector(
-          "button[aria-label*='Pending' i], button[aria-label*='Message' i]"
+          "main button[aria-label*='Pending' i], main a[aria-label*='Pending' i], " +
+            ".pvs-profile-actions button[aria-label*='Pending' i]"
         )
       )
+        return true;
+      for (const b of document.querySelectorAll(
+        "main button, main a, .pvs-profile-actions button"
+      )) {
+        if (/^pending$/i.test((b.textContent || "").replace(/\s+/g, " ").trim()))
+          return true;
+      }
+      return false;
+    };
+
+    // Poll for the "Send without a note" button DIRECTLY every cycle — do NOT
+    // gate on a separate _ccInviteModalOpen() check. Earlier versions gated on
+    // that helper, which used a stricter anchored regex than the button-finder;
+    // when the gate returned false the lenient finder never ran, so a clearly
+    // visible button went unclicked and we mis-reported "no_dialog_appeared".
+    // One matcher, used for both detection and the click target.
+    let sawSendBtn = false;
+    let firstClickDone = false;
+    let swClickFired = false;
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      if (_pendingVisible()) {
+        console.log("[LeadCaptura] connect-queue: Pending detected → invitation sent ✓");
         return { ok: true };
-      console.log("[LeadCaptura] connect-queue: no modal after click");
-      return { ok: false, reason: "no_dialog_appeared" };
-    }
+      }
 
-    console.log("[LeadCaptura] connect-queue: modal open → clicking Send without a note");
-
-    // Click "Send without a note"
-    for (let attempt = 0; attempt < 6 && _ccInviteModalOpen(); attempt++) {
       const sendBtn = _ccFindSendBtn();
-      if (!sendBtn) {
-        await sleep(300);
-        continue;
-      }
-      if (simulateCursorMove) await simulateCursorMove(sendBtn);
-      await sleep(60 + Math.random() * 80);
-      // Multi-strategy click for reliability
-      try { sendBtn.click(); } catch {}
-      try {
-        const rect = sendBtn.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const opts = {
-          bubbles: true, cancelable: true, view: window,
-          clientX: cx, clientY: cy, button: 0,
-        };
-        sendBtn.dispatchEvent(new PointerEvent("pointerdown", opts));
-        sendBtn.dispatchEvent(new MouseEvent("mousedown", opts));
-        sendBtn.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0 }));
-        sendBtn.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
-        sendBtn.dispatchEvent(new MouseEvent("click", { ...opts, buttons: 0 }));
-      } catch {}
-      // Wait for dialog to close (= invitation sent)
-      for (let w = 0; w < 20; w++) {
-        await sleep(250);
-        if (!_ccInviteModalOpen()) {
-          console.log("[LeadCaptura] connect-queue: invitation sent ✓");
-          return { ok: true };
+      if (sendBtn) {
+        if (!sawSendBtn) {
+          sawSendBtn = true;
+          await sleep(280);  // let modal fully mount
         }
+        if (!firstClickDone) {
+          firstClickDone = true;
+          if (simulateCursorMove) {
+            try { await simulateCursorMove(sendBtn); } catch {}
+          }
+          // First click: use all nuclear strategies simultaneously
+          _ccSwMainWorldClick();
+          swClickFired = true;
+        }
+        console.log("[LeadCaptura] connect-queue: found 'Send without a note' → clicking", sendBtn);
+        _ccForceClick(sendBtn);
+        _ccMainWorldClick();
+        // Re-fire SW main-world click every ~2s while stuck
+        if (!swClickFired || Date.now() % 2000 < 200) {
+          _ccSwMainWorldClick();
+          swClickFired = true;
+        }
+      } else if (sawSendBtn) {
+        console.log("[LeadCaptura] connect-queue: send button gone → invitation sent ✓");
+        return { ok: true };
       }
+
+      await sleep(200);
     }
 
-    if (!_ccInviteModalOpen()) return { ok: true };
-    console.log("[LeadCaptura] connect-queue: could not dismiss modal");
-    return { ok: false, reason: "send_failed" };
+    if (_pendingVisible()) return { ok: true };
+    if (sawSendBtn) {
+      console.log("[LeadCaptura] connect-queue: button stayed visible, send did not complete");
+      return { ok: false, reason: "send_failed" };
+    }
+    console.log("[LeadCaptura] connect-queue: no invite button appeared after Connect click");
+    return { ok: false, reason: "no_dialog_appeared" };
   }
 
   // Called on every profile page. If there is a pending connect queue in
@@ -435,22 +775,36 @@
 
     // Update persistent queue state
     const [, ...remaining] = queue.urls;
+    // "followed" counts as success — the user chose to engage with this profile
+    const resultStatus = result.ok
+      ? (result.action === "followed" ? "followed" : "sent")
+      : (result.reason || "failed");
     const updatedQueue = {
       ...queue,
       urls: remaining,
       sent: queue.sent + (result.ok ? 1 : 0),
       failed: queue.failed + (result.ok ? 0 : 1),
-      results: {
-        ...(queue.results || {}),
-        [queue.urls[0]]: result.ok ? "sent" : (result.reason || "failed"),
-      },
+      results: { ...(queue.results || {}), [queue.urls[0]]: resultStatus },
     };
+
+    // Sync result back to CRM if the lead was successfully acted on
+    if (result.ok) {
+      const profileUrl = queue.urls[0];
+      try {
+        const Api = globalThis.__lcApi;
+        if (Api?.connectResult) {
+          Api.connectResult(profileUrl, result.action === "followed" ? "followed" : "connected")
+            .catch(() => {});
+        }
+      } catch {}
+    }
 
     // Show brief progress toast on the profile page
     const done = updatedQueue.sent + updatedQueue.failed;
+    const actionLabel = result.action === "followed" ? "Followed" : "Connected";
     Overlay.toast?.(
       result.ok
-        ? `Connected ✓  ${done}/${updatedQueue.total}`
+        ? `${actionLabel} ✓  ${done}/${updatedQueue.total}`
         : `Skipped (${result.reason || "failed"})  ${done}/${updatedQueue.total}`,
       2800
     );
@@ -866,6 +1220,10 @@
       if (contact.phone) profile.phone = contact.phone;
       if (contact.website) profile.company_url = contact.website;
       if (contact.address) profile.location = contact.address.slice(0, 200);
+      // Stash all linked websites so the website scraper can try each one.
+      if (contact.websites?.length) {
+        profile.raw = { ...(profile.raw || {}), websites: contact.websites };
+      }
       // Text-scan fallback for emails/phones the user wrote into their About
       // or Experience. This catches public contact info even when LinkedIn's
       // Contact-Info modal is empty (non-1st-degree connections).
@@ -877,12 +1235,52 @@
         } catch {}
       }
       profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
+      // Carry the segment the user picked in the toolbar through the bulk
+      // enrichment tab (passed as ?lc_segment= by the service worker).
+      const segParam = params.get("lc_segment");
+      if (segParam) profile.segment = segParam;
 
       try {
         await globalThis.__lcApi.syncProfile(profile);
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
+
+      // Website scraping: if still no email/phone, scrape all linked websites.
+      // Uses the primary company_url plus any extra sites captured from the
+      // Contact Info modal (personal site, portfolio, etc.).
+      const _wsUrl = profile.company_url;
+      const _wsExtra = (profile.raw?.websites || []).filter(u => u && u !== _wsUrl);
+      const _wsPrimary = _wsUrl || _wsExtra[0] || null;
+      const _wsAdditional = _wsUrl ? _wsExtra : _wsExtra.slice(1);
+      if (_wsPrimary && (!profile.email || !profile.phone)) {
+        try {
+          const wsSettings = await globalThis.__lcStorage.getSettings();
+          if (wsSettings.webScrapeEnabled) {
+            const wsResult = await new Promise((resolve) => {
+              try {
+                chrome.runtime.sendMessage(
+                  { type: "lc:scrapeWebsite", url: _wsPrimary, extraUrls: _wsAdditional },
+                  (r) => resolve(r || {})
+                );
+              } catch { resolve({}); }
+            });
+            if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+              const merged = { ...profile };
+              if (wsResult.emails?.[0] && !merged.email) merged.email = wsResult.emails[0];
+              if (wsResult.phones?.[0] && !merged.phone) merged.phone = wsResult.phones[0];
+              merged.raw = {
+                ...(merged.raw || {}),
+                contact_source: "website_scrape",
+                scraped_emails: wsResult.emails,
+                scraped_phones: wsResult.phones,
+              };
+              try { await globalThis.__lcApi.syncProfile(merged); } catch {}
+            }
+          }
+        } catch { /* best-effort */ }
+      }
+
       await Human.sleep(Human.rand(80, 200));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
@@ -893,6 +1291,52 @@
       if (!redirected) closeSelf();
     }
   }
+
+  // ── LinkedIn message interceptor drain ─────────────────────────────────────
+  // interceptor.js (document_start) buffers conversation participants into
+  // window.__lcMsgQueue. We drain that queue here — after the API client is
+  // ready — and sync each unique participant as a lead. This passively turns
+  // anyone the user has messaged on LinkedIn into an enriched lead, with no
+  // additional page opens or LinkedIn API calls on our part.
+  let _msgQueueDrained = new Set(); // deduplicate across multiple drains
+
+  async function _drainMsgQueue() {
+    const queue = window.__lcMsgQueue;
+    if (!Array.isArray(queue) || !queue.length) return;
+    const batch = queue.splice(0, queue.length);
+    try {
+      const settings = await globalThis.__lcStorage.getSettings();
+      if (!settings.apiKey || !settings.syncLinkedInMessages) return;
+    } catch { return; }
+
+    for (const p of batch) {
+      if (!p.linkedin_url || !p.first_name) continue;
+      const key = p.linkedin_url.toLowerCase().replace(/\?.*$/, "");
+      if (_msgQueueDrained.has(key)) continue;
+      _msgQueueDrained.add(key);
+      try {
+        await globalThis.__lcApi.syncProfile({
+          linkedin_url: p.linkedin_url,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          full_name: p.full_name,
+          headline: p.headline,
+          photo_url: p.photo_url,
+          raw: { contact_source: "linkedin_messages" },
+        });
+        console.log("[LeadCaptura] msg-sync: saved lead from conversation →", p.full_name);
+      } catch (e) {
+        console.warn("[LeadCaptura] msg-sync: sync failed for", p.linkedin_url, e?.message);
+      }
+    }
+  }
+
+  // Run drain once on boot (catches conversations already loaded by the time
+  // main.js initialises) then again after 5s to catch async-loaded batches.
+  setTimeout(_drainMsgQueue, 1500);
+  setTimeout(_drainMsgQueue, 6000);
+  // Also drain whenever the user navigates to /messaging/ SPA route.
+  const _origOnPathChange = onPathChange;
 
   // Boot
   onPathChange();

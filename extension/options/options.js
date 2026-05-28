@@ -48,6 +48,8 @@ const DEFAULTS = {
   showOverlay: true,
   autoSaveOnOpen: true,
   autoEnrichOnSave: true,
+  syncLinkedInMessages: false,
+  webScrapeEnabled: true,
   // Auto-apply: pre-configured answers (Option A)
   applicationProfile: {
     fullName: "Todd Santner",
@@ -231,6 +233,8 @@ async function onSave() {
     showOverlay: $("#showOverlay").checked,
     autoSaveOnOpen: $("#autoSaveOnOpen").checked,
     autoEnrichOnSave: $("#autoEnrichOnSave").checked,
+    syncLinkedInMessages: $("#syncLinkedInMessages").checked,
+    webScrapeEnabled: $("#webScrapeEnabled").checked,
     applicationProfile: {
       fullName: $("#ap_fullName").value.trim(),
       email: $("#ap_email").value.trim(),
@@ -257,6 +261,28 @@ async function onSave() {
   if ($("#aiEnabled").checked) {
     try { await ensureAiPermission($("#aiProvider").value); } catch {}
   }
+  // Request broad host permission for website scraping when the toggle is on.
+  if ($("#webScrapeEnabled").checked) {
+    const el = document.getElementById("web-scrape-status");
+    try {
+      const already = await chrome.permissions.contains({ origins: ["http://*/*", "https://*/*"] });
+      if (!already) {
+        const ok = await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
+        if (!ok) {
+          el.textContent = "Permission denied — website scraping disabled.";
+          el.className = "status err";
+          await save({ webScrapeEnabled: false });
+          $("#webScrapeEnabled").checked = false;
+        } else {
+          el.textContent = "Permission granted ✓";
+          el.className = "status ok";
+        }
+      }
+    } catch (e) {
+      el.textContent = "Couldn't request permission: " + (e.message || e);
+      el.className = "status err";
+    }
+  }
   await testConnection();
 }
 
@@ -269,6 +295,8 @@ async function init() {
   $("#showOverlay").checked = settings.showOverlay;
   $("#autoSaveOnOpen").checked = settings.autoSaveOnOpen !== false;
   $("#autoEnrichOnSave").checked = settings.autoEnrichOnSave !== false;
+  $("#syncLinkedInMessages").checked = !!settings.syncLinkedInMessages;
+  $("#webScrapeEnabled").checked = !!settings.webScrapeEnabled;
   $("#docs-link").href = `${settings.apiUrl.replace(/:8000$/, ":3000") || "http://localhost:3000"}/settings/api-keys`;
 
   // Application profile (Option A)
