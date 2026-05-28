@@ -155,19 +155,23 @@
     // LinkedIn renders the invite modal's action buttons ("Send without a note")
     // in a portal sibling OUTSIDE the div[role='dialog'] element on many
     // profiles. Scoping to modal.querySelectorAll() silently returns null and
-    // the button is never clicked. This mirrors the proven overlay.js approach
-    // (_findSendWithoutNoteButton) which always searches document-wide.
-    // Bare "Send" is intentionally omitted — it matches LinkedIn's Share modal.
-    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
+    // the button is never clicked.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a")).filter(
+      (b) => !(b.classList && b.classList.contains("lc-inline-save")) && !b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")
+    );
     const label = (b) => ({
-      t: (b.textContent || "").replace(/\s+/g, " ").trim(),
-      a: b.getAttribute("aria-label") || "",
+      t: (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase(),
+      a: (b.getAttribute("aria-label") || "").trim().toLowerCase(),
     });
+    // Progressive passes, strictest first. The final substring pass is the
+    // safety net: it matches even if LinkedIn wraps the label in extra
+    // (visually-hidden) text that breaks the anchored ^...$ regexes. Bare
+    // "send" is never used — it would match LinkedIn's "Send Post" share modal.
     const tests = [
-      (s) => /^send without a note$/i.test(s),
-      (s) => /\bsend without a note\b/i.test(s),
-      (s) => /^send now$/i.test(s),
-      (s) => /^send invitation$/i.test(s),
+      (s) => s === "send without a note",
+      (s) => /\bsend without a note\b/.test(s),
+      (s) => s === "send now" || s === "send invitation",
+      (s) => s.includes("send without a note"),
     ];
     for (const test of tests) {
       const matches = all.filter((b) => {
@@ -461,9 +465,15 @@
       return false;
     };
 
-    let sawModal = false;
+    // Poll for the "Send without a note" button DIRECTLY every cycle — do NOT
+    // gate on a separate _ccInviteModalOpen() check. Earlier versions gated on
+    // that helper, which used a stricter anchored regex than the button-finder;
+    // when the gate returned false the lenient finder never ran, so a clearly
+    // visible button went unclicked and we mis-reported "no_dialog_appeared".
+    // One matcher, used for both detection and the click target.
+    let sawSendBtn = false;
     let firstClickDone = false;
-    const deadline = Date.now() + 25000;
+    const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
       // Strongest success signal: LinkedIn accepted the invite and the button
       // flipped to "Pending".
@@ -472,28 +482,26 @@
         return { ok: true };
       }
 
-      if (_ccInviteModalOpen()) {
-        if (!sawModal) {
-          sawModal = true;
+      const sendBtn = _ccFindSendBtn();
+      if (sendBtn) {
+        if (!sawSendBtn) {
+          sawSendBtn = true;
           // Let Ember finish mounting/binding the button handler before the
           // first click — clicking mid-animation is a silent no-op.
           await sleep(320);
         }
-        const sendBtn = _ccFindSendBtn();
-        if (sendBtn) {
-          if (!firstClickDone) {
-            firstClickDone = true;
-            if (simulateCursorMove) {
-              try { await simulateCursorMove(sendBtn); } catch {}
-            }
+        if (!firstClickDone) {
+          firstClickDone = true;
+          if (simulateCursorMove) {
+            try { await simulateCursorMove(sendBtn); } catch {}
           }
-          console.log("[LeadCaptura] connect-queue: invite modal open → clicking 'Send without a note'", sendBtn);
-          _ccForceClick(sendBtn);
         }
-      } else if (sawModal) {
-        // The modal we saw is gone and no error surfaced → invite was sent
-        // (by us or by the global watcher). This mirrors overlay.js STEP 4.
-        console.log("[LeadCaptura] connect-queue: modal closed after send → invitation sent ✓");
+        console.log("[LeadCaptura] connect-queue: found 'Send without a note' → clicking", sendBtn);
+        _ccForceClick(sendBtn);
+      } else if (sawSendBtn) {
+        // The button we saw is gone and no error surfaced → invite was sent
+        // (by us or by the global overlay.js watcher).
+        console.log("[LeadCaptura] connect-queue: send button gone → invitation sent ✓");
         return { ok: true };
       }
 
@@ -502,11 +510,11 @@
 
     // Timed out. Final authoritative checks before declaring failure.
     if (_pendingVisible()) return { ok: true };
-    if (sawModal) {
-      console.log("[LeadCaptura] connect-queue: modal stayed open, send did not complete");
+    if (sawSendBtn) {
+      console.log("[LeadCaptura] connect-queue: button stayed visible, send did not complete");
       return { ok: false, reason: "send_failed" };
     }
-    console.log("[LeadCaptura] connect-queue: no modal appeared after Connect click");
+    console.log("[LeadCaptura] connect-queue: no invite button appeared after Connect click");
     return { ok: false, reason: "no_dialog_appeared" };
   }
 
