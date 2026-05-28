@@ -3378,6 +3378,12 @@
 
     state.applyActive = true;
     state.applyCancel = false;
+    // Hide every per-card "Auto Apply" chip for the duration of the run — once
+    // the automated workflow starts there's nothing for the user to click, and
+    // a stray chip floating over the open Easy Apply modal looks broken. The
+    // chips stay in the DOM (the engine still reads their keys); they're just
+    // visually hidden via .lc-applying in overlay.css. Removed again in finally.
+    try { document.documentElement.classList.add("lc-applying"); } catch {}
     state.applyProgress = { current: 0, total: Math.min(firstPageKeys.length, MAX_APPLIES_PER_RUN), name: "" };
     unmountSelectAllHeader();
     renderToolbar();
@@ -3473,6 +3479,8 @@
       state.applyActive = false;
       state.applyProgress = null;
       if (!singleJob) state.selectedJobUrls.clear();
+      // Run finished — show the per-card chips again.
+      try { document.documentElement.classList.remove("lc-applying"); } catch {}
       mountSelectAllHeader();
       renderToolbar();
       try { decorateJobCards(); } catch {}
