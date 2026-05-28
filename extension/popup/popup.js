@@ -44,6 +44,9 @@ async function init() {
   $("#search-sales-nav").addEventListener("click", () => {
     chrome.tabs.create({ url: "https://www.linkedin.com/sales/search/people" });
   });
+  $("#search-jobs").addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://www.linkedin.com/jobs/search/" });
+  });
 
   $("#open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
   $("#open-app").addEventListener("click", async () => {

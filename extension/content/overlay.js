@@ -2246,11 +2246,18 @@
   function _gcJobChips() {
     for (const [key, node] of injectedJobChips.entries()) {
       const card = _jobChipCards.get(key);
-      if (!node || !card || !document.body.contains(card) || _inDetailPane(card)) {
+      // Clean up when: node missing, card missing, card left DOM, card is in
+      // the detail pane, OR the node is no longer inside the tracked card
+      // (e.g. LinkedIn re-rendered the card's inner DOM).
+      if (!node || !card || !document.body.contains(card) || _inDetailPane(card) || !card.contains(node)) {
         injectedJobChips.delete(key);
         _jobChipCards.delete(key);
         _jobChipApplyUrls.delete(key);
         try { if (node) node.remove(); } catch {}
+        // Also sweep any orphan chips that may have been left in the card DOM.
+        if (card && document.body.contains(card)) {
+          card.querySelectorAll(".lc-job-apply-row").forEach(n => { try { n.remove(); } catch {} });
+        }
       }
     }
   }
@@ -2285,13 +2292,12 @@
   }
 
   // Inject a select-tick + Apply chip onto every visible job card.
-  // Chips are mounted in a fixed-position portal on document.body, completely
-  // bypassing LinkedIn's overflow:hidden scroll containers. Positions are
-  // recalculated each animation frame via _syncJobChipPositions().
+  // Chips are injected INLINE directly into the card DOM (same pattern as the
+  // people-search Save chip) rather than a fixed-position portal — this is more
+  // reliable across LinkedIn's many card layouts and requires no coordinate sync.
   function decorateJobCards() {
     if (!_isJobsPage()) return;
     _gcJobChips();
-    const portal = _ensurePortalRoot();
     const cards = _jobCardEls();
     let created = 0;
     for (const card of cards) {
@@ -2299,18 +2305,21 @@
         const key = _jobCardKey(card);
         if (!key) continue;
 
-        // Keep our tracking pointed at the freshest card element for this key
-        // (LinkedIn recycles card nodes on scroll/pagination).
         _jobChipCards.set(key, card);
         _jobChipApplyUrls.set(key, _jobApplyUrlFromCard(card));
         if (injectedJobChips.has(key)) continue;
+        // Hard-remove any orphan chips already in the card DOM before injecting
+        // a fresh one — guards against LinkedIn re-rendering card internals while
+        // the map entry was still live.
+        card.querySelectorAll(".lc-job-apply-row").forEach(n => { try { n.remove(); } catch {} });
 
+        const isSelected = state.selectedJobUrls.has(key);
         const checkSpan = el(
           "span",
-          { class: "lc-inline-check", title: "Select this job for Apply All" },
-          state.selectedJobUrls.has(key) ? "☑" : "☐"
+          { class: "lc-inline-check" + (isSelected ? " lc-inline-check-on" : ""),
+            title: "Select this job for Apply All" },
+          isSelected ? "☑" : "☐"
         );
-        if (state.selectedJobUrls.has(key)) checkSpan.classList.add("lc-inline-check-on");
         checkSpan.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -2341,9 +2350,27 @@
           await applyAllJobs([key]);
         });
 
-        const wrap = el("div", { class: "lc-job-row" }, checkSpan, btn);
+        const wrap = el("div", { class: "lc-job-apply-row" }, checkSpan, btn);
         wrap.dataset.lcKey = key;
-        portal.appendChild(wrap);
+
+        // Best injection point (in priority order):
+        //   1. Just after the card's metadata/footer row (time posted + Easy Apply badge)
+        //   2. Before the Dismiss "X" button (always present, most reliable fallback)
+        //   3. Append to card as last resort
+        const metaRow = card.querySelector(
+          ".job-card-container__footer-wrapper, .job-card-list__footer-wrapper, " +
+          ".job-card-container__metadata-wrapper, .artdeco-entity-lockup__metadata, " +
+          "[class*='footer'], [class*='metadata'], .jobs-unified-top-card__job-insight"
+        );
+        const dismissBtn = card.querySelector("button[aria-label*='Dismiss' i]");
+        if (metaRow && metaRow.parentElement) {
+          metaRow.parentElement.insertBefore(wrap, metaRow.nextSibling || null);
+        } else if (dismissBtn && dismissBtn.parentElement) {
+          dismissBtn.parentElement.insertBefore(wrap, dismissBtn);
+        } else {
+          card.appendChild(wrap);
+        }
+
         injectedJobChips.set(key, wrap);
         created++;
       } catch (e) {
@@ -2351,57 +2378,8 @@
       }
     }
     if (cards.length || created) {
-      console.log(`[LeadCaptura] jobs: detected ${cards.length} cards, ${injectedJobChips.size} chips live (+${created} new)`);
+      console.log(`[LeadCaptura] jobs: ${cards.length} cards detected, ${injectedJobChips.size} chips live (+${created} new)`);
     }
-    // Structural probe rendered as an ON-PAGE badge (bottom-left) so it shows
-    // up in screenshots — plus the console. Only while detection looks wrong.
-    try {
-      let badge = document.getElementById("lc-jobs-diag");
-      if (cards.length < 2) {
-        const firstDismiss = document.querySelector("button[aria-label*='Dismiss' i]");
-        const probeCard = firstDismiss ? (firstDismiss.closest("li") || _climbToJobBox(firstDismiss)) : null;
-        const liJob = Array.from(document.querySelectorAll("li")).filter((li) =>
-          li.querySelector("a[href*='/jobs/']")
-        ).length;
-        const divJob = document.querySelectorAll(
-          "div[data-job-id], [data-occludable-job-id], div[class*='job-card']"
-        ).length;
-        const card1 =
-          (probeCard?.tagName || "-") +
-          "." +
-          ((probeCard?.className || "").toString().split(" ").filter(Boolean).slice(0, 2).join(".") || "-");
-        const txt =
-          "LC diag · cards=" + cards.length +
-          " dismiss=" + document.querySelectorAll("button[aria-label*='Dismiss' i]").length +
-          " view=" + document.querySelectorAll("a[href*='/jobs/view/']").length +
-          " cj=" + document.querySelectorAll("a[href*='currentJobId=']").length +
-          " liJob=" + liJob +
-          " divJob=" + divJob +
-          " card1=" + card1;
-        console.log("[LeadCaptura] jobs-diag " + txt);
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.id = "lc-jobs-diag";
-          badge.style.cssText =
-            "position:fixed;bottom:72px;left:8px;z-index:2147483647;background:#111;color:#0f0;" +
-            "font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;" +
-            "white-space:pre-wrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)";
-          document.documentElement.appendChild(badge);
-        }
-        badge.textContent = txt;
-      } else if (badge) {
-        badge.remove();
-      }
-    } catch {
-      /* diag is best-effort */
-    }
-    _bindJobChipScroll();
-    // Position immediately (synchronously) so chips are visible on this frame —
-    // not only on the next requestAnimationFrame, which can be delayed.
-    try { _syncJobChipPositions(); } catch {}
-    _scheduleJobChipSync();
-    // Surface the live count on the toolbar's Apply button the moment new
-    // chips appear, so the user can confirm detection at a glance.
     if (created > 0) { try { renderToolbar(); } catch {} }
   }
 
