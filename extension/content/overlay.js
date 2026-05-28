@@ -4007,21 +4007,45 @@
   // listeners rather than the button element itself.
   function _tryMainWorldClick(btn) {
     try {
-      const code =
-        "(function(){" +
-        "var all=Array.from(document.querySelectorAll('button,[role=\"button\"]'));" +
-        "var b=all.find(function(x){" +
-        "  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();" +
-        "  var a=(x.getAttribute('aria-label')||'').toLowerCase();" +
-        "  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';" +
-        "});" +
-        "if(!b)return;" +
-        "if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}" +
-        "HTMLElement.prototype.click.call(b);" +
-        "var f=b.closest('form');" +
-        "if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}" +
-        "b.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));" +
-        "})();";
+      // Inject into the page's MAIN world via a script tag. This is the only
+      // way to reach LinkedIn's React fiber tree from a content script, since
+      // React stores internal state as DOM properties set in the MAIN world.
+      const code = `(function(){
+var all=Array.from(document.querySelectorAll('button,[role="button"]'));
+var b=all.find(function(x){
+  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+  var a=(x.getAttribute('aria-label')||'').toLowerCase();
+  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';
+});
+if(!b)return;
+// React fiber traversal — call the onClick directly with a trusted-looking event.
+try{
+  var fk=Object.keys(b).find(function(k){return k.startsWith('__reactFiber$')||k.startsWith('__reactInternalInstance$');});
+  if(fk){
+    var fiber=b[fk];
+    for(var d=0;fiber&&d<12;fiber=fiber.return,d++){
+      var oc=fiber.memoizedProps&&fiber.memoizedProps.onClick||fiber.pendingProps&&fiber.pendingProps.onClick;
+      if(typeof oc==='function'){
+        oc({type:'click',bubbles:true,cancelable:true,isTrusted:true,target:b,currentTarget:b,
+            preventDefault:function(){},stopPropagation:function(){},nativeEvent:{isTrusted:true}});
+        break;
+      }
+    }
+  }
+}catch(e){}
+if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}
+HTMLElement.prototype.click.call(b);
+try{
+  var r=b.getBoundingClientRect();
+  var cx=Math.round(r.left+r.width/2),cy=Math.round(r.top+r.height/2);
+  var opts={bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy,button:0,buttons:1};
+  b.dispatchEvent(new MouseEvent('mousedown',opts));
+  b.dispatchEvent(new MouseEvent('mouseup',{...opts,buttons:0}));
+  b.dispatchEvent(new MouseEvent('click',{...opts,buttons:0}));
+}catch(e){}
+var f=b.closest('form');
+if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
+})();`;
       const s = document.createElement("script");
       s.textContent = code;
       (document.head || document.documentElement).appendChild(s);
@@ -4056,11 +4080,13 @@
     _inviteAutoBusy = true;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
-      await sleep(180);  // let the modal animation finish
+      // Wait for the modal animation to finish before clicking.
+      // LinkedIn's Ember/React mounts button handlers ~250-350ms after the dialog appears.
+      await sleep(350);
       btn = _findSendWithoutNoteButton();
       if (!btn || !_invitationModalOpen()) return;
 
-      // Immediately show the visual overlay so user can see what we're targeting
+      // Show visual highlight so the user can see which button we're targeting.
       if (!_inviteHighlightShown) {
         _inviteHighlightShown = true;
         _highlightSendBtn(btn);
@@ -4068,36 +4094,38 @@
       _lcToast("LeadCaptura: sending invitation…");
       console.log("[LeadCaptura] auto-confirm: found Send without a note", btn);
 
-      // First volley: all strategies at once
+      // Fire all click strategies simultaneously on the first attempt.
+      // The MAIN-world strategies (script injection + service worker executeScript)
+      // have React fiber access and are the most reliable for LinkedIn's buttons.
       _forceClick(btn);
       _tryMainWorldClick(btn);
       _tryServiceWorkerMainWorldClick();
 
-      // Aggressive retry: every 200ms for up to 5s (25 attempts)
-      for (let i = 0; i < 25; i++) {
-        await sleep(200);
+      // Aggressive retry loop: check every 300ms for up to 9s.
+      // MAIN world click fires every attempt; isolated-world forceClick fires
+      // on alternating attempts to avoid overwhelming LinkedIn's event queue.
+      for (let i = 0; i < 30; i++) {
+        await sleep(300);
         if (!_invitationModalOpen()) {
-          console.log("[LeadCaptura] auto-confirm: modal closed ✓");
+          console.log("[LeadCaptura] auto-confirm: modal closed ✓ (attempt", i + 1, ")");
           _lcToast("LeadCaptura: invitation sent ✓");
           _removeSendBtnHighlight();
           _inviteHighlightShown = false;
           return;
         }
         const stillBtn = _findSendWithoutNoteButton();
-        if (stillBtn && !stillBtn.disabled) {
-          _forceClick(stillBtn);
-          if (i % 4 === 0) _tryMainWorldClick(stillBtn);
-          if (i % 8 === 0) _tryServiceWorkerMainWorldClick();
-        }
+        if (!stillBtn || stillBtn.disabled) continue;
+        // Always fire the MAIN world path — it calls React fiber directly.
+        _tryMainWorldClick(stillBtn);
+        _tryServiceWorkerMainWorldClick();
+        // Also fire isolated-world click on every other attempt.
+        if (i % 2 === 0) _forceClick(stillBtn);
       }
 
-      // After 5s still stuck — show persistent "please click" prompt
+      // 9s elapsed — still open. Prompt the user.
       if (_invitationModalOpen()) {
-        _lcToast('⚠️ Please click the highlighted "Send without a note" button');
-        console.log("[LeadCaptura] auto-confirm: prompting user — auto-click blocked by LinkedIn");
-        // Keep the highlight active; the MutationObserver will catch the modal
-        // closing when the user manually clicks it, and the next iteration of
-        // this function will clean up.
+        _lcToast('⚠️ Please click "Send without a note" manually');
+        console.log("[LeadCaptura] auto-confirm: prompting user — click blocked by LinkedIn");
       }
     } catch (e) {
       console.warn("[LeadCaptura] auto-confirm error", e);

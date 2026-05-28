@@ -162,18 +162,58 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             return (
               /send without a note/i.test(t) ||
               /send without a note/i.test(a) ||
-              t === "send now" ||
-              t === "send"
+              t === "send now" || t === "send"
             );
           });
           if (!btn) return { found: false };
-          // jQuery path — LinkedIn still ships jQuery in many page bundles
+
+          // 1. React fiber traversal — most reliable from MAIN world because we
+          //    have direct access to LinkedIn's React instance. Walk the fiber tree
+          //    to find and call the onClick handler with a synthetic trusted event.
+          try {
+            const fKey = Object.keys(btn).find(
+              (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+            );
+            if (fKey) {
+              let fiber = btn[fKey];
+              for (let d = 0; fiber && d < 12; fiber = fiber.return, d++) {
+                const onClick = fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+                if (typeof onClick === "function") {
+                  onClick({
+                    type: "click", bubbles: true, cancelable: true,
+                    isTrusted: true, target: btn, currentTarget: btn,
+                    preventDefault() {}, stopPropagation() {},
+                    nativeEvent: { isTrusted: true },
+                  });
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+
+          // 2. jQuery — LinkedIn may still use it for some interactions.
           if (window.jQuery || window.$) {
             try { (window.jQuery || window.$)(btn).trigger("click"); } catch (_) {}
           }
-          // Direct prototype call — bypasses any "click" override on the element
+
+          // 3. Native prototype click — bypasses overridden element.click.
           HTMLElement.prototype.click.call(btn);
-          // Form submission fallback
+
+          // 4. Full pointer event sequence — closest to a real user click.
+          try {
+            const r = btn.getBoundingClientRect();
+            const cx = Math.round(r.left + r.width / 2);
+            const cy = Math.round(r.top + r.height / 2);
+            const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, buttons: 1 };
+            btn.dispatchEvent(new PointerEvent("pointerover", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+            btn.dispatchEvent(new PointerEvent("pointerdown", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+            btn.dispatchEvent(new MouseEvent("mousedown", opts));
+            btn.dispatchEvent(new PointerEvent("pointerup", { ...opts, pointerId: 1, isPrimary: true, pointerType: "mouse", buttons: 0 }));
+            btn.dispatchEvent(new MouseEvent("mouseup", { ...opts, buttons: 0 }));
+            btn.dispatchEvent(new MouseEvent("click", { ...opts, buttons: 0 }));
+          } catch (_) {}
+
+          // 5. Form submission fallback.
           const form = btn.closest("form");
           if (form) {
             try { form.requestSubmit(btn); } catch (_) {
