@@ -547,7 +547,64 @@
       }
     }
 
-    if (!connectBtn) return { ok: false, reason: "no_connect_button" };
+    if (!connectBtn) {
+      // ── Follow fallback ──────────────────────────────────────────────────
+      // Some profiles only offer "Follow" (e.g. LinkedIn celebrities, pages,
+      // or accounts where Connect has been withdrawn). If Connect is absent
+      // after exhausting all searches, find a Follow button and follow instead.
+      const _findFollow = () => {
+        for (const b of document.querySelectorAll("button, [role='button']")) {
+          if (b.closest("[role='menu'], .artdeco-dropdown__content")) continue;
+          const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+          const hay = txt + " " + aria;
+          if (!/\bfollow\b/.test(hay)) continue;
+          if (/\bfollowing\b|\bunfollow\b|\bcontact\b/.test(hay)) continue;
+          if (b.disabled) continue;
+          const cs = window.getComputedStyle(b);
+          if (cs.display === "none" || cs.visibility === "hidden") continue;
+          const rect = b.getBoundingClientRect();
+          if (rect.width < 1 || rect.height < 1) continue;
+          return b;
+        }
+        return null;
+      };
+
+      let followBtn = _findFollow();
+      if (!followBtn) {
+        for (let w = 0; w < 8 && !followBtn; w++) {
+          await sleep(500);
+          followBtn = _findFollow();
+        }
+      }
+
+      if (followBtn) {
+        console.log("[LeadCaptura] connect-queue: no Connect button — falling back to Follow");
+        try { followBtn.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch {}
+        await sleep(300 + Math.random() * 200);
+        if (simulateCursorMove) await simulateCursorMove(followBtn);
+        await sleep(80 + Math.random() * 120);
+        await dispatchHumanClick(followBtn);
+        // Wait for "Following" state to appear (no modal for Follow)
+        const _followingVisible = () => {
+          for (const b of document.querySelectorAll(
+            "main button, main a, .pvs-profile-actions button, [class*='profile-actions'] button"
+          )) {
+            const hay = ((b.textContent || "") + " " + (b.getAttribute("aria-label") || "")).toLowerCase();
+            if (/\bfollowing\b/.test(hay)) return true;
+          }
+          return false;
+        };
+        for (let w = 0; w < 10; w++) {
+          await sleep(300);
+          if (_followingVisible()) break;
+        }
+        console.log("[LeadCaptura] connect-queue: Follow clicked ✓");
+        return { ok: true, action: "followed" };
+      }
+
+      return { ok: false, reason: "no_connect_button" };
+    }
 
     // Skip if already pending / following
     const hay = (
@@ -718,22 +775,36 @@
 
     // Update persistent queue state
     const [, ...remaining] = queue.urls;
+    // "followed" counts as success — the user chose to engage with this profile
+    const resultStatus = result.ok
+      ? (result.action === "followed" ? "followed" : "sent")
+      : (result.reason || "failed");
     const updatedQueue = {
       ...queue,
       urls: remaining,
       sent: queue.sent + (result.ok ? 1 : 0),
       failed: queue.failed + (result.ok ? 0 : 1),
-      results: {
-        ...(queue.results || {}),
-        [queue.urls[0]]: result.ok ? "sent" : (result.reason || "failed"),
-      },
+      results: { ...(queue.results || {}), [queue.urls[0]]: resultStatus },
     };
+
+    // Sync result back to CRM if the lead was successfully acted on
+    if (result.ok) {
+      const profileUrl = queue.urls[0];
+      try {
+        const Api = globalThis.__lcApi;
+        if (Api?.connectResult) {
+          Api.connectResult(profileUrl, result.action === "followed" ? "followed" : "connected")
+            .catch(() => {});
+        }
+      } catch {}
+    }
 
     // Show brief progress toast on the profile page
     const done = updatedQueue.sent + updatedQueue.failed;
+    const actionLabel = result.action === "followed" ? "Followed" : "Connected";
     Overlay.toast?.(
       result.ok
-        ? `Connected ✓  ${done}/${updatedQueue.total}`
+        ? `${actionLabel} ✓  ${done}/${updatedQueue.total}`
         : `Skipped (${result.reason || "failed"})  ${done}/${updatedQueue.total}`,
       2800
     );

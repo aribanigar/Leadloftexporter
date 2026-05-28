@@ -101,6 +101,10 @@
     // AI answer (Gemini or Claude, per the user's chosen provider) for an
     // Easy-Apply form question. Resolves to { ok, answer } or { ok:false,
     // error }. Never throws — the caller treats any failure as "leave blank".
+    // Notify the CRM that a Connect or Follow action was completed for a profile.
+    // Called after each successful queue step so Pipeline/Prospecting stay in sync.
+    connectResult: (linkedin_url, action) =>
+      call("connectResult", { linkedin_url, action }),
     geminiAnswer: ({ question, kind, options }) =>
       new Promise((resolve) => {
         try {

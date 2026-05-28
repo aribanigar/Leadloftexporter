@@ -4163,9 +4163,12 @@ if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
   // a Connect All run. Updates chip states and resets the toolbar.
   function applyConnectResults(results) {
     for (const [url, status] of Object.entries(results || {})) {
-      if (status === "sent") {
+      if (status === "sent" || status === "connected") {
         _setChipState(url, "saved", "Connected ✓");
-        _markContacted(url); // record as contacted
+        _markContacted(url);
+      } else if (status === "followed") {
+        _setChipState(url, "saved", "Followed ✓");
+        _markContacted(url);
       } else if (
         status === "already_connected" ||
         status === "already_pending" ||

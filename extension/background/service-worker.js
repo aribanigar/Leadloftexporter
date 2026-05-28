@@ -135,6 +135,8 @@ const handlers = {
   nextJobs: ({ limit }) => fetchJson(`/extension/jobs/next?limit=${limit || 1}`),
   submitJobResult: ({ jobId, result }) =>
     fetchJson(`/extension/jobs/${jobId}/result`, { method: "POST", body: result }),
+  connectResult: ({ linkedin_url, action }) =>
+    fetchJson("/extension/connect-result", { method: "POST", body: { linkedin_url, action } }),
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
