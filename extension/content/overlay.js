@@ -2567,7 +2567,9 @@
   // ---- Easy Apply modal driving ----
 
   function _easyApplyModal() {
-    return (
+    // 1. Dialog/modal overlay — the popup form on search-results and the
+    //    inline job-view modal.
+    const dialog =
       document.querySelector("div.jobs-easy-apply-modal") ||
       document.querySelector("div[data-test-modal][role='dialog']") ||
       document.querySelector(".artdeco-modal[role='dialog']") ||
@@ -2576,9 +2578,29 @@
           /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
           /easy apply|application/i.test(d.getAttribute("aria-labelledby") ? (document.getElementById(d.getAttribute("aria-labelledby"))?.innerText || "") : "") ||
           d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form")
-      ) ||
-      null
+      );
+    if (dialog) return dialog;
+
+    // 2. Full-page Easy Apply (URL = /jobs/view/<id>/apply/). The form is
+    //    rendered inline, NOT inside a [role='dialog'], so the checks above miss
+    //    it and the stepper has nothing to click. Anchor on the apply content
+    //    container's nearest layout ancestor so _modalActionButton can still
+    //    reach the Next/Submit footer (which is a sibling of the form).
+    const content = document.querySelector(
+      ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
+      ".job-details-easy-apply-content, form.jobs-easy-apply-form-element"
     );
+    if (content) {
+      return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
+    }
+    // 3. Last resort: on an /apply/ path with a visible Next/Submit + progress
+    //    bar, treat the main content region as the form container.
+    if (/\/apply\b/.test(location.pathname) &&
+        (document.querySelector("progress") ||
+         document.querySelector("button[aria-label*='Submit application' i], button[aria-label*='Continue to next' i]"))) {
+      return document.querySelector("main") || document.body;
+    }
+    return null;
   }
 
   function _challengeOnPage() {
@@ -3068,7 +3090,10 @@
       { timeout: 10000 }
     );
     modal = _easyApplyModal() || modal;
-    if (!modal) return { ok: false, reason: "modal_not_found" };
+    if (!modal) {
+      console.log("[LeadCaptura] easy-apply: form/modal not found after click — skipping job");
+      return { ok: false, reason: "modal_not_found" };
+    }
     // Extra settle time — LinkedIn animates the modal in.
     await sleep(600 + Math.random() * 400);
 
@@ -3089,7 +3114,9 @@
       await sleep(500 + Math.random() * 500);
 
       const action = _modalActionButton(modal);
+      console.log(`[LeadCaptura] easy-apply step ${step + 1}: page="${_modalHeading(modal) || "?"}" progress=${_modalProgress(modal)}% action=${action ? action.type : "NONE"}`);
       if (!action) {
+        console.log("[LeadCaptura] easy-apply: no Next/Submit button found on this page — discarding");
         await _dismissEasyApplyModal();
         return { ok: false, reason: "no_action_button" };
       }
