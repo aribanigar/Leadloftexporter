@@ -2477,33 +2477,11 @@
         // the map entry was still live.
         card.querySelectorAll(".lc-job-apply-row").forEach(n => { try { n.remove(); } catch {} });
 
-        const isSelected = state.selectedJobUrls.has(key);
-        const checkSpan = el(
-          "span",
-          { class: "lc-inline-check" + (isSelected ? " lc-inline-check-on" : ""),
-            title: "Select this job for Apply All" },
-          isSelected ? "☑" : "☐"
-        );
-        checkSpan.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (state.selectedJobUrls.has(key)) {
-            state.selectedJobUrls.delete(key);
-            checkSpan.textContent = "☐";
-            checkSpan.classList.remove("lc-inline-check-on");
-          } else {
-            state.selectedJobUrls.add(key);
-            checkSpan.textContent = "☑";
-            checkSpan.classList.add("lc-inline-check-on");
-          }
-          refreshSelectAllHeader();
-          renderToolbar();
-        });
-
         const textSpan = el("span", { class: "lc-inline-save-text" }, "Auto Apply");
         const btn = el(
           "button",
-          { class: "lc-inline-save", type: "button", title: "Auto-apply to this job" },
+          { class: "lc-inline-save", type: "button",
+            title: "Auto-apply to this job — one click runs every page of the application and submits" },
           textSpan
         );
         btn.dataset.state = "ready";
@@ -2514,7 +2492,10 @@
           await applyAllJobs([key]);
         });
 
-        const wrap = el("div", { class: "lc-job-apply-row" }, checkSpan, btn);
+        // One button per card — a single click fully automates the whole
+        // multi-page Easy Apply flow for this job (no checkbox, no per-page
+        // re-clicks). Bulk selection lives in the bottom toolbar's Apply All.
+        const wrap = el("div", { class: "lc-job-apply-row" }, btn);
         wrap.dataset.lcKey = key;
 
         // Best injection point (in priority order):
