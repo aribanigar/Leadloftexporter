@@ -138,29 +138,45 @@
       if (rect.width < 1 || rect.height < 1) continue;
       const cs = getComputedStyle(d);
       if (cs.display === "none" || cs.visibility === "hidden") continue;
-      if (
-        /add a note to your invitation|send without a note|personalize your invitation/i.test(
-          d.textContent || ""
-        )
-      )
-        return d;
+      const txt = d.textContent || "";
+      // Must contain invite-specific phrases
+      if (!/add a note|send without a note|personalize your invitation|note.*optional/i.test(txt))
+        continue;
+      // Must NOT be LinkedIn's "Send [Name]'s Post" share/DM modal
+      const heading = d.querySelector("h2, h3, h4, [role='heading']");
+      if (heading && /send .+['']s post/i.test(heading.textContent || "")) continue;
+      return d;
     }
     return null;
   }
 
   function _ccFindSendBtn() {
-    // Include <a> — LinkedIn renders some action controls as styled anchors.
-    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
+    // Prefer searching inside the confirmed invite modal so we never
+    // accidentally match the "Send" button in LinkedIn's "Send Post" share
+    // modal (which also appears on profile pages and caused send_failed).
+    const modal = _ccFindInviteModal();
+    const scope = modal || document;
+    const all = Array.from(scope.querySelectorAll("button, [role='button'], a"));
     const label = (b) => ({
       t: (b.textContent || "").replace(/\s+/g, " ").trim(),
       a: b.getAttribute("aria-label") || "",
     });
-    const tests = [
-      (s) => /^send without a note$/i.test(s),
-      (s) => /\bsend without a note\b/i.test(s),
-      (s) => /^send now$/i.test(s),
-      (s) => /^send( invitation)?$/i.test(s),
-    ];
+    // When scoped to the confirmed invite modal, bare "Send"/"Send invitation"
+    // is safe. When falling back to the whole document, omit bare "Send" —
+    // it matches the Share modal's submit button and triggers a false positive.
+    const tests = modal
+      ? [
+          (s) => /^send without a note$/i.test(s),
+          (s) => /\bsend without a note\b/i.test(s),
+          (s) => /^send now$/i.test(s),
+          (s) => /^send( invitation)?$/i.test(s),
+        ]
+      : [
+          (s) => /^send without a note$/i.test(s),
+          (s) => /\bsend without a note\b/i.test(s),
+          (s) => /^send now$/i.test(s),
+          // Bare "Send" intentionally omitted — matches LinkedIn's Share modal
+        ];
     for (const test of tests) {
       const matches = all.filter((b) => {
         const { t, a } = label(b);
@@ -177,11 +193,24 @@
   }
 
   function _ccInviteModalOpen() {
+    // Primary: the invite modal itself is visible.
     if (_ccFindInviteModal()) return true;
-    const b = _ccFindSendBtn();
-    if (!b) return false;
-    const r = b.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
+    // Fallback: a specific "Send without a note" or "Send now" button is visible.
+    // Intentionally excludes bare "Send" — that phrase matches LinkedIn's
+    // "Send [Name]'s Post" share modal submit button and causes false positives.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
+    for (const b of all) {
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (
+        /^send without a note$/i.test(t) || /^send without a note$/i.test(a) ||
+        /^send now$/i.test(t) || /^send now$/i.test(a)
+      ) {
+        const r = b.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return true;
+      }
+    }
+    return false;
   }
 
   // Fire a full pointer/mouse sequence on one element at its centre.
@@ -381,17 +410,35 @@
     console.log("[LeadCaptura] connect-queue: clicking Connect on", location.pathname,
       connectBtn.tagName === "A" ? "(anchor)" : "(button)");
 
+    // Scroll the button to the centre of the viewport so its bounding rect
+    // gives valid in-viewport coordinates for the pointer events.
+    try { connectBtn.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch {}
+    await sleep(300 + Math.random() * 200);
+
     // Cursor movement + dwell before click (anti-bot)
     if (simulateCursorMove) await simulateCursorMove(connectBtn);
     await sleep(80 + Math.random() * 120);
 
-    // Dispatch the click directly — no custom preventDefault interceptors.
-    // LinkedIn's own delegated handler calls event.preventDefault() itself
-    // to cancel navigation and open the invite modal. Adding our own
-    // capturing-phase preventDefault before LinkedIn's handler runs changes
-    // event.defaultPrevented state and causes LinkedIn to route to a
-    // different action (e.g. the "Share post" modal). Let LinkedIn handle it.
-    await dispatchHumanClick(connectBtn);
+    if (connectBtn.tagName === "A") {
+      // Temporarily remove the href before clicking. When the href is present
+      // (/preload/custom-invite/…), LinkedIn's SPA router intercepts the click
+      // and — for untrusted synthetic events — routes to its Share modal rather
+      // than the invite modal. Without the href, LinkedIn's handler falls back to
+      // reading data-* attributes which correctly opens the "Add a note?" invite
+      // modal. (This is the v1.0.80 approach that proved it works; the only
+      // v1.0.80 failure was a 10s modal wait that was too short — now 20s.)
+      const savedHref = connectBtn.getAttribute("href");
+      if (savedHref) connectBtn.removeAttribute("href");
+      await dispatchHumanClick(connectBtn);
+      // Restore href so LinkedIn's UI remains consistent after the click.
+      if (savedHref) {
+        setTimeout(() => {
+          try { connectBtn.setAttribute("href", savedHref); } catch {}
+        }, 600);
+      }
+    } else {
+      await dispatchHumanClick(connectBtn);
+    }
 
     // Wait for invitation modal (up to ~20s — slow/janky profiles render the
     // modal late, and we never want to give up before it actually appears).
