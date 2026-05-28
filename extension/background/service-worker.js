@@ -167,9 +167,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           });
           if (!btn) return { found: false };
 
-          // 1. React fiber traversal — most reliable from MAIN world because we
-          //    have direct access to LinkedIn's React instance. Walk the fiber tree
-          //    to find and call the onClick handler with a synthetic trusted event.
+          // 1. React fiber traversal — defer via queueMicrotask so React's
+          //    concurrent renderer doesn't throw error #418 ("component
+          //    suspended while responding to synchronous input").
           try {
             const fKey = Object.keys(btn).find(
               (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
@@ -179,11 +179,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               for (let d = 0; fiber && d < 12; fiber = fiber.return, d++) {
                 const onClick = fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
                 if (typeof onClick === "function") {
-                  onClick({
-                    type: "click", bubbles: true, cancelable: true,
-                    isTrusted: true, target: btn, currentTarget: btn,
-                    preventDefault() {}, stopPropagation() {},
-                    nativeEvent: { isTrusted: true },
+                  const _oc = onClick, _btn = btn;
+                  queueMicrotask(() => {
+                    try {
+                      _oc({
+                        type: "click", bubbles: true, cancelable: true,
+                        isTrusted: true, target: _btn, currentTarget: _btn,
+                        preventDefault() {}, stopPropagation() {},
+                        nativeEvent: { isTrusted: true },
+                      });
+                    } catch (_) {}
                   });
                   break;
                 }

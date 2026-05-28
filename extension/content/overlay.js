@@ -4018,7 +4018,9 @@ var b=all.find(function(x){
   return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';
 });
 if(!b)return;
-// React fiber traversal — call the onClick directly with a trusted-looking event.
+// React fiber traversal — defer via queueMicrotask so React's concurrent
+// renderer processes the update asynchronously (avoids error #418 "component
+// suspended while responding to synchronous input").
 try{
   var fk=Object.keys(b).find(function(k){return k.startsWith('__reactFiber$')||k.startsWith('__reactInternalInstance$');});
   if(fk){
@@ -4026,8 +4028,11 @@ try{
     for(var d=0;fiber&&d<12;fiber=fiber.return,d++){
       var oc=fiber.memoizedProps&&fiber.memoizedProps.onClick||fiber.pendingProps&&fiber.pendingProps.onClick;
       if(typeof oc==='function'){
-        oc({type:'click',bubbles:true,cancelable:true,isTrusted:true,target:b,currentTarget:b,
-            preventDefault:function(){},stopPropagation:function(){},nativeEvent:{isTrusted:true}});
+        var _oc=oc,_b=b;
+        queueMicrotask(function(){try{_oc({type:'click',bubbles:true,cancelable:true,
+            isTrusted:true,target:_b,currentTarget:_b,
+            preventDefault:function(){},stopPropagation:function(){},
+            nativeEvent:{isTrusted:true}});}catch(e){}});
         break;
       }
     }
@@ -4135,12 +4140,22 @@ if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
   }
 
   function _startInviteAutoConfirm() {
+    // Debounce the MutationObserver — LinkedIn's React app fires hundreds of
+    // DOM mutations per second on a search page. Without debouncing, every
+    // mutation runs a full button scan. A 120ms debounce keeps response time
+    // under 200ms while eliminating the CPU spike.
+    let _mutDebounce = null;
+    const _debouncedAutoConfirm = () => {
+      if (_mutDebounce) return;
+      _mutDebounce = setTimeout(() => { _mutDebounce = null; _autoConfirmInviteModal(); }, 120);
+    };
     try {
-      const obs = new MutationObserver(() => { _autoConfirmInviteModal(); });
+      const obs = new MutationObserver(_debouncedAutoConfirm);
       obs.observe(document.documentElement, { childList: true, subtree: true });
     } catch {}
-    // Faster safety-net poll (200ms vs old 600ms) to catch any missed mutations.
-    setInterval(_autoConfirmInviteModal, 200);
+    // Safety-net poll every 400ms (was 200ms — the debounced observer already
+    // catches real-time modal appearances; the poll is a fallback for missed mutations).
+    setInterval(_autoConfirmInviteModal, 400);
   }
   _startInviteAutoConfirm();
 
