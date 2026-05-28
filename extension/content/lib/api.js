@@ -62,19 +62,19 @@
           const elapsed = Date.now() - t0;
           if (chrome.runtime.lastError) {
             const err = new Error(_decorate(chrome.runtime.lastError.message, action));
-            console.warn(`[LeadCaptura] api.call lastError action=${action} elapsed=${elapsed}ms raw="${chrome.runtime.lastError.message}" decorated="${err.message}"`);
+            console.log(`[LeadCaptura] api.call lastError action=${action} elapsed=${elapsed}ms raw="${chrome.runtime.lastError.message}" decorated="${err.message}"`);
             reject(err);
             return;
           }
           if (!response) {
             const err = new Error(_decorate("No response from background", action));
-            console.warn(`[LeadCaptura] api.call no-response action=${action} elapsed=${elapsed}ms`);
+            console.log(`[LeadCaptura] api.call no-response action=${action} elapsed=${elapsed}ms`);
             reject(err);
             return;
           }
           if (response.error) {
             const err = new Error(_decorate(response.error, action));
-            console.warn(`[LeadCaptura] api.call backend-error action=${action} elapsed=${elapsed}ms raw="${typeof response.error === "string" ? response.error : JSON.stringify(response.error)}" decorated="${err.message}"`);
+            console.log(`[LeadCaptura] api.call backend-error action=${action} elapsed=${elapsed}ms raw="${typeof response.error === "string" ? response.error : JSON.stringify(response.error)}" decorated="${err.message}"`);
             reject(err);
             return;
           }
@@ -83,7 +83,7 @@
         });
       } catch (e) {
         const err = new Error(_decorate(e?.message || String(e), action));
-        console.warn(`[LeadCaptura] api.call threw action=${action} raw="${e?.message || String(e)}" decorated="${err.message}"`);
+        console.log(`[LeadCaptura] api.call threw action=${action} raw="${e?.message || String(e)}" decorated="${err.message}"`);
         reject(err);
       }
     });

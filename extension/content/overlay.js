@@ -132,7 +132,7 @@
       if (state.options?.user) state.selection.userId = state.options.user.id;
       state.connectError = null;
     } catch (e) {
-      console.error("[LeadCaptura] ensureOptions failed", e?.message);
+      console.log("[LeadCaptura] ensureOptions failed:", e?.message);
       state.options = null;
       state.connectError = e?.message || String(e);
     }
