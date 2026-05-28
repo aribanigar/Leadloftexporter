@@ -62,6 +62,7 @@
     applyCancel: false,
     applyProgress: null,
     avoidDuplicates: true, // "Avoid Duplicate Outreach" toggle
+    toolbarCollapsed: false, // pill ↑/↓ collapse state
   };
 
   // ── Contacted-URL registry ──────────────────────────────────────────────────
@@ -951,19 +952,36 @@
   async function renderToolbar() {
     const root = await mountToolbar();
     if (!root) return;
+
+    // Always-visible branded pill handle — clicking toggles the body open/closed.
+    const _toggleToolbar = () => {
+      state.toolbarCollapsed = !state.toolbarCollapsed;
+      renderToolbar();
+    };
+    const _makeHandle = () =>
+      el("div", { class: "lc-toolbar-handle", onclick: _toggleToolbar },
+        el("span", { class: "lc-logo" }, "L"),
+        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-toolbar-arrow" }, state.toolbarCollapsed ? "↑" : "↓")
+      );
+
     const opts = await ensureOptions();
+
+    root.textContent = "";
+    root.classList.toggle("lc-collapsed", !!state.toolbarCollapsed);
+
     if (!opts) {
-      root.textContent = "";
       root.append(
-        el("div", { class: "lc-toolbar-inner" },
-          el("span", { class: "lc-logo" }, "L"),
-          el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
-          el("span", { class: "lc-flex" }),
-          el("span", { class: "lc-muted" }, "Not connected — "),
-          el(
-            "button",
-            { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => openOptions() },
-            "Connect workspace"
+        _makeHandle(),
+        el("div", { class: "lc-toolbar-body" },
+          el("div", { class: "lc-toolbar-inner" },
+            el("span", { class: "lc-flex" }),
+            el("span", { class: "lc-muted" }, "Not connected — "),
+            el(
+              "button",
+              { class: "lc-btn lc-btn-primary lc-btn-sm", onclick: () => openOptions() },
+              "Connect workspace"
+            )
           )
         )
       );
@@ -975,183 +993,173 @@
     const userName =
       (opts.users.find((u) => u.id === state.selection.userId) || { name: "Me" }).name;
 
-    root.textContent = "";
     root.append(
-      el(
-        "div",
-        { class: "lc-toolbar-inner" },
-        el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
-        // Unread LinkedIn message count badge (data from interceptor.js)
-        (() => {
-          const counts = window.__lcMsgCounts || {};
-          const unread = (counts.INBOX || 0) + (counts.MESSAGE_REQUEST_PENDING || 0);
-          if (!unread) return el("span");
-          const badge = el("span", {
-            class: "lc-msg-badge",
-            title: `${unread} unread LinkedIn message${unread > 1 ? "s" : ""}`,
-            onclick: () => { location.href = "https://www.linkedin.com/messaging/"; },
-          }, `✉ ${unread}`);
-          return badge;
-        })(),
-        dropdown("Segment", segmentName, opts.segments, (s) => {
-          state.selection.segmentId = s.id;
-          renderToolbar();
-        }),
-        dropdown("Playbook", playbookName, opts.playbooks, (p) => {
-          state.selection.playbookId = p.id;
-          renderToolbar();
-        }),
-        dropdown(
-          "User",
-          userName,
-          opts.users.map((u) => ({ id: u.id, name: u.name })),
-          (u) => {
-            state.selection.userId = u.id;
-            renderToolbar();
-          },
-          { includeNone: false }
-        ),
-        // Select-all toggle: when no cards are selected, click ticks every
-        // visible card; when ANY are selected, click clears the set. The label
-        // flips so the user always sees the action that'll happen next. On Jobs
-        // pages it operates on the job selection instead of the people set.
-        (state.bulkActive || state.connectActive || state.applyActive)
-          ? null
-          : el(
-              "button",
-              {
-                class: "lc-btn lc-btn-ghost",
-                onclick: toggleSelectAllCurrent,
-                title: _isJobsPage()
-                  ? "Tick every visible job so Apply All processes them"
-                  : "Tick every visible /in/ card so Save All processes them",
-              },
-              (() => {
-                const n = _isJobsPage()
-                  ? state.selectedJobUrls.size
-                  : state.selectedUrls.size;
-                return n > 0 ? `Clear (${n})` : "Select All";
-              })()
-            ),
-        el("span", { class: "lc-flex" }),
-        // Realtime bulk progress: shown only during a Save-All run. Always
-        // names the profile currently being scraped so the user can verify
-        // automation is alive and on-track. The hidden .lc-status-slot child
-        // keeps flashStatus() working (e.g. "Stopping after current profile…"
-        // when the user clicks Stop mid-run).
-        (state.bulkActive && state.bulkProgress) ||
-        (state.connectActive && state.connectProgress) ||
-        (state.applyActive && state.applyProgress)
-          ? el(
-              "div",
-              { class: "lc-bulk-progress" },
-              el("span", { class: "lc-bulk-spinner" }, "⏳"),
-              el(
-                "span",
-                { class: "lc-bulk-progress-text" },
-                (() => {
-                  const p =
-                    state.applyProgress ||
-                    state.connectProgress ||
-                    state.bulkProgress;
-                  const verb = state.applyActive
-                    ? "Applying"
-                    : state.connectActive
-                    ? "Connecting"
-                    : "Enriching";
-                  return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
-                })()
-              ),
-              el("span", { class: "lc-status-slot lc-status-slot-inline" })
-            )
-          : el("div", { class: "lc-status-slot" }),
-        // Connect Selected — people pages only, hidden during any active run.
-        _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
-          ? null
-          : el(
-              "button",
-              {
-                class: "lc-btn lc-btn-connect",
-                onclick: connectAllVisible,
-                title:
-                  "Send connection requests to selected (or all visible) profiles. Auto-advances pages, skips already-sent/connected. Human-paced; LinkedIn weekly invite caps still apply.",
-              },
-              state.selectedUrls.size > 0
-                ? `Connect ${state.selectedUrls.size}`
-                : "Connect All"
-            ),
-        // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
-        // pages, Save All Leads on people pages.
-        state.bulkActive || state.connectActive || state.applyActive
-          ? el(
-              "button",
-              {
-                class: "lc-btn lc-btn-stop",
-                onclick: () => {
-                  if (state.bulkActive) state.bulkCancel = true;
-                  if (state.connectActive) state.connectCancel = true;
-                  if (state.applyActive) state.applyCancel = true;
-                  flashStatus("Stopping after current item…");
-                },
-              },
-              "Stop"
-            )
-          : _isJobsPage()
-          ? el(
-              "button",
-              {
-                class: "lc-btn lc-btn-primary",
-                onclick: applyAllJobs,
-                title:
-                  "Auto-apply to selected (or all visible) Easy Apply jobs. Human-paced; skips external-apply jobs, already-applied jobs, and any that need extra screening answers.",
-              },
-              state.selectedJobUrls.size > 0
-                ? `Apply ${state.selectedJobUrls.size}`
-                : `Apply All (${_allJobUrls().length})`
-            )
-          : el(
-              "button",
-              { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
-              state.selectedUrls.size > 0
-                ? `Save ${state.selectedUrls.size} Selected`
-                : "Save All Leads"
-            ),
-        el(
-          "button",
-          {
-            class: "lc-icon-btn lc-icon-btn-light",
-            onclick: (e) => {
-              e.stopPropagation();
-              const m = root.querySelector(".lc-overflow");
-              m.classList.toggle("lc-open");
-            },
-            title: "More",
-          },
-          "⋮"
-        ),
+      _makeHandle(),
+      el("div", { class: "lc-toolbar-body" },
         el(
           "div",
-          { class: "lc-overflow lc-dd-menu" },
+          { class: "lc-toolbar-inner" },
+          el("span", { class: "lc-tb-version" }, `v${_LC_VERSION}`),
+          // Unread LinkedIn message count badge (data from interceptor.js)
+          (() => {
+            const counts = window.__lcMsgCounts || {};
+            const unread = (counts.INBOX || 0) + (counts.MESSAGE_REQUEST_PENDING || 0);
+            if (!unread) return el("span");
+            const badge = el("span", {
+              class: "lc-msg-badge",
+              title: `${unread} unread LinkedIn message${unread > 1 ? "s" : ""}`,
+              onclick: () => { location.href = "https://www.linkedin.com/messaging/"; },
+            }, `✉ ${unread}`);
+            return badge;
+          })(),
+          dropdown("Segment", segmentName, opts.segments, (s) => {
+            state.selection.segmentId = s.id;
+            renderToolbar();
+          }),
+          dropdown("Playbook", playbookName, opts.playbooks, (p) => {
+            state.selection.playbookId = p.id;
+            renderToolbar();
+          }),
+          dropdown(
+            "User",
+            userName,
+            opts.users.map((u) => ({ id: u.id, name: u.name })),
+            (u) => {
+              state.selection.userId = u.id;
+              renderToolbar();
+            },
+            { includeNone: false }
+          ),
+          // Select-all toggle: when no cards are selected, click ticks every
+          // visible card; when ANY are selected, click clears the set. The label
+          // flips so the user always sees the action that'll happen next. On Jobs
+          // pages it operates on the job selection instead of the people set.
+          (state.bulkActive || state.connectActive || state.applyActive)
+            ? null
+            : el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-ghost",
+                  onclick: toggleSelectAllCurrent,
+                  title: _isJobsPage()
+                    ? "Tick every visible job so Apply All processes them"
+                    : "Tick every visible /in/ card so Save All processes them",
+                },
+                (() => {
+                  const n = _isJobsPage()
+                    ? state.selectedJobUrls.size
+                    : state.selectedUrls.size;
+                  return n > 0 ? `Clear (${n})` : "Select All";
+                })()
+              ),
+          el("span", { class: "lc-flex" }),
+          // Realtime bulk progress: shown only during a Save-All run. Always
+          // names the profile currently being scraped so the user can verify
+          // automation is alive and on-track. The hidden .lc-status-slot child
+          // keeps flashStatus() working (e.g. "Stopping after current profile…"
+          // when the user clicks Stop mid-run).
+          (state.bulkActive && state.bulkProgress) ||
+          (state.connectActive && state.connectProgress) ||
+          (state.applyActive && state.applyProgress)
+            ? el(
+                "div",
+                { class: "lc-bulk-progress" },
+                el("span", { class: "lc-bulk-spinner" }, "⏳"),
+                el(
+                  "span",
+                  { class: "lc-bulk-progress-text" },
+                  (() => {
+                    const p =
+                      state.applyProgress ||
+                      state.connectProgress ||
+                      state.bulkProgress;
+                    const verb = state.applyActive
+                      ? "Applying"
+                      : state.connectActive
+                      ? "Connecting"
+                      : "Enriching";
+                    return `${verb} ${p.current} of ${p.total}: ${p.name}…`;
+                  })()
+                ),
+                el("span", { class: "lc-status-slot lc-status-slot-inline" })
+              )
+            : el("div", { class: "lc-status-slot" }),
+          // Connect Selected — people pages only, hidden during any active run.
+          _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
+            ? null
+            : el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-connect",
+                  onclick: connectAllVisible,
+                  title:
+                    "Send connection requests to selected (or all visible) profiles. Auto-advances pages, skips already-sent/connected. Human-paced; LinkedIn weekly invite caps still apply.",
+                },
+                state.selectedUrls.size > 0
+                  ? `Connect ${state.selectedUrls.size}`
+                  : "Connect All"
+              ),
+          // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
+          // pages, Save All Leads on people pages.
+          state.bulkActive || state.connectActive || state.applyActive
+            ? el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-stop",
+                  onclick: () => {
+                    if (state.bulkActive) state.bulkCancel = true;
+                    if (state.connectActive) state.connectCancel = true;
+                    if (state.applyActive) state.applyCancel = true;
+                    flashStatus("Stopping after current item…");
+                  },
+                },
+                "Stop"
+              )
+            : _isJobsPage()
+            ? el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-primary",
+                  onclick: applyAllJobs,
+                  title:
+                    "Auto-apply to selected (or all visible) Easy Apply jobs. Human-paced; skips external-apply jobs, already-applied jobs, and any that need extra screening answers.",
+                },
+                state.selectedJobUrls.size > 0
+                  ? `Apply ${state.selectedJobUrls.size}`
+                  : `Apply All (${_allJobUrls().length})`
+              )
+            : el(
+                "button",
+                { class: "lc-btn lc-btn-primary", onclick: saveAllVisible },
+                state.selectedUrls.size > 0
+                  ? `Save ${state.selectedUrls.size} Selected`
+                  : "Save All Leads"
+              ),
           el(
             "button",
             {
-              class: "lc-dd-item",
-              type: "button",
-              onclick: () => openOptions(),
+              class: "lc-icon-btn lc-icon-btn-light",
+              onclick: (e) => {
+                e.stopPropagation();
+                const m = root.querySelector(".lc-overflow");
+                m.classList.toggle("lc-open");
+              },
+              title: "More",
             },
-            "Settings"
+            "⋮"
           ),
           el(
-            "button",
-            {
-              class: "lc-dd-item",
-              type: "button",
-              onclick: () => {
-                state.toolbar.classList.toggle("lc-collapsed");
+            "div",
+            { class: "lc-overflow lc-dd-menu" },
+            el(
+              "button",
+              {
+                class: "lc-dd-item",
+                type: "button",
+                onclick: () => openOptions(),
               },
-            },
-            "Hide toolbar"
+              "Settings"
+            )
           )
         )
       )

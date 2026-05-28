@@ -87,17 +87,52 @@
   position: fixed;
   left: 0; right: 0;
   bottom: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
   color: #fff;
-  padding: 10px 16px 12px;
+  padding: 0;
   box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.18);
 }
-#lc-toolbar.lc-collapsed { transform: translateY(calc(100% - 24px)); }
+/* Collapsed: shrink to just the branded pill at the bottom-left */
+#lc-toolbar.lc-collapsed { width: fit-content; right: auto; border-radius: 6px 6px 0 0; }
+#lc-toolbar.lc-collapsed .lc-toolbar-body { display: none !important; }
+
+/* Always-visible handle — the branded "LeadCaptura ↑/↓" pill */
+.lc-toolbar-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+.lc-toolbar-handle:hover { background: rgba(255,255,255,0.06); }
+
+/* Expandable body — all dropdowns and action buttons */
+.lc-toolbar-body {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid rgba(255,255,255,0.10);
+}
+
+.lc-toolbar-arrow {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.lc-toolbar-handle:hover .lc-toolbar-arrow { opacity: 1; }
+
 .lc-toolbar-inner {
   display: flex; align-items: center; gap: 10px;
   max-width: 1400px; margin: 0 auto;
+  padding: 10px 16px 12px;
 }
 .lc-tb-title { font-weight: 600; font-size: 13px; letter-spacing: 0.01em; }
+.lc-tb-version { font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 0.01em; }
 
 /* ------------ Dropdowns inside the toolbar ------------ */
 
