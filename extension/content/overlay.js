@@ -823,7 +823,7 @@
   function _allChipUrls() {
     const urls = [];
     for (const [url, wrap] of injectedSaves.entries()) {
-      if (url && url.includes("/in/") && wrap && document.body.contains(wrap)) {
+      if (url && (url.includes("/in/") || url.includes("/sales/lead/")) && wrap && document.body.contains(wrap)) {
         urls.push(url);
       }
     }
@@ -1235,7 +1235,7 @@
     try { decorateSearchCards(); } catch {}
     let urls =
       state.selectedUrls.size > 0
-        ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
+        ? Array.from(state.selectedUrls).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
         : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
@@ -1806,7 +1806,7 @@
       page1Selection
         ? Array.from(page1Selection)
         : _allChipUrls()
-    ).filter((u) => u && u.includes("/in/"));
+    ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
 
     if (!urls.length) {
       flashStatus("No profiles selected to connect with", "warn");
