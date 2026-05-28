@@ -2614,21 +2614,38 @@
 
   // The job detail's apply control + its classification.
   function _classifyJobDetail() {
-    // Helper: text-based Easy Apply check on any button.
-    const _isEasyApplyBtn = (b) => {
+    const _hasLinkedInIcon = (b) =>
+      !!b.querySelector(
+        "li-icon[type*='linkedin' i], svg[data-test-icon*='linkedin' i], " +
+        "[data-test-icon*='linkedin' i], [class*='linkedin-bug'], use[href*='linkedin' i]"
+      );
+    const _isExternalBtn = (b) => {
       const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
       const a = b.getAttribute("aria-label") || "";
-      return /easy apply/i.test(t) || /easy apply/i.test(a);
+      return /company website|apply on company website|apply externally|on company site/i.test(t) ||
+             /company website|apply externally/i.test(a);
+    };
+    // In-app apply button. Handles BOTH the old "Easy Apply" label and the new
+    // (2026) LinkedIn rename where the in-app button is just "Apply" /
+    // "LinkedIn Apply". A plain "Apply" only counts as in-app when it's the real
+    // apply control (class jobs-apply-button, inside a jobs-apply container, or
+    // carrying the LinkedIn bug icon) so we never match the "Apply" filter chip.
+    const _isEasyApplyBtn = (b) => {
+      if (_isExternalBtn(b)) return false;
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (/easy apply|linkedin apply/i.test(t) || /easy apply|linkedin apply/i.test(a)) return true;
+      const isApplyWord = /^apply$/i.test(t) || /^apply\b/i.test(a) || /^apply to /i.test(a);
+      const isInApp =
+        b.classList.contains("jobs-apply-button") ||
+        !!b.closest(".jobs-apply-button__container, [class*='jobs-apply']") ||
+        _hasLinkedInIcon(b);
+      return isApplyWord && isInApp;
     };
     const _isAppliedBtn = (b) => {
       const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
       const a = b.getAttribute("aria-label") || "";
       return /\bapplied\b/i.test(t) || /\bapplied\b/i.test(a);
-    };
-    const _isExternalBtn = (b) => {
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      return /company website|apply on company website/i.test(t) || /company website/i.test(a);
     };
 
     // Fast path: specific selectors for known LinkedIn container class names.
@@ -3293,6 +3310,7 @@
   // Apply to one job (its card is already in the list). Returns {ok, reason}.
   async function _applyToJob(card) {
     const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
     const id = _realJobId(card);
     const onRightJob = await _openJobDetail(card, id);
     if (state.applyCancel) return { ok: false, reason: "cancelled" };
@@ -3315,9 +3333,13 @@
     if (detail.status !== "easy" || !detail.btn) return { ok: false, reason: "no_easy_apply" };
 
     await sleep(500 + Math.random() * 700);
-    // Use _forceClick for the Easy Apply button — LinkedIn's primary buttons are
-    // React-controlled and may silently swallow dispatchHumanClick events.
-    _forceClick(detail.btn);
+    // Click the apply control with a human pointer sequence (v1.0.38 wiring).
+    // Load-bearing: the control is often an <a href=".../apply/"> and
+    // _forceClick's native element.click() NAVIGATES to the full-page
+    // /jobs/view/<id>/apply/ URL instead of opening the in-page modal, leaving
+    // the stepper unable to find the form. dispatchHumanClick fires the pointer
+    // events LinkedIn's SPA handler listens for, opening the modal in place.
+    await dispatchHumanClick(detail.btn);
     return await _runEasyApplyModal();
   }
 
