@@ -2577,29 +2577,21 @@
     if (content) {
       return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
     }
-    // 3. Full-page Easy Apply (URL = /jobs/view/<id>/apply/) where the form is
-    //    NOT in a dialog and uses no recognizable container class. Anchor on the
-    //    visible primary action button (Next / Review / Submit application) and
-    //    return a container that holds both it and the form. This is layout-
-    //    agnostic — it works no matter what wrapper classes LinkedIn ships.
-    const onApplyPath = /\/apply\b/.test(location.pathname);
-    const actionBtn = Array.from(document.querySelectorAll("button, [role='button']")).find((b) => {
-      if (!_isVisible(b)) return false;
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      return (
-        /^(next|continue to next step|review|review your application|submit|submit application|done)$/i.test(t) ||
-        /continue to next step|submit application|review your application/i.test(a)
-      );
-    });
-    if (onApplyPath || actionBtn) {
-      if (actionBtn) {
-        return (
-          actionBtn.closest(
-            "form, main, .scaffold-layout, .application-outlet, [class*='easy-apply'], [class*='apply']"
-          ) || document.querySelector("main") || document.body
-        );
-      }
+    // 3. Full-page Easy Apply where the form has no recognizable container
+    //    class: rely on the apply-progress REGION ("Your job application
+    //    progress is at N percent.") or an actual /jobs/view/<id>/apply/ URL.
+    //    Do NOT infer the form from a bare "Next"/"Submit" button — the job
+    //    SEARCH page has its own pagination "Next", and matching that made the
+    //    stepper walk start=25→50→100 instead of applying.
+    const progressRegion = document.querySelector(
+      "[aria-label*='job application progress' i][role='region'], " +
+      "[aria-label*='application progress' i]"
+    );
+    if (progressRegion) {
+      return progressRegion.closest("main, .scaffold-layout, .application-outlet, form") ||
+        progressRegion.parentElement || progressRegion;
+    }
+    if (/\/jobs\/view\/\d+\/apply\b/.test(location.pathname)) {
       return document.querySelector("main") || document.body;
     }
     return null;
@@ -2748,23 +2740,30 @@
     const isBack = (x) =>
       /back to previous step|^back$|previous/i.test(x.getAttribute("aria-label") || "") ||
       SKIP.has((x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase());
+    // Search-results PAGINATION must never be treated as an apply step — that
+    // made the stepper page through start=25→50→100 instead of applying.
+    const isPagination = (x) =>
+      !!x.closest(".artdeco-pagination, [class*='pagination']") ||
+      /pagination/i.test(x.getAttribute("data-testid") || "") ||
+      /view next page|view previous page|^page \d+$/i.test(x.getAttribute("aria-label") || "");
+    const ok = (b) => b && _isVisible(b) && !isPagination(b);
     const pick = (scope) => {
       if (!scope) return null;
       // Stable fast paths from LinkedIn's live DOM (data attrs + exact labels).
       let b =
         scope.querySelector("button[data-live-test-easy-apply-submit-button]") ||
         scope.querySelector("button[aria-label*='Submit application' i]");
-      if (b && _isVisible(b)) return { type: "submit", btn: b };
+      if (ok(b)) return { type: "submit", btn: b };
       b = scope.querySelector("button[aria-label*='Review your application' i]");
-      if (b && _isVisible(b)) return { type: "review", btn: b };
+      if (ok(b)) return { type: "review", btn: b };
       b =
         scope.querySelector("button[data-easy-apply-next-button]") ||
         scope.querySelector("button[data-live-test-easy-apply-next-button]") ||
         scope.querySelector("button[aria-label*='Continue to next step' i]");
-      if (b && _isVisible(b)) return { type: "next", btn: b };
+      if (ok(b)) return { type: "next", btn: b };
 
-      // Text-based fallback (excludes Back).
-      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x));
+      // Text-based fallback (excludes Back and pagination).
+      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x) && !isPagination(x));
       if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
       if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
       if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
@@ -2788,7 +2787,7 @@
     // Absolute last resort: any visible non-dismiss, non-back button.
     const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !!t && !SKIP.has(t) && !isBack(x);
+      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x);
     });
     return fallback ? { type: "next", btn: fallback } : null;
   }
