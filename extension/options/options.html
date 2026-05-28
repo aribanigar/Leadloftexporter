@@ -62,6 +62,13 @@
         <p class="muted small">
           When you save a lead from a search result, opens the profile in a background tab, reads the &ldquo;Contact info&rdquo; overlay, and updates the lead. The tab closes itself when done.
         </p>
+        <label class="row checkbox">
+          <input type="checkbox" id="webScrapeEnabled" /> <span>Scrape company websites for contact info</span>
+        </label>
+        <p class="muted small">
+          After saving a lead, if their company website is known but email/phone is still missing, fetches the website&rsquo;s Contact and About pages and extracts any visible email addresses or phone numbers. Requires permission to access all websites.
+        </p>
+        <div id="web-scrape-status" class="status"></div>
       </section>
 
       <section class="card">

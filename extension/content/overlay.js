@@ -592,6 +592,44 @@
         /* enrichment is best-effort */
       }
     }
+
+    // Step 7: Website scraping — fetch the company website for contact info
+    // when email/phone is still missing after all LinkedIn-based enrichment.
+    const websiteUrl = enriched.company_url;
+    if (websiteUrl && (!enriched.email || !enriched.phone)) {
+      try {
+        const wsSettings = await Storage.getSettings();
+        if (wsSettings.webScrapeEnabled) {
+          const wsResult = await new Promise((resolve) => {
+            try {
+              chrome.runtime.sendMessage(
+                { type: "lc:scrapeWebsite", url: websiteUrl },
+                (resp) => resolve(resp || {})
+              );
+            } catch { resolve({}); }
+          });
+          if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+            const merged = { ...enriched };
+            const added = [];
+            if (wsResult.emails?.[0] && !merged.email) {
+              merged.email = wsResult.emails[0];
+              added.push("email");
+            }
+            if (wsResult.phones?.[0] && !merged.phone) {
+              merged.phone = wsResult.phones[0];
+              added.push("phone");
+            }
+            if (added.length) {
+              merged.raw = { ...(merged.raw || {}), contact_source: "website_scrape" };
+              try {
+                await Api.syncProfile(merged);
+                flashStatus(`Website scraped ✓ (${added.join(" + ")})`, "ok");
+              } catch { /* best-effort */ }
+            }
+          }
+        }
+      } catch { /* best-effort */ }
+    }
   }
 
   // ---------- Auto-save on profile open ----------

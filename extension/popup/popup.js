@@ -38,6 +38,13 @@ async function init() {
     setStatus(e.target.checked ? "Autopilot on" : "Autopilot off", "ok");
   });
 
+  $("#search-linkedin").addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://www.linkedin.com/search/results/people/" });
+  });
+  $("#search-sales-nav").addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://www.linkedin.com/sales/search/people" });
+  });
+
   $("#open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
   $("#open-app").addEventListener("click", async () => {
     const s = await getSettings();

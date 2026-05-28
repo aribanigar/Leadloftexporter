@@ -1006,6 +1006,32 @@
       } catch (e) {
         console.warn("[LeadCaptura] enrichment sync failed", e?.message);
       }
+
+      // Website scraping: if we have a company URL but still no email/phone,
+      // ask the service worker to fetch the company website for contact info.
+      if (profile.company_url && (!profile.email || !profile.phone)) {
+        try {
+          const wsSettings = await globalThis.__lcStorage.getSettings();
+          if (wsSettings.webScrapeEnabled) {
+            const wsResult = await new Promise((resolve) => {
+              try {
+                chrome.runtime.sendMessage(
+                  { type: "lc:scrapeWebsite", url: profile.company_url },
+                  (r) => resolve(r || {})
+                );
+              } catch { resolve({}); }
+            });
+            if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+              const merged = { ...profile };
+              if (wsResult.emails?.[0] && !merged.email) merged.email = wsResult.emails[0];
+              if (wsResult.phones?.[0] && !merged.phone) merged.phone = wsResult.phones[0];
+              merged.raw = { ...(merged.raw || {}), contact_source: "website_scrape" };
+              try { await globalThis.__lcApi.syncProfile(merged); } catch {}
+            }
+          }
+        } catch { /* best-effort */ }
+      }
+
       await Human.sleep(Human.rand(80, 200));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);

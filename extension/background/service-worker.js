@@ -408,6 +408,68 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+  // Fetch a company website and extract any visible email addresses / phone
+  // numbers from the HTML. Tries the root URL first, then /contact, /about,
+  // /contact-us, /about-us — stopping as soon as we find at least one email.
+  // Requires optional_host_permissions ["http://*/*", "https://*/*"] to be
+  // granted; responds with needs_permission if not.
+  if (msg?.type === "lc:scrapeWebsite") {
+    const rawUrl = String(msg.url || "").trim();
+    if (!rawUrl) { sendResponse({ ok: false, error: "url_required" }); return true; }
+    (async () => {
+      try {
+        // Confirm permission is granted before fetching arbitrary URLs.
+        const granted = await chrome.permissions.contains({ origins: ["http://*/*", "https://*/*"] });
+        if (!granted) {
+          sendResponse({ ok: false, error: "needs_permission" });
+          return;
+        }
+        let origin;
+        try { origin = new URL(rawUrl).origin; } catch {
+          sendResponse({ ok: false, error: "invalid_url" });
+          return;
+        }
+        const paths = ["", "/contact", "/about", "/contact-us", "/about-us", "/team"];
+        const foundEmails = new Set();
+        const foundPhones = new Set();
+        for (const p of paths) {
+          try {
+            const res = await fetch(origin + p, {
+              headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0" },
+              signal: AbortSignal.timeout(8000),
+            });
+            if (!res.ok) continue;
+            const html = await res.text();
+            // Extract emails — skip image filenames, CDN paths, sentry addresses
+            const emailRe = /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g;
+            let m;
+            while ((m = emailRe.exec(html)) !== null) {
+              const e = m[1].toLowerCase();
+              if (/\.(png|jpg|gif|svg|css|js|woff)$/i.test(e)) continue;
+              if (/sentry|example\.|@2x|noreply|no-reply|donotreply/i.test(e)) continue;
+              foundEmails.add(e);
+            }
+            // Extract phone numbers (7-15 digits, optional leading +)
+            const phoneRe = /(?:tel:|phone:|ph:)?\s*(\+?[\d][\d\s\-\(\)\.]{5,14}[\d])/gi;
+            while ((m = phoneRe.exec(html)) !== null) {
+              const digits = m[1].replace(/\D/g, "");
+              if (digits.length >= 7 && digits.length <= 15) foundPhones.add(m[1].trim());
+            }
+          } catch { continue; }
+          if (foundEmails.size > 0) break; // Stop scanning pages once we have an email
+        }
+        sendResponse({
+          ok: true,
+          emails: [...foundEmails].slice(0, 5),
+          phones: [...foundPhones].slice(0, 3),
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
   if (msg?.type !== "lc:api") return;
   const handler = handlers[msg.action];
   if (!handler) {
