@@ -2756,23 +2756,58 @@
     }
   }
 
+  // The "Save this application?" / "Discard application?" confirmation button.
+  // LinkedIn varies the dialog's role and the button's data-control-name, so we
+  // match the visible "Discard" label too.
+  function _discardConfirmButton() {
+    const byAttr = document.querySelector(
+      "button[data-control-name='discard_application_confirm_btn']"
+    );
+    if (byAttr && _isVisible(byAttr)) return byAttr;
+    return (
+      Array.from(
+        document.querySelectorAll(
+          "div[role='alertdialog'] button, div[role='dialog'] button, .artdeco-modal button"
+        )
+      ).find(
+        (b) =>
+          _isVisible(b) &&
+          /^discard$/i.test((b.innerText || b.textContent || "").replace(/\s+/g, " ").trim())
+      ) || null
+    );
+  }
+
+  // Close an in-progress Easy Apply flow and confirm the discard. Both the
+  // Dismiss (X) and the "Discard" confirmation are React-controlled, so a plain
+  // .click() is unreliable — use _forceClick (5 strategies) and verify the
+  // dialog actually closed. If we leave a blocking "Save this application?"
+  // dialog open, every subsequent job fails to open and the whole run stalls.
   async function _dismissEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
-    const dismiss =
-      document.querySelector("button[aria-label='Dismiss']") ||
-      document.querySelector("button[aria-label*='Dismiss' i]");
-    if (dismiss) {
-      try { dismiss.click(); } catch {}
-      await sleep(500 + Math.random() * 400);
-    }
-    // A "Discard application?" confirmation may appear.
-    const discard =
-      document.querySelector("button[data-control-name='discard_application_confirm_btn']") ||
-      Array.from(document.querySelectorAll("div[role='alertdialog'] button, div[role='dialog'] button"))
-        .find((b) => /^discard$/i.test((b.innerText || b.textContent || "").trim()));
-    if (discard) {
-      try { discard.click(); } catch {}
-      await sleep(400 + Math.random() * 300);
+    for (let round = 0; round < 5; round++) {
+      // If the discard confirmation is already up, clear it first.
+      const discard = _discardConfirmButton();
+      if (discard) {
+        _forceClick(discard);
+        await sleep(500 + Math.random() * 400);
+        continue;
+      }
+      // Otherwise, if the Easy Apply modal is open, click its Dismiss (X) to
+      // raise the confirmation, then the next round will click Discard.
+      const modalOpen = !!_easyApplyModal();
+      if (modalOpen) {
+        const dismiss =
+          document.querySelector("button[aria-label='Dismiss']") ||
+          document.querySelector("button[aria-label*='Dismiss' i]");
+        if (dismiss && _isVisible(dismiss)) {
+          _forceClick(dismiss);
+          await sleep(500 + Math.random() * 400);
+          continue;
+        }
+      }
+      // Nothing left to dismiss — we're done.
+      if (!modalOpen && !_discardConfirmButton()) return;
+      await sleep(400);
     }
   }
 
