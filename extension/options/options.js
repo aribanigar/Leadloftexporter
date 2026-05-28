@@ -49,7 +49,7 @@ const DEFAULTS = {
   autoSaveOnOpen: true,
   autoEnrichOnSave: true,
   syncLinkedInMessages: false,
-  webScrapeEnabled: false,
+  webScrapeEnabled: true,
   // Auto-apply: pre-configured answers (Option A)
   applicationProfile: {
     fullName: "Todd Santner",

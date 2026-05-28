@@ -840,47 +840,45 @@
       address = address.replace(/\s*\([^)]*\)\s*$/, "").trim() || null;
     }
 
-    // --- Website ---
+    // --- Website(s) ---
+    // Collect ALL external links from the modal so the website scraper can try
+    // each one — LinkedIn profiles can list multiple websites (Personal, Company,
+    // Portfolio, etc.). The first match against the "Website" label becomes
+    // `website` (single, for backward compat); all of them go into `websites`.
+    const _isExternalHref = (href) =>
+      href &&
+      href.startsWith("http") &&
+      !href.includes("linkedin.com") &&
+      !href.includes("/overlay/") &&
+      !href.startsWith("mailto:") &&
+      !href.startsWith("tel:");
+
     let website = null;
-    const labelled = _modalFieldAfterLabel(modal, /^\s*website\s*$/i);
-    if (labelled) {
-      // The labelled value can be the URL itself ("example.com (Other)") or
-      // we may need to look for the anchor's href to get the full https://.
-      const anchors = modal.querySelectorAll("a[href^='http']");
-      for (const a of anchors) {
-        const href = a.getAttribute("href") || "";
-        const at = (a.textContent || "").trim();
-        if (
-          !href.includes("linkedin.com") &&
-          !href.includes("/overlay/") &&
-          (labelled.includes(at) || at.includes(labelled.split(" ")[0]))
-        ) {
-          website = href;
-          break;
-        }
-      }
-      if (!website) {
-        const m = labelled.match(/https?:\/\/\S+/);
-        if (m) website = m[0];
-      }
-    }
-    if (!website) {
-      const externals = modal.querySelectorAll("a[href^='http']");
-      for (const a of externals) {
-        const href = a.getAttribute("href") || "";
-        if (
-          !href.includes("linkedin.com") &&
-          !href.startsWith("mailto:") &&
-          !href.startsWith("tel:") &&
-          !href.includes("/overlay/")
-        ) {
-          website = href;
-          break;
-        }
-      }
+    const websites = [];
+    const allExternals = modal.querySelectorAll("a[href^='http']");
+    for (const a of allExternals) {
+      const href = a.getAttribute("href") || "";
+      if (!_isExternalHref(href)) continue;
+      try { new URL(href); } catch { continue; } // skip malformed
+      if (!websites.includes(href)) websites.push(href);
     }
 
-    return { email, phone, website, address };
+    // Prefer the URL that appears right after the "Website" label (labelled field)
+    const labelled = _modalFieldAfterLabel(modal, /^\s*websites?\s*$/i);
+    if (labelled) {
+      const best = websites.find((u) => {
+        const at = new URL(u).hostname;
+        return labelled.includes(at) || at.includes(labelled.split(/\s/)[0]);
+      });
+      website = best || websites[0] || null;
+      if (!website) {
+        const m = labelled.match(/https?:\/\/\S+/);
+        if (m) { website = m[0]; if (!websites.includes(m[0])) websites.push(m[0]); }
+      }
+    }
+    if (!website && websites.length) website = websites[0];
+
+    return { email, phone, website, websites, address };
   }
 
   function _closeContactModal() {

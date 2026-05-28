@@ -509,6 +509,10 @@
         if (contact.address && (!enriched.location || enriched.location.length < 4)) {
           enriched.location = contact.address.slice(0, 200);
         }
+        // Store all linked websites for the multi-URL website scraper (Step 7)
+        if (contact.websites?.length) {
+          enriched.raw = { ...(enriched.raw || {}), websites: contact.websites };
+        }
       } catch (e) {
         console.warn("[LeadCaptura] auto-open Contact info failed", e?.message || e);
       }
@@ -641,22 +645,30 @@
       }
     }
 
-    // Step 7: Website scraping — fetch the company website for contact info
-    // when email/phone is still missing after all LinkedIn-based enrichment.
+    // Step 7: Website scraping — visit all websites linked on the LinkedIn
+    // profile and extract emails/phones when still missing after all LinkedIn
+    // enrichment. Collects multiple URLs from the Contact Info modal (personal
+    // site + company site + portfolio, etc.) and passes them all to the SW.
     const websiteUrl = enriched.company_url;
+    const extraWebsites = (enriched.raw?.websites || []).filter(
+      (u) => u && u !== websiteUrl
+    );
     if (websiteUrl && (!enriched.email || !enriched.phone)) {
       try {
         const wsSettings = await Storage.getSettings();
-        if (wsSettings.webScrapeEnabled) {
+        if (wsSettings.webScrapeEnabled !== false) {
+          _lcToast("LeadCaptura: scanning website for contact info…");
           const wsResult = await new Promise((resolve) => {
             try {
               chrome.runtime.sendMessage(
-                { type: "lc:scrapeWebsite", url: websiteUrl },
+                { type: "lc:scrapeWebsite", url: websiteUrl, extraUrls: extraWebsites },
                 (resp) => resolve(resp || {})
               );
             } catch { resolve({}); }
           });
-          if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
+          if (wsResult.error === "needs_permission") {
+            _lcToast("Enable website scraping in LeadCaptura Options to auto-find emails");
+          } else if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length)) {
             const merged = { ...enriched };
             const added = [];
             if (wsResult.emails?.[0] && !merged.email) {
@@ -667,12 +679,20 @@
               merged.phone = wsResult.phones[0];
               added.push("phone");
             }
+            // Store the full list in raw for later reference
+            merged.raw = {
+              ...(merged.raw || {}),
+              contact_source: "website_scrape",
+              scraped_emails: wsResult.emails,
+              scraped_phones: wsResult.phones,
+            };
             if (added.length) {
-              merged.raw = { ...(merged.raw || {}), contact_source: "website_scrape" };
               try {
                 await Api.syncProfile(merged);
                 flashStatus(`Website scraped ✓ (${added.join(" + ")})`, "ok");
               } catch { /* best-effort */ }
+            } else {
+              _lcToast("Website scanned — no new contact info found");
             }
           }
         }
