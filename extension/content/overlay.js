@@ -1036,7 +1036,7 @@
     const _makeHandle = () =>
       el("div", { class: "lc-toolbar-handle", onclick: _toggleToolbar },
         el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
         el("span", { class: "lc-toolbar-arrow" }, state.toolbarCollapsed ? "↑" : "↓")
       );
 
