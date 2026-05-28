@@ -2902,11 +2902,24 @@
         await sleep(500 + Math.random() * 400);
         continue;
       }
-      // 2. Click Dismiss (X) ONLY inside the real Easy Apply dialog. A
+      // 2. Work only inside the real Easy Apply / post-apply dialog. A
       //    document-wide search would match a job card's own "Dismiss" X (which
       //    means "don't recommend this job") — never click those.
       const dialog = _realModalDialog();
       if (dialog) {
+        // 2a. Post-apply "show recruiters you're open to work" / next-best-action
+        //     prompt — decline politely (NEVER click "Get started"/"Yes").
+        const decline = Array.from(dialog.querySelectorAll("button")).find((b) => {
+          if (!_isVisible(b)) return false;
+          const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+          return /^(no thanks|not now|skip|maybe later|no,? thanks)$/i.test(t);
+        });
+        if (decline) {
+          _forceClick(decline);
+          await sleep(500 + Math.random() * 400);
+          continue;
+        }
+        // 2b. Otherwise click the dialog's Dismiss (X).
         const dismiss = dialog.querySelector(
           "button[aria-label='Dismiss'], button[aria-label*='Dismiss' i]"
         );
@@ -3439,12 +3452,23 @@
   async function _goToNextJobsPage() {
     const { sleep } = globalThis.__lcHuman;
 
-    // Try multiple pagination button selectors
+    // Try multiple pagination button selectors (newest LinkedIn layout first).
     let nextBtn =
+      document.querySelector("button[data-testid='pagination-controls-next-button-visible']:not([disabled])") ||
+      document.querySelector("button[data-testid='pagination-controls-next-button']:not([disabled])") ||
       document.querySelector("button[aria-label='View next page']") ||
       document.querySelector("button[aria-label*='next page' i]") ||
       document.querySelector(".artdeco-pagination__button--next:not([disabled])") ||
       null;
+
+    // Newer pagination renders "Next" as a button whose label is a child <span>.
+    if (!nextBtn) {
+      nextBtn = Array.from(document.querySelectorAll("button")).find((b) => {
+        if (b.disabled || b.getAttribute("aria-disabled") === "true") return false;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        return /^next$/i.test(t) && b.querySelector("svg[id*='chevron-right' i], [class*='chevron-right']");
+      }) || null;
+    }
 
     if (!nextBtn) {
       // Walk pagination indicators: find active → click next sibling
@@ -3573,6 +3597,7 @@
         if (res.ok) {
           applied++; sinceBreak++;
           _setJobChipState(key, "saved", "Applied ✓");
+          try { _lcToast(`✅ Applied ✓ — ${applied} applied this run`, 3500); } catch {}
         } else if (res.reason === "already_applied") {
           skipped++; _setJobChipState(key, "saved", "Already applied ✓");
         } else if (res.reason === "external_apply") {
@@ -3593,15 +3618,29 @@
 
         const last = i >= keys.length - 1;
         if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
-          let gap;
+          let gap, isBreak = false;
           if (sinceBreak >= nextBreakAt) {
             sinceBreak = 0;
             nextBreakAt = 8 + Math.floor(Math.random() * 5);
-            gap = 25000 + Math.random() * 20000;
-            flashStatus(`Short break… (${applied} applied)`);
+            gap = 25000 + Math.random() * 20000; // 25–45s "micro-break"
+            isBreak = true;
           } else {
-            gap = _applyGap(applied);
+            gap = _applyGap(applied); // human-paced 4-tier gap
           }
+          const secs = Math.round(gap / 1000);
+          const summary = `${applied} applied · ${skipped} skipped · ${failed} failed`;
+          flashStatus(
+            isBreak
+              ? `Taking a ${secs}s break (human pacing) — ${summary}`
+              : `Pausing ${secs}s before next job — ${summary}`
+          );
+          // On-page live indicator with running count + the exact halt time.
+          try {
+            _lcToast(
+              `${isBreak ? "☕ Break" : "⏳ Waiting"} ${secs}s before next job · ${applied} applied so far`,
+              Math.min(gap, 6000)
+            );
+          } catch {}
           await sleep(gap);
         }
       }
