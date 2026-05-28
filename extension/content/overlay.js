@@ -61,7 +61,51 @@
     applyActive: false,
     applyCancel: false,
     applyProgress: null,
+    avoidDuplicates: true, // "Avoid Duplicate Outreach" toggle
   };
+
+  // ── Contacted-URL registry ──────────────────────────────────────────────────
+  // Persistent set of LinkedIn profile URLs already saved or connected.
+  // Stored in chrome.storage.local so it survives tab reloads.
+  // Format: { [normalizedUrl]: timestamp }
+  const _contacted = new Map(); // normalized url → timestamp (in-memory mirror)
+
+  async function _loadContacted() {
+    try {
+      const { lc_contacted_urls } = await new Promise((r) =>
+        chrome.storage.local.get("lc_contacted_urls", r)
+      );
+      if (lc_contacted_urls && typeof lc_contacted_urls === "object") {
+        for (const [u, t] of Object.entries(lc_contacted_urls)) {
+          _contacted.set(u, t);
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
+  function _markContacted(url) {
+    if (!url) return;
+    const norm = (url.split("?")[0].split("#")[0].replace(/\/$/, "")).toLowerCase();
+    if (_contacted.has(norm)) return; // already recorded
+    _contacted.set(norm, Date.now());
+    // Persist fire-and-forget
+    try {
+      const patch = Object.fromEntries(_contacted);
+      chrome.storage.local.set({ lc_contacted_urls: patch }).catch(() => {});
+    } catch {}
+  }
+
+  function _isContacted(url) {
+    if (!url) return false;
+    const norm = (url.split("?")[0].split("#")[0].replace(/\/$/, "")).toLowerCase();
+    return _contacted.has(norm);
+  }
+
+  // Load on boot
+  _loadContacted();
+  Storage.getSettings().then((s) => {
+    state.avoidDuplicates = s.avoidDuplicates !== false; // default ON
+  }).catch(() => {});
 
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -540,6 +584,7 @@
         "ok"
       );
       if (result.lead?.id) state.lastSavedLeadIds = [result.lead.id];
+      _markContacted(enriched.linkedin_url || profile.linkedin_url);
       maybeAutoEnroll();
     } catch (e) {
       flashStatus(`Failed: ${e.message}`, "err");
@@ -689,6 +734,7 @@
     const root = el("div", { id: "lc-toolbar" });
     document.documentElement.appendChild(root);
     state.toolbar = root;
+    _mountAvoidDupPanel();
     return root;
   }
 
@@ -697,6 +743,52 @@
       state.toolbar.remove();
       state.toolbar = null;
     }
+    const p = document.getElementById("lc-avoid-dup-panel");
+    if (p) p.remove();
+  }
+
+  // ── "Avoid Duplicate Outreach" floating panel ──────────────────────────────
+  function _mountAvoidDupPanel() {
+    if (document.getElementById("lc-avoid-dup-panel")) return;
+    const panel = el("div", { id: "lc-avoid-dup-panel" });
+
+    function _render() {
+      panel.textContent = "";
+      const on = state.avoidDuplicates;
+      panel.append(
+        el("span", { class: "lc-ado-label" }, "Avoid Duplicate Outreach"),
+        el("span", {
+          class: "lc-ado-info",
+          title:
+            "When ON, Connect All skips profiles you have already saved or connected with. " +
+            "The contacted list is persisted locally.",
+        }, " ⓘ"),
+        el("div", { class: "lc-ado-btns" },
+          el("button", {
+            class: "lc-ado-btn" + (on ? " lc-ado-active" : ""),
+            onclick: () => {
+              state.avoidDuplicates = true;
+              Storage.getSettings().then((s) =>
+                chrome.storage.local.set({ settings: { ...s, avoidDuplicates: true } })
+              ).catch(() => {});
+              _render();
+            },
+          }, "On"),
+          el("button", {
+            class: "lc-ado-btn" + (!on ? " lc-ado-active" : ""),
+            onclick: () => {
+              state.avoidDuplicates = false;
+              Storage.getSettings().then((s) =>
+                chrome.storage.local.set({ settings: { ...s, avoidDuplicates: false } })
+              ).catch(() => {});
+              _render();
+            },
+          }, "Off")
+        )
+      );
+    }
+    _render();
+    document.documentElement.appendChild(panel);
   }
 
   // Every /in/ URL that currently has a LIVE chip on the page. The injected
@@ -1654,6 +1746,24 @@
       try { return new URL(u, "https://www.linkedin.com").href; }
       catch { return u; }
     });
+
+    // Avoid Duplicate Outreach: if enabled, skip profiles already contacted
+    if (state.avoidDuplicates) {
+      const before = urls.length;
+      urls = urls.filter((u) => !_isContacted(u));
+      const skipped = before - urls.length;
+      if (skipped > 0) {
+        flashStatus(`Duplicate Outreach filter: skipped ${skipped} already-contacted profile${skipped > 1 ? "s" : ""}`, "ok");
+        await sleep(1200);
+      }
+      if (!urls.length) {
+        flashStatus("All selected profiles already contacted — no new connections to send.", "warn");
+        state.connectActive = false;
+        mountSelectAllHeader();
+        renderToolbar();
+        return;
+      }
+    }
 
     state.connectActive = true;
     state.connectCancel = false;
@@ -3046,6 +3156,7 @@
         });
         btn.dataset.state = "saved";
         textSpan.textContent = "Opened ✓";
+        _markContacted(url); // record as contacted so duplicate check knows
       } catch (err) {
         btn.dataset.state = "error";
         const msg = err?.message || String(err);
@@ -3643,12 +3754,14 @@
     for (const [url, status] of Object.entries(results || {})) {
       if (status === "sent") {
         _setChipState(url, "saved", "Connected ✓");
+        _markContacted(url); // record as contacted
       } else if (
         status === "already_connected" ||
         status === "already_pending" ||
         status === "already_done"
       ) {
         _setChipState(url, "saved", "Already done ✓");
+        _markContacted(url);
       } else {
         _setChipState(url, "error", "Skipped");
       }
