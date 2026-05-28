@@ -1983,80 +1983,136 @@
   // "Connect" button is a simplified control that does NOT always open the
   // "Add a note?" modal reliably. The full-page profile button is the one
   // LinkedIn's own UX always uses, and it consistently triggers the modal.
+  // In-page gap between consecutive connect actions. Same 4-tier human-paced
+  // distribution the profile-navigation queue used (5-10s / 11-19s / 21-33s /
+  // 38-60s) — fast enough to feel responsive, slow + varied enough to stay
+  // under LinkedIn's bot radar. Do not flatten this into a fixed delay.
+  function _connectGap() {
+    const r = Math.random();
+    return r < 0.60 ? 5000 + Math.random() * 5000
+      : r < 0.82 ? 11000 + Math.random() * 8000
+      : r < 0.93 ? 21000 + Math.random() * 12000
+      : 38000 + Math.random() * 22000;
+  }
+
   async function connectAllVisible() {
     const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const Api = globalThis.__lcApi;
 
-    const page1Selection =
-      state.selectedUrls.size > 0 ? new Set(state.selectedUrls) : null;
+    const userSelected = state.selectedUrls.size > 0;
+    // Auto-paginate only in "Connect All" (no explicit selection) — when the
+    // user ticked specific cards, connect exactly those and stop.
+    const autoPage = !userSelected;
 
     let urls = (
-      page1Selection
-        ? Array.from(page1Selection)
-        : _allChipUrls()
+      userSelected ? Array.from(state.selectedUrls) : _allChipUrls()
     ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
 
     if (!urls.length) {
       flashStatus("No profiles selected to connect with", "warn");
       return;
     }
-
-    // Normalize to absolute LinkedIn URLs
     urls = urls.map((u) => {
       try { return new URL(u, "https://www.linkedin.com").href; }
       catch { return u; }
     });
-
-    // Avoid Duplicate Outreach: if enabled, skip profiles already contacted
-    if (state.avoidDuplicates) {
-      const before = urls.length;
-      urls = urls.filter((u) => !_isContacted(u));
-      const skipped = before - urls.length;
-      if (skipped > 0) {
-        flashStatus(`Duplicate Outreach filter: skipped ${skipped} already-contacted profile${skipped > 1 ? "s" : ""}`, "ok");
-        await sleep(1200);
-      }
-      if (!urls.length) {
-        flashStatus("All selected profiles already contacted — no new connections to send.", "warn");
-        state.connectActive = false;
-        mountSelectAllHeader();
-        renderToolbar();
-        return;
-      }
-    }
 
     state.connectActive = true;
     state.connectCancel = false;
     unmountSelectAllHeader();
     renderToolbar();
 
-    const queue = {
-      urls,
-      returnUrl: location.href,
-      total: urls.length,
-      sent: 0,
-      failed: 0,
-      results: {},
-      startedAt: Date.now(),
-    };
+    let sent = 0, followed = 0, skipped = 0, failed = 0, processed = 0, pageNum = 1;
+    const summarise = () =>
+      `Connect All: ${sent} invited` +
+      (followed ? `, ${followed} followed` : "") +
+      `, ${skipped} skipped` +
+      (failed ? `, ${failed} failed` : "");
 
-    try {
-      await new Promise((res) =>
-        chrome.storage.local.set({ lc_connect_queue: queue }, res)
-      );
-    } catch (e) {
-      flashStatus("Could not save queue: " + String(e), "err");
-      state.connectActive = false;
-      mountSelectAllHeader();
-      renderToolbar();
-      return;
+    outer:
+    while (true) {
+      for (const url of urls) {
+        if (state.connectCancel) break outer;
+
+        // Avoid Duplicate Outreach: skip people already contacted.
+        if (state.avoidDuplicates && _isContacted(url)) {
+          skipped++;
+          _setChipState(url, "saved", "Already contacted");
+          continue;
+        }
+
+        const card = _cardForUrl(url);
+        const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+        const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+
+        // Already pending / connected → nothing to do.
+        if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+        if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+        if (cls === "unknown" || !card) { skipped++; continue; }
+
+        processed++;
+        _setChipState(url, "saving", "Connecting…");
+
+        let result;
+        if (cls === "follow") {
+          result = await _sendFollowOnCard(card, presetBtn);
+        } else {
+          // Bring the row into view so the modal's buttons get valid coordinates,
+          // then run the proven click-Connect → "Send without a note" sequence.
+          try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+          await sleep(300 + Math.random() * 300);
+          result = await _sendConnectOnCard(card, presetBtn);
+        }
+
+        if (result.ok) {
+          if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+          else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+          _markContacted(url);
+          try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+        } else {
+          failed++;
+          _setChipState(url, "error", "Skipped");
+          // Make sure a leftover dialog never blocks the next card.
+          if (_invitationModalOpen()) _closeAnyDialog();
+        }
+
+        flashStatus(`${summarise()} (${processed})`);
+        if (state.connectCancel) break outer;
+        await sleep(_connectGap());
+      }
+
+      // ---- advance to the next results page (Connect All mode only) --------
+      if (!autoPage || state.connectCancel) break;
+      const nextBtn = _findNextPageButton();
+      if (!nextBtn) break;
+      const sig = _pageSignature();
+      try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+      await sleep(400 + Math.random() * 400);
+      await dispatchHumanClick(nextBtn);
+      // Wait for the page to actually change (signature flip), up to ~12s.
+      let changed = false;
+      for (let i = 0; i < 40 && !state.connectCancel; i++) {
+        await sleep(300);
+        if (_pageSignature() !== sig) { changed = true; break; }
+      }
+      if (!changed || state.connectCancel) break;
+      await _scrollLoadPage();
+      decorateSearchCards();
+      await sleep(800 + Math.random() * 600);
+      pageNum++;
+      urls = _allChipUrls()
+        .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
+        .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+      if (!urls.length) break;
     }
 
-    flashStatus(`Connect All: visiting ${urls.length} profile(s) one by one…`);
-    await sleep(800 + Math.random() * 600);
-    // Mark chips as "pending navigation"
-    for (const url of urls) _setChipState(url, "saving", "Queued…");
-    // Navigate to first profile — main.js takes over from here
-    location.href = urls[0];
+    state.connectActive = false;
+    state.connectCancel = false;
+    mountSelectAllHeader();
+    renderToolbar();
+    const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
+    flashStatus(`Connect All done: ${summarise()}${pageLabel} ✓`, "ok");
   }
 
   // ====================================================================
