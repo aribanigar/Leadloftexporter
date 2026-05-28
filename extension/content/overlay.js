@@ -2387,6 +2387,24 @@
 
   // The job detail's apply control + its classification.
   function _classifyJobDetail() {
+    // Helper: text-based Easy Apply check on any button.
+    const _isEasyApplyBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /easy apply/i.test(t) || /easy apply/i.test(a);
+    };
+    const _isAppliedBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /\bapplied\b/i.test(t) || /\bapplied\b/i.test(a);
+    };
+    const _isExternalBtn = (b) => {
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return /company website|apply on company website/i.test(t) || /company website/i.test(a);
+    };
+
+    // Fast path: specific selectors for known LinkedIn container class names.
     const cands = Array.from(
       document.querySelectorAll(
         "button.jobs-apply-button, button[aria-label*='Easy Apply' i], " +
@@ -2394,33 +2412,45 @@
         ".jobs-apply-button--top-card button, .jobs-s-apply button, " +
         ".jobs-unified-top-card button, .jobs-details-top-card button, " +
         "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button, " +
-        ".jobs-apply-button, [data-control-name='apply_topcard_btn'], " +
-        ".artdeco-button--primary[href*='apply'], " +
         ".job-details-jobs-unified-top-card__container--two-pane button, " +
         ".jobs-unified-top-card__content--two-pane button, " +
         ".jobs-apply-button__container button"
       )
     ).filter(_isVisible);
+
     for (const b of cands) {
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      if (/easy apply/i.test(t) || /easy apply/i.test(a)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
     }
-    // Check for "Applied" badge / button (already submitted)
+    for (const b of cands) {
+      if (_isAppliedBtn(b)) return { status: "applied", btn: null };
+      if (_isExternalBtn(b)) return { status: "external", btn: null };
+    }
+
+    // Broad fallback: scan EVERY visible button in the document.
+    // LinkedIn renames container classes often; the button text is stable.
+    const allBtns = Array.from(document.querySelectorAll("button")).filter(_isVisible);
+    for (const b of allBtns) {
+      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+    }
+
+    // Also check static "Applied" and "External" badges that aren't buttons.
     const applied = Array.from(document.querySelectorAll(
       "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied, " +
       "[aria-label*='Applied' i], .jobs-apply-button--applied-state"
     )).filter(_isVisible);
     if (applied.length) return { status: "applied", btn: null };
-    const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout, .job-details-jobs-unified-top-card__container--two-pane")?.innerText || "");
-    if (/\bapplied\b/i.test(bodyTxt) && !cands.length) return { status: "applied", btn: null };
-    for (const b of cands) {
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      if (/company website|apply\b/i.test(t) || /company website/i.test(a)) {
-        return { status: "external", btn: null };
-      }
+
+    const bodyTxt = (document.querySelector(
+      ".jobs-s-apply, .jobs-details, .job-view-layout, " +
+      ".job-details-jobs-unified-top-card__container--two-pane"
+    )?.innerText || "");
+    if (/\bapplied\b/i.test(bodyTxt) && !allBtns.some(_isEasyApplyBtn)) {
+      return { status: "applied", btn: null };
     }
+    for (const b of allBtns) {
+      if (_isExternalBtn(b)) return { status: "external", btn: null };
+    }
+
     return { status: "none", btn: null };
   }
 
@@ -2825,25 +2855,27 @@
       }
 
       if (action.type === "submit") {
-        // Use _forceClick for the final submit — LinkedIn's submit button is often
-        // React-controlled and dispatchHumanClick alone may not register.
+        // React-aware submit click.
         _forceClick(action.btn);
-        await sleep(1800 + Math.random() * 1200);
-        // Confirm modal closed (success) or still open (failed submit).
-        const stillOpen = _easyApplyModal();
-        if (stillOpen) {
-          // Check if it's a success screen or still the form.
-          const successEl = document.querySelector(
-            ".jobs-easy-apply-modal--confirmation, [class*='confirmation'], " +
-            "[class*='success'], [aria-label*='submitted' i], [aria-label*='applied' i]"
-          );
-          if (!successEl) {
-            await _dismissEasyApplyModal();
-            return { ok: false, reason: "submit_failed" };
-          }
+        await sleep(2000 + Math.random() * 1500);
+
+        const modalAfter = _easyApplyModal();
+        if (!modalAfter) {
+          // Modal closed on its own = successful submission.
+          return { ok: true };
         }
+        // Modal still open — check whether it transitioned to a success screen.
+        // LinkedIn shows "Your application was sent" / "Application submitted" etc.
+        // inside the same modal element after submission.
+        const modalText = (modalAfter.innerText || modalAfter.textContent || "").toLowerCase();
+        const isSuccess =
+          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(modalText) ||
+          !!modalAfter.querySelector(
+            ".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], " +
+            "[class*='success-banner'], progress[value='100']"
+          );
         await _dismissEasyApplyModal();
-        return { ok: true };
+        return isSuccess ? { ok: true } : { ok: false, reason: "submit_failed" };
       }
 
       // Snapshot state before advancing so we can detect if the modal moved on.
@@ -2906,25 +2938,19 @@
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
-    // Use _forceClick so the card click reliably triggers LinkedIn's navigation.
-    try { await dispatchHumanClick(link); } catch {}
-    _forceClick(link === card ? card : link);
+    // Single controlled click — do NOT double-click (dispatchHumanClick + _forceClick)
+    // because two rapid clicks confuse LinkedIn's SPA router and may close the pane.
+    try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
 
-    // Wait for the detail pane to reflect this specific job (URL change OR the
-    // Easy Apply button appearing in the detail area).
-    const _detailHasEasyApply = () => {
-      const detail = document.querySelector(
-        ".jobs-details, .jobs-unified-top-card, .job-view-layout, " +
-        ".job-details-jobs-unified-top-card__container--two-pane, " +
-        ".jobs-details__main-content"
-      );
-      if (!detail) return false;
-      return Array.from(detail.querySelectorAll("button")).some((b) => {
+    // Broad check: any visible "Easy Apply" button anywhere in the document.
+    // Don't restrict to specific containers — LinkedIn renames them constantly.
+    const _anyEasyApplyVisible = () =>
+      Array.from(document.querySelectorAll("button")).some((b) => {
+        if (!_isVisible(b)) return false;
         const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
         const a = b.getAttribute("aria-label") || "";
         return /easy apply/i.test(t) || /easy apply/i.test(a);
       });
-    };
 
     const _urlMatchesJob = () => {
       if (!expectedId) return false;
@@ -2941,11 +2967,11 @@
     // Wait up to 8s for EITHER: URL reflects this job OR Easy Apply button appears.
     while (Date.now() - start < 8000) {
       if (state.applyCancel) return false;
-      if (_urlMatchesJob() || _detailHasEasyApply()) break;
+      if (_urlMatchesJob() || _anyEasyApplyVisible()) break;
       await sleep(300);
     }
-    // Extra hydration buffer — React takes a moment after the URL update to render.
-    await sleep(800 + Math.random() * 700);
+    // Extra settle buffer for React to finish rendering.
+    await sleep(600 + Math.random() * 600);
     return true;
   }
 
