@@ -445,3 +445,22 @@
 
 /* Make room for the bottom bar on the underlying page */
 body.lc-toolbar-mounted { padding-bottom: 64px !important; }
+
+/* LinkedIn unread message count badge in toolbar */
+.lc-msg-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+.lc-msg-badge:hover {
+  background: #b91c1c !important;
+}

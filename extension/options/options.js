@@ -48,6 +48,7 @@ const DEFAULTS = {
   showOverlay: true,
   autoSaveOnOpen: true,
   autoEnrichOnSave: true,
+  syncLinkedInMessages: false,
   webScrapeEnabled: false,
   // Auto-apply: pre-configured answers (Option A)
   applicationProfile: {
@@ -232,6 +233,7 @@ async function onSave() {
     showOverlay: $("#showOverlay").checked,
     autoSaveOnOpen: $("#autoSaveOnOpen").checked,
     autoEnrichOnSave: $("#autoEnrichOnSave").checked,
+    syncLinkedInMessages: $("#syncLinkedInMessages").checked,
     webScrapeEnabled: $("#webScrapeEnabled").checked,
     applicationProfile: {
       fullName: $("#ap_fullName").value.trim(),
@@ -293,6 +295,7 @@ async function init() {
   $("#showOverlay").checked = settings.showOverlay;
   $("#autoSaveOnOpen").checked = settings.autoSaveOnOpen !== false;
   $("#autoEnrichOnSave").checked = settings.autoEnrichOnSave !== false;
+  $("#syncLinkedInMessages").checked = !!settings.syncLinkedInMessages;
   $("#webScrapeEnabled").checked = !!settings.webScrapeEnabled;
   $("#docs-link").href = `${settings.apiUrl.replace(/:8000$/, ":3000") || "http://localhost:3000"}/settings/api-keys`;
 

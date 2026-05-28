@@ -1043,6 +1043,52 @@
     }
   }
 
+  // ── LinkedIn message interceptor drain ─────────────────────────────────────
+  // interceptor.js (document_start) buffers conversation participants into
+  // window.__lcMsgQueue. We drain that queue here — after the API client is
+  // ready — and sync each unique participant as a lead. This passively turns
+  // anyone the user has messaged on LinkedIn into an enriched lead, with no
+  // additional page opens or LinkedIn API calls on our part.
+  let _msgQueueDrained = new Set(); // deduplicate across multiple drains
+
+  async function _drainMsgQueue() {
+    const queue = window.__lcMsgQueue;
+    if (!Array.isArray(queue) || !queue.length) return;
+    const batch = queue.splice(0, queue.length);
+    try {
+      const settings = await globalThis.__lcStorage.getSettings();
+      if (!settings.apiKey || !settings.syncLinkedInMessages) return;
+    } catch { return; }
+
+    for (const p of batch) {
+      if (!p.linkedin_url || !p.first_name) continue;
+      const key = p.linkedin_url.toLowerCase().replace(/\?.*$/, "");
+      if (_msgQueueDrained.has(key)) continue;
+      _msgQueueDrained.add(key);
+      try {
+        await globalThis.__lcApi.syncProfile({
+          linkedin_url: p.linkedin_url,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          full_name: p.full_name,
+          headline: p.headline,
+          photo_url: p.photo_url,
+          raw: { contact_source: "linkedin_messages" },
+        });
+        console.log("[LeadCaptura] msg-sync: saved lead from conversation →", p.full_name);
+      } catch (e) {
+        console.warn("[LeadCaptura] msg-sync: sync failed for", p.linkedin_url, e?.message);
+      }
+    }
+  }
+
+  // Run drain once on boot (catches conversations already loaded by the time
+  // main.js initialises) then again after 5s to catch async-loaded batches.
+  setTimeout(_drainMsgQueue, 1500);
+  setTimeout(_drainMsgQueue, 6000);
+  // Also drain whenever the user navigates to /messaging/ SPA route.
+  const _origOnPathChange = onPathChange;
+
   // Boot
   onPathChange();
   startAutopilot();

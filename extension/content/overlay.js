@@ -890,6 +890,18 @@
         { class: "lc-toolbar-inner" },
         el("span", { class: "lc-logo" }, "L"),
         el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
+        // Unread LinkedIn message count badge (data from interceptor.js)
+        (() => {
+          const counts = window.__lcMsgCounts || {};
+          const unread = (counts.INBOX || 0) + (counts.MESSAGE_REQUEST_PENDING || 0);
+          if (!unread) return el("span");
+          const badge = el("span", {
+            class: "lc-msg-badge",
+            title: `${unread} unread LinkedIn message${unread > 1 ? "s" : ""}`,
+            onclick: () => { location.href = "https://www.linkedin.com/messaging/"; },
+          }, `✉ ${unread}`);
+          return badge;
+        })(),
         dropdown("Segment", segmentName, opts.segments, (s) => {
           state.selection.segmentId = s.id;
           renderToolbar();
