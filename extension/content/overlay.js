@@ -1046,6 +1046,51 @@
     root.classList.toggle("lc-collapsed", !!state.toolbarCollapsed);
 
     if (!opts) {
+      // Jobs page: Apply All is purely local — no backend needed. Render a
+      // minimal jobs toolbar so users can still auto-apply without configuring
+      // a workspace.
+      if (_isJobsPage()) {
+        root.append(
+          _makeHandle(),
+          el("div", { class: "lc-toolbar-body" },
+            el("div", { class: "lc-toolbar-inner" },
+              state.applyActive
+                ? null
+                : el("button", {
+                    class: "lc-btn lc-btn-ghost",
+                    onclick: toggleSelectAllCurrent,
+                    title: "Tick every visible job so Apply All processes them",
+                  }, state.selectedJobUrls.size > 0 ? `Clear (${state.selectedJobUrls.size})` : "Select All"),
+              el("span", { class: "lc-flex" }),
+              (state.applyActive && state.applyProgress)
+                ? el("div", { class: "lc-bulk-progress" },
+                    el("span", { class: "lc-bulk-spinner" }, "⏳"),
+                    el("span", { class: "lc-bulk-progress-text" },
+                      `Applying ${state.applyProgress.current} of ${state.applyProgress.total}: ${state.applyProgress.name}…`),
+                    el("span", { class: "lc-status-slot lc-status-slot-inline" })
+                  )
+                : el("div", { class: "lc-status-slot" }),
+              state.applyActive
+                ? el("button", {
+                    class: "lc-btn lc-btn-stop",
+                    onclick: () => { state.applyCancel = true; flashStatus("Stopping after current item…"); },
+                  }, "Stop")
+                : el("button", {
+                    class: "lc-btn lc-btn-primary",
+                    onclick: applyAllJobs,
+                    title: "Auto-apply to selected (or all visible) Easy Apply jobs. Skips external-apply and already-applied jobs.",
+                  }, state.selectedJobUrls.size > 0 ? `Apply ${state.selectedJobUrls.size}` : `Apply All (${_allJobUrls().length})`),
+              el("button", {
+                class: "lc-icon-btn lc-icon-btn-light",
+                onclick: () => openOptions(),
+                title: "Settings",
+              }, "⚙")
+            )
+          )
+        );
+        return;
+      }
+      // Non-jobs pages: show the standard "Not connected" prompt.
       root.append(
         _makeHandle(),
         el("div", { class: "lc-toolbar-body" },
@@ -2030,87 +2075,89 @@
       `, ${skipped} skipped` +
       (failed ? `, ${failed} failed` : "");
 
-    outer:
-    while (true) {
-      for (const url of urls) {
-        if (state.connectCancel) break outer;
+    try {
+      outer:
+      while (true) {
+        for (const url of urls) {
+          if (state.connectCancel) break outer;
 
-        // Avoid Duplicate Outreach: skip people already contacted.
-        if (state.avoidDuplicates && _isContacted(url)) {
-          skipped++;
-          _setChipState(url, "saved", "Already contacted");
-          continue;
+          // Avoid Duplicate Outreach: skip people already contacted.
+          if (state.avoidDuplicates && _isContacted(url)) {
+            skipped++;
+            _setChipState(url, "saved", "Already contacted");
+            continue;
+          }
+
+          const card = _cardForUrl(url);
+          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+
+          // Already pending / connected → nothing to do.
+          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+          if (cls === "unknown" || !card) { skipped++; continue; }
+
+          processed++;
+          _setChipState(url, "saving", "Connecting…");
+
+          let result;
+          if (cls === "follow") {
+            result = await _sendFollowOnCard(card, presetBtn);
+          } else {
+            // Bring the row into view so the modal's buttons get valid coordinates,
+            // then run the proven click-Connect → "Send without a note" sequence.
+            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 300);
+            result = await _sendConnectOnCard(card, presetBtn);
+          }
+
+          if (result.ok) {
+            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+            _markContacted(url);
+            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+          } else {
+            failed++;
+            _setChipState(url, "error", "Skipped");
+            // Make sure a leftover dialog never blocks the next card.
+            if (_invitationModalOpen()) _closeAnyDialog();
+          }
+
+          flashStatus(`${summarise()} (${processed})`);
+          if (state.connectCancel) break outer;
+          await sleep(_connectGap());
         }
 
-        const card = _cardForUrl(url);
-        const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
-        const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
-
-        // Already pending / connected → nothing to do.
-        if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
-        if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
-        if (cls === "unknown" || !card) { skipped++; continue; }
-
-        processed++;
-        _setChipState(url, "saving", "Connecting…");
-
-        let result;
-        if (cls === "follow") {
-          result = await _sendFollowOnCard(card, presetBtn);
-        } else {
-          // Bring the row into view so the modal's buttons get valid coordinates,
-          // then run the proven click-Connect → "Send without a note" sequence.
-          try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
-          await sleep(300 + Math.random() * 300);
-          result = await _sendConnectOnCard(card, presetBtn);
+        // ---- advance to the next results page (Connect All mode only) --------
+        if (!autoPage || state.connectCancel) break;
+        const nextBtn = _findNextPageButton();
+        if (!nextBtn) break;
+        const sig = _pageSignature();
+        try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+        await sleep(400 + Math.random() * 400);
+        await dispatchHumanClick(nextBtn);
+        // Wait for the page to actually change (signature flip), up to ~12s.
+        let changed = false;
+        for (let i = 0; i < 40 && !state.connectCancel; i++) {
+          await sleep(300);
+          if (_pageSignature() !== sig) { changed = true; break; }
         }
-
-        if (result.ok) {
-          if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
-          else { sent++; _setChipState(url, "saved", "Invited ✓"); }
-          _markContacted(url);
-          try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
-        } else {
-          failed++;
-          _setChipState(url, "error", "Skipped");
-          // Make sure a leftover dialog never blocks the next card.
-          if (_invitationModalOpen()) _closeAnyDialog();
-        }
-
-        flashStatus(`${summarise()} (${processed})`);
-        if (state.connectCancel) break outer;
-        await sleep(_connectGap());
+        if (!changed || state.connectCancel) break;
+        await _scrollLoadPage();
+        decorateSearchCards();
+        await sleep(800 + Math.random() * 600);
+        pageNum++;
+        urls = _allChipUrls()
+          .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
+          .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+        if (!urls.length) break;
       }
-
-      // ---- advance to the next results page (Connect All mode only) --------
-      if (!autoPage || state.connectCancel) break;
-      const nextBtn = _findNextPageButton();
-      if (!nextBtn) break;
-      const sig = _pageSignature();
-      try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
-      await sleep(400 + Math.random() * 400);
-      await dispatchHumanClick(nextBtn);
-      // Wait for the page to actually change (signature flip), up to ~12s.
-      let changed = false;
-      for (let i = 0; i < 40 && !state.connectCancel; i++) {
-        await sleep(300);
-        if (_pageSignature() !== sig) { changed = true; break; }
-      }
-      if (!changed || state.connectCancel) break;
-      await _scrollLoadPage();
-      decorateSearchCards();
-      await sleep(800 + Math.random() * 600);
-      pageNum++;
-      urls = _allChipUrls()
-        .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
-        .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
-      if (!urls.length) break;
+    } finally {
+      state.connectActive = false;
+      state.connectCancel = false;
+      mountSelectAllHeader();
+      renderToolbar();
     }
-
-    state.connectActive = false;
-    state.connectCancel = false;
-    mountSelectAllHeader();
-    renderToolbar();
     const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
     flashStatus(`Connect All done: ${summarise()}${pageLabel} ✓`, "ok");
   }
@@ -3095,6 +3142,25 @@
     return { ok: false, reason: "too_many_steps" };
   }
 
+  // Stable fingerprint for whatever job is currently shown in the detail pane.
+  // Uses the URL's currentJobId/path first; falls back to the visible job title.
+  function _detailPaneFingerprint() {
+    try {
+      const u = new URL(location.href);
+      const cj = u.searchParams.get("currentJobId");
+      if (cj) return "id:" + cj;
+      const m = u.pathname.match(/\/jobs\/view\/(\d+)/);
+      if (m) return "id:" + m[1];
+    } catch {}
+    const h = document.querySelector(
+      ".jobs-search__job-details h1, .scaffold-layout__detail h1, " +
+      ".jobs-unified-top-card__job-title, [class*='top-card'] h1, " +
+      ".jobs-details-top-card__job-title"
+    );
+    const title = (h?.innerText || "").trim();
+    return title ? "title:" + title : "";
+  }
+
   // Open one job's detail pane (clicks its card link) and wait until the detail
   // actually reflects THIS job — otherwise a slow detail-pane update could make
   // us click Easy Apply on the previously-open job.
@@ -3109,19 +3175,16 @@
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
+
+    // Snapshot what's currently in the detail pane BEFORE clicking so we can
+    // tell when it actually updates to the new job. Without this, a stale
+    // "Easy Apply" button from the previously-open job would make us proceed
+    // immediately without waiting for the correct job to load.
+    const prevFingerprint = _detailPaneFingerprint();
+
     // Single controlled click — do NOT double-click (dispatchHumanClick + _forceClick)
     // because two rapid clicks confuse LinkedIn's SPA router and may close the pane.
     try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
-
-    // Broad check: any visible "Easy Apply" button anywhere in the document.
-    // Don't restrict to specific containers — LinkedIn renames them constantly.
-    const _anyEasyApplyVisible = () =>
-      Array.from(document.querySelectorAll("button")).some((b) => {
-        if (!_isVisible(b)) return false;
-        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-        const a = b.getAttribute("aria-label") || "";
-        return /easy apply/i.test(t) || /easy apply/i.test(a);
-      });
 
     const _urlMatchesJob = () => {
       if (!expectedId) return false;
@@ -3134,11 +3197,27 @@
       return false;
     };
 
+    const _easyApplyVisible = () =>
+      Array.from(document.querySelectorAll("button")).some((b) => {
+        if (!_isVisible(b)) return false;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        const a = b.getAttribute("aria-label") || "";
+        return /easy apply/i.test(t) || /easy apply/i.test(a);
+      });
+
     const start = Date.now();
-    // Wait up to 8s for EITHER: URL reflects this job OR Easy Apply button appears.
+    // Wait up to 8s. Accept either:
+    //   - URL now references the expected job id, OR
+    //   - The detail pane fingerprint changed AND an Easy Apply button is visible.
+    // The fingerprint check prevents acting on the previous job's stale button.
     while (Date.now() - start < 8000) {
       if (state.applyCancel) return false;
-      if (_urlMatchesJob() || _anyEasyApplyVisible()) break;
+      if (_urlMatchesJob()) break;
+      const curFp = _detailPaneFingerprint();
+      const paneChanged = curFp !== prevFingerprint;
+      if (paneChanged && _easyApplyVisible()) break;
+      // No previous pane (first job) — any Easy Apply button is fine.
+      if (!prevFingerprint && _easyApplyVisible()) break;
       await sleep(300);
     }
     // Extra settle buffer for React to finish rendering.
@@ -3347,33 +3426,35 @@
       return true; // Completed page without cancellation
     };
 
-    // Process first page
-    await processPage(firstPageKeys);
-
-    // Auto-paginate through subsequent pages (bulk mode only, not singleJob)
     let pageNum = 0;
-    while (!singleJob && !cancelled && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
-      const moved = await _goToNextJobsPage();
-      if (!moved) break; // No more pages
-      pageNum++;
-      // Visibly select every job on the fresh page, then apply them all —
-      // matching the requested "next page → select all → apply all" loop.
-      _selectAllVisibleJobs();
-      flashStatus(`Page ${pageNum + 1} — selected all, applying… (${applied} done)`);
-      const nextKeys = _allJobUrls();
-      if (!nextKeys.length) break;
-      state.applyProgress = { current: applied + 1, total: applied + nextKeys.length, name: "" };
-      renderToolbar();
-      const cont = await processPage(nextKeys);
-      if (!cont) break;
-    }
+    try {
+      // Process first page
+      await processPage(firstPageKeys);
 
-    state.applyActive = false;
-    state.applyProgress = null;
-    if (!singleJob) state.selectedJobUrls.clear();
-    mountSelectAllHeader();
-    renderToolbar();
-    try { decorateJobCards(); } catch {}
+      // Auto-paginate through subsequent pages (bulk mode only, not singleJob)
+      while (!singleJob && !cancelled && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
+        const moved = await _goToNextJobsPage();
+        if (!moved) break; // No more pages
+        pageNum++;
+        // Visibly select every job on the fresh page, then apply them all —
+        // matching the requested "next page → select all → apply all" loop.
+        _selectAllVisibleJobs();
+        flashStatus(`Page ${pageNum + 1} — selected all, applying… (${applied} done)`);
+        const nextKeys = _allJobUrls();
+        if (!nextKeys.length) break;
+        state.applyProgress = { current: applied + 1, total: applied + nextKeys.length, name: "" };
+        renderToolbar();
+        const cont = await processPage(nextKeys);
+        if (!cont) break;
+      }
+    } finally {
+      state.applyActive = false;
+      state.applyProgress = null;
+      if (!singleJob) state.selectedJobUrls.clear();
+      mountSelectAllHeader();
+      renderToolbar();
+      try { decorateJobCards(); } catch {}
+    }
 
     const extra = [
       skipped ? `${skipped} skipped` : "",
