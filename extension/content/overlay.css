@@ -386,6 +386,13 @@
   z-index: 10 !important;
 }
 
+/* While an Auto Apply run is in progress the per-card chips have nothing to do
+   and a stray one can float over the open Easy Apply modal. Hide them all for
+   the duration of the run; the bottom toolbar shows progress + Stop instead. */
+.lc-applying .lc-job-apply-row {
+  display: none !important;
+}
+
 .lc-inline-check {
   display: inline-flex !important;
   align-items: center !important;

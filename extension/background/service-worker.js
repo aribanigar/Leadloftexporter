@@ -159,7 +159,7 @@ async function fetchJson(path, opts = {}) {
     });
   } catch (e) {
     // Network / DNS / CORS failure — fetch throws, never gets to .ok
-    console.error("[LeadCaptura SW] fetch threw", { url, method: opts.method, error: e?.message });
+    console.log(`[LeadCaptura SW] fetch threw ${opts.method || "GET"} ${url} error="${e?.message || e}"`);
     throw new Error(`Failed to fetch ${url}: ${e?.message || e}`);
   }
   const text = await res.text();
@@ -172,12 +172,18 @@ async function fetchJson(path, opts = {}) {
   if (!res.ok) {
     // Surface HTTP status alongside the server's message so the content
     // script's error decorator can map 401/403 etc. to actionable hints.
-    const detail =
+    const rawDetail =
       (data && typeof data === "object" && data.detail) ||
       (typeof data === "string" && data) ||
       "";
+    // FastAPI 422 validation errors return detail as an array of {loc, msg, type}
+    // objects. Stringifying via template literals yields "[object Object]"; pull
+    // the human-readable .msg fields instead.
+    const detail = Array.isArray(rawDetail)
+      ? rawDetail.map((e) => e?.msg || JSON.stringify(e)).join("; ")
+      : String(rawDetail || "");
     const message = `HTTP ${res.status}${detail ? ` — ${detail}` : ""}`;
-    console.error("[LeadCaptura SW] fetch !ok", { url, status: res.status, detail });
+    console.log(`[LeadCaptura SW] fetch !ok ${url} status=${res.status} detail="${detail}"`);
     throw new Error(message);
   }
   return data;
