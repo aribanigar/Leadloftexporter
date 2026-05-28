@@ -1036,7 +1036,7 @@
     const _makeHandle = () =>
       el("div", { class: "lc-toolbar-handle", onclick: _toggleToolbar },
         el("span", { class: "lc-logo" }, "L"),
-        el("span", { class: "lc-tb-title" }, "LeadCaptura"),
+        el("span", { class: "lc-tb-title" }, `LeadCaptura v${_LC_VERSION}`),
         el("span", { class: "lc-toolbar-arrow" }, state.toolbarCollapsed ? "↑" : "↓")
       );
 
@@ -1073,7 +1073,7 @@
               state.applyActive
                 ? el("button", {
                     class: "lc-btn lc-btn-stop",
-                    onclick: () => { state.applyCancel = true; flashStatus("Stopping after current item…"); },
+                    onclick: () => { state.applyCancel = true; flashStatus("Stopping…", "warn"); try { _lcToast("⏹ Stopping…"); } catch {} },
                   }, "Stop")
                 : el("button", {
                     class: "lc-btn lc-btn-primary",
@@ -1236,7 +1236,8 @@
                     if (state.bulkActive) state.bulkCancel = true;
                     if (state.connectActive) state.connectCancel = true;
                     if (state.applyActive) state.applyCancel = true;
-                    flashStatus("Stopping after current item…");
+                    flashStatus("Stopping…", "warn");
+                    try { _lcToast("⏹ Stopping…"); } catch {}
                   },
                 },
                 "Stop"
@@ -2536,14 +2537,6 @@
       for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
     }
     decorateJobCards();
-    for (const wrap of injectedJobChips.values()) {
-      const key = wrap?.dataset?.lcKey;
-      const check = wrap?.querySelector(".lc-inline-check");
-      if (!key || !check) continue;
-      const on = state.selectedJobUrls.has(key);
-      check.textContent = on ? "☑" : "☐";
-      check.classList.toggle("lc-inline-check-on", on);
-    }
     refreshSelectAllHeader();
     renderToolbar();
   }
@@ -2553,14 +2546,6 @@
   function _selectAllVisibleJobs() {
     try { decorateJobCards(); } catch {}
     for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
-    for (const wrap of injectedJobChips.values()) {
-      const key = wrap?.dataset?.lcKey;
-      const check = wrap?.querySelector(".lc-inline-check");
-      if (!key || !check) continue;
-      const on = state.selectedJobUrls.has(key);
-      check.textContent = on ? "☑" : "☐";
-      check.classList.toggle("lc-inline-check-on", on);
-    }
     refreshSelectAllHeader();
   }
 
@@ -2593,29 +2578,21 @@
     if (content) {
       return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
     }
-    // 3. Full-page Easy Apply (URL = /jobs/view/<id>/apply/) where the form is
-    //    NOT in a dialog and uses no recognizable container class. Anchor on the
-    //    visible primary action button (Next / Review / Submit application) and
-    //    return a container that holds both it and the form. This is layout-
-    //    agnostic — it works no matter what wrapper classes LinkedIn ships.
-    const onApplyPath = /\/apply\b/.test(location.pathname);
-    const actionBtn = Array.from(document.querySelectorAll("button, [role='button']")).find((b) => {
-      if (!_isVisible(b)) return false;
-      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      return (
-        /^(next|continue to next step|review|review your application|submit|submit application|done)$/i.test(t) ||
-        /continue to next step|submit application|review your application/i.test(a)
-      );
-    });
-    if (onApplyPath || actionBtn) {
-      if (actionBtn) {
-        return (
-          actionBtn.closest(
-            "form, main, .scaffold-layout, .application-outlet, [class*='easy-apply'], [class*='apply']"
-          ) || document.querySelector("main") || document.body
-        );
-      }
+    // 3. Full-page Easy Apply where the form has no recognizable container
+    //    class: rely on the apply-progress REGION ("Your job application
+    //    progress is at N percent.") or an actual /jobs/view/<id>/apply/ URL.
+    //    Do NOT infer the form from a bare "Next"/"Submit" button — the job
+    //    SEARCH page has its own pagination "Next", and matching that made the
+    //    stepper walk start=25→50→100 instead of applying.
+    const progressRegion = document.querySelector(
+      "[aria-label*='job application progress' i][role='region'], " +
+      "[aria-label*='application progress' i]"
+    );
+    if (progressRegion) {
+      return progressRegion.closest("main, .scaffold-layout, .application-outlet, form") ||
+        progressRegion.parentElement || progressRegion;
+    }
+    if (/\/jobs\/view\/\d+\/apply\b/.test(location.pathname)) {
       return document.querySelector("main") || document.body;
     }
     return null;
@@ -2670,12 +2647,22 @@
       return /\bapplied\b/i.test(t) || /\bapplied\b/i.test(a);
     };
 
+    // SCOPE to the right-hand DETAIL pane. On /jobs/search/ (split view) the
+    // left list's per-card "Apply" badges would otherwise be matched first —
+    // clicking those just re-opens the job and never starts an application.
+    const root = document.querySelector(
+      ".jobs-search__job-details, .jobs-search__job-details--container, " +
+      ".jobs-search__job-details--wrapper, .scaffold-layout__detail, " +
+      ".jobs-details, .job-view-layout, .jobs-details__main-content, " +
+      ".job-details-jobs-unified-top-card__container--two-pane"
+    ) || document;
+
     // Fast path: specific selectors for known LinkedIn container class names.
     // NOTE: the 2026 rename makes the in-app apply control an <a> anchor
     // (e.g. <a href=".../apply/" aria-label="LinkedIn Apply to this job">), not
     // a <button> — so every selector below covers BOTH button and a.
     const cands = Array.from(
-      document.querySelectorAll(
+      root.querySelectorAll(
         "button.jobs-apply-button, a.jobs-apply-button, " +
         "button[aria-label*='Easy Apply' i], a[aria-label*='Easy Apply' i], " +
         "button[aria-label*='LinkedIn Apply' i], a[aria-label*='LinkedIn Apply' i], " +
@@ -2696,22 +2683,26 @@
     ).filter(_isVisible);
 
     for (const b of cands) {
-      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) {
+        console.log(`[LeadCaptura] classify: Easy/LinkedIn Apply found — "${(b.innerText||b.textContent||'').trim()}" aria="${b.getAttribute('aria-label')||''}" tag=${b.tagName}`);
+        return { status: "easy", btn: b };
+      }
     }
     for (const b of cands) {
       if (_isAppliedBtn(b)) return { status: "applied", btn: null };
       if (_isExternalBtn(b)) return { status: "external", btn: null };
     }
 
-    // Broad fallback: scan EVERY visible button AND anchor in the document.
-    // LinkedIn renames container classes often and moved the in-app apply
-    // control from <button> to <a>; the label text is the stable signal.
-    const allBtns = Array.from(document.querySelectorAll(
+    // Broad fallback: scan EVERY visible button AND anchor in the DETAIL pane.
+    const allBtns = Array.from(root.querySelectorAll(
       "button, a[role='button'], a.jobs-apply-button, " +
       "a[aria-label*='apply' i], a[href*='/jobs/view/'][href*='/apply'], a[href*='/apply/']"
     )).filter(_isVisible);
     for (const b of allBtns) {
-      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) {
+        console.log(`[LeadCaptura] classify(fallback): Apply found — "${(b.innerText||b.textContent||'').trim()}" aria="${b.getAttribute('aria-label')||''}" tag=${b.tagName}`);
+        return { status: "easy", btn: b };
+      }
     }
 
     // Also check static "Applied" and "External" badges that aren't buttons.
@@ -2760,19 +2751,40 @@
 
     // Resolve the action button within a given scope. Submit/Review/Next take
     // priority (in that order); then an artdeco primary; then any non-dismiss
-    // button as a last resort.
+    // button as a last resort. NEVER the "Back to previous step" button.
+    const isBack = (x) =>
+      /back to previous step|^back$|previous/i.test(x.getAttribute("aria-label") || "") ||
+      SKIP.has((x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase());
+    // Search-results PAGINATION must never be treated as an apply step — that
+    // made the stepper page through start=25→50→100 instead of applying.
+    const isPagination = (x) =>
+      !!x.closest(".artdeco-pagination, [class*='pagination']") ||
+      /pagination/i.test(x.getAttribute("data-testid") || "") ||
+      /view next page|view previous page|^page \d+$/i.test(x.getAttribute("aria-label") || "");
+    const ok = (b) => b && _isVisible(b) && !isPagination(b);
     const pick = (scope) => {
       if (!scope) return null;
-      const btns = Array.from(scope.querySelectorAll("button")).filter(_isVisible);
-      let b;
+      // Stable fast paths from LinkedIn's live DOM (data attrs + exact labels).
+      let b =
+        scope.querySelector("button[data-live-test-easy-apply-submit-button]") ||
+        scope.querySelector("button[aria-label*='Submit application' i]");
+      if (ok(b)) return { type: "submit", btn: b };
+      b = scope.querySelector("button[aria-label*='Review your application' i]");
+      if (ok(b)) return { type: "review", btn: b };
+      b =
+        scope.querySelector("button[data-easy-apply-next-button]") ||
+        scope.querySelector("button[data-live-test-easy-apply-next-button]") ||
+        scope.querySelector("button[aria-label*='Continue to next step' i]");
+      if (ok(b)) return { type: "next", btn: b };
+
+      // Text-based fallback (excludes Back and pagination).
+      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x) && !isPagination(x));
       if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
       if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
       if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
-      const primary = btns.find((x) => {
-        const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-        if (!t || SKIP.has(t)) return false;
-        return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
-      });
+      const primary = btns.find(
+        (x) => x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3")
+      );
       if (primary) return { type: "next", btn: primary };
       return null;
     };
@@ -2787,10 +2799,10 @@
     const result = pick(footer) || pick(modal);
     if (result) return result;
 
-    // Absolute last resort: any visible non-dismiss button anywhere in the modal.
+    // Absolute last resort: any visible non-dismiss, non-back button.
     const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !!t && !SKIP.has(t);
+      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x);
     });
     return fallback ? { type: "next", btn: fallback } : null;
   }
@@ -2823,10 +2835,13 @@
     const boxes = Array.from(modal.querySelectorAll("input[type='checkbox']"));
     for (const cb of boxes) {
       const id = cb.id || "";
-      const lbl = modal.querySelector(`label[for='${id}']`);
-      const txt = (lbl?.innerText || cb.getAttribute("aria-label") || "").toLowerCase();
-      if (/follow/i.test(txt) && cb.checked) {
-        try { cb.click(); } catch {}
+      const lbl = (id && modal.querySelector(`label[for='${id}']`)) || cb.closest("label");
+      const txt = (lbl?.innerText || lbl?.textContent || cb.getAttribute("aria-label") || "").toLowerCase();
+      // LinkedIn's follow checkbox (id=follow-company-checkbox) is
+      // visually-hidden and Ember binds the toggle to the LABEL, so a click on
+      // the input itself is a no-op. Click the label (fall back to the input).
+      if (/\bfollow\b/i.test(txt) && cb.checked) {
+        try { (lbl || cb).click(); } catch { try { cb.click(); } catch {} }
       }
     }
   }
@@ -2885,11 +2900,24 @@
         await sleep(500 + Math.random() * 400);
         continue;
       }
-      // 2. Click Dismiss (X) ONLY inside the real Easy Apply dialog. A
+      // 2. Work only inside the real Easy Apply / post-apply dialog. A
       //    document-wide search would match a job card's own "Dismiss" X (which
       //    means "don't recommend this job") — never click those.
       const dialog = _realModalDialog();
       if (dialog) {
+        // 2a. Post-apply "show recruiters you're open to work" / next-best-action
+        //     prompt — decline politely (NEVER click "Get started"/"Yes").
+        const decline = Array.from(dialog.querySelectorAll("button")).find((b) => {
+          if (!_isVisible(b)) return false;
+          const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+          return /^(no thanks|not now|skip|maybe later|no,? thanks)$/i.test(t);
+        });
+        if (decline) {
+          _forceClick(decline);
+          await sleep(500 + Math.random() * 400);
+          continue;
+        }
+        // 2b. Otherwise click the dialog's Dismiss (X).
         const dismiss = dialog.querySelector(
           "button[aria-label='Dismiss'], button[aria-label*='Dismiss' i]"
         );
@@ -3168,20 +3196,26 @@
   // Step through the open Easy Apply modal. Returns {ok, reason}.
   async function _runEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
-    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
+    const { dispatchHumanClick } = globalThis.__lcDom;
 
-    // Wait up to 10s for the modal — LinkedIn can be slow to open it.
-    let modal = await waitFor(
-      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']",
-       ".artdeco-modal[role='dialog']", "div[role='dialog']"],
-      { timeout: 10000 }
-    );
-    modal = _easyApplyModal() || modal;
+    // Poll for the apply form to appear — modal OR full-page /apply/ — up to 12s.
+    // _easyApplyModal understands both layouts, so this catches the form the
+    // instant it renders no matter how LinkedIn opened it.
+    let modal = null;
+    const _waitStart = Date.now();
+    while (Date.now() - _waitStart < 12000) {
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+      if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
+      modal = _easyApplyModal();
+      if (modal) break;
+      await sleep(300);
+    }
     if (!modal) {
-      console.log("[LeadCaptura] easy-apply: form/modal not found after click — skipping job");
+      console.log(`[LeadCaptura] easy-apply: form not found after click (url=${location.pathname}) — skipping job`);
       return { ok: false, reason: "modal_not_found" };
     }
-    // Extra settle time — LinkedIn animates the modal in.
+    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName})`);
+    // Extra settle time — LinkedIn animates the form in.
     await sleep(600 + Math.random() * 400);
 
     const MAX_STEPS = 20;
@@ -3217,6 +3251,10 @@
         html: m?.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 300) || "",
       });
 
+      // Stop pressed? Bail before firing any further click (never submit/advance
+      // after the user hit Stop).
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+
       if (action.type === "submit") {
         // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
         // handlers reliably honour. Escalate to _forceClick only if it didn't land.
@@ -3242,8 +3280,9 @@
 
       // Advance (next / review). Snapshot first so we can detect movement.
       const before = snap(modal);
-      // Reading pause before clicking.
-      await sleep(600 + Math.random() * 700);
+      // Reading pause before clicking — interruptible by Stop.
+      await _cancellableSleep(600 + Math.random() * 700);
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
       // Did the modal move past `before`?
       const progressed = (m) => {
@@ -3422,12 +3461,23 @@
   async function _goToNextJobsPage() {
     const { sleep } = globalThis.__lcHuman;
 
-    // Try multiple pagination button selectors
+    // Try multiple pagination button selectors (newest LinkedIn layout first).
     let nextBtn =
+      document.querySelector("button[data-testid='pagination-controls-next-button-visible']:not([disabled])") ||
+      document.querySelector("button[data-testid='pagination-controls-next-button']:not([disabled])") ||
       document.querySelector("button[aria-label='View next page']") ||
       document.querySelector("button[aria-label*='next page' i]") ||
       document.querySelector(".artdeco-pagination__button--next:not([disabled])") ||
       null;
+
+    // Newer pagination renders "Next" as a button whose label is a child <span>.
+    if (!nextBtn) {
+      nextBtn = Array.from(document.querySelectorAll("button")).find((b) => {
+        if (b.disabled || b.getAttribute("aria-disabled") === "true") return false;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        return /^next$/i.test(t) && b.querySelector("svg[id*='chevron-right' i], [class*='chevron-right']");
+      }) || null;
+    }
 
     if (!nextBtn) {
       // Walk pagination indicators: find active → click next sibling
@@ -3475,6 +3525,17 @@
     try { decorateJobCards(); } catch {}
 
     return true;
+  }
+
+  // Sleep that wakes the instant Stop is pressed (state.applyCancel), checked
+  // every 150ms — so a long inter-job gap doesn't delay Stop by 30–50s.
+  async function _cancellableSleep(ms) {
+    const { sleep } = globalThis.__lcHuman;
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (state.applyCancel) return;
+      await sleep(Math.min(150, end - Date.now()));
+    }
   }
 
   function _applyGap(doneCount) {
@@ -3556,6 +3617,7 @@
         if (res.ok) {
           applied++; sinceBreak++;
           _setJobChipState(key, "saved", "Applied ✓");
+          try { _lcToast(`✅ Applied ✓ — ${applied} applied this run`, 3500); } catch {}
         } else if (res.reason === "already_applied") {
           skipped++; _setJobChipState(key, "saved", "Already applied ✓");
         } else if (res.reason === "external_apply") {
@@ -3576,16 +3638,31 @@
 
         const last = i >= keys.length - 1;
         if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
-          let gap;
+          let gap, isBreak = false;
           if (sinceBreak >= nextBreakAt) {
             sinceBreak = 0;
             nextBreakAt = 8 + Math.floor(Math.random() * 5);
-            gap = 25000 + Math.random() * 20000;
-            flashStatus(`Short break… (${applied} applied)`);
+            gap = 25000 + Math.random() * 20000; // 25–45s "micro-break"
+            isBreak = true;
           } else {
-            gap = _applyGap(applied);
+            gap = _applyGap(applied); // human-paced 4-tier gap
           }
-          await sleep(gap);
+          const secs = Math.round(gap / 1000);
+          const summary = `${applied} applied · ${skipped} skipped · ${failed} failed`;
+          flashStatus(
+            isBreak
+              ? `Taking a ${secs}s break (human pacing) — ${summary}`
+              : `Pausing ${secs}s before next job — ${summary}`
+          );
+          // On-page live indicator with running count + the exact halt time.
+          try {
+            _lcToast(
+              `${isBreak ? "☕ Break" : "⏳ Waiting"} ${secs}s before next job · ${applied} applied so far`,
+              Math.min(gap, 6000)
+            );
+          } catch {}
+          await _cancellableSleep(gap);
+          if (state.applyCancel) { cancelled = true; return false; }
         }
       }
       return true; // Completed page without cancellation
