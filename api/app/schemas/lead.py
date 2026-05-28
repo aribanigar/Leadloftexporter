@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class LeadBase(BaseModel):
@@ -9,7 +9,12 @@ class LeadBase(BaseModel):
     last_name: Optional[str] = None
     full_name: Optional[str] = None
     title: Optional[str] = None
-    email: Optional[EmailStr] = None
+    # Plain str (not EmailStr): leads are ingested from scraping, which can yield
+    # malformed values ("N/A", "email protected", truncated text). LeadOut inherits
+    # this field and Pydantic re-validates on serialization, so strict EmailStr
+    # validation here 500s GET /leads whenever one stored lead has a bad email —
+    # which blanks the entire Pipeline/Prospecting view.
+    email: Optional[str] = None
     phone: Optional[str] = None
     linkedin_url: Optional[str] = None
     location: Optional[str] = None
@@ -32,7 +37,7 @@ class LeadUpdate(BaseModel):
     last_name: Optional[str] = None
     full_name: Optional[str] = None
     title: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     linkedin_url: Optional[str] = None
     location: Optional[str] = None
