@@ -1073,7 +1073,7 @@
               state.applyActive
                 ? el("button", {
                     class: "lc-btn lc-btn-stop",
-                    onclick: () => { state.applyCancel = true; flashStatus("Stopping after current item…"); },
+                    onclick: () => { state.applyCancel = true; flashStatus("Stopping…", "warn"); try { _lcToast("⏹ Stopping…"); } catch {} },
                   }, "Stop")
                 : el("button", {
                     class: "lc-btn lc-btn-primary",
@@ -1236,7 +1236,8 @@
                     if (state.bulkActive) state.bulkCancel = true;
                     if (state.connectActive) state.connectCancel = true;
                     if (state.applyActive) state.applyCancel = true;
-                    flashStatus("Stopping after current item…");
+                    flashStatus("Stopping…", "warn");
+                    try { _lcToast("⏹ Stopping…"); } catch {}
                   },
                 },
                 "Stop"
@@ -3250,6 +3251,10 @@
         html: m?.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 300) || "",
       });
 
+      // Stop pressed? Bail before firing any further click (never submit/advance
+      // after the user hit Stop).
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+
       if (action.type === "submit") {
         // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
         // handlers reliably honour. Escalate to _forceClick only if it didn't land.
@@ -3275,8 +3280,9 @@
 
       // Advance (next / review). Snapshot first so we can detect movement.
       const before = snap(modal);
-      // Reading pause before clicking.
-      await sleep(600 + Math.random() * 700);
+      // Reading pause before clicking — interruptible by Stop.
+      await _cancellableSleep(600 + Math.random() * 700);
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
       // Did the modal move past `before`?
       const progressed = (m) => {
@@ -3521,6 +3527,17 @@
     return true;
   }
 
+  // Sleep that wakes the instant Stop is pressed (state.applyCancel), checked
+  // every 150ms — so a long inter-job gap doesn't delay Stop by 30–50s.
+  async function _cancellableSleep(ms) {
+    const { sleep } = globalThis.__lcHuman;
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (state.applyCancel) return;
+      await sleep(Math.min(150, end - Date.now()));
+    }
+  }
+
   function _applyGap(doneCount) {
     const r = Math.random();
     let gap;
@@ -3644,7 +3661,8 @@
               Math.min(gap, 6000)
             );
           } catch {}
-          await sleep(gap);
+          await _cancellableSleep(gap);
+          if (state.applyCancel) { cancelled = true; return false; }
         }
       }
       return true; // Completed page without cancellation
