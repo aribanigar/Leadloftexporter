@@ -2393,7 +2393,12 @@
         "button[data-control-name*='apply' i], " +
         ".jobs-apply-button--top-card button, .jobs-s-apply button, " +
         ".jobs-unified-top-card button, .jobs-details-top-card button, " +
-        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button"
+        "div[class*='jobs-apply'] button, div[class*='top-card-layout'] button, " +
+        ".jobs-apply-button, [data-control-name='apply_topcard_btn'], " +
+        ".artdeco-button--primary[href*='apply'], " +
+        ".job-details-jobs-unified-top-card__container--two-pane button, " +
+        ".jobs-unified-top-card__content--two-pane button, " +
+        ".jobs-apply-button__container button"
       )
     ).filter(_isVisible);
     for (const b of cands) {
@@ -2403,10 +2408,11 @@
     }
     // Check for "Applied" badge / button (already submitted)
     const applied = Array.from(document.querySelectorAll(
-      "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied"
+      "button[aria-label*='Applied' i], span[class*='applied'], .jobs-apply-button--applied, " +
+      "[aria-label*='Applied' i], .jobs-apply-button--applied-state"
     )).filter(_isVisible);
     if (applied.length) return { status: "applied", btn: null };
-    const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout")?.innerText || "");
+    const bodyTxt = (document.querySelector(".jobs-s-apply, .jobs-details, .job-view-layout, .job-details-jobs-unified-top-card__container--two-pane")?.innerText || "");
     if (/\bapplied\b/i.test(bodyTxt) && !cands.length) return { status: "applied", btn: null };
     for (const b of cands) {
       const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
@@ -2437,7 +2443,10 @@
   function _modalActionButton(modal) {
     if (!modal) return null;
     // Prefer footer buttons but fall back to all visible buttons
-    const footer = modal.querySelector("footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer']");
+    const footer = modal.querySelector(
+      "footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer'], " +
+      ".artdeco-modal__actionbar, [data-test-modal-footer]"
+    );
     const btns = Array.from((footer || modal).querySelectorAll("button")).filter(_isVisible);
     const match = (b, re) =>
       re.test((b.getAttribute("aria-label") || "")) ||
@@ -2445,13 +2454,21 @@
     let b;
     if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
     if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$/i)))) return { type: "next", btn: b };
-    // Last resort: any non-dismiss, non-back primary button in the modal footer
-    const primaryBtn = btns.find((x) => {
+    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
+    // Prioritise any artdeco primary button not on the exclusion list
+    const SKIP = new Set(["back", "dismiss", "discard", "cancel", "close", "previous"]);
+    const primary = btns.find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !["back", "dismiss", "discard", "cancel", "close"].includes(t) && t.length > 0;
+      if (!t || SKIP.has(t)) return false;
+      return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
     });
-    if (primaryBtn) return { type: "next", btn: primaryBtn };
+    if (primary) return { type: "next", btn: primary };
+    // Last resort: any non-dismiss, non-back button
+    const fallback = btns.find((x) => {
+      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      return !!t && !SKIP.has(t);
+    });
+    if (fallback) return { type: "next", btn: fallback };
     return null;
   }
 
@@ -2712,6 +2729,61 @@
         }
       }
     }
+
+    // LinkedIn ARIA combobox / custom dropdowns (not native <select>).
+    // These render as [role='combobox'] or .artdeco-dropdown wrappers; clicking
+    // the trigger opens a [role='listbox'] and each option is [role='option'].
+    const combos = Array.from(modal.querySelectorAll(
+      "[role='combobox']:not([type='text']):not([type='search']), " +
+      ".artdeco-dropdown__trigger, [data-test-text-entity-list-form-select]"
+    )).filter((el) => _isVisible(el) && !el.disabled);
+    for (const trigger of combos) {
+      const wrap = trigger.closest(
+        ".artdeco-dropdown, [data-test-form-element], .fb-dash-form-element, " +
+        ".jobs-easy-apply-form-element"
+      ) || trigger.parentElement;
+      const label = _fieldLabelFor(trigger) || _fieldLabelFor(wrap);
+      const currentVal = (trigger.getAttribute("aria-activedescendant") ? "" :
+        trigger.textContent || trigger.value || "").trim();
+      const isPlaceholder = !currentVal || /^(select|choose|please|--)/.test(currentVal);
+      if (!isPlaceholder) continue;
+      // Collect options from any open or triggerable listbox.
+      const getOptions = () => {
+        const lb = document.querySelector("[role='listbox']") ||
+          wrap?.querySelector("[role='listbox']");
+        if (!lb) return [];
+        return Array.from(lb.querySelectorAll("[role='option']"))
+          .map((o) => (o.innerText || o.textContent || "").trim())
+          .filter(Boolean);
+      };
+      try { trigger.click(); } catch {}
+      await sleep(400 + Math.random() * 300);
+      let opts = getOptions();
+      if (!opts.length) {
+        _forceClick(trigger);
+        await sleep(500);
+        opts = getOptions();
+      }
+      if (!opts.length) continue;
+      let ans = _matchProfileAnswer(label, profile, "select", opts);
+      if (ans == null) ans = await askGemini(label, "select", opts);
+      const pick = ans ? _pickOption(opts, ans) : null;
+      if (pick) {
+        const lb = document.querySelector("[role='listbox']") || wrap?.querySelector("[role='listbox']");
+        if (lb) {
+          const opt = Array.from(lb.querySelectorAll("[role='option']"))
+            .find((o) => (o.innerText || o.textContent || "").trim() === pick);
+          if (opt) {
+            try { opt.click(); } catch {}
+            await sleep(200 + Math.random() * 200);
+          }
+        }
+      } else {
+        // Close the dropdown without selecting anything (press Escape).
+        try { trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); } catch {}
+        await sleep(200);
+      }
+    }
   }
 
   // Step through the open Easy Apply modal. Returns {ok, reason}.
@@ -2719,14 +2791,19 @@
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
 
+    // Wait up to 10s for the modal — LinkedIn can be slow to open it.
     let modal = await waitFor(
-      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']", "div[role='dialog']"],
-      { timeout: 6000 }
+      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']",
+       ".artdeco-modal[role='dialog']", "div[role='dialog']"],
+      { timeout: 10000 }
     );
     modal = _easyApplyModal() || modal;
     if (!modal) return { ok: false, reason: "modal_not_found" };
+    // Extra settle time — LinkedIn animates the modal in.
+    await sleep(600 + Math.random() * 400);
 
-    const MAX_STEPS = 14;
+    const MAX_STEPS = 20;
+    let consecutiveStuck = 0;
     for (let step = 0; step < MAX_STEPS; step++) {
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
       if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
@@ -2736,8 +2813,7 @@
       // Keep a resume selected + don't auto-follow companies.
       _ensureResumeSelected(modal);
       _uncheckFollow(modal);
-      // Auto-fill this step's questions (profile answers + Gemini fallback)
-      // before trying to advance.
+      // Auto-fill this step's questions.
       try { await _answerModalQuestions(modal); }
       catch (e) { console.warn("[LeadCaptura] question auto-fill failed", e?.message); }
       await sleep(500 + Math.random() * 500);
@@ -2749,39 +2825,68 @@
       }
 
       if (action.type === "submit") {
-        await dispatchHumanClick(action.btn);
-        await sleep(1400 + Math.random() * 1200);
-        // Close the "application sent" confirmation.
+        // Use _forceClick for the final submit — LinkedIn's submit button is often
+        // React-controlled and dispatchHumanClick alone may not register.
+        _forceClick(action.btn);
+        await sleep(1800 + Math.random() * 1200);
+        // Confirm modal closed (success) or still open (failed submit).
+        const stillOpen = _easyApplyModal();
+        if (stillOpen) {
+          // Check if it's a success screen or still the form.
+          const successEl = document.querySelector(
+            ".jobs-easy-apply-modal--confirmation, [class*='confirmation'], " +
+            "[class*='success'], [aria-label*='submitted' i], [aria-label*='applied' i]"
+          );
+          if (!successEl) {
+            await _dismissEasyApplyModal();
+            return { ok: false, reason: "submit_failed" };
+          }
+        }
         await _dismissEasyApplyModal();
         return { ok: true };
       }
 
-      // Advance (next / review) and verify the modal actually moved on.
-      const before = { progress: _modalProgress(modal), heading: _modalHeading(modal) };
-      // Reading pause before clicking — looks like a human checking the form.
-      await sleep(600 + Math.random() * 900);
-      await dispatchHumanClick(action.btn);
-      await sleep(1100 + Math.random() * 1000);
+      // Snapshot state before advancing so we can detect if the modal moved on.
+      const before = {
+        progress: _modalProgress(modal),
+        heading: _modalHeading(modal),
+        html: modal.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "",
+      };
+      // Reading pause before clicking.
+      await sleep(700 + Math.random() * 800);
+      // Use _forceClick (5 strategies) for reliable step advancement.
+      _forceClick(action.btn);
+      await sleep(1500 + Math.random() * 1000);
 
       const after = _easyApplyModal();
-      if (!after) return { ok: false, reason: "modal_vanished" }; // unexpected
+      if (!after) return { ok: false, reason: "modal_vanished" };
       const act2 = _modalActionButton(after);
-      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
       const progAfter = _modalProgress(after);
       const headAfter = _modalHeading(after);
+      const htmlAfter = after.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 200) || "";
       const errorShown = !!after.querySelector(
-        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text"
+        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
+        ".jobs-easy-apply-form-element__error, [class*='error-text']"
       );
-      const progressed =
-        progressedByButton ||
-        (before.progress != null && progAfter != null && progAfter > before.progress) ||
-        (before.heading && headAfter && headAfter !== before.heading);
 
-      if (!progressed && (errorShown || (progAfter === before.progress && headAfter === before.heading))) {
-        // Stuck — this job needs answers we can't safely fill. Discard.
-        await _dismissEasyApplyModal();
-        return { ok: false, reason: "needs_manual_input" };
+      const progressedByButton = act2 && (act2.type === "submit" || act2.type === "review") && action.type === "next";
+      const progressBarMoved = before.progress != null && progAfter != null && progAfter > before.progress;
+      const headingChanged = before.heading && headAfter && headAfter !== before.heading;
+      const contentChanged = htmlAfter !== before.html;
+      const progressed = progressedByButton || progressBarMoved || headingChanged || contentChanged;
+
+      if (!progressed && errorShown) {
+        // Explicit validation error — this step needs manual input we can't provide.
+        consecutiveStuck++;
+        if (consecutiveStuck >= 2) {
+          await _dismissEasyApplyModal();
+          return { ok: false, reason: "needs_manual_input" };
+        }
+        // Give it one more attempt (maybe the click landed too early).
+        await sleep(1000);
+        continue;
       }
+      consecutiveStuck = 0;
     }
     await _dismissEasyApplyModal();
     return { ok: false, reason: "too_many_steps" };
@@ -2793,8 +2898,7 @@
   async function _openJobDetail(card, expectedId) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
-    // Prefer a real job link; otherwise click the card's title/clickable area
-    // (current search-results cards open on card click, not via a job <a>).
+    // Prefer a real job link; otherwise click the card's title/clickable area.
     const link =
       card.querySelector("a.job-card-container__link, a.job-card-list__title, a[href*='/jobs/view/']") ||
       card.querySelector("a[href*='/jobs/']") ||
@@ -2802,17 +2906,28 @@
       card;
     try { card.scrollIntoView({ block: "center" }); } catch {}
     await sleep(400 + Math.random() * 500);
-    try { await dispatchHumanClick(link); } catch { try { link.click(); } catch {} }
+    // Use _forceClick so the card click reliably triggers LinkedIn's navigation.
+    try { await dispatchHumanClick(link); } catch {}
+    _forceClick(link === card ? card : link);
 
-    // When we know the job's real id, wait until the detail pane reflects THIS
-    // job before clicking Easy Apply (so a slow pane swap can't apply to the
-    // previously-open job). When we don't (cards expose only a shared
-    // currentJobId), just give the pane time to settle after the click.
-    if (!expectedId) {
-      await sleep(1400 + Math.random() * 1000);
-      return true;
-    }
-    const matches = () => {
+    // Wait for the detail pane to reflect this specific job (URL change OR the
+    // Easy Apply button appearing in the detail area).
+    const _detailHasEasyApply = () => {
+      const detail = document.querySelector(
+        ".jobs-details, .jobs-unified-top-card, .job-view-layout, " +
+        ".job-details-jobs-unified-top-card__container--two-pane, " +
+        ".jobs-details__main-content"
+      );
+      if (!detail) return false;
+      return Array.from(detail.querySelectorAll("button")).some((b) => {
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        const a = b.getAttribute("aria-label") || "";
+        return /easy apply/i.test(t) || /easy apply/i.test(a);
+      });
+    };
+
+    const _urlMatchesJob = () => {
+      if (!expectedId) return false;
       try {
         const u = new URL(location.href);
         if (u.searchParams.get("currentJobId") === expectedId) return true;
@@ -2821,35 +2936,47 @@
       } catch {}
       return false;
     };
+
     const start = Date.now();
-    while (Date.now() - start < 6000 && !matches()) {
+    // Wait up to 8s for EITHER: URL reflects this job OR Easy Apply button appears.
+    while (Date.now() - start < 8000) {
       if (state.applyCancel) return false;
+      if (_urlMatchesJob() || _detailHasEasyApply()) break;
       await sleep(300);
     }
-    // Let the detail pane finish hydrating its apply button.
-    await sleep(900 + Math.random() * 1000);
-    // Even if the URL never matched (LinkedIn sometimes doesn't reflect the id
-    // for search-results cards), proceed — the click opened the pane.
+    // Extra hydration buffer — React takes a moment after the URL update to render.
+    await sleep(800 + Math.random() * 700);
     return true;
   }
 
   // Apply to one job (its card is already in the list). Returns {ok, reason}.
   async function _applyToJob(card) {
     const { sleep } = globalThis.__lcHuman;
-    const { dispatchHumanClick } = globalThis.__lcDom;
     const id = _realJobId(card);
     const onRightJob = await _openJobDetail(card, id);
     if (state.applyCancel) return { ok: false, reason: "cancelled" };
     if (!onRightJob) return { ok: false, reason: "detail_mismatch" };
     if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
 
-    const detail = _classifyJobDetail();
+    // Retry classification — the detail pane may still be hydrating.
+    let detail = _classifyJobDetail();
+    if (detail.status === "none") {
+      for (let t = 0; t < 5; t++) {
+        await sleep(800);
+        if (state.applyCancel) return { ok: false, reason: "cancelled" };
+        detail = _classifyJobDetail();
+        if (detail.status !== "none") break;
+      }
+    }
+
     if (detail.status === "applied") return { ok: false, reason: "already_applied" };
     if (detail.status === "external") return { ok: false, reason: "external_apply" };
     if (detail.status !== "easy" || !detail.btn) return { ok: false, reason: "no_easy_apply" };
 
     await sleep(500 + Math.random() * 700);
-    await dispatchHumanClick(detail.btn);
+    // Use _forceClick for the Easy Apply button — LinkedIn's primary buttons are
+    // React-controlled and may silently swallow dispatchHumanClick events.
+    _forceClick(detail.btn);
     return await _runEasyApplyModal();
   }
 
@@ -3006,7 +3133,7 @@
         // Make sure any leftover dialog is gone before the next job.
         await _dismissEasyApplyModal();
 
-        const last = i >= urls.length - 1;
+        const last = i >= keys.length - 1;
         if (!last && !state.applyCancel && applied < MAX_APPLIES_PER_RUN) {
           let gap;
           if (sinceBreak >= nextBreakAt) {
