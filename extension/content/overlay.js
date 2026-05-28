@@ -2857,31 +2857,52 @@
   // .click() is unreliable — use _forceClick (5 strategies) and verify the
   // dialog actually closed. If we leave a blocking "Save this application?"
   // dialog open, every subsequent job fails to open and the whole run stalls.
+  // The real Easy Apply DIALOG (popup) element ONLY — never the full-page
+  // container and NEVER the job list. Dismiss/discard clicks must be scoped to
+  // this so we never click a job card's "Dismiss" X, which tells LinkedIn
+  // "don't recommend this job" (that was wrongly hiding the user's jobs).
+  function _realModalDialog() {
+    return (
+      document.querySelector("div.jobs-easy-apply-modal") ||
+      document.querySelector("[data-test-modal][role='dialog']") ||
+      document.querySelector(".artdeco-modal[role='dialog']") ||
+      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog']")).find(
+        (d) =>
+          /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
+          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form")
+      ) ||
+      null
+    );
+  }
+
   async function _dismissEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
     for (let round = 0; round < 5; round++) {
-      // If the discard confirmation is already up, clear it first.
+      // 1. Clear the "Save this application?" / discard confirmation if present.
       const discard = _discardConfirmButton();
       if (discard) {
         _forceClick(discard);
         await sleep(500 + Math.random() * 400);
         continue;
       }
-      // Otherwise, if the Easy Apply modal is open, click its Dismiss (X) to
-      // raise the confirmation, then the next round will click Discard.
-      const modalOpen = !!_easyApplyModal();
-      if (modalOpen) {
-        const dismiss =
-          document.querySelector("button[aria-label='Dismiss']") ||
-          document.querySelector("button[aria-label*='Dismiss' i]");
+      // 2. Click Dismiss (X) ONLY inside the real Easy Apply dialog. A
+      //    document-wide search would match a job card's own "Dismiss" X (which
+      //    means "don't recommend this job") — never click those.
+      const dialog = _realModalDialog();
+      if (dialog) {
+        const dismiss = dialog.querySelector(
+          "button[aria-label='Dismiss'], button[aria-label*='Dismiss' i]"
+        );
         if (dismiss && _isVisible(dismiss)) {
           _forceClick(dismiss);
           await sleep(500 + Math.random() * 400);
           continue;
         }
       }
-      // Nothing left to dismiss — we're done.
-      if (!modalOpen && !_discardConfirmButton()) return;
+      // Nothing left to dismiss (no dialog, no confirmation) — done. In full-page
+      // apply mode there is no dialog; we simply move on (the next job navigates
+      // away) rather than touching anything in the job list.
+      if (!dialog && !_discardConfirmButton()) return;
       await sleep(400);
     }
   }
@@ -3180,7 +3201,9 @@
       await sleep(500 + Math.random() * 500);
 
       const action = _modalActionButton(modal);
+      const _pageName = _modalHeading(modal) || `step ${step + 1}`;
       console.log(`[LeadCaptura] easy-apply step ${step + 1}: page="${_modalHeading(modal) || "?"}" progress=${_modalProgress(modal)}% action=${action ? action.type : "NONE"}`);
+      try { _lcToast(`Auto Apply — ${_pageName}${action ? " → " + action.type : ""}`); } catch {}
       if (!action) {
         console.log("[LeadCaptura] easy-apply: no Next/Submit button found on this page — discarding");
         await _dismissEasyApplyModal();
