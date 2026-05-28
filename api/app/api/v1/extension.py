@@ -241,6 +241,56 @@ def submit_result(
     return {"ok": True}
 
 
+# Default segments every workspace gets — the lead "lists" the extension tags
+# saved leads into. Stored as shared SavedViews whose filters carry a "segment"
+# key, which both distinguishes them from pipeline saved-views and lets the
+# Pipeline/Prospecting list filter by lead.custom["segment"].
+_DEFAULT_SEGMENTS = [
+    {"name": "LinkedIn Leads", "icon": "linkedin"},
+    {"name": "Website Leads", "icon": "globe"},
+]
+
+
+def _segment_query(db: Session, workspace_id: str):
+    """Shared SavedViews that are segments (their filters carry a 'segment' key)."""
+    return (
+        db.query(SavedView)
+        .filter(
+            SavedView.workspace_id == workspace_id,
+            SavedView.is_shared.is_(True),
+            SavedView.filters.has_key("segment"),  # noqa: W601 — JSONB has_key
+        )
+        .order_by(SavedView.position.asc())
+    )
+
+
+def _ensure_default_segments(db: Session, workspace_id: str) -> None:
+    """Idempotently create the default segments for a workspace if absent.
+
+    Runs on /options so both freshly-bootstrapped and pre-existing workspaces
+    surface "LinkedIn Leads" / "Website Leads" in the extension dropdown.
+    """
+    existing = {s.name for s in _segment_query(db, workspace_id).all()}
+    missing = [s for s in _DEFAULT_SEGMENTS if s["name"] not in existing]
+    if not missing:
+        return
+    base_pos = db.query(SavedView).filter(SavedView.workspace_id == workspace_id).count()
+    for i, seg in enumerate(missing):
+        db.add(
+            SavedView(
+                workspace_id=workspace_id,
+                name=seg["name"],
+                icon=seg["icon"],
+                filters={"segment": seg["name"]},
+                columns=["full_name", "title", "company", "email", "stage", "owner"],
+                sort={"field": "created_at", "dir": "desc"},
+                position=base_pos + i,
+                is_shared=True,
+            )
+        )
+    db.commit()
+
+
 @router.get("/options")
 def options(ctx: AuthContext = Depends(get_extension_context), db: Session = Depends(get_db)):
     """Populate the bottom-toolbar dropdowns: Segment / Playbook / User."""
@@ -250,12 +300,8 @@ def options(ctx: AuthContext = Depends(get_extension_context), db: Session = Dep
         .order_by(Playbook.created_at.desc())
         .all()
     )
-    segments = (
-        db.query(SavedView)
-        .filter(SavedView.workspace_id == ctx.workspace_id, SavedView.is_shared.is_(True))
-        .order_by(SavedView.position.asc())
-        .all()
-    )
+    _ensure_default_segments(db, ctx.workspace_id)
+    segments = _segment_query(db, ctx.workspace_id).all()
     members = (
         db.query(Membership, User)
         .join(User, User.id == Membership.user_id)
@@ -277,6 +323,44 @@ def options(ctx: AuthContext = Depends(get_extension_context), db: Session = Dep
             for (m, u) in members
         ],
     }
+
+
+@router.post("/segments")
+def create_segment(
+    body: dict,
+    ctx: AuthContext = Depends(get_extension_context),
+    db: Session = Depends(get_db),
+):
+    """Create a new segment (lead list) from the extension's '+ New Segment'.
+
+    A segment is a shared SavedView whose filters carry a 'segment' key, so the
+    Pipeline list can group by lead.custom['segment'] == name. Idempotent on
+    name: re-creating an existing segment returns the existing one.
+    """
+    name = (body.get("name") or "").strip()[:120]
+    if not name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "name_required")
+    existing = (
+        _segment_query(db, ctx.workspace_id).filter(SavedView.name == name).first()
+    )
+    if existing:
+        return {"id": existing.id, "name": existing.name, "icon": existing.icon}
+    pos = db.query(SavedView).filter(SavedView.workspace_id == ctx.workspace_id).count()
+    view = SavedView(
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        name=name,
+        icon="tag",
+        filters={"segment": name},
+        columns=["full_name", "title", "company", "email", "stage", "owner"],
+        sort={"field": "created_at", "dir": "desc"},
+        position=pos,
+        is_shared=True,
+    )
+    db.add(view)
+    db.commit()
+    db.refresh(view)
+    return {"id": view.id, "name": view.name, "icon": view.icon}
 
 
 @router.post("/enroll")

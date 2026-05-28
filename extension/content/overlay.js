@@ -38,7 +38,7 @@
     profilePanel: null,
     toolbar: null,
     options: null, // { workspace, user, playbooks, segments, users }
-    selection: { segmentId: null, playbookId: null, userId: null },
+    selection: { segmentId: null, segmentName: null, playbookId: null, userId: null },
     lastSavedLeadIds: [],
     statusTimer: null,
     me: null,
@@ -570,6 +570,8 @@
       name_authority: "profile_page",
       scraped_from: "h1",
     };
+    // Tag with the segment the user picked in the toolbar, if any.
+    if (state.selection.segmentName) enriched.segment = state.selection.segmentName;
     flashStatus("Saving…");
     let result;
     try {
@@ -749,45 +751,66 @@
   }
 
   // ── "Avoid Duplicate Outreach" floating panel ──────────────────────────────
+  // Exposed so decorateSearchCards() can refresh the live skip-count whenever
+  // new cards render or the contacted registry changes.
+  let _renderAvoidDupPanel = () => {};
+
   function _mountAvoidDupPanel() {
     if (document.getElementById("lc-avoid-dup-panel")) return;
     const panel = el("div", { id: "lc-avoid-dup-panel" });
 
+    function _persist(on) {
+      Storage.getSettings().then((s) =>
+        chrome.storage.local.set({ settings: { ...s, avoidDuplicates: on } })
+      ).catch(() => {});
+    }
+
+    function _setOn(on) {
+      if (state.avoidDuplicates === on) return;
+      state.avoidDuplicates = on;
+      _persist(on);
+      // Realtime: re-mark every visible chip and refresh the count immediately.
+      _refreshContactedVisuals();
+      _render();
+    }
+
     function _render() {
       panel.textContent = "";
       const on = state.avoidDuplicates;
+      const skip = on ? _countContactedVisible() : 0;
+      panel.classList.toggle("lc-ado-on", on);
       panel.append(
-        el("span", { class: "lc-ado-label" }, "Avoid Duplicate Outreach"),
-        el("span", {
-          class: "lc-ado-info",
-          title:
-            "When ON, Connect All skips profiles you have already saved or connected with. " +
-            "The contacted list is persisted locally.",
-        }, " ⓘ"),
+        el("div", { class: "lc-ado-textcol" },
+          el("span", { class: "lc-ado-label" },
+            "Avoid Duplicate Outreach",
+            el("span", {
+              class: "lc-ado-info",
+              title:
+                "When ON, Save All and Connect All skip profiles you have already " +
+                "saved or connected with. Already-contacted cards are marked live. " +
+                "The contacted list is persisted locally.",
+            }, " ⓘ")
+          ),
+          el("span", { class: "lc-ado-count" },
+            on
+              ? (skip > 0
+                  ? `${skip} duplicate${skip > 1 ? "s" : ""} on this page will be skipped`
+                  : "No duplicates on this page")
+              : "Duplicate filtering is off")
+        ),
         el("div", { class: "lc-ado-btns" },
           el("button", {
             class: "lc-ado-btn" + (on ? " lc-ado-active" : ""),
-            onclick: () => {
-              state.avoidDuplicates = true;
-              Storage.getSettings().then((s) =>
-                chrome.storage.local.set({ settings: { ...s, avoidDuplicates: true } })
-              ).catch(() => {});
-              _render();
-            },
+            onclick: () => _setOn(true),
           }, "On"),
           el("button", {
             class: "lc-ado-btn" + (!on ? " lc-ado-active" : ""),
-            onclick: () => {
-              state.avoidDuplicates = false;
-              Storage.getSettings().then((s) =>
-                chrome.storage.local.set({ settings: { ...s, avoidDuplicates: false } })
-              ).catch(() => {});
-              _render();
-            },
+            onclick: () => _setOn(false),
           }, "Off")
         )
       );
     }
+    _renderAvoidDupPanel = _render;
     _render();
     document.documentElement.appendChild(panel);
   }
@@ -949,6 +972,26 @@
     return wrap;
   }
 
+  // "+ New Segment" → prompt for a name, create it server-side, select it.
+  async function createNewSegment() {
+    const name = (window.prompt("Name your new segment (lead list):") || "").trim();
+    if (!name) return;
+    try {
+      const seg = await Api.createSegment(name);
+      // Refresh options so the new segment appears in the dropdown.
+      state.options = null;
+      await ensureOptions();
+      if (seg?.id) {
+        state.selection.segmentId = seg.id;
+        state.selection.segmentName = seg.name || name;
+      }
+      flashStatus(`Segment "${seg?.name || name}" created ✓`, "ok");
+    } catch (e) {
+      flashStatus(`Couldn't create segment: ${e.message || e}`, "err");
+    }
+    renderToolbar();
+  }
+
   async function renderToolbar() {
     const root = await mountToolbar();
     if (!root) return;
@@ -999,7 +1042,6 @@
         el(
           "div",
           { class: "lc-toolbar-inner" },
-          el("span", { class: "lc-tb-version" }, `v${_LC_VERSION}`),
           // Unread LinkedIn message count badge (data from interceptor.js)
           (() => {
             const counts = window.__lcMsgCounts || {};
@@ -1012,10 +1054,17 @@
             }, `✉ ${unread}`);
             return badge;
           })(),
-          dropdown("Segment", segmentName, opts.segments, (s) => {
-            state.selection.segmentId = s.id;
-            renderToolbar();
-          }),
+          dropdown(
+            "Segment",
+            segmentName,
+            [...opts.segments, { id: "__new__", name: "+ New Segment", icon: "✚" }],
+            (s) => {
+              if (s.id === "__new__") { createNewSegment(); return; }
+              state.selection.segmentId = s.id;
+              state.selection.segmentName = s.id ? s.name : null;
+              renderToolbar();
+            }
+          ),
           dropdown("Playbook", playbookName, opts.playbooks, (p) => {
             state.selection.playbookId = p.id;
             renderToolbar();
@@ -1184,13 +1233,27 @@
     // Driving off the chips (not a fresh scrape) guarantees Save All covers
     // every card the user sees — no divergence on real-photo cards.
     try { decorateSearchCards(); } catch {}
-    const urls =
+    let urls =
       state.selectedUrls.size > 0
         ? Array.from(state.selectedUrls).filter((u) => u && u.includes("/in/"))
         : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
       return;
+    }
+
+    // Avoid Duplicate Outreach: skip profiles already saved/contacted.
+    if (state.avoidDuplicates) {
+      const before = urls.length;
+      urls = urls.filter((u) => !_isContacted(u));
+      const skipped = before - urls.length;
+      if (skipped > 0) {
+        flashStatus(`Skipped ${skipped} already-saved profile${skipped > 1 ? "s" : ""} (Avoid Duplicate Outreach)`, "ok");
+      }
+      if (!urls.length) {
+        flashStatus("All selected profiles already saved — nothing new to enrich.", "warn");
+        return;
+      }
     }
 
     // INTENTIONAL: no syncSearch pre-save. Card-level scrapes can pick up
@@ -1253,6 +1316,7 @@
               active: false,        // background tab — silent automation
               awaitClose: true,     // resolve only when the tab self-closes
               enrichFlag: true,     // adds ?lc_enrich=1 → triggers enrichment
+              segment: state.selection.segmentName || null,
             },
             (r) => {
               if (chrome.runtime.lastError) {
@@ -3055,6 +3119,40 @@
     if (span) span.textContent = text;
   }
 
+  // ── Avoid Duplicate Outreach: live chip visuals ─────────────────────────────
+  // When the toggle is ON, every already-contacted card's Save chip flips to a
+  // muted "Contacted" state so the user sees, in realtime, which profiles will
+  // be skipped. Toggling OFF restores them to the normal "Save" state.
+  function _applyContactedVisual(url) {
+    const wrap = injectedSaves.get(url);
+    if (!wrap || !document.body.contains(wrap)) return;
+    const btn = wrap.querySelector(".lc-inline-save");
+    const span = wrap.querySelector(".lc-inline-save-text");
+    if (!btn) return;
+    // Never override an in-flight or terminal save/error state.
+    if (btn.dataset.state === "saving" || btn.dataset.state === "saved" || btn.dataset.state === "error") return;
+    if (state.avoidDuplicates && _isContacted(url)) {
+      btn.dataset.state = "contacted";
+      if (span) span.textContent = "Contacted";
+      btn.title = "Already contacted — skipped by Avoid Duplicate Outreach";
+    } else if (btn.dataset.state === "contacted") {
+      btn.dataset.state = "ready";
+      if (span) span.textContent = "Save";
+      btn.title = "Open this profile and auto-enrich";
+    }
+  }
+
+  function _refreshContactedVisuals() {
+    for (const url of injectedSaves.keys()) _applyContactedVisual(url);
+  }
+
+  // How many currently-visible cards are already contacted (= would be skipped).
+  function _countContactedVisible() {
+    let n = 0;
+    for (const url of _allChipUrls()) if (_isContacted(url)) n++;
+    return n;
+  }
+
   function injectInlineSave(card, profile, anchorBtn) {
     // Sales Navigator cards often expose BOTH a /sales/lead/ anchor and an
     // /in/ anchor pointing at the same person. Contact-info scraping only
@@ -3203,6 +3301,8 @@
     }
     injectedSaves.set(url, wrap);
     chipCardEl.set(url, card);
+    // Reflect Avoid-Duplicate state immediately on the freshly-injected chip.
+    _applyContactedVisual(url);
     // Remember the precise native button this chip sits beside (if any) so
     // Connect All can act on it directly.
     if (anchor && _isActionButton(anchor)) chipActionBtn.set(url, anchor);
@@ -3665,6 +3765,10 @@
         console.warn("[LeadCaptura] decorate(link) failed", e?.message);
       }
     }
+
+    // Refresh the Avoid-Duplicate panel's live skip-count for the cards now
+    // on screen (new cards may have rendered via scroll/pagination).
+    try { _renderAvoidDupPanel(); } catch {}
   }
 
   // Resolve the canonical profile-owner link for a card. Preference order:

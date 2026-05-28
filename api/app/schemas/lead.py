@@ -101,6 +101,9 @@ class LeadIngest(BaseModel):
     experience: list[dict[str, Any]] = Field(default_factory=list)
     education: list[dict[str, Any]] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
+    # Optional segment/list name the user picked in the extension toolbar.
+    # Stored on lead.custom["segment"] so saved-view filters can group by it.
+    segment: Optional[str] = None
 
 
 class LeadIngestResponse(BaseModel):

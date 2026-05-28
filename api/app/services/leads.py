@@ -399,9 +399,16 @@ def ingest_lead(
             lead.company_id = company.id
         merged_custom = dict(lead.custom or {})
         merged_custom.update({k: v for k, v in (payload.get("raw") or {}).items() if v is not None})
+        seg = (payload.get("segment") or "").strip()
+        if seg:
+            merged_custom["segment"] = seg[:120]
         lead.custom = merged_custom
     else:
         stage = default_stage(db, workspace_id)
+        new_custom = dict(payload.get("raw") or {})
+        seg = (payload.get("segment") or "").strip()
+        if seg:
+            new_custom["segment"] = seg[:120]
         lead = Lead(
             workspace_id=workspace_id,
             owner_id=owner_id,
@@ -418,7 +425,7 @@ def ingest_lead(
             location=capped["location"],
             avatar_url=capped["avatar_url"],
             source=_cap(source, 40),
-            custom=payload.get("raw") or {},
+            custom=new_custom,
         )
         db.add(lead)
         created = True

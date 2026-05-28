@@ -426,6 +426,12 @@
   cursor: progress !important;
   animation: lc-pulse 1.1s ease-in-out infinite !important;
 }
+.lc-inline-save[data-state="contacted"] {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border-color: #cbd5e1 !important;
+  border-style: dashed !important;
+}
 @keyframes lc-pop {
   0% { transform: scale(0.92); }
   60% { transform: scale(1.04); }
@@ -519,11 +525,23 @@ body.lc-toolbar-mounted { padding-bottom: 64px !important; }
   white-space: nowrap !important;
   pointer-events: all !important;
 }
+.lc-ado-textcol {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  min-width: 0 !important;
+}
 .lc-ado-label {
   font-weight: 600 !important;
   color: #0f172a !important;
   font-size: 12px !important;
 }
+.lc-ado-count {
+  font-size: 10px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+#lc-avoid-dup-panel.lc-ado-on .lc-ado-count { color: #2563eb !important; }
 .lc-ado-info {
   color: #94a3b8 !important;
   font-size: 11px !important;

@@ -92,6 +92,7 @@
   globalThis.__lcApi = {
     me: () => call("me"),
     options: () => call("options"),
+    createSegment: (name) => call("createSegment", { name }),
     syncProfile: (profile) => call("syncProfile", { profile }),
     syncSearch: (data) => call("syncSearch", data),
     enrollBatch: (playbook_id, lead_ids) => call("enrollBatch", { playbook_id, lead_ids }),

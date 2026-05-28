@@ -125,6 +125,8 @@ async function fetchJson(path, opts = {}) {
 const handlers = {
   me: () => fetchJson("/extension/me"),
   options: () => fetchJson("/extension/options"),
+  createSegment: ({ name }) =>
+    fetchJson("/extension/segments", { method: "POST", body: { name } }),
   syncProfile: ({ profile }) =>
     fetchJson("/extension/sync/profile", { method: "POST", body: profile }),
   syncSearch: (body) => fetchJson("/extension/sync/search", { method: "POST", body }),
@@ -244,12 +246,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await sleep(jitter(80, 300));
         let openUrl = target;
         if (includeEnrichFlag) {
+          const seg = msg.segment ? String(msg.segment) : "";
           try {
             const u = new URL(target);
             u.searchParams.set("lc_enrich", "1");
+            if (seg) u.searchParams.set("lc_segment", seg);
             openUrl = u.toString();
           } catch {
-            openUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
+            openUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1" +
+              (seg ? "&lc_segment=" + encodeURIComponent(seg) : "");
           }
         }
         chrome.tabs.create({ url: openUrl, active }, (tab) => {

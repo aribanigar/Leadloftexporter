@@ -1000,6 +1000,10 @@
         } catch {}
       }
       profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
+      // Carry the segment the user picked in the toolbar through the bulk
+      // enrichment tab (passed as ?lc_segment= by the service worker).
+      const segParam = params.get("lc_segment");
+      if (segParam) profile.segment = segParam;
 
       try {
         await globalThis.__lcApi.syncProfile(profile);
