@@ -89,12 +89,17 @@ def list_leads(
     rows = base.offset((page - 1) * page_size).limit(page_size).all()
     items: list[LeadOut] = []
     for r in rows:
-        item = LeadOut.model_validate(r)
-        if r.company_id and getattr(r, "company", None):
-            from app.schemas.lead import CompanyMini
+        # Defense-in-depth: never let one malformed row 500 the whole list.
+        # A single bad lead used to blank the entire Pipeline/Prospecting view.
+        try:
+            item = LeadOut.model_validate(r)
+            if r.company_id and getattr(r, "company", None):
+                from app.schemas.lead import CompanyMini
 
-            item.company = CompanyMini.model_validate(r.company)
-        items.append(item)
+                item.company = CompanyMini.model_validate(r.company)
+            items.append(item)
+        except Exception:  # noqa: BLE001 — skip the row, keep the page working
+            continue
     return LeadList(items=items, total=total, page=page, page_size=page_size)
 
 
