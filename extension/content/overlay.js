@@ -2536,14 +2536,6 @@
       for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
     }
     decorateJobCards();
-    for (const wrap of injectedJobChips.values()) {
-      const key = wrap?.dataset?.lcKey;
-      const check = wrap?.querySelector(".lc-inline-check");
-      if (!key || !check) continue;
-      const on = state.selectedJobUrls.has(key);
-      check.textContent = on ? "☑" : "☐";
-      check.classList.toggle("lc-inline-check-on", on);
-    }
     refreshSelectAllHeader();
     renderToolbar();
   }
@@ -2553,14 +2545,6 @@
   function _selectAllVisibleJobs() {
     try { decorateJobCards(); } catch {}
     for (const url of _allJobUrls()) state.selectedJobUrls.add(url);
-    for (const wrap of injectedJobChips.values()) {
-      const key = wrap?.dataset?.lcKey;
-      const check = wrap?.querySelector(".lc-inline-check");
-      if (!key || !check) continue;
-      const on = state.selectedJobUrls.has(key);
-      check.textContent = on ? "☑" : "☐";
-      check.classList.toggle("lc-inline-check-on", on);
-    }
     refreshSelectAllHeader();
   }
 
