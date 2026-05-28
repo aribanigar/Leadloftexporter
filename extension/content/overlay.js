@@ -2646,12 +2646,22 @@
       return /\bapplied\b/i.test(t) || /\bapplied\b/i.test(a);
     };
 
+    // SCOPE to the right-hand DETAIL pane. On /jobs/search/ (split view) the
+    // left list's per-card "Apply" badges would otherwise be matched first —
+    // clicking those just re-opens the job and never starts an application.
+    const root = document.querySelector(
+      ".jobs-search__job-details, .jobs-search__job-details--container, " +
+      ".jobs-search__job-details--wrapper, .scaffold-layout__detail, " +
+      ".jobs-details, .job-view-layout, .jobs-details__main-content, " +
+      ".job-details-jobs-unified-top-card__container--two-pane"
+    ) || document;
+
     // Fast path: specific selectors for known LinkedIn container class names.
     // NOTE: the 2026 rename makes the in-app apply control an <a> anchor
     // (e.g. <a href=".../apply/" aria-label="LinkedIn Apply to this job">), not
     // a <button> — so every selector below covers BOTH button and a.
     const cands = Array.from(
-      document.querySelectorAll(
+      root.querySelectorAll(
         "button.jobs-apply-button, a.jobs-apply-button, " +
         "button[aria-label*='Easy Apply' i], a[aria-label*='Easy Apply' i], " +
         "button[aria-label*='LinkedIn Apply' i], a[aria-label*='LinkedIn Apply' i], " +
@@ -2672,22 +2682,26 @@
     ).filter(_isVisible);
 
     for (const b of cands) {
-      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) {
+        console.log(`[LeadCaptura] classify: Easy/LinkedIn Apply found — "${(b.innerText||b.textContent||'').trim()}" aria="${b.getAttribute('aria-label')||''}" tag=${b.tagName}`);
+        return { status: "easy", btn: b };
+      }
     }
     for (const b of cands) {
       if (_isAppliedBtn(b)) return { status: "applied", btn: null };
       if (_isExternalBtn(b)) return { status: "external", btn: null };
     }
 
-    // Broad fallback: scan EVERY visible button AND anchor in the document.
-    // LinkedIn renames container classes often and moved the in-app apply
-    // control from <button> to <a>; the label text is the stable signal.
-    const allBtns = Array.from(document.querySelectorAll(
+    // Broad fallback: scan EVERY visible button AND anchor in the DETAIL pane.
+    const allBtns = Array.from(root.querySelectorAll(
       "button, a[role='button'], a.jobs-apply-button, " +
       "a[aria-label*='apply' i], a[href*='/jobs/view/'][href*='/apply'], a[href*='/apply/']"
     )).filter(_isVisible);
     for (const b of allBtns) {
-      if (_isEasyApplyBtn(b)) return { status: "easy", btn: b };
+      if (_isEasyApplyBtn(b)) {
+        console.log(`[LeadCaptura] classify(fallback): Apply found — "${(b.innerText||b.textContent||'').trim()}" aria="${b.getAttribute('aria-label')||''}" tag=${b.tagName}`);
+        return { status: "easy", btn: b };
+      }
     }
 
     // Also check static "Applied" and "External" badges that aren't buttons.
@@ -3181,20 +3195,26 @@
   // Step through the open Easy Apply modal. Returns {ok, reason}.
   async function _runEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
-    const { dispatchHumanClick, waitFor } = globalThis.__lcDom;
+    const { dispatchHumanClick } = globalThis.__lcDom;
 
-    // Wait up to 10s for the modal — LinkedIn can be slow to open it.
-    let modal = await waitFor(
-      ["div.jobs-easy-apply-modal", "div[data-test-modal][role='dialog']",
-       ".artdeco-modal[role='dialog']", "div[role='dialog']"],
-      { timeout: 10000 }
-    );
-    modal = _easyApplyModal() || modal;
+    // Poll for the apply form to appear — modal OR full-page /apply/ — up to 12s.
+    // _easyApplyModal understands both layouts, so this catches the form the
+    // instant it renders no matter how LinkedIn opened it.
+    let modal = null;
+    const _waitStart = Date.now();
+    while (Date.now() - _waitStart < 12000) {
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+      if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
+      modal = _easyApplyModal();
+      if (modal) break;
+      await sleep(300);
+    }
     if (!modal) {
-      console.log("[LeadCaptura] easy-apply: form/modal not found after click — skipping job");
+      console.log(`[LeadCaptura] easy-apply: form not found after click (url=${location.pathname}) — skipping job`);
       return { ok: false, reason: "modal_not_found" };
     }
-    // Extra settle time — LinkedIn animates the modal in.
+    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName})`);
+    // Extra settle time — LinkedIn animates the form in.
     await sleep(600 + Math.random() * 400);
 
     const MAX_STEPS = 20;
