@@ -69,7 +69,7 @@ const DEFAULTS = {
   aiEnabled: false,
   aiProvider: "gemini", // "gemini" | "claude"
   geminiApiKey: "",
-  geminiModel: "gemini-1.5-flash",
+  geminiModel: "gemini-2.5-flash",
   claudeApiKey: "",
   claudeModel: "claude-haiku-4-5-20251001",
   cvText: DEFAULT_CV,
@@ -140,6 +140,56 @@ function setGeminiStatus(msg, level = "") {
   el.className = "status " + level;
 }
 
+// Query Google for the models this key can actually use, then return them as
+// short names ordered best-first. Google keeps removing older models for new
+// keys, so the only reliable approach is to ask rather than hardcode a name.
+// `prefer` (the user's saved model) is tried first if it's still available.
+async function listGeminiModels(key, prefer) {
+  let names = [];
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=200`
+    );
+    if (r.ok) {
+      const d = await r.json();
+      names = (d.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map((m) => (m.name || "").replace(/^models\//, ""))
+        .filter(Boolean);
+    }
+  } catch {
+    /* fall through to static list */
+  }
+
+  // Rank: flash-lite (cheapest) → flash → everything else; exclude preview/
+  // experimental/vision-only/embedding variants which 404 or aren't chat models.
+  const usable = names.filter((n) => !/embedding|aqa|vision|imagen|veo|tts|image-generation/i.test(n));
+  const score = (n) => {
+    let s = 0;
+    if (/flash-lite/i.test(n)) s += 100;
+    else if (/flash/i.test(n)) s += 80;
+    else if (/pro/i.test(n)) s += 40;
+    // Prefer higher version numbers (2.5 > 2.0 > 1.5)
+    const v = parseFloat((n.match(/(\d+\.\d+)/) || [])[1] || "0");
+    s += v * 5;
+    if (/preview|exp|experimental/i.test(n)) s -= 30; // less stable
+    return s;
+  };
+  const ranked = usable.sort((a, b) => score(b) - score(a));
+
+  // Put the saved model first if it survived the cull.
+  const ordered = [];
+  if (prefer && ranked.includes(prefer)) ordered.push(prefer);
+  for (const n of ranked) if (!ordered.includes(n)) ordered.push(n);
+
+  // If listing failed entirely (network/permission), fall back to a static
+  // best-guess list so Test can still attempt something.
+  if (!ordered.length) {
+    return ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+  }
+  return ordered;
+}
+
 async function ensureAiPermission(provider) {
   const origin =
     provider === "claude"
@@ -193,7 +243,7 @@ async function testGemini() {
       setGeminiStatus(reply ? `Claude connected ✓ (replied: ${reply.slice(0, 40)})` : "Claude connected ✓", "ok");
     } else {
       const key = $("#geminiApiKey").value.trim();
-      let model = $("#geminiModel").value.trim() || "gemini-1.5-flash";
+      const saved = $("#geminiModel").value.trim();
       if (!key) { setGeminiStatus("Add a Gemini API key first.", "err"); return; }
 
       const _callGemini = async (m) => {
@@ -208,34 +258,45 @@ async function testGemini() {
         });
       };
 
-      let res = await _callGemini(model);
+      // Ask Google which models THIS key can actually use, instead of guessing
+      // names that Google keeps deprecating. Returns short names that support
+      // generateContent (e.g. "gemini-2.5-flash"). [] if the listing fails.
+      const candidates = await listGeminiModels(key, saved);
+      if (!candidates.length) {
+        setGeminiStatus("This API key has no usable models. Check the key is valid and that the Generative Language API is enabled in your Google Cloud project.", "err");
+        return;
+      }
 
-      // 429 = quota exceeded, 404 = model deprecated/removed for new users.
-      // Both mean "this model won't work" — auto-retry with gemini-1.5-flash.
-      const _shouldFallback = (r) => (r.status === 429 || r.status === 404) && model !== "gemini-1.5-flash";
-      if (!res.ok && _shouldFallback(res)) {
-        const reason = res.status === 404 ? `${model} is no longer available` : `${model} quota exceeded`;
-        setGeminiStatus(`${reason} — trying gemini-1.5-flash…`);
-        res = await _callGemini("gemini-1.5-flash");
-        if (res.ok) {
-          model = "gemini-1.5-flash";
-          $("#geminiModel").value = model;
+      // Try each candidate until one responds OK. 404 (deprecated) / 429 (quota)
+      // → move to the next; any other error (401 bad key, etc.) → stop and show it.
+      let res = null, working = null, lastStatus = 0, lastText = "";
+      for (const m of candidates) {
+        setGeminiStatus(`Testing ${m}…`);
+        res = await _callGemini(m);
+        lastStatus = res.status;
+        if (res.ok) { working = m; break; }
+        if (res.status !== 404 && res.status !== 429) {
+          lastText = await res.text().catch(() => "");
+          break;
         }
       }
 
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        const hint = res.status === 429
-          ? `Quota exceeded for ${model}. Enable billing on your Google Cloud project at console.cloud.google.com.`
-          : res.status === 404
-          ? `Model ${model} is no longer available. Switch to gemini-1.5-flash in the Gemini model field.`
-          : `Gemini rejected (${res.status}). ${t.slice(0, 120)}`;
+      if (!working) {
+        const hint = lastStatus === 429
+          ? "All available models are over quota. Enable billing on your Google Cloud project at console.cloud.google.com, or try again later."
+          : lastStatus === 401 || lastStatus === 403
+          ? "API key rejected. Generate a fresh key at aistudio.google.com/app/apikey and make sure the Generative Language API is enabled."
+          : `Gemini rejected (${lastStatus}). ${lastText.slice(0, 120)}`;
         setGeminiStatus(hint, "err");
         return;
       }
+
+      // Lock in the model that actually works so future calls skip discovery.
+      $("#geminiModel").value = working;
+      await save({ geminiModel: working });
       const data = await res.json();
       const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      setGeminiStatus(reply ? `Gemini connected ✓ using ${model} (replied: ${reply.slice(0, 40)})` : `Gemini connected ✓ using ${model}`, "ok");
+      setGeminiStatus(reply ? `Gemini connected ✓ using ${working} (replied: ${reply.slice(0, 40)})` : `Gemini connected ✓ using ${working}`, "ok");
     }
   } catch (err) {
     setGeminiStatus(err.message || "Failed to reach the AI provider.", "err");
@@ -276,7 +337,7 @@ async function onSave() {
     aiEnabled: $("#aiEnabled").checked,
     aiProvider: $("#aiProvider").value,
     geminiApiKey: $("#geminiApiKey").value.trim(),
-    geminiModel: $("#geminiModel").value.trim() || "gemini-1.5-flash",
+    geminiModel: $("#geminiModel").value.trim() || "gemini-2.5-flash",
     claudeApiKey: $("#claudeApiKey").value.trim(),
     claudeModel: $("#claudeModel").value.trim() || "claude-haiku-4-5-20251001",
     cvText: $("#cvText").value,
@@ -343,8 +404,10 @@ async function init() {
   $("#aiProvider").value = settings.aiProvider || "gemini";
   $("#geminiApiKey").value = settings.geminiApiKey || "";
   // Migrate deprecated models that Google has removed for new users.
-  const _savedModel = settings.geminiModel || "gemini-1.5-flash";
-  $("#geminiModel").value = _savedModel === "gemini-2.0-flash" ? "gemini-1.5-flash" : _savedModel;
+  // Migrate models Google has removed for new users to a current default.
+  // (Test will further auto-correct to whatever the key can actually use.)
+  const _savedModel = settings.geminiModel || "gemini-2.5-flash";
+  $("#geminiModel").value = /^gemini-(1\.5|2\.0)-/.test(_savedModel) ? "gemini-2.5-flash" : _savedModel;
   $("#claudeApiKey").value = settings.claudeApiKey || "";
   $("#claudeModel").value = settings.claudeModel || "claude-haiku-4-5-20251001";
   $("#cvText").value = settings.cvText || "";

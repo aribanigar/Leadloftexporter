@@ -99,6 +99,48 @@ async function getSettings() {
   return Object.assign({}, DEFAULT_SETTINGS, settings || {});
 }
 
+// Ask Google which models this API key can actually use (Google keeps
+// deprecating model names for new keys, so hardcoding one is fragile).
+// Returns short names that support generateContent, ranked best-first, with
+// the user's saved model first if it's still available. Falls back to a
+// static best-guess list if the listing call fails.
+async function listGeminiModels(key, prefer) {
+  let names = [];
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=200`
+    );
+    if (r.ok) {
+      const d = await r.json();
+      names = (d.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map((m) => (m.name || "").replace(/^models\//, ""))
+        .filter(Boolean);
+    }
+  } catch {
+    /* fall through */
+  }
+  const usable = names.filter((n) => !/embedding|aqa|vision|imagen|veo|tts|image-generation/i.test(n));
+  const score = (n) => {
+    let s = 0;
+    if (/flash-lite/i.test(n)) s += 100;
+    else if (/flash/i.test(n)) s += 80;
+    else if (/pro/i.test(n)) s += 40;
+    const v = parseFloat((n.match(/(\d+\.\d+)/) || [])[1] || "0");
+    s += v * 5;
+    if (/preview|exp|experimental/i.test(n)) s -= 30;
+    return s;
+  };
+  const ranked = usable.sort((a, b) => score(b) - score(a));
+  const ordered = [];
+  if (prefer && ranked.includes(prefer)) ordered.push(prefer);
+  for (const n of ranked) if (!ordered.includes(n)) ordered.push(n);
+  if (!ordered.length) {
+    return ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"];
+  }
+  return ordered;
+}
+
 async function fetchJson(path, opts = {}) {
   const { apiUrl, apiKey } = await getSettings();
   if (!apiUrl) throw new Error("API URL not configured.");
@@ -503,15 +545,30 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               }),
             });
           };
-          let usedModel = s.geminiModel || "gemini-1.5-flash";
+          let usedModel = s.geminiModel || "gemini-2.5-flash";
           let res;
           try {
             res = await _geminiCall(usedModel);
-            // 429 = quota exceeded, 404 = model deprecated for new users.
-            // Both mean "try gemini-1.5-flash which has broader availability."
-            if (!res.ok && (res.status === 429 || res.status === 404) && usedModel !== "gemini-1.5-flash") {
-              usedModel = "gemini-1.5-flash";
-              res = await _geminiCall(usedModel);
+            // 404 (model deprecated for new keys) or 429 (quota): ask Google
+            // which models this key can actually use and try the best one.
+            // Google keeps removing model names, so discovery is the only
+            // reliable fix rather than guessing another hardcoded name.
+            if (!res.ok && (res.status === 429 || res.status === 404)) {
+              const models = await listGeminiModels(s.geminiApiKey, usedModel);
+              for (const m of models) {
+                if (m === usedModel) continue;
+                res = await _geminiCall(m);
+                if (res.ok) {
+                  usedModel = m;
+                  // Persist so subsequent answers skip discovery entirely.
+                  try {
+                    const cur = (await chrome.storage.local.get("settings")).settings || {};
+                    chrome.storage.local.set({ settings: { ...cur, geminiModel: m } });
+                  } catch {}
+                  break;
+                }
+                if (res.status !== 404 && res.status !== 429) break;
+              }
             }
           } catch (e) {
             sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` });
