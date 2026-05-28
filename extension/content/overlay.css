@@ -359,10 +359,11 @@
 /* Per-job chip — portal-mounted with position:fixed so LinkedIn's
  * overflow:hidden scroll container can never clip it. top/left are set
  * per-frame by _syncJobChipPositions() from getBoundingClientRect(). */
+/* Portal-chip (legacy fixed-position, kept for reference) */
 .lc-job-row {
   position: fixed !important;
   z-index: 2147483640 !important;
-  visibility: hidden !important; /* JS makes it visible after setting top/left */
+  visibility: hidden !important;
   margin: 0 !important;
   padding: 2px 0 !important;
   width: auto !important;
@@ -371,6 +372,18 @@
   align-items: center !important;
   gap: 6px !important;
   pointer-events: auto !important;
+}
+
+/* Inline per-card Apply chip — injected directly into the job card DOM */
+.lc-job-apply-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 8px 4px 4px !important;
+  margin: 2px 0 0 !important;
+  pointer-events: all !important;
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 .lc-inline-check {
