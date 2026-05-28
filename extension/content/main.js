@@ -151,32 +151,24 @@
   }
 
   function _ccFindSendBtn() {
-    // Prefer searching inside the confirmed invite modal so we never
-    // accidentally match the "Send" button in LinkedIn's "Send Post" share
-    // modal (which also appears on profile pages and caused send_failed).
-    const modal = _ccFindInviteModal();
-    const scope = modal || document;
-    const all = Array.from(scope.querySelectorAll("button, [role='button'], a"));
+    // ALWAYS scan the whole document — never scope to the modal element.
+    // LinkedIn renders the invite modal's action buttons ("Send without a note")
+    // in a portal sibling OUTSIDE the div[role='dialog'] element on many
+    // profiles. Scoping to modal.querySelectorAll() silently returns null and
+    // the button is never clicked. This mirrors the proven overlay.js approach
+    // (_findSendWithoutNoteButton) which always searches document-wide.
+    // Bare "Send" is intentionally omitted — it matches LinkedIn's Share modal.
+    const all = Array.from(document.querySelectorAll("button, [role='button'], a"));
     const label = (b) => ({
       t: (b.textContent || "").replace(/\s+/g, " ").trim(),
       a: b.getAttribute("aria-label") || "",
     });
-    // When scoped to the confirmed invite modal, bare "Send"/"Send invitation"
-    // is safe. When falling back to the whole document, omit bare "Send" —
-    // it matches the Share modal's submit button and triggers a false positive.
-    const tests = modal
-      ? [
-          (s) => /^send without a note$/i.test(s),
-          (s) => /\bsend without a note\b/i.test(s),
-          (s) => /^send now$/i.test(s),
-          (s) => /^send( invitation)?$/i.test(s),
-        ]
-      : [
-          (s) => /^send without a note$/i.test(s),
-          (s) => /\bsend without a note\b/i.test(s),
-          (s) => /^send now$/i.test(s),
-          // Bare "Send" intentionally omitted — matches LinkedIn's Share modal
-        ];
+    const tests = [
+      (s) => /^send without a note$/i.test(s),
+      (s) => /\bsend without a note\b/i.test(s),
+      (s) => /^send now$/i.test(s),
+      (s) => /^send invitation$/i.test(s),
+    ];
     for (const test of tests) {
       const matches = all.filter((b) => {
         const { t, a } = label(b);
