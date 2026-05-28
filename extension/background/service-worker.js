@@ -7,8 +7,8 @@
  */
 
 const DEFAULT_SETTINGS = {
-  apiUrl: "http://localhost:8000",
-  apiKey: "",
+  apiUrl: "https://leadloftexporter.onrender.com",
+  apiKey: "lcx_lqpLWLIgFoMLKCTs7-Xj38dKp9QCe2BG60BQ5N59Uo8",
   enabled: true,
   autopilot: false,
   showOverlay: true,
