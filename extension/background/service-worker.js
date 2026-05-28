@@ -507,9 +507,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           let res;
           try {
             res = await _geminiCall(usedModel);
-            // Auto-fallback: gemini-2.0-flash has limited free-tier quota in many
-            // regions; retry with gemini-1.5-flash which has broader availability.
-            if (!res.ok && res.status === 429 && usedModel !== "gemini-1.5-flash") {
+            // 429 = quota exceeded, 404 = model deprecated for new users.
+            // Both mean "try gemini-1.5-flash which has broader availability."
+            if (!res.ok && (res.status === 429 || res.status === 404) && usedModel !== "gemini-1.5-flash") {
               usedModel = "gemini-1.5-flash";
               res = await _geminiCall(usedModel);
             }

@@ -210,10 +210,12 @@ async function testGemini() {
 
       let res = await _callGemini(model);
 
-      // gemini-1.5-flash has very limited free-tier quota in many regions.
-      // Auto-retry with gemini-1.5-flash which has broader global availability.
-      if (!res.ok && res.status === 429 && model !== "gemini-1.5-flash") {
-        setGeminiStatus(`${model} quota exceeded — trying gemini-1.5-flash…`);
+      // 429 = quota exceeded, 404 = model deprecated/removed for new users.
+      // Both mean "this model won't work" — auto-retry with gemini-1.5-flash.
+      const _shouldFallback = (r) => (r.status === 429 || r.status === 404) && model !== "gemini-1.5-flash";
+      if (!res.ok && _shouldFallback(res)) {
+        const reason = res.status === 404 ? `${model} is no longer available` : `${model} quota exceeded`;
+        setGeminiStatus(`${reason} — trying gemini-1.5-flash…`);
         res = await _callGemini("gemini-1.5-flash");
         if (res.ok) {
           model = "gemini-1.5-flash";
@@ -223,9 +225,10 @@ async function testGemini() {
 
       if (!res.ok) {
         const t = await res.text().catch(() => "");
-        const is429 = res.status === 429;
-        const hint = is429
-          ? `Quota exceeded for ${model}. Try switching to gemini-1.5-flash, or enable billing on your Google Cloud project at console.cloud.google.com.`
+        const hint = res.status === 429
+          ? `Quota exceeded for ${model}. Enable billing on your Google Cloud project at console.cloud.google.com.`
+          : res.status === 404
+          ? `Model ${model} is no longer available. Switch to gemini-1.5-flash in the Gemini model field.`
           : `Gemini rejected (${res.status}). ${t.slice(0, 120)}`;
         setGeminiStatus(hint, "err");
         return;
@@ -339,7 +342,9 @@ async function init() {
   $("#aiEnabled").checked = !!settings.aiEnabled;
   $("#aiProvider").value = settings.aiProvider || "gemini";
   $("#geminiApiKey").value = settings.geminiApiKey || "";
-  $("#geminiModel").value = settings.geminiModel || "gemini-1.5-flash";
+  // Migrate deprecated models that Google has removed for new users.
+  const _savedModel = settings.geminiModel || "gemini-1.5-flash";
+  $("#geminiModel").value = _savedModel === "gemini-2.0-flash" ? "gemini-1.5-flash" : _savedModel;
   $("#claudeApiKey").value = settings.claudeApiKey || "";
   $("#claudeModel").value = settings.claudeModel || "claude-haiku-4-5-20251001";
   $("#cvText").value = settings.cvText || "";
