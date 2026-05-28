@@ -1247,16 +1247,24 @@
   }
 
   async function saveAllVisible() {
+    const { sleep } = globalThis.__lcHuman;
+
     // Pick the working set FROM THE INJECTED CHIPS (single source of truth):
     //   - If the user has explicitly ticked checkboxes, process EXACTLY those.
     //   - Else process every visible /in/ card that has a chip.
     // Driving off the chips (not a fresh scrape) guarantees Save All covers
     // every card the user sees — no divergence on real-photo cards.
     try { decorateSearchCards(); } catch {}
-    let urls =
-      state.selectedUrls.size > 0
-        ? Array.from(state.selectedUrls).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
-        : _allChipUrls();
+
+    // Auto-paginate only when NO explicit selection — "Save All" mode, not
+    // "Save X Selected". When the user ticks specific cards we process exactly
+    // those and stop; we don't presume they want all pages.
+    const userSelected = state.selectedUrls.size > 0;
+    const autoPage = !userSelected;
+
+    let urls = userSelected
+      ? Array.from(state.selectedUrls).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
+      : _allChipUrls();
     if (!urls.length) {
       flashStatus("No profiles to save. Scroll the list so cards render.", "warn");
       return;
@@ -1282,7 +1290,7 @@
     // background-tab enrichment below saves the canonical name+title+
     // company+email+phone+location pulled from the unambiguous /in/<handle>
     // DOM. We only need the URL here; the profile page yields the real name.
-    const enrichable = urls.map((u) => ({
+    let enrichable = urls.map((u) => ({
       linkedin_url: u,
       full_name: _labelFromUrl(u),
     }));
@@ -1305,75 +1313,169 @@
     // enrichment is in progress and would just clutter the screen.
     unmountSelectAllHeader();
     renderToolbar();
-    let enriched = 0;
+
+    let totalEnriched = 0;
+    let totalProcessed = 0;
     let rateLimited = false;
     let cancelled = false;
-    for (let i = 0; i < enrichable.length; i++) {
-      if (state.bulkCancel) {
-        cancelled = true;
-        break;
-      }
-      const profile = enrichable[i];
-      const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
-      state.bulkProgress = {
-        current: i + 1,
-        total: enrichable.length,
-        name: label,
-        url: profile.linkedin_url,
-      };
-      // Drive the per-card chip into "Enriching…" state so the user sees
-      // live progress on the exact card being processed — no more guessing
-      // which lead the toolbar status refers to.
-      _setChipState(profile.linkedin_url, "saving", "Enriching…");
-      renderToolbar();
+    let pageNum = 1;
 
-      const resp = await new Promise((resolve) => {
-        try {
-          chrome.runtime.sendMessage(
-            {
-              type: "lc:openProfileTab",
-              url: profile.linkedin_url,
-              active: false,        // background tab — silent automation
-              awaitClose: true,     // resolve only when the tab self-closes
-              enrichFlag: true,     // adds ?lc_enrich=1 → triggers enrichment
-              segment: state.selection.segmentName || null,
-            },
-            (r) => {
-              if (chrome.runtime.lastError) {
-                return resolve({ ok: false, error: chrome.runtime.lastError.message });
-              }
-              resolve(r || { ok: false });
-            }
-          );
-        } catch (e) {
-          resolve({ ok: false, error: String(e) });
+    // Outer loop: one iteration per search-results page.
+    // In "Save X Selected" mode this runs exactly once.
+    outerLoop: while (true) {
+      for (let i = 0; i < enrichable.length; i++) {
+        if (state.bulkCancel) {
+          cancelled = true;
+          break outerLoop;
         }
-      });
+        const profile = enrichable[i];
+        const label = profile.full_name || profile.linkedin_url.split("/in/")[1] || "";
+        state.bulkProgress = {
+          current: totalProcessed + i + 1,
+          total: state.bulkProgress.total, // keep the running total across pages
+          name: label,
+          url: profile.linkedin_url,
+        };
+        // Drive the per-card chip into "Enriching…" state so the user sees
+        // live progress on the exact card being processed — no more guessing
+        // which lead the toolbar status refers to.
+        _setChipState(profile.linkedin_url, "saving", "Enriching…");
+        renderToolbar();
 
-      if (!resp.ok && resp.error === "safe_zone_limit_reached") {
-        _setChipState(profile.linkedin_url, "error", "Rate limited");
-        rateLimited = true;
-        break;
-      }
-      if (resp.ok && !resp.timedOut) {
-        _setChipState(profile.linkedin_url, "saved", "Saved ✓");
-        enriched++;
-      } else {
-        _setChipState(profile.linkedin_url, "error", resp.timedOut ? "Timed out" : "Failed");
+        const resp = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage(
+              {
+                type: "lc:openProfileTab",
+                url: profile.linkedin_url,
+                active: false,        // background tab — silent automation
+                awaitClose: true,     // resolve only when the tab self-closes
+                enrichFlag: true,     // adds ?lc_enrich=1 → triggers enrichment
+                segment: state.selection.segmentName || null,
+              },
+              (r) => {
+                if (chrome.runtime.lastError) {
+                  return resolve({ ok: false, error: chrome.runtime.lastError.message });
+                }
+                resolve(r || { ok: false });
+              }
+            );
+          } catch (e) {
+            resolve({ ok: false, error: String(e) });
+          }
+        });
+
+        if (!resp.ok && resp.error === "safe_zone_limit_reached") {
+          _setChipState(profile.linkedin_url, "error", "Rate limited");
+          rateLimited = true;
+          break outerLoop;
+        }
+        if (resp.ok && !resp.timedOut) {
+          _setChipState(profile.linkedin_url, "saved", "Saved ✓");
+          totalEnriched++;
+        } else {
+          _setChipState(profile.linkedin_url, "error", resp.timedOut ? "Timed out" : "Failed");
+        }
+
+        // Gap between enrichment tabs. Keeps ≤5s end-to-end target while
+        // avoiding perfectly uniform bursts that look scripted.
+        if (i < enrichable.length - 1 && !state.bulkCancel) {
+          const r = Math.random();
+          const base = r < 0.70
+            ? 700 + Math.random() * 900     // 0.7-1.6s (70%)
+            : r < 0.92
+            ? 1800 + Math.random() * 1400   // 1.8-3.2s (22%)
+            : 3500 + Math.random() * 1500;  // 3.5-5s   (8%)
+          await new Promise((resolve) => setTimeout(resolve, base));
+        }
       }
 
-      // Gap between enrichment tabs. Keeps ≤5s end-to-end target while
-      // avoiding perfectly uniform bursts that look scripted.
-      if (i < enrichable.length - 1 && !state.bulkCancel) {
-        const r = Math.random();
-        const base = r < 0.70
-          ? 700 + Math.random() * 900     // 0.7-1.6s (70%)
-          : r < 0.92
-          ? 1800 + Math.random() * 1400   // 1.8-3.2s (22%)
-          : 3500 + Math.random() * 1500;  // 3.5-5s   (8%)
-        await new Promise((resolve) => setTimeout(resolve, base));
+      totalProcessed += enrichable.length;
+
+      // Don't paginate if: user made explicit selection, cancelled, rate-limited,
+      // or no Next button exists (last page).
+      if (!autoPage || cancelled || rateLimited) break;
+      const nextBtn = _findNextPageButton();
+      if (!nextBtn) break;
+
+      // ── Navigate to next page ──────────────────────────────────────────
+      const prevSig = _pageSignature();
+      // Scroll the Next button into view so the click lands naturally
+      try { nextBtn.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+      await sleep(500 + Math.random() * 400);
+      nextBtn.click();
+      pageNum++;
+      flashStatus(`Loading page ${pageNum}…`);
+
+      // Wait up to 15s for the page signature to change
+      const changed = await (async () => {
+        const start = Date.now();
+        while (Date.now() - start < 15000) {
+          if (state.bulkCancel) return false;
+          await sleep(400);
+          if (_pageSignature() !== prevSig) {
+            await sleep(1800); // let the new page settle and React re-render
+            return true;
+          }
+        }
+        return false;
+      })();
+
+      if (!changed) break; // timed out or no page change
+      if (state.bulkCancel) { cancelled = true; break; }
+
+      // ── Scroll to trigger lazy card rendering ──────────────────────────
+      flashStatus(`Page ${pageNum}: scanning profiles…`);
+      {
+        const viewH = window.innerHeight;
+        let pos = 0;
+        for (let i = 0; i < 12 && !state.bulkCancel; i++) {
+          const pageH = document.body.scrollHeight;
+          pos = Math.min(pageH - 40, pos + Math.round(viewH * (0.25 + Math.random() * 0.18)));
+          window.scrollTo(0, pos);
+          await sleep(280 + Math.random() * 380);
+          if (pos >= pageH * 0.92) break;
+        }
+        await sleep(450 + Math.random() * 350);
+        window.scrollTo(0, 0);
+        await sleep(350 + Math.random() * 200);
       }
+      if (state.bulkCancel) { cancelled = true; break; }
+
+      // Re-inject chips on the new page so _allChipUrls() returns fresh URLs
+      try { decorateSearchCards(); } catch {}
+      await sleep(300 + Math.random() * 200);
+
+      // ── Build enrichable list for this page ────────────────────────────
+      const newUrls = _allChipUrls().filter(
+        (u) => u && (u.includes("/in/") || u.includes("/sales/lead/"))
+      );
+      if (!newUrls.length) break; // no profiles on this page — stop
+
+      let newEnrichable = newUrls.map((u) => ({
+        linkedin_url: u,
+        full_name: _labelFromUrl(u),
+      }));
+
+      if (state.avoidDuplicates) {
+        newEnrichable = newEnrichable.filter((e) => !_isContacted(e.linkedin_url));
+        if (!newEnrichable.length) {
+          flashStatus(`Page ${pageNum}: all ${newUrls.length} already saved — done.`, "ok");
+          break;
+        }
+      }
+
+      enrichable = newEnrichable;
+      // Grow the running total so the toolbar counter keeps climbing
+      state.bulkProgress = {
+        ...state.bulkProgress,
+        total: totalProcessed + enrichable.length,
+        current: totalProcessed,
+      };
+      flashStatus(`Page ${pageNum}: saving ${enrichable.length} profile(s)…`);
+      renderToolbar();
     }
+
     state.bulkActive = false;
     state.bulkProgress = null;
     // Clear selections so the toolbar resets to "Save All Leads" and the top
@@ -1383,13 +1485,14 @@
     mountSelectAllHeader();
     renderToolbar();
 
+    const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
     let summary;
     if (cancelled) {
-      summary = `Stopped: ${enriched} of ${enrichable.length} enriched`;
+      summary = `Stopped: ${totalEnriched} of ${totalProcessed} enriched${pageLabel}`;
     } else if (rateLimited) {
-      summary = `Hit daily limit: ${enriched} of ${enrichable.length} enriched`;
+      summary = `Hit daily limit: ${totalEnriched} of ${totalProcessed} enriched${pageLabel}`;
     } else {
-      summary = `Done: ${enriched} of ${enrichable.length} enriched ✓`;
+      summary = `Done: ${totalEnriched} of ${totalProcessed} enriched ✓${pageLabel}`;
     }
     flashStatus(summary, rateLimited ? "warn" : "ok");
     decorateSearchCards();
