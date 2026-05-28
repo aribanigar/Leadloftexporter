@@ -2760,19 +2760,33 @@
 
     // Resolve the action button within a given scope. Submit/Review/Next take
     // priority (in that order); then an artdeco primary; then any non-dismiss
-    // button as a last resort.
+    // button as a last resort. NEVER the "Back to previous step" button.
+    const isBack = (x) =>
+      /back to previous step|^back$|previous/i.test(x.getAttribute("aria-label") || "") ||
+      SKIP.has((x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase());
     const pick = (scope) => {
       if (!scope) return null;
-      const btns = Array.from(scope.querySelectorAll("button")).filter(_isVisible);
-      let b;
+      // Stable fast paths from LinkedIn's live DOM (data attrs + exact labels).
+      let b =
+        scope.querySelector("button[data-live-test-easy-apply-submit-button]") ||
+        scope.querySelector("button[aria-label*='Submit application' i]");
+      if (b && _isVisible(b)) return { type: "submit", btn: b };
+      b = scope.querySelector("button[aria-label*='Review your application' i]");
+      if (b && _isVisible(b)) return { type: "review", btn: b };
+      b =
+        scope.querySelector("button[data-easy-apply-next-button]") ||
+        scope.querySelector("button[data-live-test-easy-apply-next-button]") ||
+        scope.querySelector("button[aria-label*='Continue to next step' i]");
+      if (b && _isVisible(b)) return { type: "next", btn: b };
+
+      // Text-based fallback (excludes Back).
+      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x));
       if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
       if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
       if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
-      const primary = btns.find((x) => {
-        const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-        if (!t || SKIP.has(t)) return false;
-        return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
-      });
+      const primary = btns.find(
+        (x) => x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3")
+      );
       if (primary) return { type: "next", btn: primary };
       return null;
     };
@@ -2787,10 +2801,10 @@
     const result = pick(footer) || pick(modal);
     if (result) return result;
 
-    // Absolute last resort: any visible non-dismiss button anywhere in the modal.
+    // Absolute last resort: any visible non-dismiss, non-back button.
     const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !!t && !SKIP.has(t);
+      return !!t && !SKIP.has(t) && !isBack(x);
     });
     return fallback ? { type: "next", btn: fallback } : null;
   }
@@ -2823,10 +2837,13 @@
     const boxes = Array.from(modal.querySelectorAll("input[type='checkbox']"));
     for (const cb of boxes) {
       const id = cb.id || "";
-      const lbl = modal.querySelector(`label[for='${id}']`);
-      const txt = (lbl?.innerText || cb.getAttribute("aria-label") || "").toLowerCase();
-      if (/follow/i.test(txt) && cb.checked) {
-        try { cb.click(); } catch {}
+      const lbl = (id && modal.querySelector(`label[for='${id}']`)) || cb.closest("label");
+      const txt = (lbl?.innerText || lbl?.textContent || cb.getAttribute("aria-label") || "").toLowerCase();
+      // LinkedIn's follow checkbox (id=follow-company-checkbox) is
+      // visually-hidden and Ember binds the toggle to the LABEL, so a click on
+      // the input itself is a no-op. Click the label (fall back to the input).
+      if (/\bfollow\b/i.test(txt) && cb.checked) {
+        try { (lbl || cb).click(); } catch { try { cb.click(); } catch {} }
       }
     }
   }
