@@ -2593,11 +2593,29 @@
     if (content) {
       return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
     }
-    // 3. Last resort: on an /apply/ path with a visible Next/Submit + progress
-    //    bar, treat the main content region as the form container.
-    if (/\/apply\b/.test(location.pathname) &&
-        (document.querySelector("progress") ||
-         document.querySelector("button[aria-label*='Submit application' i], button[aria-label*='Continue to next' i]"))) {
+    // 3. Full-page Easy Apply (URL = /jobs/view/<id>/apply/) where the form is
+    //    NOT in a dialog and uses no recognizable container class. Anchor on the
+    //    visible primary action button (Next / Review / Submit application) and
+    //    return a container that holds both it and the form. This is layout-
+    //    agnostic — it works no matter what wrapper classes LinkedIn ships.
+    const onApplyPath = /\/apply\b/.test(location.pathname);
+    const actionBtn = Array.from(document.querySelectorAll("button, [role='button']")).find((b) => {
+      if (!_isVisible(b)) return false;
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      return (
+        /^(next|continue to next step|review|review your application|submit|submit application|done)$/i.test(t) ||
+        /continue to next step|submit application|review your application/i.test(a)
+      );
+    });
+    if (onApplyPath || actionBtn) {
+      if (actionBtn) {
+        return (
+          actionBtn.closest(
+            "form, main, .scaffold-layout, .application-outlet, [class*='easy-apply'], [class*='apply']"
+          ) || document.querySelector("main") || document.body
+        );
+      }
       return document.querySelector("main") || document.body;
     }
     return null;
@@ -2716,34 +2734,46 @@
   // terminal-ish; "next/continue" advances.
   function _modalActionButton(modal) {
     if (!modal) return null;
-    // Prefer footer buttons but fall back to all visible buttons
+    const match = (b, re) =>
+      re.test((b.getAttribute("aria-label") || "")) ||
+      re.test((b.innerText || b.textContent || "").replace(/\s+/g, " ").trim());
+    const SKIP = new Set(["back", "dismiss", "discard", "cancel", "close", "previous"]);
+
+    // Resolve the action button within a given scope. Submit/Review/Next take
+    // priority (in that order); then an artdeco primary; then any non-dismiss
+    // button as a last resort.
+    const pick = (scope) => {
+      if (!scope) return null;
+      const btns = Array.from(scope.querySelectorAll("button")).filter(_isVisible);
+      let b;
+      if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
+      if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
+      if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
+      const primary = btns.find((x) => {
+        const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        if (!t || SKIP.has(t)) return false;
+        return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
+      });
+      if (primary) return { type: "next", btn: primary };
+      return null;
+    };
+
+    // Try the footer/action-bar first (tight scope), but if it yields nothing
+    // actionable — which happens on the full-page apply layout where the wrong
+    // [class*='footer'] can match — fall back to the whole container.
     const footer = modal.querySelector(
       "footer, .jobs-easy-apply-modal__action-bar, [class*='action-bar'], [class*='footer'], " +
       ".artdeco-modal__actionbar, [data-test-modal-footer]"
     );
-    const btns = Array.from((footer || modal).querySelectorAll("button")).filter(_isVisible);
-    const match = (b, re) =>
-      re.test((b.getAttribute("aria-label") || "")) ||
-      re.test((b.innerText || b.textContent || "").replace(/\s+/g, " ").trim());
-    let b;
-    if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
-    if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-    if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
-    // Prioritise any artdeco primary button not on the exclusion list
-    const SKIP = new Set(["back", "dismiss", "discard", "cancel", "close", "previous"]);
-    const primary = btns.find((x) => {
-      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      if (!t || SKIP.has(t)) return false;
-      return x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3");
-    });
-    if (primary) return { type: "next", btn: primary };
-    // Last resort: any non-dismiss, non-back button
-    const fallback = btns.find((x) => {
+    const result = pick(footer) || pick(modal);
+    if (result) return result;
+
+    // Absolute last resort: any visible non-dismiss button anywhere in the modal.
+    const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
       return !!t && !SKIP.has(t);
     });
-    if (fallback) return { type: "next", btn: fallback };
-    return null;
+    return fallback ? { type: "next", btn: fallback } : null;
   }
 
   // If a resume picker is present, make sure one resume is selected. LinkedIn
