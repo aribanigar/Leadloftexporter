@@ -139,13 +139,22 @@
       const cs = getComputedStyle(d);
       if (cs.display === "none" || cs.visibility === "hidden") continue;
       const txt = d.textContent || "";
-      // Must contain invite-specific phrases
-      if (!/add a note|send without a note|personalize your invitation|note.*optional/i.test(txt))
-        continue;
-      // Must NOT be LinkedIn's "Send [Name]'s Post" share/DM modal
       const heading = d.querySelector("h2, h3, h4, [role='heading']");
-      if (heading && /send .+['']s post/i.test(heading.textContent || "")) continue;
-      return d;
+      const headingTxt = (heading?.textContent || "").toLowerCase();
+      // Must NOT be LinkedIn's "Send [Name]'s Post" share/DM modal
+      if (heading && /send .+['']s post/i.test(headingTxt)) continue;
+      // Classic invite modal: contains invite-specific body phrases
+      if (/add a note|send without a note|personalize your invitation|note.*optional/i.test(txt))
+        return d;
+      // Redesigned modal: heading references "invite" or "connect" and has a
+      // non-dismiss action button. LinkedIn removed "Send without a note" wording
+      // in 2025 and now shows a plain "Send" CTA inside an "Invite … to connect" modal.
+      if (/invite|connect.*request|connection request/i.test(headingTxt)) {
+        const actionBtn = d.querySelector(
+          "button:not([aria-label*='close' i]):not([aria-label*='dismiss' i]):not([aria-label*='back' i])"
+        );
+        if (actionBtn) return d;
+      }
     }
     return null;
   }
@@ -163,10 +172,11 @@
       t: (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase(),
       a: (b.getAttribute("aria-label") || "").trim().toLowerCase(),
     });
-    // Progressive passes, strictest first. The final substring pass is the
-    // safety net: it matches even if LinkedIn wraps the label in extra
-    // (visually-hidden) text that breaks the anchored ^...$ regexes. Bare
-    // "send" is never used — it would match LinkedIn's "Send Post" share modal.
+    const isVisible = (b) => {
+      const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && !b.disabled;
+    };
+    // Progressive passes, strictest first.
     const tests = [
       (s) => s === "send without a note",
       (s) => /\bsend without a note\b/.test(s),
@@ -179,11 +189,35 @@
         return test(t) || test(a);
       });
       if (!matches.length) continue;
-      const vis = matches.filter((b) => {
-        const r = b.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && !b.disabled;
-      });
+      const vis = matches.filter(isVisible);
       return vis[0] || matches.find((b) => !b.disabled) || matches[0];
+    }
+    // Fallback for redesigned modal: bare "send" is safe when inside a confirmed
+    // invite modal (no share modal can be open on a /in/ profile page mid-connect).
+    const modal = _ccFindInviteModal();
+    if (modal) {
+      // Primary action button in the modal (artdeco primary style = the "Send" CTA).
+      for (const sel of [
+        ".artdeco-button--primary",
+        ".artdeco-modal__actionbar .artdeco-button",
+        "[data-test-dialog-primary-btn]",
+        "[data-test-modal-action-primary]",
+      ]) {
+        try {
+          const btn = modal.querySelector(sel);
+          if (btn && !btn.disabled && isVisible(btn)) {
+            const { t } = label(btn);
+            if (!/(cancel|close|dismiss|back|add.*note|note)/i.test(t)) return btn;
+          }
+        } catch {}
+      }
+      // Bare "send" button anywhere in the document — safe because we verified
+      // the invite modal is open and we are on a /in/ profile page.
+      const sendBtn = all.find((b) => {
+        const { t, a } = label(b);
+        return (t === "send" || a === "send") && isVisible(b);
+      });
+      if (sendBtn) return sendBtn;
     }
     return null;
   }
@@ -255,6 +289,33 @@
       const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
       el.dispatchEvent(new KeyboardEvent("keydown", kopts));
       el.dispatchEvent(new KeyboardEvent("keyup", kopts));
+    } catch {}
+    // Direct React fiber call — bypasses the DOM event system entirely.
+    // When LinkedIn's button handler checks event.isTrusted, synthetic DOM
+    // events fail (isTrusted is always false for programmatic events). Calling
+    // the React onClick prop directly with a plain object where isTrusted=true
+    // passes that check. Walk up the fiber tree so we find the onClick even if
+    // it is attached to a parent wrapper component.
+    try {
+      const fKey = Object.keys(el).find(
+        (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+      );
+      if (fKey) {
+        let fiber = el[fKey];
+        for (let depth = 0; fiber && depth < 8; fiber = fiber.return, depth++) {
+          const onClick =
+            fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+          if (typeof onClick === "function") {
+            onClick({
+              type: "click", bubbles: true, cancelable: true,
+              isTrusted: true, target: el, currentTarget: el,
+              preventDefault: () => {}, stopPropagation: () => {},
+              nativeEvent: { isTrusted: true },
+            });
+            break;
+          }
+        }
+      }
     } catch {}
   }
 

@@ -1521,6 +1521,29 @@
       const pick = visible[0] || matches.find((b) => !b.disabled) || matches[0];
       if (pick) return pick;
     }
+    // Fallback for redesigned modal (bare "send" CTA, primary button in modal).
+    const modal = _findInvitationModal();
+    if (modal) {
+      for (const sel of [
+        ".artdeco-button--primary",
+        ".artdeco-modal__actionbar .artdeco-button",
+        "[data-test-dialog-primary-btn]",
+      ]) {
+        try {
+          const btn = modal.querySelector(sel);
+          if (btn && _isVisible(btn) && !btn.disabled) {
+            const { t } = labelOf(btn);
+            if (!/(cancel|close|dismiss|back|add.*note|note)/i.test(t)) return btn;
+          }
+        } catch {}
+      }
+      // Bare "send" in document — only safe after confirming invite modal is open.
+      const sendBtn = all.find((b) => {
+        const { t, a } = labelOf(b);
+        return (/^send$/i.test(t) || /^send$/i.test(a)) && _isVisible(b) && !b.disabled;
+      });
+      if (sendBtn) return sendBtn;
+    }
     return null;
   }
 
@@ -1592,6 +1615,32 @@
       const kopts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
       el.dispatchEvent(new KeyboardEvent("keydown", kopts));
       el.dispatchEvent(new KeyboardEvent("keyup", kopts));
+    } catch {}
+    // 5. Direct React fiber call — bypasses the DOM event system. When LinkedIn
+    // checks event.isTrusted, synthetic DOM events always fail (isTrusted=false).
+    // Calling the React onClick prop directly with isTrusted=true in a plain
+    // object passes that check. Walk up the fiber tree to find the handler even
+    // when it's on a parent wrapper component.
+    try {
+      const fKey = Object.keys(el).find(
+        (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+      );
+      if (fKey) {
+        let fiber = el[fKey];
+        for (let depth = 0; fiber && depth < 8; fiber = fiber.return, depth++) {
+          const onClick =
+            fiber.memoizedProps?.onClick || fiber.pendingProps?.onClick;
+          if (typeof onClick === "function") {
+            onClick({
+              type: "click", bubbles: true, cancelable: true,
+              isTrusted: true, target: el, currentTarget: el,
+              preventDefault: () => {}, stopPropagation: () => {},
+              nativeEvent: { isTrusted: true },
+            });
+            break;
+          }
+        }
+      }
     } catch {}
   }
 
