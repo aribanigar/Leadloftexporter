@@ -979,9 +979,15 @@
   // jobs). Centralised so the interval / scroll / search-change handlers stay
   // in lock-step about which decorator to call.
   function _decorateCurrent() {
-    const type = Scraper.pageType();
-    if (type === "jobs") Overlay.decorateJobCards?.();
-    else Overlay.decorateSearchCards?.();
+    try {
+      const type = Scraper.pageType();
+      if (type === "jobs") Overlay.decorateJobCards?.();
+      else Overlay.decorateSearchCards?.();
+    } catch (e) {
+      // A transient DOM error during a re-render must never break the 1.5s
+      // heartbeat — swallow it; the next tick retries on fresh DOM.
+      console.warn("[LeadCaptura] decorate tick failed:", e?.message || e);
+    }
   }
 
   // Pagination (and most LinkedIn search filters) change only the QUERY
@@ -1006,7 +1012,7 @@
   // paginates without a pathname change). 1.5s keeps chips appearing quickly
   // on freshly-rendered cards without hammering the DOM.
   setInterval(() => {
-    _onSearchMaybeChanged();
+    try { _onSearchMaybeChanged(); } catch {}
     _decorateCurrent();
   }, 1500);
 
