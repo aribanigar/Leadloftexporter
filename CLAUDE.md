@@ -233,6 +233,106 @@ orphaned/stale content-script context. `_invitationModalOpen()` returns true if
 either a matching dialog node is visible **or** a visible "Send without a note"
 button exists, so neither owner bails when LinkedIn changes the dialog's `role`.
 
+### Auto-apply engine (LinkedIn Apply / Easy Apply) — design rules — do not break
+
+The bulk auto-apply path (`applyAllJobs` → `_applyToJob` → `_runEasyApplyModal`
+in `overlay.js`) is the second hardest-won subsystem. Every rule below was
+established by a regression — re-introducing any of them re-breaks the run.
+
+**LinkedIn rebranded "Easy Apply" → "LinkedIn Apply" and changed the control
+type.** The in-app apply control is now an `<a href=".../jobs/view/<id>/apply/"
+aria-label="LinkedIn Apply to this job">` (was a `<button>`). `_classifyJobDetail`
+must scan anchors AND buttons, and `_isEasyApplyBtn` accepts both the old
+"Easy Apply" label and `linkedin apply` / plain "Apply" + an in-app signal
+(`jobs-apply-button` class, `[class*='jobs-apply']` ancestor, the
+`linkedin-bug` SVG, OR an href matching `linkedin.com/jobs/view/\d+/apply`).
+
+**Two layouts to support.** Modal popup (on `/jobs/search-results/`) AND
+full-page inline form (when LinkedIn navigates to `/jobs/view/<id>/apply/`).
+`_easyApplyModal()` detects both — dialog selectors first, then `.jobs-easy-apply-content`
+/ form container, then the apply-progress **region** as the last fallback.
+
+**NEVER infer the apply form from a bare "Next" button** — the search page's
+own pagination "Next" matches that and made the stepper walk `start=25→50→100`
+forever. Use the `aria-label*='job application progress'` region or a real
+`/jobs/view/<id>/apply/` path as the only signals for "we're in the apply form."
+
+**`_modalActionButton` must refuse pagination controls** outright
+(`.artdeco-pagination`, `[data-testid*='pagination']`, "View next page", "Page N")
+and "Back to previous step". Defence-in-depth even when the modal detection is right.
+
+**`_classifyJobDetail` must scope to the right-hand DETAIL pane**
+(`.jobs-search__job-details`, `.scaffold-layout__detail`, `.jobs-details`,
+`.job-view-layout`). The left job-list cards each show their own "Apply" badge —
+if classify clicks one of those, it just re-opens the job and no application
+form ever appears (every job logs "failed"). Fall back to `document` only when
+no pane matches.
+
+**`_dismissEasyApplyModal` must scope to the real Easy Apply DIALOG only**
+(`_realModalDialog()`). A document-wide `button[aria-label*='Dismiss']` hits
+the job cards' own Dismiss X — which tells LinkedIn "don't recommend this job"
+and silently destroys the user's recommendations. In full-page apply mode there
+is no dialog; do nothing (the next job's navigation handles it).
+
+**Clicking — v1.0.47 wiring is load-bearing.** Both the Easy Apply control and
+the modal's Next/Submit must be clicked with **`dispatchHumanClick`** first
+(real pointer sequence). `_forceClick`'s plain `.click()` doesn't reliably
+trigger LinkedIn's React/Ember handlers — pages don't advance. Use `_forceClick`
+ONLY as a fallback when the page didn't move after `dispatchHumanClick`.
+
+**Stable selectors** (from live DOM, prefer these over text matching):
+- Next: `button[data-easy-apply-next-button]`, `button[data-live-test-easy-apply-next-button]`, aria-label "Continue to next step".
+- Submit: `button[data-live-test-easy-apply-submit-button]`, aria-label "Submit application".
+- Dismiss inside dialog: `button[aria-label='Dismiss'][data-test-modal-close-btn]`.
+- Progress region: `[aria-label*='job application progress'][role='region']`.
+
+**Untick "Follow <company>" via the LABEL, not the input.** The
+`#follow-company-checkbox` is `visually-hidden` and Ember binds the toggle to
+the `<label for="follow-company-checkbox">`. Clicking the input itself is a
+no-op; the box stays checked.
+
+**Decline post-apply NBA prompts.** After submit, LinkedIn often shows a
+"show recruiters you're #OpenToWork" / next-best-action modal. Click
+"No thanks" / "Not now" / "Skip" — NEVER "Get started" (that toggles real
+profile flags the user didn't ask for).
+
+**Stop must be immediate.** `_cancellableSleep(ms)` checks `state.applyCancel`
+every 150ms and is used for the inter-job gap (4–50s) and the in-step reading
+pause. `_runEasyApplyModal` also guards `if (state.applyCancel) return` right
+before any Next/Submit click — never submit/advance after Stop is pressed.
+
+**Job-card detection (`_jobCardEls`) runs BOTH strategies, always.**
+- Strategy A: `data-occludable-job-id` / `data-job-id` / known container classes.
+- Strategy B: climb from each `button[aria-label*='Dismiss']` to its repeated card.
+
+Gating one behind the other (a previous bug) broke chip decoration on
+`/jobs/search-results/?origin=JOB_COLLECTION_PAGE`. Dedup + innermost-filter
+handle overlap.
+
+**Per-card chip is a single one-click "Auto Apply" button.** No checkbox. Hidden
+via CSS `.lc-applying .lc-job-apply-row { display:none }` while a run is in
+progress (toggled by adding/removing `.lc-applying` on `<html>` in
+`applyAllJobs`'s start/finally). The chips stay in the DOM so the engine still
+reads their keys; they're just not shown.
+
+**State always resets via `try/finally`.** `applyAllJobs` (and `connectAllVisible`,
+and bulk save) wrap the run in try/finally that clears `state.applyActive` /
+`state.applyCancel` / progress, removes `.lc-applying`, and re-mounts the
+toolbar. The toolbar can never get stuck on "Stop." Per-job errors are isolated
+in `processPage` (each `_applyToJob` is wrapped) so one bad job becomes "failed"
+and the loop continues.
+
+**Form-wait is a poll, not a fixed `waitFor`.** `_runEasyApplyModal` polls
+`_easyApplyModal()` every 300ms for up to 12s — catches the form the instant it
+renders, whether modal or full-page. Don't go back to `waitFor` on dialog
+selectors only (misses full-page).
+
+**Default config baked in for fresh installs.** `service-worker.js` and
+`options/options.js` ship `DEFAULT_SETTINGS.apiUrl` = the production backend and
+a pre-set workspace `apiKey`, AND `manifest.json` `host_permissions` includes
+the backend origin so fetches work without a manual permission grant. These
+defaults only apply when `chrome.storage.local` has no prior settings.
+
 ### Stale-tab self-heal + version badge
 
 Updating an unpacked extension does **not** re-inject content scripts into
