@@ -49,6 +49,11 @@
     // back to every visible /in/ card so the legacy one-click bulk still
     // works for users who don't care about selection.
     selectedUrls: new Set(),
+    // When true (after pressing "Select All"), newly-decorated chips
+    // auto-tick themselves — so Sales Nav cards that lazy-load on scroll
+    // are picked up live. Cleared when the user clears the selection or
+    // manually unticks any single chip.
+    selectAllSticky: false,
     bulkProgress: null, // { current, total, name } during a bulk run
     // Bulk-connect run state — mirrors the bulk-save flags but drives the
     // native LinkedIn "Connect" button on each selected card instead.
@@ -900,12 +905,17 @@
   function toggleSelectAll() {
     if (state.selectedUrls.size > 0) {
       state.selectedUrls.clear();
+      state.selectAllSticky = false;
     } else {
       // Make sure every visible card has a chip, THEN select exactly those
       // chips. Using the chips (not a fresh scrape) guarantees Select All
       // matches what the user sees one-for-one.
       try { decorateSearchCards(); } catch {}
       for (const url of _allChipUrls()) state.selectedUrls.add(url);
+      // Sticky: as Sales Nav (and regular search) lazy-load more rows, the
+      // decorate heartbeat will inject new chips — those auto-tick into the
+      // selection set until the user clears or manually unticks one.
+      state.selectAllSticky = true;
     }
     // Mirror selection state across all three surfaces: per-card checkboxes,
     // top pill, bottom toolbar counter. Without this, ticking one place would
@@ -3838,6 +3848,13 @@
     if (existing && document.body.contains(existing)) return;
     if (existing) injectedSaves.delete(url);
 
+    // Sticky Select-All: if the user pressed "Select All" and this chip is a
+    // newly-decorated row (lazy-load via scroll, pagination, etc.), auto-add
+    // its URL to the selection set so the count grows live.
+    if (state.selectAllSticky && !state.selectedUrls.has(url)) {
+      state.selectedUrls.add(url);
+    }
+
     // Selection checkbox — toggles inclusion of this URL in the bulk
     // selection set. Clicking it never opens a tab; it's a pure selection
     // primitive. The Save chip next to it does the open-and-enrich action.
@@ -3854,6 +3871,9 @@
         state.selectedUrls.delete(url);
         checkSpan.textContent = "☐";
         checkSpan.classList.remove("lc-inline-check-on");
+        // A manual untick means the user no longer wants newly-loaded rows
+        // to auto-tick into their selection — disable sticky mode.
+        state.selectAllSticky = false;
       } else {
         state.selectedUrls.add(url);
         checkSpan.textContent = "☑";
@@ -4352,7 +4372,7 @@
       const ownerLink = _resolveCardOwnerLink(card, linkSel);
       if (!ownerLink) return;
       const url = globalThis.__lcDom.normalizeProfileUrl(ownerLink.href);
-      if (!url || !url.includes("/in/")) return;
+      if (!url || !(url.includes("/in/") || url.includes("/sales/lead/"))) return;
       if (handled.has(url)) return;
       handled.add(url);
 
@@ -4404,7 +4424,7 @@
     for (const a of document.querySelectorAll(linkSel)) {
       if (_isInsightLink(a) || _isMutualConnectionContext(a)) continue;
       const url = globalThis.__lcDom.normalizeProfileUrl(a.href);
-      if (!url || !url.includes("/in/") || handled.has(url)) continue;
+      if (!url || !(url.includes("/in/") || url.includes("/sales/lead/")) || handled.has(url)) continue;
       let node = a.parentElement;
       let card = null;
       for (
@@ -4432,6 +4452,13 @@
     // Refresh the Avoid-Duplicate panel's live skip-count for the cards now
     // on screen (new cards may have rendered via scroll/pagination).
     try { _renderAvoidDupPanel(); } catch {}
+
+    // Sticky Select-All: keep toolbar + pill counts live as lazy-loaded
+    // chips get auto-added by injectInlineSave above.
+    if (state.selectAllSticky) {
+      try { refreshSelectAllHeader(); } catch {}
+      try { renderToolbar(); } catch {}
+    }
   }
 
   // Resolve the canonical profile-owner link for a card. Preference order:
@@ -4524,46 +4551,137 @@
   // Creates a dark semi-transparent overlay that covers the whole viewport with
   // a transparent "cutout" over the "Send without a note" button. pointer-events
   // on both elements are NONE so user clicks pass through directly to the button.
-  // The box-shadow technique: the cutout div is transparent + has a massive
-  // box-shadow that darkens everything OUTSIDE it — the spotlight effect.
+  // Adds a top banner ("Action needed"), a bouncing arrow above the cutout,
+  // a soft "ding" beep when first shown, and a Skip button below the cutout.
   let _spotlightRAF = null;
   let _spotlightEl = null;
   let _bannerEl = null;
+  let _arrowEl = null;
+  let _skipBtnEl = null;
+  let _spotlightSkipCb = null;
 
-  function _showSendSpotlight() {
+  function _playSpotlightBeep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+      osc.onended = () => { try { ctx.close(); } catch {} };
+    } catch {}
+  }
+
+  // opts: { remaining: number, onSkip: function }
+  function _showSendSpotlight(opts = {}) {
     _removeSpotlight();
-    _removeSendBtnHighlight(); // retire the old arrow/highlight
+    _removeSendBtnHighlight();
+    _spotlightSkipCb = typeof opts.onSkip === "function" ? opts.onSkip : null;
+    const remaining = typeof opts.remaining === "number" ? opts.remaining : null;
     try {
       const spot = document.createElement("div");
       spot.id = "lc-send-spotlight";
       document.body.appendChild(spot);
       _spotlightEl = spot;
 
+      // Top banner — large, fixed at viewport top centre.
       const banner = document.createElement("div");
       banner.id = "lc-send-banner";
+      banner.innerHTML = `
+        <div style="font-size:17px!important;font-weight:800!important;margin-bottom:4px!important;">
+          ⚡ Action needed — Click "Send without a note"
+        </div>
+        <div id="lc-send-banner-sub" style="font-size:13px!important;font-weight:500!important;opacity:0.92!important;">
+          ${remaining != null ? `${remaining} more profile${remaining === 1 ? "" : "s"} after this one` : "The extension will continue automatically once you click"}
+        </div>`;
       document.body.appendChild(banner);
       _bannerEl = banner;
+
+      // Bouncing arrow above the cutout.
+      const arrow = document.createElement("div");
+      arrow.id = "lc-send-btn-arrow";
+      arrow.innerHTML = `
+        <div class="lc-arrow-inner">
+          <span class="lc-arrow-emoji">👇</span>
+          <span>Click this button</span>
+        </div>
+        <div class="lc-arrow-tail"></div>`;
+      document.body.appendChild(arrow);
+      _arrowEl = arrow;
+
+      // Skip button below the cutout, real clickable element.
+      const skip = document.createElement("button");
+      skip.id = "lc-send-skip";
+      skip.type = "button";
+      skip.textContent = "Skip this profile";
+      skip.style.cssText = [
+        "position:fixed", "z-index:2147483647", "padding:8px 16px",
+        "background:rgba(255,255,255,0.95)", "color:#0a66c2",
+        "border:2px solid #0a66c2", "border-radius:8px",
+        "font:600 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        "cursor:pointer", "box-shadow:0 4px 14px rgba(0,0,0,0.4)",
+      ].map((s) => s + " !important").join(";");
+      skip.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const cb = _spotlightSkipCb;
+        _spotlightSkipCb = null;
+        _removeSpotlight();
+        if (cb) try { cb(); } catch {}
+      });
+      document.body.appendChild(skip);
+      _skipBtnEl = skip;
+
+      // Audio cue — one soft ding so it's obvious even out of focus.
+      _playSpotlightBeep();
 
       const tick = () => {
         if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
         const btn = _findSendWithoutNoteButton();
         if (btn && _isVisible(btn)) {
           const r = btn.getBoundingClientRect();
-          const pad = 12;
+          const pad = 14;
           _spotlightEl.style.cssText = [
             `left:${r.left - pad}px`, `top:${r.top - pad}px`,
             `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
           ].join("!important;") + "!important;";
 
-          // Banner: above the cutout, centred horizontally
-          const bw = _bannerEl.offsetWidth || 380;
-          const bh = _bannerEl.offsetHeight || 50;
-          const bLeft = Math.max(8, Math.min(window.innerWidth - bw - 8,
-            r.left + r.width / 2 - bw / 2));
-          const bTop = Math.max(8, r.top - bh - 18);
+          // Top banner — fixed near top of viewport, centred horizontally.
+          const bw = _bannerEl.offsetWidth || 460;
+          const bLeft = Math.max(8, (window.innerWidth - bw) / 2);
           _bannerEl.style.cssText =
-            `left:${bLeft}px!important;top:${bTop}px!important;`;
-          _bannerEl.textContent = '\u{1F446} Click “Send without a note” to send the invitation';
+            `left:${bLeft}px!important;top:24px!important;`;
+
+          // Arrow — directly above the spotlight cutout, pointing down at it.
+          const aw = _arrowEl.offsetWidth || 180;
+          const ah = _arrowEl.offsetHeight || 56;
+          const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
+            r.left + r.width / 2 - aw / 2));
+          const aTop = Math.max(96, r.top - ah - 18);
+          _arrowEl.style.cssText =
+            `left:${aLeft}px!important;top:${aTop}px!important;`;
+
+          // Skip button — directly below the spotlight cutout.
+          const sw = _skipBtnEl.offsetWidth || 150;
+          const sLeft = Math.max(8, Math.min(window.innerWidth - sw - 8,
+            r.left + r.width / 2 - sw / 2));
+          const sTop = Math.min(window.innerHeight - 50,
+            r.top + r.height + pad + 14);
+          _skipBtnEl.style.cssText =
+            `left:${sLeft}px!important;top:${sTop}px!important;` +
+            `position:fixed!important;z-index:2147483647!important;` +
+            `padding:8px 16px!important;background:rgba(255,255,255,0.95)!important;` +
+            `color:#0a66c2!important;border:2px solid #0a66c2!important;` +
+            `border-radius:8px!important;cursor:pointer!important;` +
+            `font:600 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;` +
+            `box-shadow:0 4px 14px rgba(0,0,0,0.4)!important;`;
         }
         _spotlightRAF = requestAnimationFrame(tick);
       };
@@ -4575,6 +4693,9 @@
     if (_spotlightRAF) { cancelAnimationFrame(_spotlightRAF); _spotlightRAF = null; }
     try { if (_spotlightEl) { _spotlightEl.remove(); _spotlightEl = null; } } catch {}
     try { if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; } } catch {}
+    try { if (_arrowEl) { _arrowEl.remove(); _arrowEl = null; } } catch {}
+    try { if (_skipBtnEl) { _skipBtnEl.remove(); _skipBtnEl = null; } } catch {}
+    _spotlightSkipCb = null;
     _removeSendBtnHighlight();
   }
 
