@@ -1636,6 +1636,12 @@
     const isSalesNav = (Scraper.pageType() || "").includes("sales");
     if (hasMessage && isSalesNav) return "salesnav-connectable";
     if (hasMessage) return "connected";
+    // On Sales Nav "Saved on LinkedIn.com" list pages (/sales/lists/), cards
+    // only show a "•••" overflow button — no Connect/Follow/Message button in
+    // the card's flat DOM. If we found no recognisable state but we ARE on
+    // Sales Nav and the card has a dropdown trigger, treat it as connectable
+    // so Connect All drives the dropdown flow instead of silently skipping.
+    if (isSalesNav && _findSalesNavMoreOptionsButton(card)) return "salesnav-connectable";
     return "unknown";
   }
 
@@ -4191,7 +4197,7 @@
       e.stopPropagation();
       if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
-      textSpan.textContent = "Enriching…";
+      textSpan.textContent = "Saving…";
 
       const targetUrl = profile.linkedin_url;
       if (!targetUrl) {
@@ -4199,60 +4205,42 @@
         textSpan.textContent = "No URL";
         return;
       }
-      // Allow /in/ (regular LinkedIn) and /sales/lead/ (Sales Navigator).
-      // The enrichment trigger in main.js bounces /sales/lead/ tabs to the
-      // matching /in/ page automatically, so both paths work with enrichFlag.
-      if (!targetUrl.includes("/in/") && !targetUrl.includes("/sales/lead/")) {
-        btn.dataset.state = "error";
-        textSpan.textContent = "Need profile URL";
-        return;
-      }
 
-      console.log("[LeadCaptura] chip clicked — enriching profile:", targetUrl);
+      console.log("[LeadCaptura] chip clicked — saving profile:", targetUrl);
 
       try {
-        const resp = await new Promise((resolve) => {
-          try {
-            chrome.runtime.sendMessage(
-              {
-                type: "lc:openProfileTab",
-                url: targetUrl,
-                active: false,       // background tab — don't disrupt the user
-                awaitClose: true,    // resolve only after enrichment finishes + tab closes
-                enrichFlag: true,    // adds ?lc_enrich=1 → triggers scrape + backend sync
-                segment: state.selection?.segmentName || null,
-              },
-              (r) => {
-                if (chrome.runtime.lastError) {
-                  return resolve({ ok: false, error: chrome.runtime.lastError.message });
-                }
-                resolve(r || { ok: false });
-              }
-            );
-          } catch (err) {
-            resolve({ ok: false, error: String(err) });
-          }
-        });
+        // STEP 1 — immediately sync card-level data (name, title, company,
+        // location) to the CRM. This is the guaranteed write: "Saved ✓" only
+        // appears after this succeeds, so the user always has real data.
+        await Api.syncProfile({ ...profile });
 
-        if (!resp.ok && resp.error === "safe_zone_limit_reached") {
-          btn.dataset.state = "error";
-          textSpan.textContent = "Rate limited";
-          return;
-        }
-        if (resp.ok && !resp.timedOut) {
-          btn.dataset.state = "saved";
-          textSpan.textContent = "Saved ✓";
-          _markContacted(url);
-        } else {
-          btn.dataset.state = "error";
-          textSpan.textContent = resp.timedOut ? "Timed out" : "Failed";
+        btn.dataset.state = "saved";
+        textSpan.textContent = "Saved ✓";
+        _markContacted(url);
+
+        // STEP 2 — fire-and-forget enrichment for email / phone / website.
+        // Runs in a background tab via the existing enrichment trigger; we
+        // do NOT wait for it (awaitClose:false) so the user's tab is
+        // unblocked immediately. Any contact-info data that arrives later
+        // simply patches the already-created CRM record.
+        if (targetUrl.includes("/in/") || targetUrl.includes("/sales/lead/")) {
+          try {
+            chrome.runtime.sendMessage({
+              type: "lc:openProfileTab",
+              url: targetUrl,
+              active: false,
+              awaitClose: false,
+              enrichFlag: true,
+              segment: state.selection?.segmentName || null,
+            });
+          } catch {}
         }
       } catch (err) {
         btn.dataset.state = "error";
         const msg = err?.message || String(err);
-        textSpan.textContent = msg.length > 40 ? "Failed — see console" : `Failed: ${msg}`;
+        textSpan.textContent = "Failed";
         btn.title = msg;
-        console.error("[LeadCaptura] per-card enrich failed", err);
+        console.error("[LeadCaptura] per-card save failed", err);
       }
     });
 
