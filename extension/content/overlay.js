@@ -1971,47 +1971,127 @@
 
   // ── Sales Navigator connect via "..." dropdown ──────────────────────────────
   // Sales Nav doesn't expose a visible "Connect" button on the card — it's
-  // hidden inside the "More options" (•••) dropdown. We open the dropdown, find
-  // the "Connect" menu item, click it, then hand off to the same
-  // "Send without a note" spotlight flow used by _sendConnectOnCard.
+  // hidden inside the "More options" (•••) dropdown. The 3-step flow:
+  //   STEP 1: click the "•••" trigger button (artdeco-dropdown__trigger)
+  //   STEP 2: find "Connect" inside the dropdown portal (attached to body)
+  //   STEP 3: click Connect → "Add a note" modal → click "Send without a note"
+  //
+  // CRITICAL: Sales Nav action rows use Artdeco component classes. We anchor
+  // on those STRUCTURAL selectors, NOT text/aria-label patterns. Text matching
+  // failed in v1.0.136 because the trigger has no visible text (icon-only) and
+  // aria-labels vary across Sales Nav account tiers.
 
-  function _findSalesNavMoreOptionsButton(card) {
-    if (!card) return null;
-    const btns = Array.from(card.querySelectorAll("button, [role='button']"));
-    for (const b of btns) {
-      if (b.classList?.contains("lc-inline-save")) continue;
-      const aria = (b.getAttribute("aria-label") || "").toLowerCase();
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      // LinkedIn Sales Nav "..." button uses various aria-labels. txt is "•••" / "..."
-      // on some renders; aria-label is "More actions", "Open actions dropdown", etc.
-      if (/more.*(action|option)/i.test(aria) || /\boverflow\b/i.test(aria) ||
-          /open.*dropdown/i.test(aria) || txt === "..." || txt === "•••" || txt === "⋯" ||
-          /more.*(action|option)/i.test(txt)) {
-        return b;
-      }
-    }
-    return null;
+  // True if the element is a Sales Nav "..." dropdown trigger button — the
+  // structural signal Artdeco uses on every dropdown across the product.
+  function _isSalesNavDropdownTrigger(b) {
+    if (!b || b.classList?.contains("lc-inline-save")) return false;
+    if (!_isVisible(b)) return false;
+    // Structural signals (Artdeco's stable class & ARIA wiring):
+    if (b.classList?.contains("artdeco-dropdown__trigger")) return true;
+    if (b.closest(".artdeco-dropdown") && b === b.closest(".artdeco-dropdown").querySelector("button")) return true;
+    // ARIA wiring is the next-most-stable signal — Artdeco sets these on
+    // every dropdown trigger across Sales Nav.
+    const hp = (b.getAttribute("aria-haspopup") || "").toLowerCase();
+    if (hp === "true" || hp === "menu" || hp === "listbox") return true;
+    // Overflow icon (•••): Artdeco LiIcon types are stable.
+    if (b.querySelector("li-icon[type*='overflow' i], svg[data-test-icon*='overflow' i]")) return true;
+    return false;
   }
 
+  // Find Sales Nav "..." trigger button anchored in/near a given card.
+  // Multi-strategy with fallbacks — no text matching.
+  function _findSalesNavMoreOptionsButton(card) {
+    if (!card) return null;
+    // STRATEGY A: structural — any dropdown trigger inside the card whose
+    // label/aria is NOT "Save lead" and NOT "Message".
+    const candidates = Array.from(
+      card.querySelectorAll(
+        "button.artdeco-dropdown__trigger, " +
+        "button[aria-haspopup='true'], " +
+        "button[aria-haspopup='menu'], " +
+        "button[aria-haspopup='listbox'], " +
+        ".artdeco-dropdown button"
+      )
+    );
+    for (const b of candidates) {
+      if (!_isSalesNavDropdownTrigger(b)) continue;
+      const hay = ((b.getAttribute("aria-label") || "") + " " + (b.textContent || "")).toLowerCase();
+      // Reject things we KNOW aren't the overflow trigger.
+      if (/\bsave lead\b/.test(hay) || /\bunsave\b/.test(hay)) continue;
+      if (/\bmessage\b/.test(hay)) continue;
+      if (/\bview profile\b/.test(hay)) continue;
+      return b;
+    }
+    // STRATEGY B: overflow icon (•••) → its parent button.
+    const overflowIcons = card.querySelectorAll(
+      "li-icon[type*='overflow' i], svg[data-test-icon*='overflow' i], " +
+      "use[href*='overflow' i], use[*|href*='overflow' i]"
+    );
+    for (const ic of overflowIcons) {
+      const b = ic.closest("button, [role='button']");
+      if (b && !b.classList?.contains("lc-inline-save") && _isVisible(b)) return b;
+    }
+    // STRATEGY C: rightmost icon-only button in the card's action row that
+    // isn't the Message or Save button. Sales Nav lays out actions left-to-right
+    // and the "..." is consistently the rightmost — so we sort by left coord.
+    const buttons = Array.from(card.querySelectorAll("button"))
+      .filter((b) => {
+        if (b.classList?.contains("lc-inline-save")) return false;
+        if (!_isVisible(b)) return false;
+        const hay = ((b.getAttribute("aria-label") || "") + " " + (b.textContent || "")).toLowerCase();
+        if (/\bsave\b/.test(hay) || /\bsaved\b/.test(hay)) return false;
+        if (/\bmessage\b/.test(hay)) return false;
+        if (/\bview\b/.test(hay)) return false;
+        if (/\bconnect\b/.test(hay)) return false;
+        if (/\bfollow\b/.test(hay)) return false;
+        // Icon-only buttons have ~no visible text — that's a strong signal.
+        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+        return t.length < 6;
+      })
+      .sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+    return buttons[0] || null;
+  }
+
+  // Find "Connect" inside the open Sales Nav dropdown. The dropdown portal is
+  // mounted under <body>, NOT inside the card — so search document-wide.
+  // Structural anchors first; text last and tight (^connect$).
   function _findSalesNavConnectMenuItem() {
-    // The dropdown portal is attached to document.body, not inside the card.
-    // Search document-wide for a visible "Connect" option.
-    const candidates = Array.from(document.querySelectorAll(
-      "[role='menuitem'], [role='option'], .artdeco-dropdown__item, " +
-      ".artdeco-hoverable-content--dropdown li, li[class*='dropdown'], " +
-      "ul[class*='dropdown'] li, ul[class*='overflow'] li"
-    ));
-    for (const item of candidates) {
-      if (!_isVisible(item)) continue;
-      const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
-      const aria = (item.getAttribute("aria-label") || "").trim();
-      // Match "Connect" exactly or as a whole word — but NOT "Connected" or
-      // "Connection" which are NOT the connect action.
-      if (
-        /^connect$/i.test(txt) || /^connect$/i.test(aria) ||
-        (/\bconnect\b/i.test(txt) && !/\bconnected\b/i.test(txt) && !/\bconnection/i.test(txt))
-      ) {
-        return item;
+    // STRATEGY A: any visible artdeco-dropdown__content that opened recently.
+    const openContents = Array.from(
+      document.querySelectorAll(
+        ".artdeco-dropdown__content--is-open, " +
+        ".artdeco-dropdown__content[aria-hidden='false'], " +
+        ".artdeco-hoverable-content--visible, " +
+        "[role='menu']:not([aria-hidden='true']), " +
+        "[role='listbox']:not([aria-hidden='true'])"
+      )
+    ).filter(_isVisible);
+
+    const scanRoots = openContents.length > 0 ? openContents : [document];
+    const itemSelector =
+      "li, [role='menuitem'], [role='option'], .artdeco-dropdown__item, " +
+      "button, a";
+    for (const root of scanRoots) {
+      const items = Array.from(root.querySelectorAll(itemSelector));
+      for (const item of items) {
+        if (!_isVisible(item)) continue;
+        if (item.closest(".lc-save-row")) continue;
+        const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
+        const aria = (item.getAttribute("aria-label") || "").trim();
+        const hay = txt + " || " + aria;
+        // Exclude "Connected" / "Connection" / "Connect on Twitter" etc.
+        if (/\bconnected\b/i.test(hay) || /\bconnection/i.test(hay)) continue;
+        if (/connect.*(twitter|email|phone|whatsapp)/i.test(hay)) continue;
+        // Accept "Connect" as a whole token (anywhere in text), or the exact
+        // word in aria. Sales Nav dropdown items often have an icon + label so
+        // textContent can include "Connect" with leading whitespace.
+        if (/^connect$/i.test(txt) || /^connect$/i.test(aria) ||
+            /\bconnect\b/i.test(txt) || /\bconnect\b/i.test(aria)) {
+          // Prefer the smallest interactive element (the menuitem itself).
+          // If item is a wrapper <li>, look for an inner button/link to click.
+          const inner = item.querySelector("button, a, [role='menuitem']");
+          return inner && _isVisible(inner) ? inner : item;
+        }
       }
     }
     return null;
@@ -2021,45 +2101,102 @@
     const { dispatchHumanClick } = globalThis.__lcDom;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    // STEP 1: open "..." dropdown
+    // STEP 1: bring card into view & click the "..." trigger.
+    try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+    await sleep(250 + Math.random() * 250);
     const moreBtn = _findSalesNavMoreOptionsButton(card);
     if (!moreBtn) {
-      console.log("[LeadCaptura] salesNav → no More-options button found");
+      console.log("[LeadCaptura] salesNav step 1 ✗ no '...' trigger button found in card");
       return { ok: false, reason: "no_more_btn" };
     }
-    console.log("[LeadCaptura] salesNav step 1 → click More Options (...)");
-    await dispatchHumanClick(moreBtn);
+    console.log("[LeadCaptura] salesNav step 1 → click '...' trigger", {
+      aria: moreBtn.getAttribute("aria-label"),
+      cls: moreBtn.className,
+    });
+    // Click via human pointer sequence first.
+    try { await dispatchHumanClick(moreBtn); } catch {}
 
-    // STEP 2: wait for "Connect" to appear in the dropdown (up to 2.5s)
+    // STEP 2: wait for the dropdown to open AND for "Connect" to appear.
+    // Sales Nav can take ~1s to mount the dropdown content portal.
     let connectItem = null;
-    for (let i = 0; i < 17 && !connectItem; i++) {
+    let dropdownOpened = false;
+    for (let i = 0; i < 30 && !connectItem; i++) {
       await sleep(150);
+      // Dropdown open signal — Artdeco toggles aria-expanded or content--is-open.
+      if (!dropdownOpened) {
+        const expanded = moreBtn.getAttribute("aria-expanded");
+        dropdownOpened =
+          expanded === "true" ||
+          !!document.querySelector(
+            ".artdeco-dropdown__content--is-open, " +
+            ".artdeco-hoverable-content--visible"
+          );
+      }
       connectItem = _findSalesNavConnectMenuItem();
+      // Retry the trigger click once at i=8 if the dropdown still isn't open
+      // (some Sales Nav builds need a second click to register).
+      if (!dropdownOpened && i === 8) {
+        console.log("[LeadCaptura] salesNav step 1.5 → retry '...' click + _forceClick");
+        try { _forceClick(moreBtn); } catch {}
+      }
     }
+
     if (!connectItem) {
-      console.log("[LeadCaptura] salesNav step 2 → no Connect item in dropdown — closing");
-      // Dismiss the dropdown and bail.
+      console.log("[LeadCaptura] salesNav step 2 ✗ no 'Connect' item in dropdown", {
+        dropdownOpened,
+      });
+      // Dismiss any open dropdown by clicking elsewhere / pressing Escape.
       try { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); } catch {}
+      try { document.body.click(); } catch {}
       await sleep(300);
-      return { ok: false, reason: "no_connect_in_dropdown" };
+      // If dropdown opened but no Connect → user is already connected or
+      // LinkedIn hides the option on this profile. Mark as connected so we
+      // don't keep retrying.
+      return {
+        ok: false,
+        reason: dropdownOpened ? "no_connect_in_dropdown" : "dropdown_did_not_open",
+      };
     }
 
-    // STEP 3: click "Connect" in the dropdown
-    console.log("[LeadCaptura] salesNav step 3 → click Connect in dropdown");
-    await dispatchHumanClick(connectItem);
-    await sleep(600 + Math.random() * 400);
+    // STEP 3: click "Connect" — human pointer sequence + force fallback.
+    console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
+      txt: (connectItem.textContent || "").trim().slice(0, 40),
+    });
+    try { await dispatchHumanClick(connectItem); } catch {}
+    await sleep(500 + Math.random() * 400);
 
-    // STEP 4: check if the "Add a note" modal opened.
-    // Some Sales Nav accounts skip the modal and connect directly.
-    if (!_invitationModalOpen()) {
-      // No modal → direct connect succeeded.
-      console.log("[LeadCaptura] salesNav step 4 → no modal, direct connect ✓");
-      return { ok: true };
+    // STEP 4: did the invitation modal open?
+    const modalAppeared = await (async () => {
+      for (let i = 0; i < 20; i++) {
+        if (_invitationModalOpen()) return true;
+        await sleep(150);
+      }
+      return false;
+    })();
+
+    if (!modalAppeared) {
+      // No modal → either it failed silently OR the invite went straight
+      // through (some Sales Nav variants connect without confirmation).
+      // Check for a toast/banner that confirms success; otherwise treat as
+      // failure so the user can see something needs attention.
+      const successToast = document.querySelector(
+        ".artdeco-toast-item--visible, " +
+        "[data-test-artdeco-toast-item]"
+      );
+      const toastText = ((successToast && successToast.textContent) || "").toLowerCase();
+      if (/invitation\s*sent|connection\s*sent|invite.*sent/i.test(toastText)) {
+        console.log("[LeadCaptura] salesNav step 4 ✓ direct connect (toast confirmed)");
+        return { ok: true };
+      }
+      console.log("[LeadCaptura] salesNav step 4 ✗ no modal, no success toast");
+      return { ok: false, reason: "no_modal_no_toast" };
     }
 
-    // STEP 5: modal appeared — same spotlight + wait flow as _sendConnectOnCard.
+    // STEP 5: invitation modal — same spotlight flow as the regular LinkedIn
+    // connect path. Auto-click is tried but isTrusted=false means LinkedIn
+    // gates this on a real user click; the spotlight makes it one-tap.
     _showSendSpotlight();
-    console.log("[LeadCaptura] salesNav step 5 → spotlight shown, attempting auto-click + awaiting user");
+    console.log("[LeadCaptura] salesNav step 5 → modal opened, spotlight shown");
 
     for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
       const sendBtn = _findSendWithoutNoteButton();
@@ -2086,10 +2223,10 @@
 
     _removeSpotlight();
     if (!_invitationModalOpen()) {
-      console.log("[LeadCaptura] salesNav step 5 → dialog closed, invitation sent ✓");
+      console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent");
       return { ok: true };
     }
-    console.log("[LeadCaptura] salesNav step 5 → timed out");
+    console.log("[LeadCaptura] salesNav step 5 ✗ timed out waiting for Send click");
     return { ok: false, reason: "send_failed" };
   }
 
