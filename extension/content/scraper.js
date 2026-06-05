@@ -230,7 +230,14 @@
     // ancestor that still contains both the h1 and an <img>.
     let card = h1.parentElement;
     for (let i = 0; i < 8 && card; i++) {
-      if (card.querySelector("img") && card.querySelector("a[href*='/overlay/']")) break;
+      if (
+        card.querySelector("img") &&
+        (
+          card.querySelector("a[href*='/overlay/']") ||
+          card.querySelector("a[href*='/details/']") ||
+          card.querySelector("a[href*='contact-info']")
+        )
+      ) break;
       card = card.parentElement;
     }
     // SAFETY GUARD: if our walk hit <main> or <body> (no proper top card
@@ -426,10 +433,13 @@
   function _findContactInfoLink() {
     return (
       document.querySelector("a[href*='/overlay/contact-info/']") ||
+      document.querySelector("a[href*='/details/contact-info/']") ||
       document.querySelector("a[id*='contact-info']") ||
-      // Text fallback — slow path
+      // Text fallback — slow path. Also returns any element whose aria-label
+      // mentions contact info (covers icon-only buttons LinkedIn sometimes ships).
       Array.from(document.querySelectorAll("a, button")).find((n) =>
-        /^\s*Contact info\s*$/i.test(n.textContent || "")
+        /^\s*Contact info\s*$/i.test(n.textContent || "") ||
+        /contact info/i.test(n.getAttribute("aria-label") || "")
       )
     );
   }
@@ -449,7 +459,9 @@
   // returned modal was null and the scrape came back empty even though
   // the user could clearly see the email and phone on the page.
   function _findContactModal() {
-    const onOverlayUrl = location.pathname.includes("/overlay/contact-info");
+    const onOverlayUrl =
+      location.pathname.includes("/overlay/contact-info") ||
+      location.pathname.includes("/details/contact-info");
 
     // Mode A — search for a visible role="dialog". Selector also covers
     // HTML5 <dialog> elements (LinkedIn shipped some routes on these in
@@ -586,10 +598,14 @@
 
   function _isValidContactModal(modal) {
     if (!modal) return false;
-    // URL context: when the user is on /in/<handle>/overlay/contact-info/,
-    // ANY element we found IS the contact info section — _findContactModal
-    // already filtered to one that contains the contact fields.
-    if (location.pathname.includes("/overlay/contact-info")) return true;
+    // URL context: when the user is on /in/<handle>/overlay/contact-info/ or
+    // /in/<handle>/details/contact-info/, ANY element we found IS the contact
+    // info section — _findContactModal already filtered to one that contains
+    // the contact fields.
+    if (
+      location.pathname.includes("/overlay/contact-info") ||
+      location.pathname.includes("/details/contact-info")
+    ) return true;
     const aria = ((modal.getAttribute && modal.getAttribute("aria-label")) || "").toLowerCase();
     const labelledBy = ((modal.getAttribute && modal.getAttribute("aria-labelledby")) || "").toLowerCase();
     if (aria.includes("contact") || labelledBy.includes("contact")) return true;
@@ -902,11 +918,17 @@
     }
 
     const { waitFor, dispatchHumanClick } = globalThis.__lcDom;
-    const isOverlayUrl = location.pathname.includes("/overlay/contact-info");
+    const isOverlayUrl =
+      location.pathname.includes("/overlay/contact-info") ||
+      location.pathname.includes("/details/contact-info");
     // Track whether the pushState fallback fired so the close-modal branch
     // can skip dismissing — the modal is bound to the URL we just navigated
     // to, and dismissing would just bounce the browser back without scrape.
     let didPushState = false;
+    // Capture the contact-info path from the link itself (when found) so the
+    // pushState fallback uses the REAL path rather than a hardcoded one. This
+    // is the key fix for LinkedIn's 2026 rename of /overlay/ → /details/.
+    let _contactInfoPath = null;
 
     let modal = _findContactModal();
     if (!_isValidContactModal(modal)) modal = null;
@@ -915,6 +937,14 @@
       if (!isOverlayUrl) {
         const link = _findContactInfoLink();
         if (link) {
+          // Remember the actual path so the pushState fallback uses it.
+          const _linkHref = link.getAttribute("href") || "";
+          if (_linkHref.includes("contact-info")) {
+            try {
+              const _u = new URL(_linkHref, location.href);
+              _contactInfoPath = _u.pathname;
+            } catch {}
+          }
           // Synthetic .click() can be no-op'd in background tabs / by React's
           // event listeners. Use a full pointer event sequence — the same
           // approach automate.js uses for connect/message — so LinkedIn's
@@ -943,16 +973,21 @@
       );
       if (!_isValidContactModal(modal)) modal = null;
 
-      // Last-resort backup: navigate the SPA router to /overlay/contact-info/.
+      // Last-resort backup: navigate the SPA router to the contact-info overlay.
       // GATED behind allowPushStateFallback because pushState mutates the
       // visible URL. Foreground callers (saveCurrentProfile from the floating
       // panel, maybeAutoEnrichCurrentProfile on profile-page open) must NOT
       // pass the flag — otherwise the user's URL bar would get rewritten
       // mid-browse. Only the background-tab enrichment trigger opts in.
+      //
+      // Path priority: (1) extracted from the link's actual href, (2) /details/
+      // (LinkedIn 2026 rename), (3) legacy /overlay/ path.
       if (!modal && !isOverlayUrl && allowPushStateFallback) {
         try {
+          const base = location.pathname.replace(/\/$/, "");
           const overlayPath =
-            location.pathname.replace(/\/$/, "") + "/overlay/contact-info/";
+            _contactInfoPath ||
+            (base + "/details/contact-info/");
           history.pushState({}, "", overlayPath + location.search);
           // Do NOT dispatch popstate here — LinkedIn's SPA router already reacts
           // to the pushState via its own history listener. A synthetic popstate

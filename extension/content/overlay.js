@@ -552,7 +552,8 @@
     try {
       if (
         location.href !== snapshot.originalHref &&
-        location.pathname.includes("/overlay/contact-info")
+        (location.pathname.includes("/overlay/contact-info") ||
+         location.pathname.includes("/details/contact-info"))
       ) {
         history.replaceState({}, "", snapshot.originalHref);
       }
@@ -1863,6 +1864,11 @@
     }
     console.log("[LeadCaptura] step 2 → dialog opened");
 
+    // Wait for React to finish mounting the modal's button handlers.
+    // LinkedIn binds click handlers ~250–400ms after the dialog appears;
+    // clicking before that is a reliable no-op.
+    await sleep(400 + Math.random() * 150);
+
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     // Nuclear approach: highlight the button visually, try every 200ms using
     // all click strategies including MAIN-world injection and SW executeScript.
@@ -1875,6 +1881,10 @@
       if (attempt === 0) {
         _highlightSendBtn(sendBtn);
         _tryServiceWorkerMainWorldClick();
+        // dispatchHumanClick fires the full pointer/mouse event sequence with
+        // real coordinates — the most trustworthy click for React-controlled
+        // buttons. Run it on the first attempt before the coarser _forceClick.
+        try { await dispatchHumanClick(sendBtn); } catch {}
       }
       console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
       _forceClick(sendBtn);
