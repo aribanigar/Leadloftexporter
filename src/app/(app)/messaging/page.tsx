@@ -34,6 +34,13 @@ interface BulkMessageResult {
   total: number;
 }
 
+interface MessageJobsStatus {
+  pending: number;
+  sent: number;
+  failed: number;
+  total: number;
+}
+
 interface Template {
   id: string;
   name: string;
@@ -77,6 +84,7 @@ export default function MessagingPage() {
   const [result, setResult] = useState<BulkMessageResult | null>(null);
   const [waResult, setWaResult] = useState<WaSendResult | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [sendingActive, setSendingActive] = useState(false);
   // WhatsApp guided send-queue: a list of lead ids + a cursor.
   const [waQueue, setWaQueue] = useState<{ ids: string[]; index: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -99,6 +107,20 @@ export default function MessagingPage() {
   const { data: waConfig } = useQuery<{ connected: boolean; display?: string | null }>({
     queryKey: ["whatsapp-config"],
     queryFn: () => api("/whatsapp/config"),
+  });
+
+  // Live progress for in-flight LinkedIn message jobs. Polls every 4s while
+  // sending is active; stops automatically once no jobs are pending.
+  const { data: jobStatus } = useQuery<MessageJobsStatus>({
+    queryKey: ["message-jobs-status"],
+    queryFn: () => api("/leads/message-jobs/status"),
+    enabled: sendingActive,
+    refetchInterval: (query) => {
+      const d = query.state.data as MessageJobsStatus | undefined;
+      if (!d) return 4000;
+      if (d.pending === 0) { setSendingActive(false); return false; }
+      return 4000;
+    },
   });
 
   const items = useMemo(() => leads?.items || [], [leads]);
@@ -142,6 +164,7 @@ export default function MessagingPage() {
     setResult(null);
     setWaResult(null);
     setWaQueue(null);
+    setSendingActive(false);
   }, [channel]);
 
   function toggle(id: string) {
@@ -197,6 +220,7 @@ export default function MessagingPage() {
     onSuccess: (r) => {
       setResult(r);
       setSelected(new Set());
+      if (r.queued > 0) setSendingActive(true);
     },
   });
 
@@ -368,15 +392,15 @@ export default function MessagingPage() {
                   <>
                     <strong>Auto-send</strong> delivers instantly via your connected WhatsApp
                     Business API ({waConfig.display || "active"}). Or use <strong>Open chats</strong>{" "}
-                    to send manually. Numbers must include the country code.
+                    to send manually one-by-one. Numbers must include the country code.
                   </>
                 ) : (
                   <>
-                    WhatsApp opens each chat with your message pre-filled — you tap
-                    send in WhatsApp (no silent auto-send). Numbers must include the
-                    country code. Want true automated bulk send?{" "}
+                    <strong>Open chats</strong> opens each WhatsApp chat with your message
+                    pre-filled — tap Send in WhatsApp for each. Numbers must include the
+                    country code. For true automated bulk send,{" "}
                     <Link href="/settings/whatsapp" className="font-medium text-emerald-700 underline">
-                      Connect the WhatsApp Business API
+                      connect the WhatsApp Business API
                     </Link>
                     .
                   </>
@@ -384,10 +408,10 @@ export default function MessagingPage() {
               </span>
             ) : (
               <span>
-                Messages are queued and sent gradually (a few minutes apart) from
-                inside your browser by the LeadCaptura extension, so keep a LinkedIn
-                tab open. Pacing protects your account. You can only message
-                1st-degree connections.
+                Messages are sent in real-time, one at a time at a human pace (45 sec –
+                3 min between sends) by the LeadCaptura extension running in your browser.
+                Keep a LinkedIn tab open with <strong>Autopilot ON</strong> in the extension
+                popup. Only 1st-degree connections can be messaged.
               </span>
             )}
           </div>
@@ -420,7 +444,7 @@ export default function MessagingPage() {
                   <MessageCircle className="h-4 w-4" />
                   {waConfig?.connected
                     ? "Open chats"
-                    : `Start WhatsApp · ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
+                    : `Open ${recipientCount} chat${recipientCount === 1 ? "" : "s"}`}
                 </button>
                 {waConfig?.connected && (
                   <button
@@ -444,29 +468,60 @@ export default function MessagingPage() {
               >
                 {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {send.isPending
-                  ? "Queueing…"
+                  ? "Sending…"
                   : `Send to ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
               </button>
             )}
           </div>
 
-          {result && (
-            <div className="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-              <div>
-                <div className="font-medium">
-                  {result.queued} message{result.queued === 1 ? "" : "s"} queued.
-                </div>
-                <div className="text-xs text-emerald-700">
-                  {result.skipped_no_linkedin > 0 && (
-                    <>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </>
-                  )}
-                  {result.skipped_pending > 0 && (
-                    <>{result.skipped_pending} already had a pending message. </>
-                  )}
-                  Keep a LinkedIn tab open so the extension can deliver them.
+          {result && result.queued > 0 && (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+              {/* Header row */}
+              <div className="flex items-start gap-2 text-emerald-800">
+                {sendingActive
+                  ? <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-emerald-600" />
+                  : <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                }
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {sendingActive
+                      ? `Sending ${result.queued} message${result.queued === 1 ? "" : "s"} in real-time…`
+                      : `${jobStatus?.sent ?? result.queued} message${result.queued === 1 ? "" : "s"} sent ✓`}
+                  </div>
+                  <div className="mt-0.5 text-xs text-emerald-700">
+                    {result.skipped_no_linkedin > 0 && (
+                      <span>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </span>
+                    )}
+                    {result.skipped_pending > 0 && (
+                      <span>{result.skipped_pending} already had a message in-flight. </span>
+                    )}
+                    {sendingActive
+                      ? "Keep a LinkedIn tab open with Autopilot ON in the extension."
+                      : "Delivered by the extension at a human pace."}
+                  </div>
                 </div>
               </div>
+              {/* Live progress bar */}
+              {sendingActive && jobStatus && jobStatus.total > 0 && (
+                <div className="mt-3">
+                  <div className="mb-1 flex justify-between text-xs text-emerald-700">
+                    <span>{jobStatus.sent} sent · {jobStatus.pending} in progress</span>
+                    <span>{Math.round((jobStatus.sent / jobStatus.total) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-200">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                      style={{ width: `${(jobStatus.sent / jobStatus.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {result && result.queued === 0 && (
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+              <div>No new messages sent — all recipients were already messaged or have no LinkedIn URL.</div>
             </div>
           )}
 

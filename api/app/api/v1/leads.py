@@ -1,13 +1,12 @@
 import csv
 import io
 import json
-import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
@@ -142,13 +141,12 @@ def bulk_message(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Queue a LinkedIn message to every (or selected) pipeline lead.
+    """Queue LinkedIn messages for every (or selected) pipeline lead.
 
-    Creates one queued ExtensionJob(kind="message") per lead with a LinkedIn
-    URL. The user's browser extension polls /extension/jobs/next and sends each
-    message from inside their own LinkedIn session, human-paced. We stagger
-    not_before across the batch as an extra safety layer so the sends never
-    burst — LinkedIn restricts accounts that message too fast.
+    Creates one ExtensionJob(kind="message") per lead with a LinkedIn URL, all
+    with not_before=now so the extension can claim them immediately. Human-paced
+    delivery (45 s – 3 min gaps) is enforced inside the extension by
+    paceBetweenActions() — no server-side stagger needed.
     """
     msg = (body.message or "").strip()
     if not msg:
@@ -165,8 +163,8 @@ def bulk_message(
         base = base.filter(Lead.stage_id == body.stage_id)
     leads = base.all()
 
-    # Skip leads that already have a pending message job so an accidental
-    # double-send doesn't queue the same message twice.
+    # Skip leads that already have a pending/claimed message job so an
+    # accidental double-click doesn't queue the same message twice.
     already_pending = {
         r[0]
         for r in db.query(ExtensionJob.lead_id)
@@ -182,7 +180,6 @@ def bulk_message(
     queued = 0
     skipped_no_linkedin = 0
     skipped_pending = 0
-    delay_min = 0.0
     for lead in leads:
         if not lead.linkedin_url:
             skipped_no_linkedin += 1
@@ -197,11 +194,9 @@ def bulk_message(
             lead_id=lead.id,
             kind="message",
             payload={"linkedin_url": lead.linkedin_url, "body": _render_message(msg, lead)},
-            not_before=now + timedelta(minutes=delay_min),
+            not_before=now,  # available immediately; extension enforces human pacing
         )
         queued += 1
-        # 1–2.5 min between consecutive sends — paced, never a burst.
-        delay_min += random.uniform(1.0, 2.5)
     db.commit()
     return {
         "queued": queued,
@@ -209,6 +204,31 @@ def bulk_message(
         "skipped_pending": skipped_pending,
         "total": len(leads),
     }
+
+
+@router.get("/message-jobs/status")
+def message_jobs_status(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Live count of today's LinkedIn message jobs for the progress indicator."""
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    rows = (
+        db.query(ExtensionJob.status, func.count())
+        .filter(
+            ExtensionJob.workspace_id == ctx.workspace_id,
+            ExtensionJob.kind == "message",
+            ExtensionJob.created_at >= since,
+        )
+        .group_by(ExtensionJob.status)
+        .all()
+    )
+    counts = {row[0]: row[1] for row in rows}
+    pending = counts.get("queued", 0) + counts.get("claimed", 0)
+    sent = counts.get("done", 0)
+    failed = counts.get("failed", 0) + counts.get("skipped", 0)
+    return {"pending": pending, "sent": sent, "failed": failed, "total": pending + sent + failed}
+
 
 
 @router.post("/import-csv/preview")
