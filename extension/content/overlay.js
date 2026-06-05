@@ -4191,56 +4191,68 @@
       e.stopPropagation();
       if (btn.dataset.state === "saving") return;
       btn.dataset.state = "saving";
-      textSpan.textContent = "Opening…";
-      // INTENTIONAL: no card-level pre-save. The card-level scrape can
-      // pick up mutual-connection names embedded in the same <li> (the
-      // "Suhaib instead of Hady" bug); we don't trust it for persistence
-      // anymore. The profile page's triggerAutoSave() scrapes the
-      // unambiguous <h1> on /in/<handle> and saves the canonical row.
-      console.log(
-        "[LeadCaptura] chip clicked — opening profile:",
-        profile.linkedin_url
-      );
+      textSpan.textContent = "Enriching…";
+
+      const targetUrl = profile.linkedin_url;
+      if (!targetUrl) {
+        btn.dataset.state = "error";
+        textSpan.textContent = "No URL";
+        return;
+      }
+      // Allow /in/ (regular LinkedIn) and /sales/lead/ (Sales Navigator).
+      // The enrichment trigger in main.js bounces /sales/lead/ tabs to the
+      // matching /in/ page automatically, so both paths work with enrichFlag.
+      if (!targetUrl.includes("/in/") && !targetUrl.includes("/sales/lead/")) {
+        btn.dataset.state = "error";
+        textSpan.textContent = "Need profile URL";
+        return;
+      }
+
+      console.log("[LeadCaptura] chip clicked — enriching profile:", targetUrl);
+
       try {
-        if (!profile.linkedin_url?.includes("/in/")) {
-          btn.dataset.state = "error";
-          textSpan.textContent = "Need /in/ URL";
-          return;
-        }
-        await new Promise((resolve) => {
+        const resp = await new Promise((resolve) => {
           try {
             chrome.runtime.sendMessage(
               {
                 type: "lc:openProfileTab",
-                url: profile.linkedin_url,
-                active: true,
-                awaitClose: false,
-                enrichFlag: false,
+                url: targetUrl,
+                active: false,       // background tab — don't disrupt the user
+                awaitClose: true,    // resolve only after enrichment finishes + tab closes
+                enrichFlag: true,    // adds ?lc_enrich=1 → triggers scrape + backend sync
+                segment: state.selection?.segmentName || null,
               },
-              (resp) => {
-                if (chrome.runtime.lastError || !resp?.ok) {
-                  console.warn(
-                    "[LeadCaptura] openProfileTab failed",
-                    chrome.runtime.lastError?.message || resp?.error
-                  );
+              (r) => {
+                if (chrome.runtime.lastError) {
+                  return resolve({ ok: false, error: chrome.runtime.lastError.message });
                 }
-                resolve();
+                resolve(r || { ok: false });
               }
             );
           } catch (err) {
-            console.warn("[LeadCaptura] openProfileTab threw", err?.message);
-            resolve();
+            resolve({ ok: false, error: String(err) });
           }
         });
-        btn.dataset.state = "saved";
-        textSpan.textContent = "Opened ✓";
-        _markContacted(url); // record as contacted so duplicate check knows
+
+        if (!resp.ok && resp.error === "safe_zone_limit_reached") {
+          btn.dataset.state = "error";
+          textSpan.textContent = "Rate limited";
+          return;
+        }
+        if (resp.ok && !resp.timedOut) {
+          btn.dataset.state = "saved";
+          textSpan.textContent = "Saved ✓";
+          _markContacted(url);
+        } else {
+          btn.dataset.state = "error";
+          textSpan.textContent = resp.timedOut ? "Timed out" : "Failed";
+        }
       } catch (err) {
         btn.dataset.state = "error";
         const msg = err?.message || String(err);
         textSpan.textContent = msg.length > 40 ? "Failed — see console" : `Failed: ${msg}`;
         btn.title = msg;
-        console.error("[LeadCaptura] per-card open failed", err);
+        console.error("[LeadCaptura] per-card enrich failed", err);
       }
     });
 
