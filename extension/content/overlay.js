@@ -1870,38 +1870,52 @@
     await sleep(400 + Math.random() * 150);
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
-    // Nuclear approach: highlight the button visually, try every 200ms using
-    // all click strategies including MAIN-world injection and SW executeScript.
-    for (let attempt = 0; attempt < 18 && _invitationModalOpen(); attempt++) {
+    //
+    // LinkedIn's 2026 invitation modal requires a TRUSTED user click (isTrusted=true)
+    // for the "Send without a note" button — content-script-generated events won't
+    // trigger it. Strategy:
+    //   A) Show the full-page spotlight overlay immediately so the user can click
+    //      manually if needed (the spotlight darkens everything except the button,
+    //      pointer-events:none so all clicks pass straight through to the button).
+    //   B) Still fire every automated strategy (MAIN-world, service-worker executeScript,
+    //      forceClick) — they will work if LinkedIn relaxes the restriction.
+    //   C) Wait up to 45s for the user to click manually while retrying every ~5s.
+    _showSendSpotlight();
+    console.log("[LeadCaptura] step 3 → spotlight shown, trying automated + waiting for user click");
+
+    // Phase A: automated attempts (4 rounds × ~1s each = ~4s)
+    for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
       const sendBtn = _findSendWithoutNoteButton();
-      if (!sendBtn) {
-        await sleep(200);
-        continue;
-      }
+      if (!sendBtn) { await sleep(400); continue; }
       if (attempt === 0) {
-        _highlightSendBtn(sendBtn);
         _tryServiceWorkerMainWorldClick();
-        // dispatchHumanClick fires the full pointer/mouse event sequence with
-        // real coordinates — the most trustworthy click for React-controlled
-        // buttons. Run it on the first attempt before the coarser _forceClick.
         try { await dispatchHumanClick(sendBtn); } catch {}
       }
-      console.log("[LeadCaptura] step 3 → click Send without a note (try", attempt + 1, ")");
       _forceClick(sendBtn);
-      if (attempt % 2 === 0) _tryMainWorldClick(sendBtn);
-      for (let w = 0; w < 10; w++) {
-        await sleep(200);
-        if (!_invitationModalOpen()) {
-          console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
-          _removeSendBtnHighlight();
-          return { ok: true };
+      _tryMainWorldClick(sendBtn);
+      for (let w = 0; w < 5 && _invitationModalOpen(); w++) await sleep(200);
+    }
+
+    // Phase B: wait up to 45s for the user to click (modal closes)
+    // Every ~5s fire another background attempt (in case timing changes).
+    for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
+      await sleep(300);
+      if (w > 0 && w % 17 === 0) {
+        const retryBtn = _findSendWithoutNoteButton();
+        if (retryBtn) {
+          _tryServiceWorkerMainWorldClick();
+          _tryMainWorldClick(retryBtn);
+          _forceClick(retryBtn);
         }
       }
     }
 
-    _removeSendBtnHighlight();
-    if (!_invitationModalOpen()) return { ok: true };
-    console.log("[LeadCaptura] step 3/4 → could not send, giving up");
+    _removeSpotlight();
+    if (!_invitationModalOpen()) {
+      console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+      return { ok: true };
+    }
+    console.log("[LeadCaptura] step 3/4 → timed out — no click received");
     return { ok: false, reason: "send_failed" };
   }
 
@@ -4506,6 +4520,64 @@
     } catch {}
   }
 
+  // ── Full-page spotlight overlay ──────────────────────────────────────────
+  // Creates a dark semi-transparent overlay that covers the whole viewport with
+  // a transparent "cutout" over the "Send without a note" button. pointer-events
+  // on both elements are NONE so user clicks pass through directly to the button.
+  // The box-shadow technique: the cutout div is transparent + has a massive
+  // box-shadow that darkens everything OUTSIDE it — the spotlight effect.
+  let _spotlightRAF = null;
+  let _spotlightEl = null;
+  let _bannerEl = null;
+
+  function _showSendSpotlight() {
+    _removeSpotlight();
+    _removeSendBtnHighlight(); // retire the old arrow/highlight
+    try {
+      const spot = document.createElement("div");
+      spot.id = "lc-send-spotlight";
+      document.body.appendChild(spot);
+      _spotlightEl = spot;
+
+      const banner = document.createElement("div");
+      banner.id = "lc-send-banner";
+      document.body.appendChild(banner);
+      _bannerEl = banner;
+
+      const tick = () => {
+        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        const btn = _findSendWithoutNoteButton();
+        if (btn && _isVisible(btn)) {
+          const r = btn.getBoundingClientRect();
+          const pad = 12;
+          _spotlightEl.style.cssText = [
+            `left:${r.left - pad}px`, `top:${r.top - pad}px`,
+            `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
+          ].join("!important;") + "!important;";
+
+          // Banner: above the cutout, centred horizontally
+          const bw = _bannerEl.offsetWidth || 380;
+          const bh = _bannerEl.offsetHeight || 50;
+          const bLeft = Math.max(8, Math.min(window.innerWidth - bw - 8,
+            r.left + r.width / 2 - bw / 2));
+          const bTop = Math.max(8, r.top - bh - 18);
+          _bannerEl.style.cssText =
+            `left:${bLeft}px!important;top:${bTop}px!important;`;
+          _bannerEl.textContent = '\u{1F446} Click “Send without a note” to send the invitation';
+        }
+        _spotlightRAF = requestAnimationFrame(tick);
+      };
+      _spotlightRAF = requestAnimationFrame(tick);
+    } catch {}
+  }
+
+  function _removeSpotlight() {
+    if (_spotlightRAF) { cancelAnimationFrame(_spotlightRAF); _spotlightRAF = null; }
+    try { if (_spotlightEl) { _spotlightEl.remove(); _spotlightEl = null; } } catch {}
+    try { if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; } } catch {}
+    _removeSendBtnHighlight();
+  }
+
   // Inject a <script> tag that runs in the PAGE's MAIN world, not the extension's
   // isolated world. In MAIN world the code has access to window.jQuery and can
   // call HTMLElement.prototype methods in the same origin as the page handler —
@@ -4580,63 +4652,69 @@ if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
   let _inviteHighlightShown = false;
 
   async function _autoConfirmInviteModal() {
-    if (state.connectActive) return;  // _sendConnectOnCard owns the sequence
+    // Note: we no longer bail when state.connectActive is true.
+    // _sendConnectOnCard already shows the spotlight and owns the wait;
+    // the 400ms poll below is a no-op while its own Phase B loop is running
+    // (both check _invitationModalOpen which would be false once done).
+    // We keep _inviteAutoBusy so this function never runs concurrently.
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) {
-      if (_inviteHighlightShown) { _removeSendBtnHighlight(); _inviteHighlightShown = false; }
+      if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
     }
+    // During a Connect All run _sendConnectOnCard is already managing the overlay.
+    // Skip this handler so we don't show a second spotlight on top.
+    if (state.connectActive) return;
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
       // Wait for the modal animation to finish before clicking.
-      // LinkedIn's Ember/React mounts button handlers ~250-350ms after the dialog appears.
       await sleep(350);
       btn = _findSendWithoutNoteButton();
       if (!btn || !_invitationModalOpen()) return;
 
-      // Show visual highlight so the user can see which button we're targeting.
+      // Show the spotlight overlay — dark backdrop with a transparent cutout
+      // exactly over "Send without a note". pointer-events:none means user clicks
+      // go straight to the button. Also fire automated strategies in case LinkedIn
+      // allows programmatic clicks in this context.
       if (!_inviteHighlightShown) {
         _inviteHighlightShown = true;
-        _highlightSendBtn(btn);
+        _showSendSpotlight();
       }
-      _lcToast("LeadCaptura: sending invitation…");
-      console.log("[LeadCaptura] auto-confirm: found Send without a note", btn);
+      _lcToast("LeadCaptura: click “Send without a note” to send");
+      console.log("[LeadCaptura] auto-confirm: spotlight shown for Send without a note");
 
-      // Fire all click strategies simultaneously on the first attempt.
-      // The MAIN-world strategies (script injection + service worker executeScript)
-      // have React fiber access and are the most reliable for LinkedIn's buttons.
+      // Fire all automated click strategies once.
       _forceClick(btn);
       _tryMainWorldClick(btn);
       _tryServiceWorkerMainWorldClick();
 
-      // Aggressive retry loop: check every 300ms for up to 9s.
-      // MAIN world click fires every attempt; isolated-world forceClick fires
-      // on alternating attempts to avoid overwhelming LinkedIn's event queue.
-      for (let i = 0; i < 30; i++) {
+      // Wait up to 45s for user or automation to close the modal.
+      for (let i = 0; i < 150; i++) {
         await sleep(300);
         if (!_invitationModalOpen()) {
-          console.log("[LeadCaptura] auto-confirm: modal closed ✓ (attempt", i + 1, ")");
+          console.log("[LeadCaptura] auto-confirm: modal closed ✓");
           _lcToast("LeadCaptura: invitation sent ✓");
-          _removeSendBtnHighlight();
+          _removeSpotlight();
           _inviteHighlightShown = false;
           return;
         }
-        const stillBtn = _findSendWithoutNoteButton();
-        if (!stillBtn || stillBtn.disabled) continue;
-        // Always fire the MAIN world path — it calls React fiber directly.
-        _tryMainWorldClick(stillBtn);
-        _tryServiceWorkerMainWorldClick();
-        // Also fire isolated-world click on every other attempt.
-        if (i % 2 === 0) _forceClick(stillBtn);
+        // Every ~5s, retry automated click in background.
+        if (i > 0 && i % 17 === 0) {
+          const stillBtn = _findSendWithoutNoteButton();
+          if (stillBtn && !stillBtn.disabled) {
+            _tryMainWorldClick(stillBtn);
+            _tryServiceWorkerMainWorldClick();
+            if (i % 2 === 0) _forceClick(stillBtn);
+          }
+        }
       }
 
-      // 9s elapsed — still open. Prompt the user.
+      // 45s elapsed — still open. Spotlight remains as guide.
       if (_invitationModalOpen()) {
-        _lcToast('⚠️ Please click "Send without a note" manually');
-        console.log("[LeadCaptura] auto-confirm: prompting user — click blocked by LinkedIn");
+        console.log("[LeadCaptura] auto-confirm: click blocked — user must click manually");
       }
     } catch (e) {
       console.warn("[LeadCaptura] auto-confirm error", e);
