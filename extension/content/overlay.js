@@ -1598,26 +1598,43 @@
 
   // Classify a card's connection state from its native buttons so the bulk
   // connector can SKIP people already contacted/connected:
-  //   "connect"   → a real Connect button is present → send an invite
-  //   "pending"   → request already sent → skip
-  //   "connected" → Message but no Connect → already a connection → skip
-  //   "follow"    → only Follow available → can't connect → skip
-  //   "unknown"   → no recognisable action button
+  //   "connect"              → a real Connect button is present → send an invite
+  //   "pending"              → request already sent → skip
+  //   "connected"            → already a LinkedIn connection → skip
+  //   "follow"               → only Follow available → skip
+  //   "salesnav-connectable" → Sales Nav card with InMail but no "Connected"
+  //                            button → connectable via the "..." dropdown
+  //   "unknown"              → no recognisable action button
   function _cardConnectState(card) {
-    let hasConnect = false, hasPending = false, hasMessage = false, hasFollow = false;
+    let hasConnect = false, hasPending = false, hasMessage = false,
+        hasFollow = false, hasAlreadyConnected = false;
     for (const b of card.querySelectorAll("button, a, [role='button']")) {
       if (b.classList.contains("lc-inline-save")) continue;
       const aria = (b.getAttribute("aria-label") || "").trim();
       const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
       const hay = txt + " || " + aria;
-      if (/\bpending\b/i.test(hay)) hasPending = true;
-      else if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) hasConnect = true;
-      else if (/\bfollow\b/i.test(hay)) hasFollow = true; // \bfollow\b excludes "Following"
-      else if (/\bmessage\b/i.test(hay)) hasMessage = true;
+      if (/\bpending\b/i.test(hay)) { hasPending = true; continue; }
+      // "Connected" (already a connection) — whole-word including the "ed".
+      // \bconnect\b does NOT match "Connected" (word boundary blocked by 'e')
+      // so we need a dedicated check. Also catches "Remove connection".
+      if (/\bconnected\b/i.test(hay) || /\bremove\s+connection\b/i.test(hay)) {
+        hasAlreadyConnected = true; continue;
+      }
+      if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) {
+        hasConnect = true; continue;
+      }
+      if (/\bfollow\b/i.test(hay)) { hasFollow = true; continue; }
+      if (/\bmessage\b/i.test(hay)) hasMessage = true;
     }
     if (hasConnect) return "connect";
     if (hasPending) return "pending";
+    if (hasAlreadyConnected) return "connected";
     if (hasFollow) return "follow";
+    // On Sales Navigator, InMail message buttons are present for ALL profiles
+    // regardless of connection status — "message" alone doesn't mean connected.
+    // Return a special state so Connect All uses the "..." dropdown flow.
+    const isSalesNav = (Scraper.pageType() || "").includes("sales");
+    if (hasMessage && isSalesNav) return "salesnav-connectable";
     if (hasMessage) return "connected";
     return "unknown";
   }
@@ -1630,8 +1647,10 @@
     const aria = (btn.getAttribute("aria-label") || "").trim();
     const txt = (btn.textContent || "").replace(/\s+/g, " ").trim();
     const hay = txt + " || " + aria;
-    // Whole-word matching handles the "+ Connect" / "+ Follow" rendering.
     if (/\bpending\b/i.test(hay)) return "pending";
+    // "Connected" (already a connection) — check BEFORE \bconnect\b so the
+    // Sales Nav "Connected" badge never falls through to "connect".
+    if (/\bconnected\b/i.test(hay) || /\bremove\s+connection\b/i.test(hay)) return "connected";
     if (/\bconnect\b/i.test(hay) || /\binvite\b.*\bto connect\b/i.test(aria)) return "connect";
     if (/\bfollow\b/i.test(hay)) return "follow"; // excludes "Following"
     if (/\bmessage\b/i.test(hay)) return "connected";
@@ -1950,6 +1969,130 @@
     return { ok: true, followed: true };
   }
 
+  // ── Sales Navigator connect via "..." dropdown ──────────────────────────────
+  // Sales Nav doesn't expose a visible "Connect" button on the card — it's
+  // hidden inside the "More options" (•••) dropdown. We open the dropdown, find
+  // the "Connect" menu item, click it, then hand off to the same
+  // "Send without a note" spotlight flow used by _sendConnectOnCard.
+
+  function _findSalesNavMoreOptionsButton(card) {
+    if (!card) return null;
+    const btns = Array.from(card.querySelectorAll("button, [role='button']"));
+    for (const b of btns) {
+      if (b.classList?.contains("lc-inline-save")) continue;
+      const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      // LinkedIn Sales Nav "..." button uses various aria-labels. txt is "•••" / "..."
+      // on some renders; aria-label is "More actions", "Open actions dropdown", etc.
+      if (/more.*(action|option)/i.test(aria) || /\boverflow\b/i.test(aria) ||
+          /open.*dropdown/i.test(aria) || txt === "..." || txt === "•••" || txt === "⋯" ||
+          /more.*(action|option)/i.test(txt)) {
+        return b;
+      }
+    }
+    return null;
+  }
+
+  function _findSalesNavConnectMenuItem() {
+    // The dropdown portal is attached to document.body, not inside the card.
+    // Search document-wide for a visible "Connect" option.
+    const candidates = Array.from(document.querySelectorAll(
+      "[role='menuitem'], [role='option'], .artdeco-dropdown__item, " +
+      ".artdeco-hoverable-content--dropdown li, li[class*='dropdown'], " +
+      "ul[class*='dropdown'] li, ul[class*='overflow'] li"
+    ));
+    for (const item of candidates) {
+      if (!_isVisible(item)) continue;
+      const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
+      const aria = (item.getAttribute("aria-label") || "").trim();
+      // Match "Connect" exactly or as a whole word — but NOT "Connected" or
+      // "Connection" which are NOT the connect action.
+      if (
+        /^connect$/i.test(txt) || /^connect$/i.test(aria) ||
+        (/\bconnect\b/i.test(txt) && !/\bconnected\b/i.test(txt) && !/\bconnection/i.test(txt))
+      ) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  async function _sendConnectViaSalesNavDropdown(card) {
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // STEP 1: open "..." dropdown
+    const moreBtn = _findSalesNavMoreOptionsButton(card);
+    if (!moreBtn) {
+      console.log("[LeadCaptura] salesNav → no More-options button found");
+      return { ok: false, reason: "no_more_btn" };
+    }
+    console.log("[LeadCaptura] salesNav step 1 → click More Options (...)");
+    await dispatchHumanClick(moreBtn);
+
+    // STEP 2: wait for "Connect" to appear in the dropdown (up to 2.5s)
+    let connectItem = null;
+    for (let i = 0; i < 17 && !connectItem; i++) {
+      await sleep(150);
+      connectItem = _findSalesNavConnectMenuItem();
+    }
+    if (!connectItem) {
+      console.log("[LeadCaptura] salesNav step 2 → no Connect item in dropdown — closing");
+      // Dismiss the dropdown and bail.
+      try { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); } catch {}
+      await sleep(300);
+      return { ok: false, reason: "no_connect_in_dropdown" };
+    }
+
+    // STEP 3: click "Connect" in the dropdown
+    console.log("[LeadCaptura] salesNav step 3 → click Connect in dropdown");
+    await dispatchHumanClick(connectItem);
+    await sleep(600 + Math.random() * 400);
+
+    // STEP 4: check if the "Add a note" modal opened.
+    // Some Sales Nav accounts skip the modal and connect directly.
+    if (!_invitationModalOpen()) {
+      // No modal → direct connect succeeded.
+      console.log("[LeadCaptura] salesNav step 4 → no modal, direct connect ✓");
+      return { ok: true };
+    }
+
+    // STEP 5: modal appeared — same spotlight + wait flow as _sendConnectOnCard.
+    _showSendSpotlight();
+    console.log("[LeadCaptura] salesNav step 5 → spotlight shown, attempting auto-click + awaiting user");
+
+    for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
+      const sendBtn = _findSendWithoutNoteButton();
+      if (!sendBtn) { await sleep(400); continue; }
+      if (attempt === 0) {
+        _tryServiceWorkerMainWorldClick();
+        try { await dispatchHumanClick(sendBtn); } catch {}
+      }
+      _forceClick(sendBtn);
+      _tryMainWorldClick(sendBtn);
+      for (let w = 0; w < 5 && _invitationModalOpen(); w++) await sleep(200);
+    }
+    for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
+      await sleep(300);
+      if (w > 0 && w % 17 === 0) {
+        const retryBtn = _findSendWithoutNoteButton();
+        if (retryBtn) {
+          _tryServiceWorkerMainWorldClick();
+          _tryMainWorldClick(retryBtn);
+          _forceClick(retryBtn);
+        }
+      }
+    }
+
+    _removeSpotlight();
+    if (!_invitationModalOpen()) {
+      console.log("[LeadCaptura] salesNav step 5 → dialog closed, invitation sent ✓");
+      return { ok: true };
+    }
+    console.log("[LeadCaptura] salesNav step 5 → timed out");
+    return { ok: false, reason: "send_failed" };
+  }
+
   function _cardForUrl(url) {
     // Prefer the exact card element captured when the chip was injected — it
     // is the authoritative single-profile card boundary the detector resolved.
@@ -2130,6 +2273,9 @@
           // Already pending / connected → nothing to do.
           if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
           if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+          // "unknown" → can't determine state → skip.
+          // "salesnav-connectable" → always process (never skip) even though no
+          // direct Connect button exists; we'll use the dropdown flow below.
           if (cls === "unknown" || !card) { skipped++; continue; }
 
           processed++;
@@ -2138,6 +2284,12 @@
           let result;
           if (cls === "follow") {
             result = await _sendFollowOnCard(card, presetBtn);
+          } else if (cls === "salesnav-connectable") {
+            // Sales Navigator: no visible "Connect" button on the card — must
+            // open the "More options" (•••) dropdown and click Connect inside.
+            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 400);
+            result = await _sendConnectViaSalesNavDropdown(card);
           } else {
             // Bring the row into view so the modal's buttons get valid coordinates,
             // then run the proven click-Connect → "Send without a note" sequence.
@@ -4059,7 +4211,21 @@
     if (!b || b.classList?.contains("lc-inline-save")) return false;
     const aria = b.getAttribute?.("aria-label") || "";
     const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-    // Whole-word match in EITHER the visible text or the aria-label. LinkedIn
+    // On Sales Navigator, InMail message buttons are present on EVERY card
+    // (connected or not) because InMail is a premium feature. If we treat them
+    // as action-button anchors the chip gets stored against the message button,
+    // _classifyButton returns "connected" for ALL Sales Nav cards, and Connect
+    // All skips every profile with "Connected" (fake). On Sales Nav we fall
+    // through to the link-only chip path so _cardConnectState() sees the full
+    // card and gives the real signal.
+    const isSalesNav = (Scraper.pageType() || "").includes("sales");
+    if (isSalesNav) {
+      const hay = txt + " " + aria;
+      // On Sales Nav the only action buttons we want to anchor on are the
+      // visible "Connect" button (rare but possible) or "Follow". Skip "Save"
+      // and all message buttons so we don't get false "connected" reads.
+      if (/\bmessage\b/i.test(hay) || /\bsave\b/i.test(hay)) return false;
+    }
     // renders these as "+ Connect" / "+ Follow" (the leading icon contributes a
     // glyph), so a strict ^connect$ anchor misses them — that was the bug that
     // left Connect cards unrecognised. \bconnect\b matches "Connect"/"+ Connect"
