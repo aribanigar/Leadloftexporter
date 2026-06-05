@@ -5216,6 +5216,7 @@ if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
     unmountToolbar,
     flashStatus,
     triggerAutoSave,
+    saveCurrentProfile,
     mountSelectAllHeader,
     unmountSelectAllHeader,
     toast: _lcToast,

@@ -1100,6 +1100,15 @@
     if (msg?.type === "lc:saveCurrent") {
       const scraped = Scraper.scrapeCurrentPage();
       if (scraped.kind === "profile" && scraped.profile?.linkedin_url) {
+        // On profile pages, use the full enrichment pipeline (Contact Info modal,
+        // website scraping) if the overlay is loaded — same as clicking "Save Lead"
+        // in the floating panel. Respond immediately; enrichment runs in background.
+        const overlay = globalThis.__lcOverlay;
+        if (overlay?.saveCurrentProfile) {
+          sendResponse({ ok: true });
+          overlay.saveCurrentProfile(scraped.profile).catch(() => {});
+          return true;
+        }
         globalThis.__lcApi
           .syncProfile(scraped.profile)
           .then((r) => sendResponse({ ok: true, ...r }))
