@@ -338,23 +338,47 @@
       if (!headline) headline = _firstTextAfter(h1);
     }
 
-    // Location: typically a short string in the top card with a city/country
-    // pattern, lives in a div with "text-body-small" inheritance — but we
-    // match it positionally instead. Heuristic: among the text-bearing
-    // descendants of the top card, the one that's NOT the name, headline,
-    // or connection counts, and has a comma or short length.
+    // Location: typically a short string in the top card. Strategy:
+    //   Pass 1 — explicit aria/data attribute (LinkedIn sometimes adds these).
+    //   Pass 2 — content scan with a greatly expanded geo-keyword list.
+    // After matching, strip LinkedIn's "· Contact info" suffix that can appear
+    // when the location and contact-info link share a parent text node.
     let location_ = null;
     if (card) {
-      const candidates = Array.from(card.querySelectorAll("div, span"))
-        .map((n) => _txt(n))
-        .filter(Boolean);
-      for (const t of candidates) {
-        if (t === fullName || t === headline) continue;
-        if (/connect|follower|mutual|message/i.test(t)) continue;
-        if (_isFeedNoise(t)) continue;
-        if (t.length > 4 && t.length < 80 && (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi|kuwait|bahrain|oman|jordan|lebanon|egypt|france|germany|spain|italy|brazil|mexico|canada|australia|singapore|japan|china|netherlands|belgium|switzerland|austria|norway|sweden|denmark|finland|poland|turkey|greece|portugal|ireland|scotland|wales|england|britain|south africa|nigeria|kenya|argentina|chile|colombia|peru|venezuela|new zealand|philippines|indonesia|malaysia|thailand|vietnam|korea|taiwan|pakistan|bangladesh|sri lanka)\b/i.test(t))) {
-          location_ = t;
-          break;
+      // Pass 1: aria/data attribute hint
+      const locEl = card.querySelector(
+        "[aria-label*='location' i]:not(button):not(a), [data-field='location']"
+      );
+      if (locEl) {
+        const t = _txt(locEl);
+        if (t && t.length > 2 && t.length < 120 &&
+            !_isFeedNoise(t) && !/connect|follower|mutual|message/i.test(t)) {
+          location_ = t.replace(/\s*[·•]\s*contact\s*info\s*$/i, "").trim() || null;
+        }
+      }
+      // Pass 2: content-pattern scan with expanded keyword list
+      if (!location_) {
+        const candidates = Array.from(card.querySelectorAll("div, span"))
+          .map((n) => _txt(n))
+          .filter(Boolean);
+        for (const t of candidates) {
+          if (t === fullName || t === headline) continue;
+          if (/connect|follower|mutual|message/i.test(t)) continue;
+          if (_isFeedNoise(t)) continue;
+          if (t.length < 3 || t.length > 120) continue;
+          // Strip "· Contact info" suffix before testing so "Riyadh Region · Contact info"
+          // correctly resolves to "Riyadh Region".
+          const clean = t.replace(/\s*[·•]\s*contact\s*info\s*$/i, "").trim();
+          if (!clean || clean.length < 3 || clean.length > 100) continue;
+          if (
+            clean.includes(",") ||
+            /\b(area|metro|greater|region|bay|valley|county|province|district)\b/i.test(clean) ||
+            /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|kong|saudi|kuwait|bahrain|oman|jordan|lebanon|egypt|france|germany|spain|italy|brazil|mexico|canada|australia|singapore|japan|china|netherlands|belgium|switzerland|austria|norway|sweden|denmark|finland|poland|turkey|greece|portugal|ireland|scotland|wales|england|britain|south africa|nigeria|kenya|argentina|chile|colombia|peru|venezuela|new zealand|philippines|indonesia|malaysia|thailand|vietnam|korea|taiwan|pakistan|bangladesh|sri lanka)\b/i.test(clean) ||
+            /\b(dubai|abu dhabi|sharjah|riyadh|jeddah|mecca|medina|doha|cairo|giza|alexandria|casablanca|lagos|nairobi|johannesburg|cape town|accra|addis ababa|london|manchester|birmingham|edinburgh|glasgow|paris|lyon|marseille|berlin|munich|hamburg|frankfurt|cologne|amsterdam|rotterdam|brussels|antwerp|zurich|geneva|vienna|stockholm|gothenburg|oslo|copenhagen|helsinki|warsaw|krakow|prague|budapest|bucharest|sofia|athens|istanbul|ankara|barcelona|madrid|seville|milan|rome|florence|naples|lisbon|porto|toronto|montreal|vancouver|calgary|edmonton|sydney|melbourne|brisbane|perth|auckland|wellington|delhi|mumbai|bangalore|hyderabad|chennai|kolkata|pune|ahmedabad|surat|karachi|lahore|islamabad|faisalabad|dhaka|chittagong|colombo|kathmandu|tokyo|osaka|kyoto|nagoya|seoul|busan|beijing|shanghai|guangzhou|shenzhen|hong kong|taipei|kaohsiung|bangkok|jakarta|surabaya|kuala lumpur|penang|manila|cebu|ho chi minh|hanoi|yangon|phnom penh|vientiane|houston|new york|los angeles|chicago|phoenix|philadelphia|san antonio|san diego|dallas|san jose|austin|san francisco|seattle|denver|boston|miami|atlanta|minneapolis|portland|las vegas|detroit|nashville|memphis|louisville|baltimore|washington|charlotte|raleigh|sacramento|kansas city|omaha|tulsa|cleveland|tampa|orlando|cincinnati|pittsburgh|st louis|indianapolis|columbus)\b/i.test(clean)
+          ) {
+            location_ = clean;
+            break;
+          }
         }
       }
     }
@@ -378,6 +402,46 @@
         companyName = parts.slice(1).join(" at ").trim();
       } else {
         title = primary;
+      }
+    }
+
+    // Fallback 1: company page link inside the top card. LinkedIn wraps company
+    // names in <a href="/company/<slug>/"> — stable across layout rotations.
+    // Strip "· Full-time" / "· 2 years" type suffixes from the link text.
+    if (!companyName && card) {
+      const compEl = card.querySelector("a[href*='/company/']");
+      if (compEl) {
+        const raw = _txt(compEl);
+        if (raw && raw.length > 1 && raw.length < 120 && !_isActionLabel(raw) && raw !== fullName) {
+          const stripped = raw.split(/\s*[·•|]\s*/)[0].trim();
+          if (stripped && stripped.length > 1) companyName = stripped;
+        }
+      }
+    }
+
+    // Fallback 2: "Company · Role-type" or "Company · Duration" text in the
+    // top card. LinkedIn renders current employment as e.g. "Zanjbiil · Full-time"
+    // or "Google · 3 years 2 months" — the part before the · is the company.
+    if (!companyName && card) {
+      for (const n of card.querySelectorAll("div, span")) {
+        const t = _txt(n);
+        if (!t || t.length < 3 || t.length > 140) continue;
+        // Must contain the LinkedIn middle-dot or bullet separator
+        const m = t.match(/^([^·•|\n]{2,80})\s*[·•]\s*\S/);
+        if (!m) continue;
+        const candidate = m[1].trim();
+        if (
+          candidate.length < 2 ||
+          candidate === fullName ||
+          candidate === headline ||
+          candidate === (title || "") ||
+          candidate === (location_ || "") ||
+          _isActionLabel(candidate) ||
+          /^(connect|follow|message|pending|mutual|premium|\d{1,3}[\s,])/i.test(candidate) ||
+          _isFeedNoise(candidate)
+        ) continue;
+        companyName = candidate;
+        break;
       }
     }
 
