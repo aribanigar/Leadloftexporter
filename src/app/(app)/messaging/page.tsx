@@ -89,6 +89,7 @@ export default function MessagingPage() {
   const [waResult, setWaResult] = useState<WaSendResult | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [sendingActive, setSendingActive] = useState(false);
+  const [stopped, setStopped] = useState(false);
   // WhatsApp guided send-queue: a list of lead ids + a cursor.
   const [waQueue, setWaQueue] = useState<{ ids: string[]; index: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -224,7 +225,16 @@ export default function MessagingPage() {
     onSuccess: (r) => {
       setResult(r);
       setSelected(new Set());
+      setStopped(false);
       if (r.queued > 0) setSendingActive(true);
+    },
+  });
+
+  const stopSending = useMutation<{ stopped: number }, Error, void>({
+    mutationFn: () => api("/leads/bulk-message/stop", { method: "POST" }),
+    onSuccess: () => {
+      setSendingActive(false);
+      setStopped(true);
     },
   });
 
@@ -559,27 +569,45 @@ export default function MessagingPage() {
                   )}
                 </div>
               ) : (
-                <button
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-700 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-brand-600 hover:to-brand-800 disabled:cursor-not-allowed disabled:opacity-50",
-                    !send.isPending && canAct && "hover:shadow-lg"
+                <div className="flex items-center gap-2">
+                  {sendingActive && (
+                    <button
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-soft transition hover:bg-red-100 disabled:opacity-50"
+                      disabled={stopSending.isPending}
+                      onClick={() => stopSending.mutate()}
+                    >
+                      {stopSending.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                      Stop
+                    </button>
                   )}
-                  disabled={!canAct || send.isPending}
-                  onClick={() => send.mutate()}
-                >
-                  {send.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {send.isPending
-                    ? "Sending…"
-                    : `Send to ${recipientCount} ${
-                        usingSelection
-                          ? "selected"
-                          : "lead" + (recipientCount === 1 ? "" : "s")
-                      }`}
-                </button>
+                  <button
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-700 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-brand-600 hover:to-brand-800 disabled:cursor-not-allowed disabled:opacity-50",
+                      !send.isPending && canAct && !sendingActive && "hover:shadow-lg"
+                    )}
+                    disabled={!canAct || send.isPending || sendingActive}
+                    onClick={() => send.mutate()}
+                  >
+                    {send.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {send.isPending
+                      ? "Queuing…"
+                      : sendingActive
+                      ? "Sending…"
+                      : `Send to ${recipientCount} ${
+                          usingSelection
+                            ? "selected"
+                            : "lead" + (recipientCount === 1 ? "" : "s")
+                        }`}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -592,32 +620,27 @@ export default function MessagingPage() {
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                     </span>
+                  ) : stopped ? (
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
                   ) : (
                     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
                   )}
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-emerald-900">
+                    <div className={cn("text-sm font-medium", stopped ? "text-amber-900" : "text-emerald-900")}>
                       {sendingActive
-                        ? `Sending ${result.queued} message${
-                            result.queued === 1 ? "" : "s"
-                          } in real-time…`
-                        : `${jobStatus?.sent ?? result.queued} message${
-                            result.queued === 1 ? "" : "s"
-                          } sent`}
+                        ? `Sending ${result.queued} message${result.queued === 1 ? "" : "s"} in real-time…`
+                        : stopped
+                        ? `Stopped — ${jobStatus?.sent ?? 0} sent before stopping`
+                        : `${jobStatus?.sent ?? result.queued} message${result.queued === 1 ? "" : "s"} sent`}
                     </div>
-                    <div className="mt-0.5 text-xs text-emerald-700">
+                    <div className={cn("mt-0.5 text-xs", stopped ? "text-amber-700" : "text-emerald-700")}>
                       {result.skipped_no_linkedin > 0 && (
-                        <span>
-                          {result.skipped_no_linkedin} skipped (no LinkedIn URL).{" "}
-                        </span>
-                      )}
-                      {result.skipped_pending > 0 && (
-                        <span>
-                          {result.skipped_pending} already had a message in-flight.{" "}
-                        </span>
+                        <span>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </span>
                       )}
                       {sendingActive
-                        ? "Keep a LinkedIn tab open with Autopilot ON."
+                        ? "Extension navigates each profile and sends at a human pace."
+                        : stopped
+                        ? "Remaining queued messages have been cancelled."
                         : "Delivered by the extension at a human pace."}
                     </div>
                   </div>
@@ -639,25 +662,16 @@ export default function MessagingPage() {
                     <div className="flex items-center justify-between gap-3 border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs">
                       <span className="inline-flex items-center gap-1.5 text-emerald-800">
                         <CheckCircle2 className="h-3 w-3" />
-                        <span className="font-semibold tabular-nums">
-                          {jobStatus.sent}
-                        </span>{" "}
-                        sent
+                        <span className="font-semibold tabular-nums">{jobStatus.sent}</span> sent
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-emerald-700">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        <span className="font-semibold tabular-nums">
-                          {jobStatus.pending}
-                        </span>{" "}
-                        in progress
+                        <span className="font-semibold tabular-nums">{jobStatus.pending}</span> in progress
                       </span>
                       {jobStatus.failed > 0 && (
                         <span className="inline-flex items-center gap-1.5 text-amber-700">
                           <AlertCircle className="h-3 w-3" />
-                          <span className="font-semibold tabular-nums">
-                            {jobStatus.failed}
-                          </span>{" "}
-                          failed
+                          <span className="font-semibold tabular-nums">{jobStatus.failed}</span> failed
                         </span>
                       )}
                     </div>

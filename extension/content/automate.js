@@ -395,6 +395,16 @@
       const jobs = await Api.nextJobs(1).catch(() => []);
       if (!jobs?.length) return;
       const [job] = jobs;
+
+      // Never auto-execute a message job while the user is viewing a LinkedIn
+      // profile page — it would silently navigate them away mid-browse.
+      // Message jobs are safe to execute from feed / search / messaging pages
+      // where a navigation won't disrupt the user's current view. The job
+      // stays "claimed" and is reclaimed after 10 min, then retried.
+      if (job.kind === "message" && location.pathname.startsWith("/in/")) {
+        return;
+      }
+
       await executeOne(job);
       // Human pause before next action
       await sleep(paceBetweenActions());

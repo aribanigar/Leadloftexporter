@@ -270,6 +270,25 @@ def message_jobs_status(
 
 
 
+@router.post("/bulk-message/stop")
+def stop_bulk_messages(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Cancel all pending LinkedIn message jobs for this workspace."""
+    stopped = (
+        db.query(ExtensionJob)
+        .filter(
+            ExtensionJob.workspace_id == ctx.workspace_id,
+            ExtensionJob.kind == "message",
+            ExtensionJob.status.in_(("queued", "claimed")),
+        )
+        .update({ExtensionJob.status: "expired"}, synchronize_session=False)
+    )
+    db.commit()
+    return {"stopped": stopped}
+
+
 @router.post("/import-csv/preview")
 async def preview_csv_import(
     file: UploadFile = File(...),
