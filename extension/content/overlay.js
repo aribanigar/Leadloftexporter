@@ -2579,7 +2579,23 @@
 
           let result;
           if (cls === "follow") {
-            result = await _sendFollowOnCard(card, presetBtn);
+            // Before following, check if "Connect" is in the "..." overflow
+            // dropdown. High-follower 3rd-degree profiles show "Follow" as the
+            // primary button but still offer "Connect" in the overflow menu
+            // (as visible in the profile page screenshot). Try the dropdown
+            // path first; fall back to Follow if no Connect option exists.
+            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
+            if (_overflowResult.ok) {
+              result = _overflowResult;
+            } else if (
+              _overflowResult.reason === "no_more_btn" ||
+              _overflowResult.reason === "no_connect_in_dropdown" ||
+              _overflowResult.reason === "dropdown_did_not_open"
+            ) {
+              result = await _sendFollowOnCard(card, presetBtn);
+            } else {
+              result = _overflowResult;
+            }
           } else if (cls === "salesnav-connectable") {
             // Sales Navigator: no visible "Connect" button on the card — must
             // open the "More options" (•••) dropdown and click Connect inside.
@@ -5045,6 +5061,23 @@
     try {
       const spot = document.createElement("div");
       spot.id = "lc-send-spotlight";
+      // Apply the dark full-screen overlay immediately via inline style so it
+      // is visible the instant this function is called — do NOT wait for tick()
+      // to find the button. A 9999px box-shadow spread from a 2×2 anchor at
+      // (0,0) covers the entire viewport. tick() replaces this with precise
+      // positioning once the button is located.
+      spot.style.cssText = [
+        "position:fixed",
+        "z-index:2147483647",
+        "background:transparent",
+        "pointer-events:none",
+        "border-radius:8px",
+        "box-shadow:0 0 0 9999px rgba(0,0,0,0.76)",
+        "left:0px",
+        "top:0px",
+        "width:2px",
+        "height:2px",
+      ].map((s) => s + "!important").join(";") + ";";
       document.body.appendChild(spot);
       _spotlightEl = spot;
 
@@ -5058,6 +5091,22 @@
         <div id="lc-send-banner-sub" style="font-size:13px!important;font-weight:500!important;opacity:0.92!important;">
           ${remaining != null ? `${remaining} more profile${remaining === 1 ? "" : "s"} after this one` : "The extension will continue automatically once you click"}
         </div>`;
+      // Position banner immediately at top-centre so it shows before tick() fires.
+      const _bLeft0 = Math.max(8, (window.innerWidth - 460) / 2);
+      banner.style.cssText = [
+        "position:fixed",
+        "z-index:2147483647",
+        "pointer-events:none",
+        "background:#0a66c2",
+        "color:#fff",
+        "font:700 15px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif",
+        "padding:12px 22px",
+        "border-radius:10px",
+        "box-shadow:0 6px 28px rgba(0,0,0,0.55)",
+        "white-space:nowrap",
+        `left:${_bLeft0}px`,
+        "top:24px",
+      ].map((s) => s + "!important").join(";") + ";";
       document.body.appendChild(banner);
       _bannerEl = banner;
 
