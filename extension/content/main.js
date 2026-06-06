@@ -1040,10 +1040,10 @@
   function startAutopilot() {
     if (autopilotInterval) return;
 
-    // Fire one tick immediately so queued jobs (e.g. bulk LinkedIn messages)
-    // start executing within seconds of autopilot being active, rather than
-    // waiting up to 15s for the first interval tick.
-    Automate.tick().catch(() => {});
+    // Delay the first tick by 5 s so the page finishes rendering before any
+    // job-driven navigation kicks in — prevents a jarring takeover the instant
+    // the user opens LinkedIn while message jobs are queued.
+    setTimeout(() => { Automate.tick().catch(() => {}); }, 5000);
 
     autopilotInterval = setInterval(async () => {
       let runtimeAlive = false;

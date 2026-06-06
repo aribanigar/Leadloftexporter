@@ -46,47 +46,63 @@
     return `${action} failed: ${m}`;
   }
 
-  async function call(action, payload) {
-    const t0 = Date.now();
+  // Single attempt — throws raw (undecorated) error string on failure.
+  function _callOnce(action, payload) {
     return new Promise((resolve, reject) => {
       let runtimeAlive = false;
       try { runtimeAlive = !!chrome.runtime?.id; } catch {}
       if (!runtimeAlive) {
-        const err = new Error(_decorate("Extension context invalidated", action));
-        console.error(`[LeadCaptura] api.call no-runtime action=${action} err="${err.message}"`);
-        reject(err);
+        reject(new Error("Extension context invalidated"));
         return;
       }
       try {
         chrome.runtime.sendMessage({ type: "lc:api", action, payload }, (response) => {
-          const elapsed = Date.now() - t0;
           if (chrome.runtime.lastError) {
-            const err = new Error(_decorate(chrome.runtime.lastError.message, action));
-            console.log(`[LeadCaptura] api.call lastError action=${action} elapsed=${elapsed}ms raw="${chrome.runtime.lastError.message}" decorated="${err.message}"`);
-            reject(err);
+            reject(new Error(chrome.runtime.lastError.message || "lastError"));
             return;
           }
-          if (!response) {
-            const err = new Error(_decorate("No response from background", action));
-            console.log(`[LeadCaptura] api.call no-response action=${action} elapsed=${elapsed}ms`);
-            reject(err);
-            return;
-          }
+          if (!response) { reject(new Error("No response from background")); return; }
           if (response.error) {
-            const err = new Error(_decorate(response.error, action));
-            console.log(`[LeadCaptura] api.call backend-error action=${action} elapsed=${elapsed}ms raw="${typeof response.error === "string" ? response.error : JSON.stringify(response.error)}" decorated="${err.message}"`);
-            reject(err);
+            reject(new Error(typeof response.error === "string" ? response.error : JSON.stringify(response.error)));
             return;
           }
-          console.log(`[LeadCaptura] api.call ok action=${action} elapsed=${elapsed}ms`);
           resolve(response.data);
         });
       } catch (e) {
-        const err = new Error(_decorate(e?.message || String(e), action));
-        console.log(`[LeadCaptura] api.call threw action=${action} raw="${e?.message || String(e)}" decorated="${err.message}"`);
-        reject(err);
+        reject(new Error(e?.message || String(e)));
       }
     });
+  }
+
+  async function call(action, payload) {
+    const t0 = Date.now();
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await _callOnce(action, payload);
+        console.log(`[LeadCaptura] api.call ok action=${action} elapsed=${Date.now() - t0}ms`);
+        return data;
+      } catch (rawErr) {
+        const raw = rawErr?.message || String(rawErr);
+        const elapsed = Date.now() - t0;
+        // Retry on MV3 service-worker wakeup race: Chrome terminates the SW
+        // after ~30 s idle; the first sendMessage after that can fail before
+        // Chrome restarts it. One retry (150 ms later) is always enough.
+        if (attempt < MAX_RETRIES && /receiving end does not exist|could not establish connection/i.test(raw)) {
+          console.log(`[LeadCaptura] api.call SW-wake retry ${attempt + 1} action=${action} elapsed=${elapsed}ms`);
+          await new Promise(r => setTimeout(r, 150 * Math.pow(2, attempt)));
+          continue;
+        }
+        if (/Extension context invalidated/i.test(raw)) {
+          const err = new Error(_decorate(raw, action));
+          console.error(`[LeadCaptura] api.call no-runtime action=${action} err="${err.message}"`);
+          throw err;
+        }
+        const err = new Error(_decorate(raw, action));
+        console.log(`[LeadCaptura] api.call error action=${action} elapsed=${elapsed}ms raw="${raw}" decorated="${err.message}"`);
+        throw err;
+      }
+    }
   }
 
   globalThis.__lcApi = {
