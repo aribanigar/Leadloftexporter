@@ -4,7 +4,7 @@ Auth uses X-API-Key. These endpoints are what the user's browser hits when they
 hover/save a LinkedIn profile, scroll a search/Sales Nav page, or when the
 extension polls for queued automated actions to execute in-page.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -141,6 +141,20 @@ def claim_jobs(
     in the user's own browser at a human pace."""
     _bump_api_key(db, ctx)
     now = datetime.now(timezone.utc)
+    # Reclaim jobs stuck in "claimed" for >10 min. A job lands here when the
+    # extension claimed it but never reported a result — the tab was closed, the
+    # page navigated away mid-send, or the browser crashed. Without this they'd
+    # be lost forever (claim_jobs only serves status="queued"), which is the main
+    # reason bulk messages appeared to "queue but never send".
+    stale_before = now - timedelta(minutes=10)
+    db.query(ExtensionJob).filter(
+        ExtensionJob.workspace_id == ctx.workspace_id,
+        ExtensionJob.user_id == ctx.user_id,
+        ExtensionJob.status == "claimed",
+        ExtensionJob.claimed_at.isnot(None),
+        ExtensionJob.claimed_at < stale_before,
+    ).update({ExtensionJob.status: "queued"}, synchronize_session=False)
+
     rows = (
         db.query(ExtensionJob)
         .filter(

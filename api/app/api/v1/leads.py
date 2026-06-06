@@ -500,27 +500,26 @@ def delete_lead(
     return {"ok": True}
 
 
-@router.delete("/cleanup/nameless")
-def cleanup_nameless_leads(
+@router.delete("/cleanup/no-contact")
+def cleanup_no_contact_leads(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Delete extension-sourced leads that have no name.
+    """Delete leads that have NEITHER an email NOR a phone number.
 
-    These are created when the background enrichment tab scrapes a LinkedIn
-    profile before the page has hydrated — the lead gets a linkedin_url and
-    possibly an email/phone, but full_name / first_name / last_name are all
-    null. They show as '—' rows in the pipeline table and duplicate the real
-    named lead for the same person.
+    A lead with no email and no phone has no way to be contacted, so it's dead
+    weight in Prospecting. This sweeps every such lead in the workspace —
+    regardless of source — treating NULL, empty, and whitespace-only values as
+    "missing". Leads with at least one of email/phone are always kept.
     """
+    blank_email = or_(Lead.email.is_(None), func.trim(Lead.email) == "")
+    blank_phone = or_(Lead.phone.is_(None), func.trim(Lead.phone) == "")
     rows = (
         db.query(Lead)
         .filter(
             Lead.workspace_id == ctx.workspace_id,
-            Lead.full_name.is_(None),
-            Lead.first_name.is_(None),
-            Lead.last_name.is_(None),
-            Lead.source == "extension",
+            blank_email,
+            blank_phone,
         )
         .all()
     )

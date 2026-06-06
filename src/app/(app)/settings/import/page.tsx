@@ -185,12 +185,12 @@ export default function ImportPage() {
 
   // --- Cleanup helpers ---
   async function runCleanup() {
-    if (!confirm("Delete all nameless extension leads? This cannot be undone.")) return;
+    if (!confirm("Delete every lead that has no email AND no phone number? This cannot be undone.")) return;
     setCleaning(true);
     setCleanResult(null);
     try {
-      const res = await api<{ deleted: number }>("/leads/cleanup/nameless", { method: "DELETE" });
-      setCleanResult(`Deleted ${res.deleted} blank lead${res.deleted !== 1 ? "s" : ""}.`);
+      const res = await api<{ deleted: number }>("/leads/cleanup/no-contact", { method: "DELETE" });
+      setCleanResult(`Deleted ${res.deleted} lead${res.deleted !== 1 ? "s" : ""} with no contact info.`);
     } catch (e: unknown) {
       setCleanResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -507,12 +507,12 @@ export default function ImportPage() {
         <div className="mt-4 space-y-4">
           <div>
             <p className="text-sm text-slate-600">
-              <strong>Blank leads</strong> — have a LinkedIn URL but no name. Appear as &quot;—&quot; rows in
-              your pipeline.
+              <strong>No-contact leads</strong> — have neither an email nor a phone number, so
+              they can&apos;t be reached. Removes them from Prospecting.
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <button className="btn-danger" onClick={runCleanup} disabled={cleaning}>
-                {cleaning ? "Cleaning…" : "Delete blank leads"}
+                {cleaning ? "Cleaning…" : "Delete no-contact leads"}
               </button>
               {cleanResult && <span className="text-sm text-slate-600">{cleanResult}</span>}
             </div>

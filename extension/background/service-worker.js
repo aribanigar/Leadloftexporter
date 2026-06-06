@@ -10,7 +10,10 @@ const DEFAULT_SETTINGS = {
   apiUrl: "https://leadloftexporter.onrender.com",
   apiKey: "lcx_lqpLWLIgFoMLKCTs7-Xj38dKp9QCe2BG60BQ5N59Uo8",
   enabled: true,
-  autopilot: false,
+  // Autopilot defaults ON so bulk-message / connect jobs queued from the CRM
+  // start sending immediately when the user opens any LinkedIn tab. The popup
+  // toggle still lets a user turn this off if they prefer manual mode.
+  autopilot: true,
   showOverlay: true,
 };
 

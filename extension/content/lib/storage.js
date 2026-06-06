@@ -18,7 +18,10 @@
     apiUrl: "http://localhost:8000",
     apiKey: "",
     enabled: true,
-    autopilot: false,
+    // Autopilot defaults ON so bulk-message jobs the user just queued in the
+    // CRM actually fire from their browser without an extra hidden toggle.
+    // Users can still turn it off from the popup if they want manual control.
+    autopilot: true,
     showOverlay: true,
     webScrapeEnabled: true,
   };

@@ -1392,6 +1392,11 @@
 
   // Boot
   onPathChange();
+  // Resume a bulk-message job that was mid-navigation when the previous
+  // page unloaded — see automate.js _persistPending. Runs BEFORE the
+  // autopilot tick so the resume finishes (and reports its result) before
+  // the loop claims the next queued job.
+  try { Automate.resumePendingMessage?.().catch(() => {}); } catch {}
   startAutopilot();
   maybeRunEnrichmentTrigger();
 })();

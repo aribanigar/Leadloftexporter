@@ -1906,42 +1906,47 @@
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     //
-    // LinkedIn's 2026 invitation modal requires a TRUSTED user click (isTrusted=true)
-    // for the "Send without a note" button — content-script-generated events won't
-    // trigger it. Strategy:
-    //   A) Show the full-page spotlight overlay immediately so the user can click
-    //      manually if needed (the spotlight darkens everything except the button,
-    //      pointer-events:none so all clicks pass straight through to the button).
-    //   B) Still fire every automated strategy (MAIN-world, service-worker executeScript,
-    //      forceClick) — they will work if LinkedIn relaxes the restriction.
-    //   C) Wait up to 45s for the user to click manually while retrying every ~5s.
-    _showSendSpotlight();
-    console.log("[LeadCaptura] step 3 → spotlight shown, trying automated + waiting for user click");
+    // The CSP-immune service-worker MAIN-world click (chrome.scripting
+    // .executeScript world:"MAIN") is what genuinely fires LinkedIn's React
+    // onClick handler on the "Send without a note" button. We call it on EVERY
+    // round and await its report — the worker re-finds the button itself, so
+    // the loop self-heals as the modal finishes binding handlers (LinkedIn
+    // binds them ~250–400 ms after the dialog mounts). dispatchHumanClick +
+    // _forceClick run in the isolated world as belt-and-braces.
+    console.log("[LeadCaptura] step 3 → auto-clicking 'Send without a note'");
 
-    // Phase A: automated attempts (4 rounds × ~1s each = ~4s)
-    for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
-      const sendBtn = _findSendWithoutNoteButton();
-      if (!sendBtn) { await sleep(400); continue; }
-      if (attempt === 0) {
-        _tryServiceWorkerMainWorldClick();
-        try { await dispatchHumanClick(sendBtn); } catch {}
+    // Phase A: ~12 aggressive automated rounds (~6s). No spotlight yet — if the
+    // auto-click lands the user never sees a manual prompt (sends in realtime).
+    for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
+      const landed = await _awaitServiceWorkerMainWorldClick();
+      if (landed) {
+        for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+        if (!_invitationModalOpen()) break;
       }
-      _forceClick(sendBtn);
-      _tryMainWorldClick(sendBtn);
-      for (let w = 0; w < 5 && _invitationModalOpen(); w++) await sleep(200);
+      const sendBtn = _findSendWithoutNoteButton();
+      if (sendBtn) {
+        try { await dispatchHumanClick(sendBtn); } catch {}
+        _forceClick(sendBtn);
+      }
+      for (let w = 0; w < 4 && _invitationModalOpen(); w++) await sleep(200);
     }
 
-    // Phase B: wait up to 45s for the user to click (modal closes)
-    // Every ~5s fire another background attempt (in case timing changes).
+    if (!_invitationModalOpen()) {
+      console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+      return { ok: true };
+    }
+
+    // Phase B: auto-click didn't close it (LinkedIn tightened the gate on this
+    // session). Show the one-tap spotlight as a fallback and keep hammering the
+    // automated click in the background, up to ~45s.
+    _showSendSpotlight();
+    console.log("[LeadCaptura] step 3 → spotlight shown, awaiting click (auto-retrying)");
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
-      if (w > 0 && w % 17 === 0) {
+      if (w % 6 === 0) {
+        await _awaitServiceWorkerMainWorldClick();
         const retryBtn = _findSendWithoutNoteButton();
-        if (retryBtn) {
-          _tryServiceWorkerMainWorldClick();
-          _tryMainWorldClick(retryBtn);
-          _forceClick(retryBtn);
-        }
+        if (retryBtn) _forceClick(retryBtn);
       }
     }
 
@@ -5002,70 +5007,45 @@
     _removeSendBtnHighlight();
   }
 
-  // Inject a <script> tag that runs in the PAGE's MAIN world, not the extension's
-  // isolated world. In MAIN world the code has access to window.jQuery and can
-  // call HTMLElement.prototype methods in the same origin as the page handler —
-  // the single most reliable bypass for frameworks that bind to document-level
-  // listeners rather than the button element itself.
-  function _tryMainWorldClick(btn) {
-    try {
-      // Inject into the page's MAIN world via a script tag. This is the only
-      // way to reach LinkedIn's React fiber tree from a content script, since
-      // React stores internal state as DOM properties set in the MAIN world.
-      const code = `(function(){
-var all=Array.from(document.querySelectorAll('button,[role="button"]'));
-var b=all.find(function(x){
-  var t=(x.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
-  var a=(x.getAttribute('aria-label')||'').toLowerCase();
-  return /send without a note/i.test(t)||/send without a note/i.test(a)||t==='send now'||t==='send';
-});
-if(!b)return;
-// React fiber traversal — defer via queueMicrotask so React's concurrent
-// renderer processes the update asynchronously (avoids error #418 "component
-// suspended while responding to synchronous input").
-try{
-  var fk=Object.keys(b).find(function(k){return k.startsWith('__reactFiber$')||k.startsWith('__reactInternalInstance$');});
-  if(fk){
-    var fiber=b[fk];
-    for(var d=0;fiber&&d<12;fiber=fiber.return,d++){
-      var oc=fiber.memoizedProps&&fiber.memoizedProps.onClick||fiber.pendingProps&&fiber.pendingProps.onClick;
-      if(typeof oc==='function'){
-        var _oc=oc,_b=b;
-        queueMicrotask(function(){try{_oc({type:'click',bubbles:true,cancelable:true,
-            isTrusted:true,target:_b,currentTarget:_b,
-            preventDefault:function(){},stopPropagation:function(){},
-            nativeEvent:{isTrusted:true}});}catch(e){}});
-        break;
-      }
-    }
-  }
-}catch(e){}
-if(window.jQuery||window.$){try{(window.jQuery||window.$)(b).trigger('click');}catch(e){}}
-HTMLElement.prototype.click.call(b);
-try{
-  var r=b.getBoundingClientRect();
-  var cx=Math.round(r.left+r.width/2),cy=Math.round(r.top+r.height/2);
-  var opts={bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy,button:0,buttons:1};
-  b.dispatchEvent(new MouseEvent('mousedown',opts));
-  b.dispatchEvent(new MouseEvent('mouseup',{...opts,buttons:0}));
-  b.dispatchEvent(new MouseEvent('click',{...opts,buttons:0}));
-}catch(e){}
-var f=b.closest('form');
-if(f){try{f.requestSubmit(b);}catch(e){try{f.submit();}catch(e2){}}}
-})();`;
-      const s = document.createElement("script");
-      s.textContent = code;
-      (document.head || document.documentElement).appendChild(s);
-      s.remove();
-    } catch {}
+  // Run the "click Send without a note" code in the page's MAIN world.
+  //
+  // This MUST go through the service worker's chrome.scripting.executeScript({
+  // world:"MAIN" }) — that is the ONLY CSP-immune way to run page-context code
+  // from an extension. The previous implementation injected an inline <script>
+  // tag, which LinkedIn's Content-Security-Policy blocks ("Executing inline
+  // script violates… script-src 'self'…") — so it both spammed the console with
+  // CSP errors AND never actually clicked anything. Delegating to the worker
+  // fixes both: no inline script, and a click that genuinely fires.
+  function _tryMainWorldClick(_btn) {
+    _tryServiceWorkerMainWorldClick();
   }
 
   // Ask the service worker to run chrome.scripting.executeScript with world:"MAIN"
   // on the current tab — the most authoritative way to fire page-context code.
+  // Fire-and-forget variant (kept for back-compat call sites).
   function _tryServiceWorkerMainWorldClick() {
     try {
-      chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {});
+      chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, () => {
+        // Swallow lastError — orphaned context during teardown is harmless here.
+        void chrome.runtime.lastError;
+      });
     } catch {}
+  }
+
+  // Awaitable version: resolves to true when the MAIN-world script reported it
+  // found AND clicked the button. Used by the LinkedIn connect path so we can
+  // retry the click and confirm it landed, rather than firing blind once.
+  function _awaitServiceWorkerMainWorldClick() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, (resp) => {
+          if (chrome.runtime.lastError) return resolve(false);
+          resolve(!!(resp && resp.ok && resp.result && resp.result.found));
+        });
+      } catch {
+        resolve(false);
+      }
+    });
   }
 
   // ---- Global auto-confirm of the invitation modal ----------------------
