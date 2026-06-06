@@ -1906,17 +1906,26 @@
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     //
+    // Mirrors the Sales Navigator flow exactly: show the one-tap spotlight
+    // overlay IMMEDIATELY when the dialog opens, then run automated clicks
+    // in the background. If LinkedIn lets the synthetic click through, the
+    // modal closes silently and the spotlight disappears before the user
+    // notices. If LinkedIn requires a trusted user click (isTrusted=true),
+    // the spotlight darkens everything except the "Send without a note"
+    // button so it's a one-tap action.
+    //
     // The CSP-immune service-worker MAIN-world click (chrome.scripting
-    // .executeScript world:"MAIN") is what genuinely fires LinkedIn's React
-    // onClick handler on the "Send without a note" button. We call it on EVERY
-    // round and await its report — the worker re-finds the button itself, so
-    // the loop self-heals as the modal finishes binding handlers (LinkedIn
-    // binds them ~250–400 ms after the dialog mounts). dispatchHumanClick +
-    // _forceClick run in the isolated world as belt-and-braces.
-    console.log("[LeadCaptura] step 3 → auto-clicking 'Send without a note'");
+    // .executeScript world:"MAIN") drives the automated path. We call it on
+    // every round and await its report — the worker re-finds the button
+    // itself, so the loop self-heals as the modal finishes binding handlers
+    // (LinkedIn binds them ~250–400 ms after the dialog mounts).
+    _showSendSpotlight();
+    console.log("[LeadCaptura] step 3 → spotlight shown, auto-clicking 'Send without a note'");
 
-    // Phase A: ~12 aggressive automated rounds (~6s). No spotlight yet — if the
-    // auto-click lands the user never sees a manual prompt (sends in realtime).
+    // Phase A: aggressive auto-click with spotlight already visible. If
+    // auto-click lands within ~6 s the spotlight is removed before the user
+    // has time to react — totally silent send. Otherwise the spotlight is
+    // already there guiding the user to tap.
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
@@ -1932,15 +1941,14 @@
     }
 
     if (!_invitationModalOpen()) {
+      _removeSpotlight();
       console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
       return { ok: true };
     }
 
-    // Phase B: auto-click didn't close it (LinkedIn tightened the gate on this
-    // session). Show the one-tap spotlight as a fallback and keep hammering the
-    // automated click in the background, up to ~45s.
-    _showSendSpotlight();
-    console.log("[LeadCaptura] step 3 → spotlight shown, awaiting click (auto-retrying)");
+    // Phase B: spotlight stays up while we keep hammering the automated
+    // click every ~2 s, for up to 45 s — gives the user time to tap.
+    console.log("[LeadCaptura] step 3 → awaiting click (auto-retrying every 2 s)");
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w % 6 === 0) {
