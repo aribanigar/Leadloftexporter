@@ -5057,18 +5057,33 @@
 
   // Find the Connect button on the profile top card (primary CTA scenario).
   function _findProfilePageConnectBtn() {
+    // LinkedIn renders Connect as <button>, [role='button'], or
+    // <a href='/preload/custom-invite/…'>. Scan all three.
     const cands = Array.from(document.querySelectorAll(
-      "main button, main [role='button'], .scaffold-layout__main button"
+      "main button, main [role='button'], main a, " +
+      ".scaffold-layout__main button, .scaffold-layout__main a, " +
+      ".pvs-profile-actions button, .pvs-profile-actions a, " +
+      "[class*='profile-actions'] button, [class*='profile-actions'] a, " +
+      ".pv-top-card button, .pv-top-card a"
     ));
+    const seen = new Set();
     for (const b of cands) {
+      if (seen.has(b)) continue; seen.add(b);
       if (b.classList?.contains("lc-inline-save")) continue;
+      if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-save-row")) continue;
+      if (b.closest?.("[role='menu'], .artdeco-dropdown__content")) continue;
       if (!_isVisible(b) || b.disabled) continue;
-      const aria = (b.getAttribute("aria-label") || "").trim();
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      // Exact "Connect" text/aria, or "Invite X to connect" pattern.
-      if (/^connect$/i.test(txt)) return b;
-      if (/^connect$/i.test(aria)) return b;
-      if (/^invite\b.*\bto\s+connect/i.test(aria)) return b;
+      const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const hay = txt + " " + aria;
+      // Must mention "connect" as a whole word.
+      if (!/\bconnect\b/.test(hay)) continue;
+      // Reject contexts that look like Connect but aren't the invite action.
+      if (/\bconnected\b|\bpending\b|\bfollowing\b|\bwithdraw\b/.test(hay)) continue;
+      if (/connect.*(twitter|email|phone|whatsapp|instagram|facebook)/i.test(hay)) continue;
+      // "Message" alone means already connected; only skip when Connect isn't ALSO there.
+      if (/\bmessage\b/.test(hay) && !/\bconnect\b/.test(txt) && !/\bconnect\b/.test(aria)) continue;
+      return b;
     }
     return null;
   }
@@ -5238,37 +5253,28 @@
       return r;
     }
 
-    // SCENARIO 1: only Follow visible → open "..." → Connect.
-    console.log("[LeadCaptura] profile-page step 2 → no Connect; opening More dropdown");
+    // SCENARIO 1: no direct Connect button → open "..." overflow → look for Connect inside.
+    console.log("[LeadCaptura] profile-page step 2 → no direct Connect; opening More dropdown");
     const opened = await _profileOpenMoreDropdown();
     if (opened) {
       await sleep(250);
       const ddConnect = _findProfileDropdownConnect();
       if (ddConnect) {
-        console.log("[LeadCaptura] profile-page step 2 → Connect found in dropdown");
+        console.log("[LeadCaptura] profile-page step 2 → Connect found in More dropdown");
         try { await dispatchHumanClick(ddConnect); } catch {}
         try { ddConnect.click?.(); } catch {}
         const r = await _profileSendInvite();
-        if (r.ok) return r;
-        // Close menu before falling through to Follow.
-        try { document.body.click(); } catch {}
-        await sleep(200);
-      } else {
-        // No Connect in menu — close dropdown and fall through to Follow.
-        try { document.body.click(); } catch {}
-        await sleep(200);
+        return r;
       }
+      // Close the dropdown — no Connect inside.
+      try { document.body.click(); } catch {}
+      await sleep(200);
     }
 
-    // FINAL FALLBACK: click Follow (no Connect path available).
-    const follow = _findProfilePageFollowBtn();
-    if (follow) {
-      console.log("[LeadCaptura] profile-page step 2 → no Connect available; clicking Follow");
-      try { await dispatchHumanClick(follow); } catch {}
-      await sleep(700 + Math.random() * 500);
-      return { ok: true, followed: true };
-    }
-    return { ok: false, reason: "no_action_available" };
+    // No Connect button anywhere. Per user request: Connect All only clicks
+    // Connect — never falls back to Follow. Skip this profile.
+    console.log("[LeadCaptura] profile-page step 2 → no Connect available; skipping (NOT following)");
+    return { ok: false, reason: "no_connect_button" };
   }
 
   // Called on every page boot from main.js. If a Connect Run is active and
