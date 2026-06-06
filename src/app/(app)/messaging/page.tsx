@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Linkedin,
@@ -13,6 +13,10 @@ import {
   ExternalLink,
   ChevronRight,
   X,
+  Sparkles,
+  Users,
+  Zap,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -254,64 +258,106 @@ export default function MessagingPage() {
 
   const trimmed = message.trim();
   const canAct = trimmed.length > 0 && recipientCount > 0;
+  const progressPct =
+    jobStatus && jobStatus.total > 0
+      ? Math.round((jobStatus.sent / jobStatus.total) * 100)
+      : 0;
 
-  const channelLabel = isWa ? "WhatsApp" : "LinkedIn";
+  // Channel icon component, flipped with the channel.
+  const ChannelIcon = isWa ? MessageCircle : Linkedin;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-1 flex items-center gap-2">
-        {isWa ? (
-          <MessageCircle className="h-5 w-5 text-emerald-600" />
-        ) : (
-          <Linkedin className="h-5 w-5 text-brand-600" />
-        )}
-        <h1 className="text-lg font-semibold">Bulk Messaging</h1>
-      </div>
-      <p className="mb-4 text-sm text-slate-500">
-        Write one message and reach your whole pipeline — or just the people you pick.
-      </p>
+    <div className="mx-auto max-w-6xl p-6 lg:p-8">
+      {/* ─── Hero header ───────────────────────────────────────────────── */}
+      <header className="mb-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              <Sparkles className="h-3 w-3" /> Outreach
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Bulk Messaging
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Compose once. Reach your whole pipeline at a human pace, in real-time.
+            </p>
+          </div>
 
-      {/* Channel switcher */}
-      <div className="mb-5 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-        <button
-          onClick={() => setChannel("linkedin")}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-            !isWa ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:text-slate-800"
-          )}
-        >
-          <Linkedin className="h-4 w-4" /> LinkedIn
-        </button>
-        <button
-          onClick={() => setChannel("whatsapp")}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-            isWa ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:text-slate-800"
-          )}
-        >
-          <MessageCircle className="h-4 w-4" /> WhatsApp
-        </button>
-      </div>
+          {/* Live stat strip */}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatPill
+              icon={<Users className="h-3.5 w-3.5" />}
+              label="Reachable"
+              value={reachable.length}
+            />
+            <StatPill
+              icon={<Send className="h-3.5 w-3.5" />}
+              label="Sent (24h)"
+              value={jobStatus?.sent ?? 0}
+              tone="emerald"
+            />
+            <StatPill
+              icon={<Zap className="h-3.5 w-3.5" />}
+              label="In progress"
+              value={jobStatus?.pending ?? 0}
+              tone={
+                (jobStatus?.pending ?? 0) > 0 ? "brand" : "slate"
+              }
+              pulse={(jobStatus?.pending ?? 0) > 0}
+            />
+          </div>
+        </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        {/* ---- Composer ---- */}
-        <div className="card p-5">
-          <div className="mb-2 flex items-center justify-between">
-            <label className="label mb-0">Message</label>
+        {/* Channel switcher — segmented control with active pill */}
+        <div className="mt-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <ChannelButton
+            active={!isWa}
+            onClick={() => setChannel("linkedin")}
+            icon={<Linkedin className="h-4 w-4" />}
+            label="LinkedIn"
+            activeClass="bg-gradient-to-r from-brand-50 to-brand-100 text-brand-700"
+          />
+          <ChannelButton
+            active={isWa}
+            onClick={() => setChannel("whatsapp")}
+            icon={<MessageCircle className="h-4 w-4" />}
+            label="WhatsApp"
+            activeClass="bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700"
+          />
+        </div>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+        {/* ─── Composer ─────────────────────────────────────────────── */}
+        <section className="card overflow-hidden p-0">
+          {/* Composer header */}
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <ChannelIcon
+                className={cn(
+                  "h-4 w-4",
+                  isWa ? "text-emerald-600" : "text-brand-600"
+                )}
+              />
+              Write your message
+            </div>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowTemplates((s) => !s)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-soft transition hover:border-slate-300 hover:text-slate-800"
               >
-                Use template
+                <Sparkles className="h-3 w-3" /> Use template
               </button>
               {showTemplates && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowTemplates(false)} />
-                  <div className="absolute right-0 z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowTemplates(false)}
+                  />
+                  <div className="absolute right-0 z-20 mt-1.5 max-h-72 w-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
                     {(templates || []).length === 0 && (
-                      <div className="px-3 py-2 text-xs text-slate-400">
+                      <div className="px-3 py-3 text-xs text-slate-400">
                         No templates yet. Create them in Settings → Templates.
                       </div>
                     )}
@@ -319,7 +365,7 @@ export default function MessagingPage() {
                       <button
                         key={t.id}
                         type="button"
-                        className="block w-full truncate rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        className="block w-full truncate rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50"
                         title={t.body}
                         onClick={() => {
                           setMessage(t.body || "");
@@ -336,285 +382,412 @@ export default function MessagingPage() {
             </div>
           </div>
 
-          {/* Merge-tag buttons */}
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {TOKENS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => insertToken(t)}
-                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                title={`Insert ${t}`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          {/* Composer body */}
+          <div className="space-y-4 px-6 py-5">
+            {/* Merge-tag chips */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-medium text-slate-500">Personalize:</span>
+              {TOKENS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => insertToken(t)}
+                  className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-600 shadow-soft transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                  title={`Insert ${t}`}
+                >
+                  <span className="font-mono">{t}</span>
+                </button>
+              ))}
+            </div>
 
-          <textarea
-            ref={textareaRef}
-            className="input min-h-[180px] resize-y leading-relaxed"
-            placeholder={
-              isWa
-                ? "Hi {first_name}, great connecting! …"
-                : "Hi {first_name}, I came across your profile and wanted to connect…"
-            }
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              setResult(null);
-            }}
-            maxLength={8000}
-          />
-          <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
-            <span>Tags are filled in per person for each message.</span>
-            <span>{trimmed.length}/8000</span>
-          </div>
-
-          {/* Live preview */}
-          {trimmed && previewLead && (
-            <div className="mt-3">
-              <div className="label">
-                Preview for {previewLead.full_name || "first recipient"}
-              </div>
-              <div className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                {renderPreview(message, previewLead)}
+            {/* Textarea */}
+            <div
+              className={cn(
+                "rounded-xl border border-slate-200 bg-white shadow-soft transition focus-within:border-transparent focus-within:ring-2",
+                isWa
+                  ? "focus-within:ring-emerald-400/30"
+                  : "focus-within:ring-brand-400/30"
+              )}
+            >
+              <textarea
+                ref={textareaRef}
+                className="block min-h-[200px] w-full resize-y rounded-xl bg-transparent px-4 py-3 text-sm leading-relaxed text-slate-800 outline-none placeholder:text-slate-400"
+                placeholder={
+                  isWa
+                    ? "Hi {first_name}, great connecting! …"
+                    : "Hi {first_name}, I came across your profile and wanted to connect…"
+                }
+                value={message}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  setResult(null);
+                }}
+                maxLength={8000}
+              />
+              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
+                <span>Tags are filled in per person for each message.</span>
+                <span>
+                  <span className="font-medium text-slate-600">{trimmed.length}</span>
+                  /8000
+                </span>
               </div>
             </div>
-          )}
 
-          {/* How it works */}
-          <div className="mt-4 flex gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-            <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-            {isWa ? (
-              <span>
-                {waConfig?.connected ? (
+            {/* Message-bubble preview */}
+            {trimmed && previewLead && (
+              <div>
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  <ChannelIcon className="h-3 w-3" />
+                  Preview · what {previewLead.full_name || "the first recipient"} will see
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold uppercase text-slate-500">
+                    {initials(previewLead.full_name || previewLead.email)}
+                  </span>
+                  <div
+                    className={cn(
+                      "max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-tl-sm border px-4 py-2.5 text-sm leading-relaxed shadow-soft",
+                      isWa
+                        ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white text-slate-800"
+                        : "border-brand-200 bg-gradient-to-br from-brand-50 to-white text-slate-800"
+                    )}
+                  >
+                    {renderPreview(message, previewLead)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* How it works callout */}
+            <div
+              className={cn(
+                "flex items-start gap-2.5 rounded-xl border bg-gradient-to-br p-3 text-xs",
+                isWa
+                  ? "border-emerald-100 from-emerald-50/60 to-white text-slate-600"
+                  : "border-brand-100 from-brand-50/60 to-white text-slate-600"
+              )}
+            >
+              <Info
+                className={cn(
+                  "mt-0.5 h-4 w-4 flex-shrink-0",
+                  isWa ? "text-emerald-500" : "text-brand-500"
+                )}
+              />
+              {isWa ? (
+                <span>
+                  {waConfig?.connected ? (
+                    <>
+                      <strong>Auto-send</strong> delivers instantly via your connected
+                      WhatsApp Business API ({waConfig.display || "active"}). Or use{" "}
+                      <strong>Open chats</strong> to send manually one-by-one. Numbers
+                      must include the country code.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Open chats</strong> opens each WhatsApp chat with your
+                      message pre-filled — tap Send in WhatsApp for each. Numbers
+                      must include the country code. For true automated bulk send,{" "}
+                      <Link
+                        href="/settings/whatsapp"
+                        className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
+                      >
+                        connect the WhatsApp Business API
+                      </Link>
+                      .
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span>
+                  Messages send <strong>in real-time</strong>, one at a time at a
+                  human pace (45 sec – 3 min between sends) by the LeadCaptura
+                  extension running in your browser. Keep a LinkedIn tab open with{" "}
+                  <strong>Autopilot ON</strong> in the extension popup. Only
+                  1st-degree connections can be messaged.
+                </span>
+              )}
+            </div>
+
+            {/* Action bar */}
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              {!isWa && send.isError ? (
+                <span className="flex items-center gap-1.5 text-xs text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {send.error?.message || "Failed to queue messages."}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-500">
+                  Ready to reach{" "}
+                  <span className="font-semibold text-slate-700">
+                    {recipientCount}
+                  </span>{" "}
+                  {recipientCount === 1 ? "person" : "people"}
+                </span>
+              )}
+              {isWa ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium shadow-soft transition disabled:cursor-not-allowed disabled:opacity-50",
+                      waConfig?.connected
+                        ? "border border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700"
+                    )}
+                    disabled={!canAct}
+                    onClick={startWaQueue}
+                    title="Open each chat in WhatsApp to send manually"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {waConfig?.connected
+                      ? "Open chats"
+                      : `Open ${recipientCount} chat${recipientCount === 1 ? "" : "s"}`}
+                  </button>
+                  {waConfig?.connected && (
+                    <button
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition hover:from-emerald-600 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!canAct || waSend.isPending}
+                      onClick={() => waSend.mutate()}
+                      title="Send automatically via the WhatsApp Business API"
+                    >
+                      {waSend.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      {waSend.isPending ? "Sending…" : `Auto-send · ${recipientCount}`}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-700 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-brand-600 hover:to-brand-800 disabled:cursor-not-allowed disabled:opacity-50",
+                    !send.isPending && canAct && "hover:shadow-lg"
+                  )}
+                  disabled={!canAct || send.isPending}
+                  onClick={() => send.mutate()}
+                >
+                  {send.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {send.isPending
+                    ? "Sending…"
+                    : `Send to ${recipientCount} ${
+                        usingSelection
+                          ? "selected"
+                          : "lead" + (recipientCount === 1 ? "" : "s")
+                      }`}
+                </button>
+              )}
+            </div>
+
+            {/* Live progress / result */}
+            {result && result.queued > 0 && (
+              <div className="overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-soft">
+                <div className="flex items-start gap-2.5 px-4 py-3">
+                  {sendingActive ? (
+                    <span className="relative mt-0.5 flex h-2.5 w-2.5 flex-shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-emerald-900">
+                      {sendingActive
+                        ? `Sending ${result.queued} message${
+                            result.queued === 1 ? "" : "s"
+                          } in real-time…`
+                        : `${jobStatus?.sent ?? result.queued} message${
+                            result.queued === 1 ? "" : "s"
+                          } sent`}
+                    </div>
+                    <div className="mt-0.5 text-xs text-emerald-700">
+                      {result.skipped_no_linkedin > 0 && (
+                        <span>
+                          {result.skipped_no_linkedin} skipped (no LinkedIn URL).{" "}
+                        </span>
+                      )}
+                      {result.skipped_pending > 0 && (
+                        <span>
+                          {result.skipped_pending} already had a message in-flight.{" "}
+                        </span>
+                      )}
+                      {sendingActive
+                        ? "Keep a LinkedIn tab open with Autopilot ON."
+                        : "Delivered by the extension at a human pace."}
+                    </div>
+                  </div>
+                  {sendingActive && (
+                    <span className="text-sm font-semibold tabular-nums text-emerald-700">
+                      {progressPct}%
+                    </span>
+                  )}
+                </div>
+
+                {sendingActive && jobStatus && jobStatus.total > 0 && (
                   <>
-                    <strong>Auto-send</strong> delivers instantly via your connected WhatsApp
-                    Business API ({waConfig.display || "active"}). Or use <strong>Open chats</strong>{" "}
-                    to send manually one-by-one. Numbers must include the country code.
+                    <div className="h-1.5 w-full overflow-hidden bg-emerald-100">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-700 ease-out"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs">
+                      <span className="inline-flex items-center gap-1.5 text-emerald-800">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span className="font-semibold tabular-nums">
+                          {jobStatus.sent}
+                        </span>{" "}
+                        sent
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span className="font-semibold tabular-nums">
+                          {jobStatus.pending}
+                        </span>{" "}
+                        in progress
+                      </span>
+                      {jobStatus.failed > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700">
+                          <AlertCircle className="h-3 w-3" />
+                          <span className="font-semibold tabular-nums">
+                            {jobStatus.failed}
+                          </span>{" "}
+                          failed
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {result && result.queued === 0 && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                <div>
+                  No new messages sent — all recipients were already messaged or
+                  have no LinkedIn URL.
+                </div>
+              </div>
+            )}
+
+            {isWa && waSend.isError && (
+              <div className="flex items-center gap-1.5 text-sm text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                {waSend.error?.message || "WhatsApp send failed."}
+              </div>
+            )}
+
+            {waResult && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                  <div>
+                    <div className="font-medium">
+                      {waResult.sent} sent
+                      {waResult.failed ? `, ${waResult.failed} failed` : ""}
+                      {waResult.skipped_no_phone
+                        ? `, ${waResult.skipped_no_phone} skipped (no phone)`
+                        : ""}
+                      .
+                    </div>
+                    {waResult.errors.length > 0 && (
+                      <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
+                        {waResult.errors.map((e, i) => (
+                          <li key={i} className="break-all">
+                            {e}
+                          </li>
+                        ))}
+                        <li>
+                          Failures are usually Meta&apos;s 24-hour / template rule —
+                          outside the window you must use an approved template.
+                        </li>
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ─── Recipients sidebar ──────────────────────────────────── */}
+        <aside className="card flex flex-col overflow-hidden p-0">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">Recipients</div>
+              <div className="mt-0.5 text-[11px] text-slate-500">
+                {usingSelection ? (
+                  <>
+                    <span className="font-semibold text-slate-700">
+                      {selectedReachable.length}
+                    </span>{" "}
+                    selected
                   </>
                 ) : (
                   <>
-                    <strong>Open chats</strong> opens each WhatsApp chat with your message
-                    pre-filled — tap Send in WhatsApp for each. Numbers must include the
-                    country code. For true automated bulk send,{" "}
-                    <Link href="/settings/whatsapp" className="font-medium text-emerald-700 underline">
-                      connect the WhatsApp Business API
-                    </Link>
-                    .
+                    <span className="font-semibold text-slate-700">
+                      {reachable.length}
+                    </span>{" "}
+                    reachable
                   </>
                 )}
-              </span>
-            ) : (
-              <span>
-                Messages are sent in real-time, one at a time at a human pace (45 sec –
-                3 min between sends) by the LeadCaptura extension running in your browser.
-                Keep a LinkedIn tab open with <strong>Autopilot ON</strong> in the extension
-                popup. Only 1st-degree connections can be messaged.
-              </span>
-            )}
-          </div>
-
-          {/* Action */}
-          <div className="mt-5 flex items-center justify-end gap-3">
-            {!isWa && send.isError && (
-              <span className="mr-auto text-xs text-red-600">
-                {send.error?.message || "Failed to queue messages."}
-              </span>
-            )}
-            {isWa ? (
-              <div className="flex items-center gap-2">
-                {waConfig?.connected && (
-                  <span className="mr-1 hidden text-xs text-slate-400 sm:inline">
-                    open chats manually, or
-                  </span>
-                )}
-                <button
-                  className={cn(
-                    waConfig?.connected
-                      ? "btn-secondary"
-                      : "btn bg-emerald-600 text-white hover:bg-emerald-700",
-                    "disabled:cursor-not-allowed disabled:opacity-50"
-                  )}
-                  disabled={!canAct}
-                  onClick={startWaQueue}
-                  title="Open each chat in WhatsApp to send manually"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  {waConfig?.connected
-                    ? "Open chats"
-                    : `Open ${recipientCount} chat${recipientCount === 1 ? "" : "s"}`}
-                </button>
-                {waConfig?.connected && (
-                  <button
-                    className="btn bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!canAct || waSend.isPending}
-                    onClick={() => waSend.mutate()}
-                    title="Send automatically via the WhatsApp Business API"
-                  >
-                    {waSend.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    {waSend.isPending
-                      ? "Sending…"
-                      : `Auto-send · ${recipientCount}`}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!canAct || send.isPending}
-                onClick={() => send.mutate()}
-              >
-                {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {send.isPending
-                  ? "Sending…"
-                  : `Send to ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
-              </button>
-            )}
-          </div>
-
-          {result && result.queued > 0 && (
-            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
-              {/* Header row */}
-              <div className="flex items-start gap-2 text-emerald-800">
-                {sendingActive
-                  ? <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-emerald-600" />
-                  : <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                }
-                <div className="flex-1">
-                  <div className="font-medium">
-                    {sendingActive
-                      ? `Sending ${result.queued} message${result.queued === 1 ? "" : "s"} in real-time…`
-                      : `${jobStatus?.sent ?? result.queued} message${result.queued === 1 ? "" : "s"} sent ✓`}
-                  </div>
-                  <div className="mt-0.5 text-xs text-emerald-700">
-                    {result.skipped_no_linkedin > 0 && (
-                      <span>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </span>
-                    )}
-                    {result.skipped_pending > 0 && (
-                      <span>{result.skipped_pending} already had a message in-flight. </span>
-                    )}
-                    {sendingActive
-                      ? "Keep a LinkedIn tab open with Autopilot ON in the extension."
-                      : "Delivered by the extension at a human pace."}
-                  </div>
-                </div>
-              </div>
-              {/* Live progress bar */}
-              {sendingActive && jobStatus && jobStatus.total > 0 && (
-                <div className="mt-3">
-                  <div className="mb-1 flex justify-between text-xs text-emerald-700">
-                    <span>{jobStatus.sent} sent · {jobStatus.pending} in progress</span>
-                    <span>{Math.round((jobStatus.sent / jobStatus.total) * 100)}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-200">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                      style={{ width: `${(jobStatus.sent / jobStatus.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {result && result.queued === 0 && (
-            <div className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-              <div>No new messages sent — all recipients were already messaged or have no LinkedIn URL.</div>
-            </div>
-          )}
-
-          {isWa && waSend.isError && (
-            <p className="mt-3 text-sm text-red-600">
-              {waSend.error?.message || "WhatsApp send failed."}
-            </p>
-          )}
-
-          {waResult && (
-            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                <div>
-                  <div className="font-medium">
-                    {waResult.sent} sent{waResult.failed ? `, ${waResult.failed} failed` : ""}
-                    {waResult.skipped_no_phone ? `, ${waResult.skipped_no_phone} skipped (no phone)` : ""}.
-                  </div>
-                  {waResult.errors.length > 0 && (
-                    <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
-                      {waResult.errors.map((e, i) => (
-                        <li key={i} className="break-all">{e}</li>
-                      ))}
-                      <li>
-                        Failures are usually Meta&apos;s 24-hour / template rule — outside the
-                        window you must use an approved template.
-                      </li>
-                    </ul>
-                  )}
-                </div>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* ---- Recipients ---- */}
-        <div className="card flex flex-col p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium">Recipients</span>
             <button
               type="button"
               onClick={selectAllShown}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+              className={cn(
+                "rounded-md px-2 py-1 text-xs font-medium transition",
+                isWa
+                  ? "text-emerald-600 hover:bg-emerald-50"
+                  : "text-brand-600 hover:bg-brand-50"
+              )}
             >
-              {shown.filter(reach).length > 0 && shown.filter(reach).every((l) => selected.has(l.id))
+              {shown.filter(reach).length > 0 &&
+              shown.filter(reach).every((l) => selected.has(l.id))
                 ? "Clear"
                 : "Select all"}
             </button>
           </div>
 
-          <select
-            className="input mb-2"
-            value={stageId}
-            onChange={(e) => {
-              setStageId(e.target.value);
-              setResult(null);
-            }}
-          >
-            <option value="">All stages</option>
-            {(stages || []).map((s) => (
-              <option key={s.id} value={s.id}>
-                Stage: {s.name}
-              </option>
-            ))}
-          </select>
-
-          <div className="relative mb-2">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              className="input pl-8"
-              placeholder="Search name, company, title…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="space-y-2 px-4 py-3">
+            <select
+              className="input"
+              value={stageId}
+              onChange={(e) => {
+                setStageId(e.target.value);
+                setResult(null);
+              }}
+            >
+              <option value="">All stages</option>
+              {(stages || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  Stage: {s.name}
+                </option>
+              ))}
+            </select>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                className="input pl-8"
+                placeholder="Search name, company, title…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
 
-          <p className="mb-2 text-xs text-slate-500">
-            {usingSelection ? (
-              <>
-                <span className="font-semibold text-slate-700">{selectedReachable.length}</span> selected
-              </>
-            ) : (
-              <>
-                Will reach{" "}
-                <span className="font-semibold text-slate-700">{reachable.length}</span>{" "}
-                lead{reachable.length === 1 ? "" : "s"} with {isWa ? "a phone number" : "LinkedIn"}
-              </>
-            )}
-          </p>
-
-          <div className="-mx-1 max-h-[460px] flex-1 overflow-y-auto px-1">
+          <div className="flex-1 overflow-y-auto px-2 pb-3">
             {shown.length === 0 && (
-              <div className="py-6 text-center text-sm text-slate-400">No leads.</div>
+              <div className="py-10 text-center">
+                <Users className="mx-auto mb-2 h-6 w-6 text-slate-300" />
+                <div className="text-sm text-slate-400">No leads to show.</div>
+              </div>
             )}
             {shown.map((l) => {
               const ok = reach(l);
@@ -624,26 +797,58 @@ export default function MessagingPage() {
                   key={l.id}
                   onClick={() => ok && toggle(l.id)}
                   className={cn(
-                    "mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left",
-                    !ok ? "cursor-not-allowed opacity-50" : on ? "cursor-pointer bg-brand-50" : "cursor-pointer hover:bg-slate-50"
+                    "group mb-0.5 flex items-center gap-2.5 rounded-lg px-2 py-2 text-left transition",
+                    !ok
+                      ? "cursor-not-allowed opacity-50"
+                      : on
+                      ? cn(
+                          "cursor-pointer",
+                          isWa
+                            ? "bg-emerald-50 ring-1 ring-emerald-200"
+                            : "bg-brand-50 ring-1 ring-brand-200"
+                        )
+                      : "cursor-pointer hover:bg-slate-50"
                   )}
-                  title={ok ? "" : isWa ? "No phone number — can't WhatsApp" : "No LinkedIn URL — can't message"}
+                  title={
+                    ok
+                      ? ""
+                      : isWa
+                      ? "No phone number — can't WhatsApp"
+                      : "No LinkedIn URL — can't message"
+                  }
                 >
                   <span
                     className={cn(
-                      "grid h-4 w-4 flex-shrink-0 place-items-center rounded border text-[10px]",
-                      on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
+                      "grid h-4 w-4 flex-shrink-0 place-items-center rounded border text-[10px] transition",
+                      on
+                        ? isWa
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-brand-600 bg-brand-600 text-white"
+                        : "border-slate-300 bg-white group-hover:border-slate-400"
                     )}
                   >
                     {on ? "✓" : ""}
                   </span>
-                  <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold uppercase text-slate-500">
+                  <span
+                    className={cn(
+                      "grid h-8 w-8 flex-shrink-0 place-items-center rounded-full text-[11px] font-semibold uppercase",
+                      on
+                        ? isWa
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-brand-100 text-brand-700"
+                        : "bg-slate-100 text-slate-500"
+                    )}
+                  >
                     {initials(l.full_name || l.email)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">{l.full_name || "Unknown"}</span>
-                    <span className="block truncate text-xs text-slate-400">
-                      {isWa ? l.phone || "no phone" : l.company?.name || l.title || "—"}
+                    <span className="block truncate text-sm font-medium text-slate-800">
+                      {l.full_name || "Unknown"}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {isWa
+                        ? l.phone || "no phone"
+                        : l.company?.name || l.title || "—"}
                     </span>
                   </span>
                   {isWa ? (
@@ -654,24 +859,28 @@ export default function MessagingPage() {
                           e.stopPropagation();
                           openWhatsApp(l);
                         }}
-                        className="flex-shrink-0 rounded p-1 text-emerald-600 hover:bg-emerald-50"
+                        className="flex-shrink-0 rounded-md p-1.5 text-emerald-600 transition hover:bg-emerald-100"
                         title="Open this chat in WhatsApp now"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <span className="flex-shrink-0 text-[10px] text-slate-400">no #</span>
+                      <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
+                        no #
+                      </span>
                     )
                   ) : ok ? (
-                    <Linkedin className="h-3.5 w-3.5 flex-shrink-0 text-brand-500" />
+                    <Linkedin className="h-4 w-4 flex-shrink-0 text-brand-500" />
                   ) : (
-                    <span className="flex-shrink-0 text-[10px] text-slate-400">no LI</span>
+                    <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
+                      no LI
+                    </span>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
+        </aside>
       </div>
 
       {/* WhatsApp guided send-queue */}
@@ -688,6 +897,72 @@ export default function MessagingPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─── Small presentational helpers ──────────────────────────────────────────
+
+function StatPill({
+  icon,
+  label,
+  value,
+  tone = "slate",
+  pulse = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  tone?: "slate" | "brand" | "emerald";
+  pulse?: boolean;
+}) {
+  const toneClass =
+    tone === "brand"
+      ? "border-brand-200 bg-brand-50 text-brand-700"
+      : tone === "emerald"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-slate-200 bg-white text-slate-600";
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-soft",
+        toneClass
+      )}
+    >
+      <span className={cn("flex h-4 w-4 items-center justify-center", pulse && "animate-pulse")}>
+        {icon}
+      </span>
+      <span className="text-slate-500">{label}</span>
+      <span className="tabular-nums font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function ChannelButton({
+  active,
+  onClick,
+  icon,
+  label,
+  activeClass,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  activeClass: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition",
+        active
+          ? `${activeClass} shadow-sm`
+          : "text-slate-500 hover:text-slate-800"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
