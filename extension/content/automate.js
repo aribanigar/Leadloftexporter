@@ -150,10 +150,28 @@
       "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
       "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
       "main button.message-anywhere-button",
+      "[class*='message-anywhere-button']",
+      "button[data-control-name*='message' i]",
     ];
     let msgBtn = first(document, _MSG_SELS);
     if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
+      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 5000 }); } catch {}
+    }
+    // Text-content fallback: find a visible "Message" button/link that isn't
+    // an InMail or recruiter variant.
+    if (!msgBtn) {
+      const candidates = document.querySelectorAll(
+        "main button:not([disabled]), main a[role='button'], " +
+        ".pvs-profile-actions button:not([disabled]), .pvs-profile-actions a"
+      );
+      for (const el of candidates) {
+        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+        const txt = (el.textContent || "").trim().toLowerCase();
+        if (
+          (/\bmessage\b/.test(lbl) || txt === "message") &&
+          !/your team|recruiter|inmail/i.test(lbl + " " + txt)
+        ) { msgBtn = el; break; }
+      }
     }
     if (!msgBtn) return { status: "failed", error: "message_button_not_found" };
     await dispatchHumanClick(msgBtn);
