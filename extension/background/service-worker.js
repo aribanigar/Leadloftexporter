@@ -344,7 +344,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             const r = b.getBoundingClientRect();
             if (r.width < 1 || r.height < 1) return false;
             const cs = getComputedStyle(b);
-            if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+            if (cs.visibility === "hidden" || cs.display === "none") return false;
             return true;
           });
           if (!btn) return { found: false };
@@ -353,24 +353,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           // It lives on Event.prototype as a configurable getter — we
           // intentionally don't delete the property after, we put the
           // original descriptor back.
+          // NOTE: If LinkedIn has made isTrusted non-configurable, the
+          // defineProperty below will throw — we catch it and still proceed
+          // with the React-fiber direct call which uses a plain object event
+          // (bypassing the native getter entirely).
           const origDesc =
             Object.getOwnPropertyDescriptor(Event.prototype, "isTrusted") || null;
 
+          let _patchActive = false;
           const restore = () => {
+            if (!_patchActive || !origDesc) return;
             try {
-              if (origDesc) {
-                Object.defineProperty(Event.prototype, "isTrusted", origDesc);
-              }
+              Object.defineProperty(Event.prototype, "isTrusted", origDesc);
             } catch (_) {}
           };
 
           let clicked = false;
           try {
             // Patch the getter so EVERY event in this turn reports isTrusted=true.
-            Object.defineProperty(Event.prototype, "isTrusted", {
-              configurable: true,
-              get() { return true; },
-            });
+            try {
+              Object.defineProperty(Event.prototype, "isTrusted", {
+                configurable: true,
+                get() { return true; },
+              });
+              _patchActive = true;
+            } catch (_patchErr) {
+              // LinkedIn may have locked Event.prototype.isTrusted — proceed
+              // without the patch; the React-fiber call below still works.
+            }
 
             btn.scrollIntoView({ block: "center", inline: "center" });
             try { btn.focus(); } catch (_) {}
@@ -417,7 +427,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                         type: "click", bubbles: true, cancelable: true,
                         isTrusted: true, target: btn, currentTarget: btn,
                         preventDefault: () => {}, stopPropagation: () => {},
-                        nativeEvent: Object.assign(new Event("click", { bubbles: true, cancelable: true }), { isTrusted: true }),
+                        stopImmediatePropagation: () => {},
+                        // Plain object for nativeEvent so .isTrusted is a real
+                        // writable property — Object.assign on an actual Event
+                        // silently fails because isTrusted is read-only there.
+                        nativeEvent: {
+                          isTrusted: true, type: "click",
+                          bubbles: true, cancelable: true,
+                          preventDefault() {}, stopPropagation() {},
+                          stopImmediatePropagation() {},
+                        },
                       });
                     } catch (_) {}
                     break;
@@ -476,16 +495,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "lc:trustedClickSendWithoutNote") {
     const tabId = _sender?.tab?.id;
     if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    // debugger is now a required manifest permission — always available.
     (async () => {
-      // Permission check first — avoids the loud "debugger.attach without
-      // permission" error message in the Errors panel.
-      let hasPerm = false;
-      try {
-        hasPerm = await new Promise((resolve) => {
-          chrome.permissions.contains({ permissions: ["debugger"] }, resolve);
-        });
-      } catch {}
-      if (!hasPerm) { sendResponse({ ok: false, error: "no_permission" }); return; }
 
       let attached = false;
       const detach = () => {
@@ -523,7 +534,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 const r = el.getBoundingClientRect();
                 if (r.width < 1 || r.height < 1) return null;
                 const cs = getComputedStyle(el);
-                if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') return null;
+                if (cs.visibility === 'hidden' || cs.display === 'none') return null;
                 return r;
               };
               const matches = (el) => {
@@ -567,7 +578,110 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             });
           });
         }
+        // Also focus + keyboard Enter for belt-and-suspenders: a keyboard-derived
+        // click has isTrusted=true even when the handler stores the original getter.
+        try {
+          await new Promise((res) => chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+            expression: `(()=>{
+              const btn = Array.from(document.querySelectorAll('button,[role="button"],a[role="button"]'))
+                .find(b => /send without a note/i.test((b.textContent||'').replace(/\\s+/g,' ').trim()) ||
+                           /send without a note/i.test(b.getAttribute('aria-label')||''));
+              if (btn) { btn.scrollIntoView({block:'center'}); btn.focus(); return true; }
+              return false;
+            })()`,
+            returnByValue: true, awaitPromise: false,
+          }, () => res()));
+          await new Promise(r => setTimeout(r, 100));
+          for (const kType of ["keyDown", "keyUp"]) {
+            await new Promise((res) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+              type: kType, windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13,
+              key: "Enter", code: "Enter", text: kType === "keyDown" ? "\r" : "", modifiers: 0,
+            }, () => res()));
+            await new Promise(r => setTimeout(r, 50));
+          }
+        } catch (_) {}
         sendResponse({ ok: true, clicked: true, x: coords.x, y: coords.y });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      } finally {
+        detach();
+      }
+    })();
+    return true;
+  }
+
+  // ── Keyboard Enter click via chrome.debugger ─────────────────────────────
+  // Focus the "Send without a note" button and dispatch a keyboard Enter key.
+  // A keyboard-derived click event is created by Chrome at the C++ level with
+  // isTrusted=true — this is the most robust approach because it bypasses
+  // BOTH the `if (!event.isTrusted) return` check AND any stored getter
+  // references that would defeat the Event.prototype patch.
+  if (msg?.type === "lc:debuggerKeyEnterClick") {
+    const tabId = _sender?.tab?.id;
+    if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    // debugger is now a required manifest permission — always available.
+    (async () => {
+      let attached = false;
+      const detach = () => {
+        if (!attached) return;
+        try { chrome.debugger.detach({ tabId }, () => void chrome.runtime.lastError); } catch {}
+        attached = false;
+      };
+      try {
+        await new Promise((res, rej) => chrome.debugger.attach({ tabId }, "1.3", () => {
+          const e = chrome.runtime.lastError;
+          if (e && /already attached|cannot attach/i.test(e.message || "")) return rej(new Error("debugger_busy"));
+          if (e) return rej(new Error(e.message || "attach_failed"));
+          attached = true; res();
+        }));
+
+        // Focus the button inside the page via Runtime.evaluate
+        const focusResult = await new Promise((res) =>
+          chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+            expression: `(()=>{
+              const all = Array.from(document.querySelectorAll('button,[role="button"],a[role="button"]'));
+              const btn = all.find(b => {
+                if (b.classList?.contains('lc-inline-save')) return false;
+                const t = (b.textContent||'').replace(/\\s+/g,' ').trim();
+                const a = b.getAttribute('aria-label')||'';
+                return /send without a note/i.test(t) || /send without a note/i.test(a);
+              });
+              if (!btn) return false;
+              btn.scrollIntoView({ block: 'center' });
+              btn.focus();
+              return true;
+            })()`,
+            returnByValue: true,
+            awaitPromise: false,
+          }, (r) => res(r))
+        );
+
+        if (!focusResult?.result?.value) {
+          sendResponse({ ok: false, error: "button_not_found" });
+          return;
+        }
+
+        // Small pause for focus to settle before key dispatch
+        await new Promise((r) => setTimeout(r, 120));
+
+        // Dispatch Enter keydown then keyup. Chrome synthesises a click event
+        // on the focused button with isTrusted=true — same as a physical keyboard.
+        for (const kType of ["keyDown", "keyUp"]) {
+          await new Promise((res) =>
+            chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+              type: kType,
+              windowsVirtualKeyCode: 13,
+              nativeVirtualKeyCode: 13,
+              key: "Enter",
+              code: "Enter",
+              text: kType === "keyDown" ? "\r" : "",
+              modifiers: 0,
+            }, () => res())
+          );
+          await new Promise((r) => setTimeout(r, 60));
+        }
+
+        sendResponse({ ok: true });
       } catch (e) {
         sendResponse({ ok: false, error: e?.message || String(e) });
       } finally {

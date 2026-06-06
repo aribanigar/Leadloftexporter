@@ -1678,7 +1678,7 @@
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return false;
     const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+    if (cs.visibility === "hidden" || cs.display === "none") return false;
     return true;
   }
 
@@ -1721,15 +1721,24 @@
     return null;
   }
 
-  // True while the invitation modal is on screen. We consider it open if either
-  // a matching dialog node is visible OR a "Send without a note" button is
-  // visible — whichever our heuristics catch first. This prevents the watcher
-  // from bailing when the dialog's role attribute changes but the button is
-  // clearly there.
+  // True while the invitation modal is on screen.
+  // v1.0.146: No longer requires the button to be "visible" — LinkedIn's modal
+  // animation can keep the button in the DOM with opacity=0 or partially
+  // off-screen during the open/close transition, which caused _isVisible() to
+  // return false and the detection to fail. We now return true as soon as the
+  // "Send without a note" button EXISTS anywhere in the DOM (or a structural
+  // modal selector matches). This matches how the Sales Nav path works.
   function _invitationModalOpen() {
     if (_findInvitationModal()) return true;
-    const b = _findSendWithoutNoteButton();
-    return !!(b && _isVisible(b));
+    // Scan all buttons — no visibility requirement, just presence in DOM.
+    const all = document.querySelectorAll("button, [role='button'], a[role='button']");
+    for (const b of all) {
+      if (b.classList?.contains("lc-inline-save")) continue;
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
+    }
+    return false;
   }
 
   // Find the "Send without a note" button. Searches the WHOLE document (not
@@ -1908,26 +1917,67 @@
     await dispatchHumanClick(connectBtn);
 
     // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
-    let dialogOpen = false;
-    for (let i = 0; i < 32; i++) {
-      await sleep(250);
-      if (_invitationModalOpen()) { dialogOpen = true; break; }
-    }
-    if (!dialogOpen) {
-      // No dialog appeared. Some connections (e.g. people who already follow
-      // you) complete instantly with no "add a note" step — if the row no
-      // longer offers Connect, treat it as done; otherwise report no-dialog.
-      const cls = _classifyButton(connectBtn);
-      if (cls === "pending" || cls === "connected") return { ok: true };
-      console.log("[LeadCaptura] step 2 → no dialog opened after 8s");
+    // v1.0.146: MutationObserver fires the instant "Send without a note" text
+    // appears anywhere in the DOM — much faster and more reliable than the
+    // previous 250ms polling which missed the button during LinkedIn's fade-in
+    // animation. The observer also catches the case where the modal is already
+    // in the DOM before the first poll tick.
+    const dialogFound = await new Promise((resolve) => {
+      // Raw DOM scan — no visibility check needed; just presence in DOM.
+      const hasSendBtn = () => {
+        const all = document.querySelectorAll("button, [role='button'], a[role='button']");
+        for (const b of all) {
+          if (b.classList?.contains("lc-inline-save")) continue;
+          const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+          const a = b.getAttribute("aria-label") || "";
+          if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
+        }
+        // Fallback: modal title text in body
+        return /send without a note|add a note to your invitation/i.test(
+          document.body?.textContent || ""
+        );
+      };
+      // Immediate check (modal might already be mounted)
+      if (hasSendBtn()) { resolve(true); return; }
+      let done = false;
+      const to = setTimeout(() => {
+        if (done) return;
+        done = true;
+        obs.disconnect();
+        if (hasSendBtn()) { resolve(true); return; }
+        // Direct connection? Button state changed to pending/connected.
+        try {
+          const cls2 = connectBtn ? _classifyButton(connectBtn) : null;
+          if (cls2 === "pending" || cls2 === "connected") { resolve("direct"); return; }
+        } catch {}
+        resolve(false);
+      }, 8000);
+      const obs = new MutationObserver(() => {
+        if (done) return;
+        if (hasSendBtn()) {
+          done = true;
+          clearTimeout(to);
+          obs.disconnect();
+          resolve(true);
+        }
+      });
+      try { obs.observe(document.body, { childList: true, subtree: true }); } catch {}
+    });
+
+    if (dialogFound === "direct") return { ok: true };
+    if (!dialogFound) {
+      // No dialog appeared. Log for debugging.
+      console.log("[LeadCaptura] step 2 → no dialog found after 8s");
       return { ok: false, reason: "no_dialog" };
     }
-    console.log("[LeadCaptura] step 2 → dialog opened");
+    console.log("[LeadCaptura] step 2 → invite modal detected");
 
-    // Wait for React to finish mounting the modal's button handlers.
-    // LinkedIn binds click handlers ~250–400ms after the dialog appears;
-    // clicking before that is a reliable no-op.
-    await sleep(400 + Math.random() * 150);
+    // Wait for React to finish mounting the modal's button handlers and
+    // for LinkedIn's CSS animation to complete. LinkedIn binds click handlers
+    // ~250–400ms after the dialog appears; clicking before that is a no-op.
+    // 600ms ensures the animation (typically 300ms) has fully completed AND
+    // React has bound all handlers before we attempt the first click.
+    await sleep(600 + Math.random() * 150);
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     //
@@ -1947,18 +1997,15 @@
     _showSendSpotlight();
     console.log("[LeadCaptura] step 3 → spotlight shown, auto-clicking 'Send without a note'");
 
-    // Phase A: aggressive auto-click with spotlight already visible. Each
-    // round tries strategies in DESCENDING order of reliability:
-    //   1. isTrusted-prototype-patch click → forges isTrusted=true on every
-    //      synthetic event, defeats LinkedIn's `if (!event.isTrusted) return`
-    //      gate. No permission needed. NEW in v1.0.145.
-    //   2. chrome.debugger Input.dispatchMouseEvent → real OS-level click.
-    //      Only available if the user granted the optional `debugger` perm.
-    //   3. CSP-immune MAIN-world click via chrome.scripting (CSP-immune but
-    //      isTrusted=false — gets through if LinkedIn doesn't gate).
-    //   4. dispatchHumanClick + _forceClick (isolated-world fallbacks).
-    // If ANY strategy closes the modal, the spotlight disappears within
-    // ~150 ms and the user never sees a manual prompt.
+    // Phase A: aggressive auto-click with spotlight visible. Five strategies:
+    //   1. isTrusted-prototype-patch → patches Event.prototype.isTrusted getter
+    //      to return true for the duration of the click, defeating the gate.
+    //   2. chrome.debugger mouse → OS-level mousePressed/mouseReleased (truly trusted).
+    //   3. chrome.debugger keyboard Enter → focus button + dispatch Enter key.
+    //      Keyboard-derived clicks have isTrusted=true at the C++ level, bypassing
+    //      even stored getter references (most robust of all approaches).
+    //   4. CSP-immune MAIN-world click via chrome.scripting.
+    //   5. dispatchHumanClick + _forceClick (isolated-world fallbacks).
     let _noPermSeen = false;
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
       // Strategy 1: isTrusted-patch click — no permission required, runs first.
@@ -1968,9 +2015,8 @@
         if (!_invitationModalOpen()) break;
       }
 
-      // Strategy 2: trusted OS-level click. Skip the round-trip if a previous
-      // attempt told us the permission isn't granted.
       if (!_noPermSeen) {
+        // Strategy 2: trusted OS-level mouse click via chrome.debugger.
         const trusted = await _awaitTrustedDebuggerClick();
         if (trusted.ok && trusted.clicked) {
           for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
@@ -1978,16 +2024,28 @@
         } else if (trusted.error === "no_permission") {
           _noPermSeen = true;
         }
+        if (!_invitationModalOpen()) break;
+
+        // Strategy 3: keyboard Enter via chrome.debugger — generates a trusted
+        // keyboard-derived click at the C++ level. Most reliable when isTrusted
+        // is checked via a stored getter reference.
+        if (!_noPermSeen) {
+          const keyed = await _awaitDebuggerKeyEnterClick();
+          if (keyed) {
+            for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+            if (!_invitationModalOpen()) break;
+          }
+        }
       }
 
-      // Strategy 3: SW MAIN-world click (CSP-immune).
+      // Strategy 4: SW MAIN-world click (CSP-immune).
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
         for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
         if (!_invitationModalOpen()) break;
       }
 
-      // Strategy 4: isolated-world fallbacks.
+      // Strategy 5: isolated-world fallbacks.
       const sendBtn = _findSendWithoutNoteButton();
       if (sendBtn) {
         try { await dispatchHumanClick(sendBtn); } catch {}
@@ -2020,6 +2078,14 @@
           if (trusted.ok && trusted.clicked) {
             for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
             if (!_invitationModalOpen()) break;
+          }
+          // Keyboard Enter (most trusted path)
+          if (!_noPermSeen) {
+            const keyed = await _awaitDebuggerKeyEnterClick();
+            if (keyed) {
+              for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
+              if (!_invitationModalOpen()) break;
+            }
           }
         }
         await _awaitServiceWorkerMainWorldClick();
@@ -2448,12 +2514,7 @@
     // Request the `debugger` optional permission ONCE while we're still
     // running inside the toolbar button's user-gesture context. If the user
     // grants it, every subsequent "Send without a note" click is dispatched
-    // as a real trusted OS-level mouse event — LinkedIn accepts those
-    // unconditionally and the entire connect loop completes autonomously.
-    // If the user declines, we silently fall back to the existing spotlight
-    // + MAIN-world strategies (zero regression).
-    _maybeRequestDebuggerPermission();
-
+    // debugger is now a required permission (manifest v1.0.147) — always available.
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
     const Api = globalThis.__lcApi;
@@ -5039,20 +5100,48 @@
 
       const tick = () => {
         if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        // v1.0.147: no longer require _isVisible — the button may have opacity:0
+        // during LinkedIn's modal fade-in animation, causing _isVisible to return
+        // false and the cutout to never get positioned.
         const btn = _findSendWithoutNoteButton();
-        if (btn && _isVisible(btn)) {
+        if (btn) {
           const r = btn.getBoundingClientRect();
+          // Skip if the button has zero size (not yet rendered)
+          if (r.width < 2 || r.height < 2) { _spotlightRAF = requestAnimationFrame(tick); return; }
           const pad = 14;
+          // All critical styles are set inline — no dependency on CSS animation
+          // or stylesheet injection. The box-shadow creates the full-page dark
+          // overlay; position:fixed keeps it locked to the viewport.
           _spotlightEl.style.cssText = [
-            `left:${r.left - pad}px`, `top:${r.top - pad}px`,
-            `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
-          ].join("!important;") + "!important;";
+            `position:fixed`,
+            `z-index:2147483647`,
+            `background:transparent`,
+            `pointer-events:none`,
+            `border-radius:8px`,
+            `box-shadow:0 0 0 9999px rgba(0,0,0,0.76),0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)`,
+            `left:${r.left - pad}px`,
+            `top:${r.top - pad}px`,
+            `width:${r.width + pad * 2}px`,
+            `height:${r.height + pad * 2}px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Top banner — fixed near top of viewport, centred horizontally.
           const bw = _bannerEl.offsetWidth || 460;
           const bLeft = Math.max(8, (window.innerWidth - bw) / 2);
-          _bannerEl.style.cssText =
-            `left:${bLeft}px!important;top:24px!important;`;
+          _bannerEl.style.cssText = [
+            `position:fixed`,
+            `z-index:2147483647`,
+            `pointer-events:none`,
+            `background:#0a66c2`,
+            `color:#fff`,
+            `font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`,
+            `padding:12px 22px`,
+            `border-radius:10px`,
+            `box-shadow:0 6px 28px rgba(0,0,0,0.55)`,
+            `white-space:nowrap`,
+            `left:${bLeft}px`,
+            `top:24px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Arrow — directly above the spotlight cutout, pointing down at it.
           const aw = _arrowEl.offsetWidth || 180;
@@ -5060,8 +5149,13 @@
           const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
             r.left + r.width / 2 - aw / 2));
           const aTop = Math.max(96, r.top - ah - 18);
-          _arrowEl.style.cssText =
-            `left:${aLeft}px!important;top:${aTop}px!important;`;
+          _arrowEl.style.cssText = [
+            `position:fixed`,
+            `z-index:2147483647`,
+            `pointer-events:none`,
+            `left:${aLeft}px`,
+            `top:${aTop}px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Skip button — directly below the spotlight cutout.
           const sw = _skipBtnEl.offsetWidth || 150;
@@ -5188,6 +5282,24 @@
     });
   }
 
+  // Ask the service worker to focus the "Send without a note" button and then
+  // dispatch a real keyboard Enter key via chrome.debugger. A keyboard-derived
+  // click event has isTrusted=true at the browser C++ level — it bypasses ANY
+  // JavaScript-level isTrusted check, including stored getter references.
+  // Requires the optional `debugger` permission.
+  function _awaitDebuggerKeyEnterClick() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "lc:debuggerKeyEnterClick" }, (resp) => {
+          if (chrome.runtime.lastError) return resolve(false);
+          resolve(!!(resp && resp.ok));
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+
   // Track whether we've asked the user for the `debugger` permission this
   // session. Avoids re-prompting on every Connect All click.
   let _debuggerPermAsked = false;
@@ -5231,18 +5343,15 @@
   let _inviteHighlightShown = false;
 
   async function _autoConfirmInviteModal() {
-    // Note: we no longer bail when state.connectActive is true.
-    // _sendConnectOnCard already shows the spotlight and owns the wait;
-    // the 400ms poll below is a no-op while its own Phase B loop is running
-    // (both check _invitationModalOpen which would be false once done).
-    // We keep _inviteAutoBusy so this function never runs concurrently.
+    // Guard: never run concurrently (two concurrent spotlights would fight).
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) {
       if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
     }
-    // During a Connect All run _sendConnectOnCard is already managing the overlay.
-    // Skip this handler so we don't show a second spotlight on top.
+    // During a Connect All run, _sendConnectOnCard owns the spotlight and the
+    // automated click loop. Bail here to avoid creating a second spotlight that
+    // would tear down _sendConnectOnCard's spotlight via _removeSpotlight().
     if (state.connectActive) return;
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;

@@ -209,7 +209,27 @@ def send(
                 else:
                     failed += 1
                     if len(errors) < 3:
-                        errors.append(r.text[:200])
+                        err_text = r.text[:200]
+                        try:
+                            meta = r.json()
+                            meta_err = meta.get("error", meta)
+                            code = meta_err.get("code")
+                            msg = meta_err.get("message", "")
+                            if code == 133010:
+                                err_text = f"Phone not registered on WhatsApp (#{code})"
+                            elif code == 131030:
+                                err_text = f"Message blocked by recipient (#{code})"
+                            elif code == 130429:
+                                err_text = f"Rate limit reached — slow down (#{code})"
+                            elif code == 131047:
+                                err_text = f"Outside 24-hour window — use an approved template (#{code})"
+                            elif code == 132001:
+                                err_text = f"Template not found (#{code})"
+                            elif msg:
+                                err_text = msg[:120]
+                        except Exception:
+                            pass
+                        errors.append(err_text)
             except Exception as e:
                 failed += 1
                 if len(errors) < 3:

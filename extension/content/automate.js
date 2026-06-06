@@ -143,11 +143,18 @@
     if (detectChallenge()) return { status: "failed", error: "captcha_or_checkpoint" };
     await sleep(readingPause());
 
-    const msgBtn = first(document, [
-      "button[aria-label*='Message ' i]",
-      "a[aria-label*='Message ' i]",
+    // Try synchronously first; then poll up to 8 s for slow SPA hydration.
+    // Removed the trailing space from 'Message ' to also match aria-label="Message"
+    // (no person name appended), which LinkedIn uses on some profile layouts.
+    const _MSG_SELS = [
+      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
+      "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
       "main button.message-anywhere-button",
-    ]);
+    ];
+    let msgBtn = first(document, _MSG_SELS);
+    if (!msgBtn) {
+      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
+    }
     if (!msgBtn) return { status: "failed", error: "message_button_not_found" };
     await dispatchHumanClick(msgBtn);
 
@@ -175,9 +182,17 @@
 
   function _sameProfile(a, b) {
     try {
-      const ua = new URL(a, "https://www.linkedin.com").href.split("?")[0];
-      const ub = new URL(b, "https://www.linkedin.com").href.split("?")[0];
-      return ua === ub;
+      const norm = (s) => {
+        const u = new URL(s, "https://www.linkedin.com");
+        // Normalize linkedin.com → www.linkedin.com
+        if (u.hostname === "linkedin.com") u.hostname = "www.linkedin.com";
+        // Strip query string and trailing slash so all these match each other:
+        //   https://www.linkedin.com/in/johndoe
+        //   https://www.linkedin.com/in/johndoe/
+        //   https://linkedin.com/in/johndoe?miniProfileUrn=...
+        return (u.origin + u.pathname).replace(/\/$/, "").toLowerCase();
+      };
+      return norm(a) === norm(b);
     } catch { return false; }
   }
 
@@ -191,9 +206,18 @@
       return _sendMessageInPlace(body, url);
     }
 
-    // We need to navigate. Persist the job FIRST so the new page can pick it
-    // up after this content-script context dies, then trigger the hard
-    // navigation. The post-resolve code is never reached — by design.
+    // Alert the user before the tab navigates to a recipient profile so they're
+    // not surprised by the auto-navigation. Give a 2 s window to react.
+    try {
+      if (globalThis.__lcOverlay?.toast) {
+        globalThis.__lcOverlay.toast("⚡ Sending message — opening recipient profile…", 4000);
+      }
+    } catch {}
+    await sleep(2000);
+
+    // Persist the job FIRST so the new page can pick it up after this
+    // content-script context dies, then trigger the hard navigation.
+    // The post-resolve code is never reached — by design.
     await _persistPending(job);
     try {
       const target = new URL(url, "https://www.linkedin.com");
@@ -217,12 +241,17 @@
     // Stale → drop & report as failed so the backend can re-queue.
     if (!pending.startedAt || Date.now() - pending.startedAt > PENDING_TTL_MS) {
       await _clearPending();
-      try {
-        await Api.submitJobResult(pending.jobId, {
-          status: "failed",
-          error: "resume_expired",
-        });
-      } catch {}
+      for (let _si = 0; _si < 3; _si++) {
+        try {
+          await Api.submitJobResult(pending.jobId, {
+            status: "failed",
+            error: "resume_expired",
+          });
+          break;
+        } catch (_se) {
+          if (_si < 2) await sleep(300 * Math.pow(2, _si));
+        }
+      }
       return;
     }
 
@@ -232,7 +261,13 @@
     // Wait for hydration + add a small human-like reading pause.
     try { await waitFor(["main h1", "h1"], { timeout: 12000 }); } catch {}
     await sleep(1200 + Math.random() * 1800);
-    if (!tabIsForeground()) await waitUntilForeground();
+    // Do NOT wait for foreground — message jobs are intentionally designed to
+    // run in background tabs so the user can stay on the CRM dashboard while
+    // bulk sends execute. (executeOne already skips waitUntilForeground for
+    // message jobs for the same reason — this must match that behaviour.
+    // Before this fix, resumePendingMessage blocked here until the user switched
+    // to the LinkedIn tab, causing jobs to stay "claimed" forever → the 10-min
+    // reclaim brought them back to "queued" → profiles kept re-opening on loop.)
 
     // Clear BEFORE sending so a crash mid-send doesn't replay on the next boot.
     await _clearPending();
@@ -243,13 +278,20 @@
     } catch (err) {
       result = { status: "failed", error: String(err?.message || err) };
     }
-    try {
-      await Api.submitJobResult(pending.jobId, {
-        status: result.status,
-        result: result.result || {},
-        error: result.error,
-      });
-    } catch {}
+    // Retry submitJobResult up to 3 times — the MV3 service worker may be idle
+    // and need one wakeup attempt before it can proxy the API call.
+    for (let _si = 0; _si < 3; _si++) {
+      try {
+        await Api.submitJobResult(pending.jobId, {
+          status: result.status,
+          result: result.result || {},
+          error: result.error,
+        });
+        break;
+      } catch (_se) {
+        if (_si < 2) await sleep(300 * Math.pow(2, _si));
+      }
+    }
   }
 
   async function executeOne(job) {

@@ -945,33 +945,44 @@
               _contactInfoPath = _u.pathname;
             } catch {}
           }
-          // Synthetic .click() can be no-op'd in background tabs / by React's
-          // event listeners. Use a full pointer event sequence — the same
-          // approach automate.js uses for connect/message — so LinkedIn's
-          // React handlers actually fire.
-          try { link.focus?.(); } catch {}
-          await _sleep(120);
-          try {
-            if (dispatchHumanClick) await dispatchHumanClick(link);
-            else link.click();
-          } catch {
-            try { link.click(); } catch {}
-          }
+          // Use a plain .click() on the contact-info anchor — it is a simple
+          // navigation link that LinkedIn's SPA intercepts via React's delegated
+          // root handler. dispatchHumanClick() was previously used here but it
+          // calls simulateCursorMove() which fires mousemove events along a path
+          // that passes over the profile picture, and its bubbling pointer events
+          // can accidentally trigger LinkedIn's photo lightbox when the contact
+          // info link is positioned near the avatar.
+          try { link.click(); } catch {}
         }
       }
 
-      modal = await waitFor(
-        [
-          "div[role='dialog'][aria-labelledby*='contact' i]",
-          "div[role='dialog'][aria-label*='Contact' i]",
-          "#artdeco-modal-outlet div[role='dialog']",
-          "artdeco-modal div[role='dialog']",
-          "div.artdeco-modal__content",
-          "div[role='dialog']",
-        ],
-        { timeout: timeoutMs }
-      );
-      if (!_isValidContactModal(modal)) modal = null;
+      // Poll for a VALID contact info modal rather than accepting the first
+      // div[role='dialog'] that appears. The old waitFor() + single validity
+      // check approach resolved immediately on ANY open dialog — including the
+      // profile photo lightbox (also a div[role='dialog']) — causing the photo
+      // viewer to open instead of (or before) the contact info panel. We now
+      // loop, skipping non-contact dialogs, until the right one appears or the
+      // timeout elapses.
+      const _ciDeadline = Date.now() + timeoutMs;
+      const _ciSelectors = [
+        "div[role='dialog'][aria-labelledby*='contact' i]",
+        "div[role='dialog'][aria-label*='Contact' i]",
+        "#artdeco-modal-outlet div[role='dialog']",
+        "artdeco-modal div[role='dialog']",
+        "div.artdeco-modal__content",
+        "div[role='dialog']",
+      ];
+      while (!modal && Date.now() < _ciDeadline) {
+        for (const sel of _ciSelectors) {
+          try {
+            for (const m of document.querySelectorAll(sel)) {
+              if (_isValidContactModal(m)) { modal = m; break; }
+            }
+          } catch {}
+          if (modal) break;
+        }
+        if (!modal) await _sleep(100);
+      }
 
       // Last-resort backup: navigate the SPA router to the contact-info overlay.
       // GATED behind allowPushStateFallback because pushState mutates the

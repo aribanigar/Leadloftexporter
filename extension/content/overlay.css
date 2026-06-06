@@ -19,7 +19,7 @@
   border-radius: 8px !important;
   background: transparent !important;
   pointer-events: none !important;
-  z-index: 2147483645 !important;
+  z-index: 2147483647 !important;
   animation: lc-spotlight-pulse 1s ease-in-out infinite !important;
   transition: left 0.08s ease, top 0.08s ease, width 0.08s ease, height 0.08s ease !important;
 }
