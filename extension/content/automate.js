@@ -201,35 +201,14 @@
     const body = job.payload?.body;
     if (!url || !body) return { status: "failed", error: "missing_url_or_body" };
 
-    // Already on the target profile? Send in-place, no navigation required.
-    if (_sameProfile(location.href, url)) {
-      return _sendMessageInPlace(body, url);
+    // Only send if already on the target profile. Never auto-navigate — that
+    // would disrupt the user's browsing without any action on their part.
+    // The job stays claimed; the backend reclaims it after ~10 min and retries.
+    if (!_sameProfile(location.href, url)) {
+      return { status: "skipped", error: "not_on_target_profile" };
     }
 
-    // Alert the user before the tab navigates to a recipient profile so they're
-    // not surprised by the auto-navigation. Give a 2 s window to react.
-    try {
-      if (globalThis.__lcOverlay?.toast) {
-        globalThis.__lcOverlay.toast("⚡ Sending message — opening recipient profile…", 4000);
-      }
-    } catch {}
-    await sleep(2000);
-
-    // Persist the job FIRST so the new page can pick it up after this
-    // content-script context dies, then trigger the hard navigation.
-    // The post-resolve code is never reached — by design.
-    await _persistPending(job);
-    try {
-      const target = new URL(url, "https://www.linkedin.com");
-      location.href = target.href;
-    } catch {
-      await _clearPending();
-      return { status: "failed", error: "bad_linkedin_url" };
-    }
-    // Block forever — the page is unloading. resumePendingMessage() in the
-    // new page context submits the result.
-    await new Promise(() => {});
-    return { status: "skipped", error: "navigated" }; // unreachable
+    return _sendMessageInPlace(body, url);
   }
 
   // Called from main.js on every page boot. If a message job is pending and
@@ -395,15 +374,6 @@
       const jobs = await Api.nextJobs(1).catch(() => []);
       if (!jobs?.length) return;
       const [job] = jobs;
-
-      // Never auto-execute a message job while the user is viewing a LinkedIn
-      // profile page — it would silently navigate them away mid-browse.
-      // Message jobs are safe to execute from feed / search / messaging pages
-      // where a navigation won't disrupt the user's current view. The job
-      // stays "claimed" and is reclaimed after 10 min, then retried.
-      if (job.kind === "message" && location.pathname.startsWith("/in/")) {
-        return;
-      }
 
       await executeOne(job);
       // Human pause before next action
