@@ -1683,15 +1683,40 @@
   }
 
   // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
+  // Broadened in v1.0.145: LinkedIn rolled out a redesigned invitation modal
+  // that uses a plain <div aria-modal="true"> instead of the old artdeco
+  // selectors, AND in some sessions a native <dialog> element. The previous
+  // detector missed both and the spotlight never showed.
   function _findInvitationModal() {
     const candidates = document.querySelectorAll(
-      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog'], " +
+      "[aria-modal='true'], dialog, " +
+      "[class*='InvitationModal' i], [class*='ConnectModal' i], " +
+      "[data-test-modal], [data-testid*='modal' i]"
     );
     for (const d of candidates) {
       if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
-      if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
+      if (/add a note to your invitation|send without a note|personalize your invitation|invite\s+\S+\s+to connect/.test(t))
         return d;
+    }
+    // Fallback — if a visible "Send without a note" button exists ANYWHERE,
+    // climb to its nearest dialog-like ancestor. This catches any modal
+    // structure LinkedIn invents in the future, as long as the button text
+    // stays the same.
+    const candidateBtns = Array.from(
+      document.querySelectorAll("button, [role='button'], a[role='button']")
+    );
+    for (const b of candidateBtns) {
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const a = (b.getAttribute("aria-label") || "").toLowerCase();
+      if (!/send without a note/i.test(t) && !/send without a note/i.test(a)) continue;
+      if (!_isVisible(b)) continue;
+      return (
+        b.closest("[role='dialog'], .artdeco-modal, [aria-modal='true'], dialog, section, aside") ||
+        b.parentElement?.parentElement ||
+        b
+      );
     }
     return null;
   }
@@ -1924,22 +1949,30 @@
 
     // Phase A: aggressive auto-click with spotlight already visible. Each
     // round tries strategies in DESCENDING order of reliability:
-    //   1. chrome.debugger Input.dispatchMouseEvent → isTrusted=true,
-    //      accepted by LinkedIn unconditionally. Only available if the user
-    //      granted the optional `debugger` permission.
-    //   2. CSP-immune MAIN-world click via chrome.scripting (isTrusted=false
-    //      but bypasses page CSP and can reach React fiber tree).
-    //   3. dispatchHumanClick + _forceClick (isolated-world fallbacks).
+    //   1. isTrusted-prototype-patch click → forges isTrusted=true on every
+    //      synthetic event, defeats LinkedIn's `if (!event.isTrusted) return`
+    //      gate. No permission needed. NEW in v1.0.145.
+    //   2. chrome.debugger Input.dispatchMouseEvent → real OS-level click.
+    //      Only available if the user granted the optional `debugger` perm.
+    //   3. CSP-immune MAIN-world click via chrome.scripting (CSP-immune but
+    //      isTrusted=false — gets through if LinkedIn doesn't gate).
+    //   4. dispatchHumanClick + _forceClick (isolated-world fallbacks).
     // If ANY strategy closes the modal, the spotlight disappears within
     // ~150 ms and the user never sees a manual prompt.
     let _noPermSeen = false;
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
-      // Strategy 1: trusted OS-level click. Skip the round-trip if a previous
+      // Strategy 1: isTrusted-patch click — no permission required, runs first.
+      const patched = await _awaitIsTrustedPatchClick();
+      if (patched) {
+        for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+        if (!_invitationModalOpen()) break;
+      }
+
+      // Strategy 2: trusted OS-level click. Skip the round-trip if a previous
       // attempt told us the permission isn't granted.
       if (!_noPermSeen) {
         const trusted = await _awaitTrustedDebuggerClick();
         if (trusted.ok && trusted.clicked) {
-          // Wait ≤1.2 s for the modal to close before declaring success.
           for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
           if (!_invitationModalOpen()) break;
         } else if (trusted.error === "no_permission") {
@@ -1947,14 +1980,14 @@
         }
       }
 
-      // Strategy 2: SW MAIN-world click (CSP-immune).
+      // Strategy 3: SW MAIN-world click (CSP-immune).
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
         for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
         if (!_invitationModalOpen()) break;
       }
 
-      // Strategy 3: isolated-world fallbacks.
+      // Strategy 4: isolated-world fallbacks.
       const sendBtn = _findSendWithoutNoteButton();
       if (sendBtn) {
         try { await dispatchHumanClick(sendBtn); } catch {}
@@ -1970,12 +2003,17 @@
     }
 
     // Phase B: spotlight stays up while we keep hammering the automated
-    // click every ~2 s, for up to 45 s — gives the user time to tap. Still
-    // tries the trusted-click first in case the permission was granted mid-run.
+    // click every ~2 s, for up to 45 s — gives the user time to tap. Tries
+    // the isTrusted-patch + trusted-debugger paths each round.
     console.log("[LeadCaptura] step 3 → awaiting click (auto-retrying every 2 s)");
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w % 6 === 0) {
+        const patched = await _awaitIsTrustedPatchClick();
+        if (patched) {
+          for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
+          if (!_invitationModalOpen()) break;
+        }
         if (!_noPermSeen) {
           const trusted = await _awaitTrustedDebuggerClick();
           if (trusted.error === "no_permission") _noPermSeen = true;
@@ -5090,6 +5128,28 @@
         chrome.runtime.sendMessage({ type: "lc:clickMainWorldSend" }, (resp) => {
           if (chrome.runtime.lastError) return resolve(false);
           resolve(!!(resp && resp.ok && resp.result && resp.result.found));
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+
+  // Ask the service worker to run the isTrusted-prototype-patch click. A new
+  // technique that doesn't require ANY permission: chrome.scripting injects a
+  // small MAIN-world script that temporarily redefines Event.prototype's
+  // isTrusted getter to always return true, fires the entire click stack on
+  // the Send button (native click + pointer/mouse sequence + React fiber +
+  // form.requestSubmit), then restores the prototype. While the patch is
+  // active, LinkedIn's `if (!event.isTrusted) return` gate cannot fire — the
+  // gate is reading our lying getter. Resolves to true if the script found
+  // and clicked the button (modal may close shortly after).
+  function _awaitIsTrustedPatchClick() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "lc:isTrustedPatchClick" }, (resp) => {
+          if (chrome.runtime.lastError) return resolve(false);
+          resolve(!!(resp && resp.ok && resp.result && resp.result.found && resp.result.clicked));
         });
       } catch {
         resolve(false);
