@@ -1757,7 +1757,11 @@
       (s) => /^send without a note$/i.test(s),
       (s) => /\bsend without a note\b/i.test(s),
       (s) => /^send now$/i.test(s),
-      (s) => /^send( invitation)?$/i.test(s),
+      // "Send invitation" only (not bare "Send") — bare "Send" is used by the
+      // LinkedIn Messaging page's compose button and would false-trigger on it.
+      // Bare "Send" is still matched below, but only when _findInvitationModal()
+      // confirms the Connect invitation dialog is actually open.
+      (s) => /^send invitation$/i.test(s),
     ];
     for (const test of tests) {
       const matches = all.filter((b) => {
@@ -5802,6 +5806,10 @@
     // (both check _invitationModalOpen which would be false once done).
     // We keep _inviteAutoBusy so this function never runs concurrently.
     if (_inviteAutoBusy) return;
+    // Never fire on the messaging page — its "Send" button false-triggers the
+    // invitation detection heuristic. The spotlight should only appear on
+    // search/profile pages after the native "Add a note?" modal appears.
+    if (location.pathname.startsWith("/messaging/")) return;
     if (!_invitationModalOpen()) {
       if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
