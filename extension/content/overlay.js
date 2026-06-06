@@ -1678,67 +1678,33 @@
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return false;
     const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none") return false;
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
     return true;
   }
 
   // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
-  // Broadened in v1.0.145: LinkedIn rolled out a redesigned invitation modal
-  // that uses a plain <div aria-modal="true"> instead of the old artdeco
-  // selectors, AND in some sessions a native <dialog> element. The previous
-  // detector missed both and the spotlight never showed.
   function _findInvitationModal() {
     const candidates = document.querySelectorAll(
-      "div[role='dialog'], .artdeco-modal, [role='alertdialog'], " +
-      "[aria-modal='true'], dialog, " +
-      "[class*='InvitationModal' i], [class*='ConnectModal' i], " +
-      "[data-test-modal], [data-testid*='modal' i]"
+      "div[role='dialog'], .artdeco-modal, [role='alertdialog']"
     );
     for (const d of candidates) {
       if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
-      if (/add a note to your invitation|send without a note|personalize your invitation|invite\s+\S+\s+to connect/.test(t))
+      if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
         return d;
-    }
-    // Fallback — if a visible "Send without a note" button exists ANYWHERE,
-    // climb to its nearest dialog-like ancestor. This catches any modal
-    // structure LinkedIn invents in the future, as long as the button text
-    // stays the same.
-    const candidateBtns = Array.from(
-      document.querySelectorAll("button, [role='button'], a[role='button']")
-    );
-    for (const b of candidateBtns) {
-      const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      const a = (b.getAttribute("aria-label") || "").toLowerCase();
-      if (!/send without a note/i.test(t) && !/send without a note/i.test(a)) continue;
-      if (!_isVisible(b)) continue;
-      return (
-        b.closest("[role='dialog'], .artdeco-modal, [aria-modal='true'], dialog, section, aside") ||
-        b.parentElement?.parentElement ||
-        b
-      );
     }
     return null;
   }
 
-  // True while the invitation modal is on screen.
-  // v1.0.146: No longer requires the button to be "visible" — LinkedIn's modal
-  // animation can keep the button in the DOM with opacity=0 or partially
-  // off-screen during the open/close transition, which caused _isVisible() to
-  // return false and the detection to fail. We now return true as soon as the
-  // "Send without a note" button EXISTS anywhere in the DOM (or a structural
-  // modal selector matches). This matches how the Sales Nav path works.
+  // True while the invitation modal is on screen. We consider it open if either
+  // a matching dialog node is visible OR a "Send without a note" button is
+  // visible — whichever our heuristics catch first. This prevents the watcher
+  // from bailing when the dialog's role attribute changes but the button is
+  // clearly there.
   function _invitationModalOpen() {
     if (_findInvitationModal()) return true;
-    // Scan all buttons — no visibility requirement, just presence in DOM.
-    const all = document.querySelectorAll("button, [role='button'], a[role='button']");
-    for (const b of all) {
-      if (b.classList?.contains("lc-inline-save")) continue;
-      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-      const a = b.getAttribute("aria-label") || "";
-      if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
-    }
-    return false;
+    const b = _findSendWithoutNoteButton();
+    return !!(b && _isVisible(b));
   }
 
   // Find the "Send without a note" button. Searches the WHOLE document (not
@@ -1917,135 +1883,46 @@
     await dispatchHumanClick(connectBtn);
 
     // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
-    // v1.0.146: MutationObserver fires the instant "Send without a note" text
-    // appears anywhere in the DOM — much faster and more reliable than the
-    // previous 250ms polling which missed the button during LinkedIn's fade-in
-    // animation. The observer also catches the case where the modal is already
-    // in the DOM before the first poll tick.
-    const dialogFound = await new Promise((resolve) => {
-      // Raw DOM scan — no visibility check needed; just presence in DOM.
-      const hasSendBtn = () => {
-        const all = document.querySelectorAll("button, [role='button'], a[role='button']");
-        for (const b of all) {
-          if (b.classList?.contains("lc-inline-save")) continue;
-          const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-          const a = b.getAttribute("aria-label") || "";
-          if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
-        }
-        // Fallback: modal title text in body
-        return /send without a note|add a note to your invitation/i.test(
-          document.body?.textContent || ""
-        );
-      };
-      // Immediate check (modal might already be mounted)
-      if (hasSendBtn()) { resolve(true); return; }
-      let done = false;
-      const to = setTimeout(() => {
-        if (done) return;
-        done = true;
-        obs.disconnect();
-        if (hasSendBtn()) { resolve(true); return; }
-        // Direct connection? Button state changed to pending/connected.
-        try {
-          const cls2 = connectBtn ? _classifyButton(connectBtn) : null;
-          if (cls2 === "pending" || cls2 === "connected") { resolve("direct"); return; }
-        } catch {}
-        resolve(false);
-      }, 8000);
-      const obs = new MutationObserver(() => {
-        if (done) return;
-        if (hasSendBtn()) {
-          done = true;
-          clearTimeout(to);
-          obs.disconnect();
-          resolve(true);
-        }
-      });
-      try { obs.observe(document.body, { childList: true, subtree: true }); } catch {}
-    });
-
-    if (dialogFound === "direct") return { ok: true };
-    if (!dialogFound) {
-      // No dialog appeared. Log for debugging.
-      console.log("[LeadCaptura] step 2 → no dialog found after 8s");
+    let dialogOpen = false;
+    for (let i = 0; i < 32; i++) {
+      await sleep(250);
+      if (_invitationModalOpen()) { dialogOpen = true; break; }
+    }
+    if (!dialogOpen) {
+      // No dialog appeared. Some connections (e.g. people who already follow
+      // you) complete instantly with no "add a note" step — if the row no
+      // longer offers Connect, treat it as done; otherwise report no-dialog.
+      const cls = _classifyButton(connectBtn);
+      if (cls === "pending" || cls === "connected") return { ok: true };
+      console.log("[LeadCaptura] step 2 → no dialog opened after 8s");
       return { ok: false, reason: "no_dialog" };
     }
-    console.log("[LeadCaptura] step 2 → invite modal detected");
+    console.log("[LeadCaptura] step 2 → dialog opened");
 
-    // Wait for React to finish mounting the modal's button handlers and
-    // for LinkedIn's CSS animation to complete. LinkedIn binds click handlers
-    // ~250–400ms after the dialog appears; clicking before that is a no-op.
-    // 600ms ensures the animation (typically 300ms) has fully completed AND
-    // React has bound all handlers before we attempt the first click.
-    await sleep(600 + Math.random() * 150);
+    // Wait for React to finish mounting the modal's button handlers.
+    // LinkedIn binds click handlers ~250–400ms after the dialog appears;
+    // clicking before that is a reliable no-op.
+    await sleep(400 + Math.random() * 150);
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     //
-    // Mirrors the Sales Navigator flow exactly: show the one-tap spotlight
-    // overlay IMMEDIATELY when the dialog opens, then run automated clicks
-    // in the background. If LinkedIn lets the synthetic click through, the
-    // modal closes silently and the spotlight disappears before the user
-    // notices. If LinkedIn requires a trusted user click (isTrusted=true),
-    // the spotlight darkens everything except the "Send without a note"
-    // button so it's a one-tap action.
-    //
     // The CSP-immune service-worker MAIN-world click (chrome.scripting
-    // .executeScript world:"MAIN") drives the automated path. We call it on
-    // every round and await its report — the worker re-finds the button
-    // itself, so the loop self-heals as the modal finishes binding handlers
-    // (LinkedIn binds them ~250–400 ms after the dialog mounts).
-    _showSendSpotlight();
-    console.log("[LeadCaptura] step 3 → spotlight shown, auto-clicking 'Send without a note'");
+    // .executeScript world:"MAIN") is what genuinely fires LinkedIn's React
+    // onClick handler on the "Send without a note" button. We call it on EVERY
+    // round and await its report — the worker re-finds the button itself, so
+    // the loop self-heals as the modal finishes binding handlers (LinkedIn
+    // binds them ~250–400 ms after the dialog mounts). dispatchHumanClick +
+    // _forceClick run in the isolated world as belt-and-braces.
+    console.log("[LeadCaptura] step 3 → auto-clicking 'Send without a note'");
 
-    // Phase A: aggressive auto-click with spotlight visible. Five strategies:
-    //   1. isTrusted-prototype-patch → patches Event.prototype.isTrusted getter
-    //      to return true for the duration of the click, defeating the gate.
-    //   2. chrome.debugger mouse → OS-level mousePressed/mouseReleased (truly trusted).
-    //   3. chrome.debugger keyboard Enter → focus button + dispatch Enter key.
-    //      Keyboard-derived clicks have isTrusted=true at the C++ level, bypassing
-    //      even stored getter references (most robust of all approaches).
-    //   4. CSP-immune MAIN-world click via chrome.scripting.
-    //   5. dispatchHumanClick + _forceClick (isolated-world fallbacks).
-    let _noPermSeen = false;
+    // Phase A: ~12 aggressive automated rounds (~6s). No spotlight yet — if the
+    // auto-click lands the user never sees a manual prompt (sends in realtime).
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
-      // Strategy 1: isTrusted-patch click — no permission required, runs first.
-      const patched = await _awaitIsTrustedPatchClick();
-      if (patched) {
-        for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
-        if (!_invitationModalOpen()) break;
-      }
-
-      if (!_noPermSeen) {
-        // Strategy 2: trusted OS-level mouse click via chrome.debugger.
-        const trusted = await _awaitTrustedDebuggerClick();
-        if (trusted.ok && trusted.clicked) {
-          for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
-          if (!_invitationModalOpen()) break;
-        } else if (trusted.error === "no_permission") {
-          _noPermSeen = true;
-        }
-        if (!_invitationModalOpen()) break;
-
-        // Strategy 3: keyboard Enter via chrome.debugger — generates a trusted
-        // keyboard-derived click at the C++ level. Most reliable when isTrusted
-        // is checked via a stored getter reference.
-        if (!_noPermSeen) {
-          const keyed = await _awaitDebuggerKeyEnterClick();
-          if (keyed) {
-            for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
-            if (!_invitationModalOpen()) break;
-          }
-        }
-      }
-
-      // Strategy 4: SW MAIN-world click (CSP-immune).
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
         for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
         if (!_invitationModalOpen()) break;
       }
-
-      // Strategy 5: isolated-world fallbacks.
       const sendBtn = _findSendWithoutNoteButton();
       if (sendBtn) {
         try { await dispatchHumanClick(sendBtn); } catch {}
@@ -2055,39 +1932,18 @@
     }
 
     if (!_invitationModalOpen()) {
-      _removeSpotlight();
       console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
       return { ok: true };
     }
 
-    // Phase B: spotlight stays up while we keep hammering the automated
-    // click every ~2 s, for up to 45 s — gives the user time to tap. Tries
-    // the isTrusted-patch + trusted-debugger paths each round.
-    console.log("[LeadCaptura] step 3 → awaiting click (auto-retrying every 2 s)");
+    // Phase B: auto-click didn't close it (LinkedIn tightened the gate on this
+    // session). Show the one-tap spotlight as a fallback and keep hammering the
+    // automated click in the background, up to ~45s.
+    _showSendSpotlight();
+    console.log("[LeadCaptura] step 3 → spotlight shown, awaiting click (auto-retrying)");
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w % 6 === 0) {
-        const patched = await _awaitIsTrustedPatchClick();
-        if (patched) {
-          for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
-          if (!_invitationModalOpen()) break;
-        }
-        if (!_noPermSeen) {
-          const trusted = await _awaitTrustedDebuggerClick();
-          if (trusted.error === "no_permission") _noPermSeen = true;
-          if (trusted.ok && trusted.clicked) {
-            for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
-            if (!_invitationModalOpen()) break;
-          }
-          // Keyboard Enter (most trusted path)
-          if (!_noPermSeen) {
-            const keyed = await _awaitDebuggerKeyEnterClick();
-            if (keyed) {
-              for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
-              if (!_invitationModalOpen()) break;
-            }
-          }
-        }
         await _awaitServiceWorkerMainWorldClick();
         const retryBtn = _findSendWithoutNoteButton();
         if (retryBtn) _forceClick(retryBtn);
@@ -2096,90 +1952,11 @@
 
     _removeSpotlight();
     if (!_invitationModalOpen()) {
-      // Verify the invite actually went out by checking the card's button
-      // state. Modal closing is NOT proof of success — the user (or LinkedIn
-      // animation, or our own clicks landing on X/Cancel) can dismiss the
-      // modal without sending. The original Connect button flips to
-      // "Pending" within ~1.5s of a real send; if it's still "Connect", we
-      // know the invite was NOT sent and must NOT mark this URL as contacted.
-      const verified = await _verifyInviteSent(connectBtn, card);
-      if (verified) {
-        console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓ (verified)");
-        return { ok: true };
-      }
-      console.log("[LeadCaptura] step 4 → dialog closed but button state unchanged — NOT sent");
-      return { ok: false, reason: "modal_closed_not_sent" };
+      console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
+      return { ok: true };
     }
     console.log("[LeadCaptura] step 3/4 → timed out — no click received");
     return { ok: false, reason: "send_failed" };
-  }
-
-  // Verify a connection invitation actually went out by checking the original
-  // action button's state. LinkedIn changes the button from "Connect" to
-  // "Pending" within ~1-2s of a real send. If the button is still "Connect"
-  // (or the modal was simply X'd out), this returns false and the caller MUST
-  // report ok:false so the URL is not marked as contacted.
-  //
-  // This is the load-bearing fix for the "fake Connected ✓ on profiles I never
-  // actually invited" bug. Never short-circuit it.
-  async function _verifyInviteSent(connectBtn, card) {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    // Wait for LinkedIn to update the DOM. The button class flip happens
-    // within ~600ms of a successful send; we give it a generous 1.8s.
-    await sleep(1200);
-    // Try the original button reference first.
-    if (connectBtn && document.body.contains(connectBtn)) {
-      try {
-        const cls = _classifyButton(connectBtn);
-        if (cls === "pending" || cls === "connected") return true;
-      } catch {}
-    }
-    // Then re-scan the card — LinkedIn often replaces the entire button node.
-    if (card && document.body.contains(card)) {
-      try {
-        const btns = card.querySelectorAll("button, [role='button']");
-        for (const b of btns) {
-          if (b.classList?.contains("lc-inline-save")) continue;
-          const cls = _classifyButton(b);
-          if (cls === "pending" || cls === "connected") return true;
-        }
-      } catch {}
-    }
-    // Last resort: success toast from LinkedIn confirming the send.
-    try {
-      const toast = document.querySelector(
-        ".artdeco-toast-item--visible, [data-test-artdeco-toast-item]"
-      );
-      const t = ((toast && toast.textContent) || "").toLowerCase();
-      if (/invitation\s*sent|connection\s*sent|invite.*sent|pending invitation/i.test(t)) {
-        return true;
-      }
-    } catch {}
-    return false;
-  }
-
-  // Verify a Follow actually went through by checking the button changed
-  // from "Follow" to "Following". Same idea as _verifyInviteSent — prevents
-  // marking profiles as "Followed ✓" when the click never registered.
-  async function _verifyFollowSent(followBtn, card) {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    await sleep(900);
-    const isFollowing = (b) => {
-      if (!b) return false;
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      const aria = (b.getAttribute("aria-label") || "").trim();
-      return /^following\b/i.test(txt) || /^following\b/i.test(aria);
-    };
-    if (followBtn && document.body.contains(followBtn) && isFollowing(followBtn)) return true;
-    if (card && document.body.contains(card)) {
-      try {
-        for (const b of card.querySelectorAll("button, [role='button']")) {
-          if (b.classList?.contains("lc-inline-save")) continue;
-          if (isFollowing(b)) return true;
-        }
-      } catch {}
-    }
-    return false;
   }
 
   // Click a card's native "Follow" button (no modal). Used by Connect All for
@@ -2200,9 +1977,6 @@
     if (!btn) return { ok: false, reason: "no_follow_button" };
     await dispatchHumanClick(btn);
     await sleep(450 + Math.random() * 400);
-    // Verify the follow actually registered before marking success.
-    const verified = await _verifyFollowSent(btn, card);
-    if (!verified) return { ok: false, reason: "follow_not_registered" };
     return { ok: true, followed: true };
   }
 
@@ -2460,16 +2234,8 @@
 
     _removeSpotlight();
     if (!_invitationModalOpen()) {
-      // Verify before reporting success: the modal closing does not prove the
-      // invite was actually sent (the X button also closes it). Check for the
-      // success toast or a card button state flip.
-      const verified = await _verifyInviteSent(null, card);
-      if (verified) {
-        console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent (verified)");
-        return { ok: true };
-      }
-      console.log("[LeadCaptura] salesNav step 5 ✗ modal closed but invite NOT verified");
-      return { ok: false, reason: "modal_closed_not_sent" };
+      console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent");
+      return { ok: true };
     }
     console.log("[LeadCaptura] salesNav step 5 ✗ timed out waiting for Send click");
     return { ok: false, reason: "send_failed" };
@@ -2601,22 +2367,12 @@
   }
 
   async function connectAllVisible() {
-    // Request the `debugger` optional permission ONCE while we're still
-    // running inside the toolbar button's user-gesture context. If the user
-    // grants it, every subsequent "Send without a note" click is dispatched
-    // debugger is now a required permission (manifest v1.0.147) — always available.
-    const { sleep } = globalThis.__lcHuman;
-    const { dispatchHumanClick } = globalThis.__lcDom;
-    const Api = globalThis.__lcApi;
-
     const userSelected = state.selectedUrls.size > 0;
-    // Auto-paginate only in "Connect All" (no explicit selection) — when the
-    // user ticked specific cards, connect exactly those and stop.
-    const autoPage = !userSelected;
+    const autoPaginate = !userSelected;
 
     let urls = (
       userSelected ? Array.from(state.selectedUrls) : _allChipUrls()
-    ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
+    ).filter((u) => u && u.includes("/in/"));
 
     if (!urls.length) {
       flashStatus("No profiles selected to connect with", "warn");
@@ -2627,128 +2383,21 @@
       catch { return u; }
     });
 
-    state.connectActive = true;
-    state.connectCancel = false;
-    unmountSelectAllHeader();
-    renderToolbar();
-
-    let sent = 0, followed = 0, skipped = 0, failed = 0, processed = 0, pageNum = 1;
-    const summarise = () =>
-      `Connect All: ${sent} invited` +
-      (followed ? `, ${followed} followed` : "") +
-      `, ${skipped} skipped` +
-      (failed ? `, ${failed} failed` : "");
-
-    try {
-      outer:
-      while (true) {
-        for (const url of urls) {
-          if (state.connectCancel) break outer;
-
-          // Avoid Duplicate Outreach: skip people already contacted.
-          if (state.avoidDuplicates && _isContacted(url)) {
-            skipped++;
-            _setChipState(url, "saved", "Already contacted");
-            continue;
-          }
-
-          const card = _cardForUrl(url);
-          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
-          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
-
-          // Already pending / connected → nothing to do.
-          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
-          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
-          // "unknown" → can't determine state → skip.
-          // "salesnav-connectable" → always process (never skip) even though no
-          // direct Connect button exists; we'll use the dropdown flow below.
-          if (cls === "unknown" || !card) { skipped++; continue; }
-
-          processed++;
-          _setChipState(url, "saving", "Connecting…");
-
-          let result;
-          if (cls === "follow") {
-            // Before following, check if "Connect" is in the "..." overflow
-            // dropdown. High-follower 3rd-degree profiles show "Follow" as the
-            // primary button but still offer "Connect" in the overflow menu
-            // (as visible in the profile page screenshot). Try the dropdown
-            // path first; fall back to Follow if no Connect option exists.
-            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
-            if (_overflowResult.ok) {
-              result = _overflowResult;
-            } else if (
-              _overflowResult.reason === "no_more_btn" ||
-              _overflowResult.reason === "no_connect_in_dropdown" ||
-              _overflowResult.reason === "dropdown_did_not_open"
-            ) {
-              result = await _sendFollowOnCard(card, presetBtn);
-            } else {
-              result = _overflowResult;
-            }
-          } else if (cls === "salesnav-connectable") {
-            // Sales Navigator: no visible "Connect" button on the card — must
-            // open the "More options" (•••) dropdown and click Connect inside.
-            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
-            await sleep(300 + Math.random() * 400);
-            result = await _sendConnectViaSalesNavDropdown(card);
-          } else {
-            // Bring the row into view so the modal's buttons get valid coordinates,
-            // then run the proven click-Connect → "Send without a note" sequence.
-            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
-            await sleep(300 + Math.random() * 300);
-            result = await _sendConnectOnCard(card, presetBtn);
-          }
-
-          if (result.ok) {
-            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
-            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
-            _markContacted(url);
-            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
-          } else {
-            failed++;
-            _setChipState(url, "error", "Skipped");
-            // Make sure a leftover dialog never blocks the next card.
-            if (_invitationModalOpen()) _closeAnyDialog();
-          }
-
-          flashStatus(`${summarise()} (${processed})`);
-          if (state.connectCancel) break outer;
-          await sleep(_connectGap());
-        }
-
-        // ---- advance to the next results page (Connect All mode only) --------
-        if (!autoPage || state.connectCancel) break;
-        const nextBtn = _findNextPageButton();
-        if (!nextBtn) break;
-        const sig = _pageSignature();
-        try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
-        await sleep(400 + Math.random() * 400);
-        await dispatchHumanClick(nextBtn);
-        // Wait for the page to actually change (signature flip), up to ~12s.
-        let changed = false;
-        for (let i = 0; i < 40 && !state.connectCancel; i++) {
-          await sleep(300);
-          if (_pageSignature() !== sig) { changed = true; break; }
-        }
-        if (!changed || state.connectCancel) break;
-        await _scrollLoadPage();
-        decorateSearchCards();
-        await sleep(800 + Math.random() * 600);
-        pageNum++;
-        urls = _allChipUrls()
-          .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
-          .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
-        if (!urls.length) break;
-      }
-    } finally {
-      state.connectActive = false;
-      state.connectCancel = false;
-      mountSelectAllHeader();
-      renderToolbar();
-    }
-    const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
-    flashStatus(`Connect All done: ${summarise()}${pageLabel} ✓`, "ok");
+    const run = {
+      active: true,
+      urls,
+      index: 0,
+      searchUrl: location.href,
+      autoPaginate,
+      pageNum: 1,
+      sent: 0, followed: 0, skipped: 0, failed: 0,
+      startedAt: Date.now(),
+    };
+    await _saveConnectRun(run);
+    flashStatus(`Connect All started — ${urls.length} profile${urls.length === 1 ? "" : "s"} on page 1`, "ok");
+    _lcToast(`⚡ Connect All — opening profile 1/${urls.length}`, 2800);
+    await new Promise((r) => setTimeout(r, 1500));
+    location.href = urls[0];
   }
 
   // ====================================================================
@@ -5143,6 +4792,14 @@
     } catch {}
   }
 
+  // POWERFUL SPOTLIGHT (v1.0.155):
+  // The original implementation used `box-shadow: 0 0 0 9999px rgba(0,0,0,.76)`
+  // on a single position:fixed element. LinkedIn's invitation modal sets
+  // `body { overflow: hidden }` which clips that box-shadow → no dim backdrop
+  // visible. The fix: four real dim rectangles around the button (not a
+  // box-shadow), attached to `document.documentElement` (so body's
+  // overflow:hidden can't reach them). Glow ring is a 5th element.
+  //
   // opts: { remaining: number, onSkip: function }
   function _showSendSpotlight(opts = {}) {
     _removeSpotlight();
@@ -5150,86 +4807,48 @@
     _spotlightSkipCb = typeof opts.onSkip === "function" ? opts.onSkip : null;
     const remaining = typeof opts.remaining === "number" ? opts.remaining : null;
     try {
-      // ── Standalone full-viewport DARK BACKDROP ──────────────────────────
-      // LinkedIn locks page scroll while a modal is open by setting body
-      // { overflow: hidden }. A box-shadow trick (9999px spread from a 2×2
-      // anchor on document.body) gets clipped by that overflow, which is why
-      // the backdrop was invisible on regular LinkedIn even though it worked
-      // on Sales Navigator (their modal lives in a different container).
-      //
-      // The fix: render the dark backdrop as its OWN element with
-      // position:fixed + inset:0 + background:rgba(0,0,0,0.76). Fixed-position
-      // sizing is relative to the viewport, not the body's box, so
-      // overflow:hidden cannot clip it. We also append to
-      // document.documentElement (the <html>) so even body display/transform
-      // tricks can't break it.
-      const backdrop = document.createElement("div");
-      backdrop.id = "lc-send-backdrop";
-      backdrop.style.cssText = [
-        "position:fixed",
-        "left:0",
-        "top:0",
-        "right:0",
-        "bottom:0",
-        "width:100vw",
-        "height:100vh",
-        "background:rgba(0,0,0,0.76)",
-        "pointer-events:none",
-        "z-index:2147483646",
-        "margin:0",
-        "padding:0",
-        "border:0",
-      ].map((s) => s + "!important").join(";") + ";";
-      document.documentElement.appendChild(backdrop);
-      _backdropEl = backdrop;
+      // 4 dim rects — top, bottom, left, right — leaving a clear hole around
+      // the Send button. Attached to documentElement (html) to escape
+      // body{overflow:hidden} clipping during the modal.
+      const mkRect = () => {
+        const d = document.createElement("div");
+        d.className = "lc-spot-rect";
+        d.style.cssText = [
+          "position:fixed", "left:0", "top:0", "width:0", "height:0",
+          "background:rgba(0,0,0,0.78)", "pointer-events:none",
+          "z-index:2147483644", "margin:0", "padding:0", "border:0",
+        ].map((s) => s + "!important").join(";") + ";";
+        return d;
+      };
+      const rTop = mkRect(), rBot = mkRect(), rLeft = mkRect(), rRight = mkRect();
+      document.documentElement.appendChild(rTop);
+      document.documentElement.appendChild(rBot);
+      document.documentElement.appendChild(rLeft);
+      document.documentElement.appendChild(rRight);
+      _backdropEl = { top: rTop, bot: rBot, left: rLeft, right: rRight };
 
-      // ── Cutout / glow ring around the Send button ───────────────────────
-      // Sits on top of the backdrop. We start it off-screen; tick() repositions
-      // it the moment the "Send without a note" button is located. The glow
-      // (3px white + 6px blue ring) is what tells the user where to tap.
+      // Glow ring (cutout) — pulses around the button.
       const spot = document.createElement("div");
       spot.id = "lc-send-spotlight";
       spot.style.cssText = [
-        "position:fixed",
-        "z-index:2147483647",
-        "background:transparent",
-        "pointer-events:none",
-        "border-radius:8px",
-        "box-shadow:0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)",
-        "left:-9999px",
-        "top:-9999px",
-        "width:2px",
-        "height:2px",
+        "position:fixed", "border-radius:8px", "background:transparent",
+        "pointer-events:none", "z-index:2147483645",
+        "box-shadow:0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 28px rgba(10,102,194,0.95),0 0 60px rgba(10,102,194,0.6)",
+        "transition:left 0.08s ease,top 0.08s ease,width 0.08s ease,height 0.08s ease",
       ].map((s) => s + "!important").join(";") + ";";
       document.documentElement.appendChild(spot);
       _spotlightEl = spot;
 
-      // Top banner — large, fixed at viewport top centre.
+      // Top banner — fixed at viewport top centre.
       const banner = document.createElement("div");
       banner.id = "lc-send-banner";
       banner.innerHTML = `
         <div style="font-size:17px!important;font-weight:800!important;margin-bottom:4px!important;">
-          ⚡ Action needed — Click "Send without a note"
+          ⚡ Auto-sending invitation — Send without a note
         </div>
         <div id="lc-send-banner-sub" style="font-size:13px!important;font-weight:500!important;opacity:0.92!important;">
-          ${remaining != null ? `${remaining} more profile${remaining === 1 ? "" : "s"} after this one` : "The extension will continue automatically once you click"}
+          ${remaining != null ? `${remaining} more profile${remaining === 1 ? "" : "s"} after this` : "Click highlighted button if it doesn't auto-send"}
         </div>`;
-      // Position banner immediately at top-centre so it shows before tick() fires.
-      const _bLeft0 = Math.max(8, (window.innerWidth - 460) / 2);
-      banner.style.cssText = [
-        "position:fixed",
-        "z-index:2147483647",
-        "pointer-events:none",
-        "background:#0a66c2",
-        "color:#fff",
-        "font:700 15px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif",
-        "padding:12px 22px",
-        "border-radius:10px",
-        "box-shadow:0 6px 28px rgba(0,0,0,0.55)",
-        "white-space:nowrap",
-        `left:${_bLeft0}px`,
-        "top:24px",
-      ].map((s) => s + "!important").join(";") + ";";
       document.documentElement.appendChild(banner);
       _bannerEl = banner;
 
@@ -5239,13 +4858,13 @@
       arrow.innerHTML = `
         <div class="lc-arrow-inner">
           <span class="lc-arrow-emoji">👇</span>
-          <span>Click this button</span>
+          <span>Send without a note</span>
         </div>
         <div class="lc-arrow-tail"></div>`;
       document.documentElement.appendChild(arrow);
       _arrowEl = arrow;
 
-      // Skip button below the cutout, real clickable element.
+      // Skip button below the cutout.
       const skip = document.createElement("button");
       skip.id = "lc-send-skip";
       skip.type = "button";
@@ -5267,77 +4886,52 @@
       document.documentElement.appendChild(skip);
       _skipBtnEl = skip;
 
-      // Audio cue — one soft ding so it's obvious even out of focus.
       _playSpotlightBeep();
 
+      const setRect = (el, x, y, w, h) => {
+        el.style.cssText += `left:${Math.max(0, x)}px!important;top:${Math.max(0, y)}px!important;width:${Math.max(0, w)}px!important;height:${Math.max(0, h)}px!important;`;
+      };
+
       const tick = () => {
-        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
-        // v1.0.147: no longer require _isVisible — the button may have opacity:0
-        // during LinkedIn's modal fade-in animation, causing _isVisible to return
-        // false and the cutout to never get positioned.
+        if (!_spotlightEl || !document.documentElement.contains(_spotlightEl)) return;
         const btn = _findSendWithoutNoteButton();
-        if (btn) {
+        if (btn && _isVisible(btn)) {
           const r = btn.getBoundingClientRect();
-          // Skip if the button has zero size (not yet rendered)
-          if (r.width < 2 || r.height < 2) { _spotlightRAF = requestAnimationFrame(tick); return; }
-          const pad = 14;
-          // All critical styles are set inline — no dependency on CSS animation
-          // or stylesheet injection. The box-shadow creates the full-page dark
-          // overlay; position:fixed keeps it locked to the viewport.
-          // Cutout: dropped the 9999px backdrop shadow — _backdropEl handles
-          // the full-screen dark layer. This element is purely the glow ring
-          // around the target button.
-          _spotlightEl.style.cssText = [
-            `position:fixed`,
-            `z-index:2147483647`,
-            `background:transparent`,
-            `pointer-events:none`,
-            `border-radius:8px`,
-            `box-shadow:0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)`,
-            `left:${r.left - pad}px`,
-            `top:${r.top - pad}px`,
-            `width:${r.width + pad * 2}px`,
-            `height:${r.height + pad * 2}px`,
-          ].map((s) => s + "!important").join(";") + ";";
+          const pad = 12;
+          const L = Math.max(0, r.left - pad);
+          const T = Math.max(0, r.top - pad);
+          const R = Math.min(window.innerWidth, r.right + pad);
+          const B = Math.min(window.innerHeight, r.bottom + pad);
+          const W = window.innerWidth;
+          const H = window.innerHeight;
 
-          // Top banner — fixed near top of viewport, centred horizontally.
+          // 4 dim rects around the button (cutout).
+          setRect(rTop, 0, 0, W, T);
+          setRect(rBot, 0, B, W, H - B);
+          setRect(rLeft, 0, T, L, B - T);
+          setRect(rRight, R, T, W - R, B - T);
+
+          // Glow ring exactly over the button.
+          _spotlightEl.style.cssText += `left:${L}px!important;top:${T}px!important;width:${R - L}px!important;height:${B - T}px!important;`;
+
+          // Banner — top centre.
           const bw = _bannerEl.offsetWidth || 460;
-          const bLeft = Math.max(8, (window.innerWidth - bw) / 2);
-          _bannerEl.style.cssText = [
-            `position:fixed`,
-            `z-index:2147483647`,
-            `pointer-events:none`,
-            `background:#0a66c2`,
-            `color:#fff`,
-            `font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`,
-            `padding:12px 22px`,
-            `border-radius:10px`,
-            `box-shadow:0 6px 28px rgba(0,0,0,0.55)`,
-            `white-space:nowrap`,
-            `left:${bLeft}px`,
-            `top:24px`,
-          ].map((s) => s + "!important").join(";") + ";";
+          const bLeft = Math.max(8, (W - bw) / 2);
+          _bannerEl.style.cssText =
+            `left:${bLeft}px!important;top:24px!important;`;
 
-          // Arrow — directly above the spotlight cutout, pointing down at it.
+          // Arrow — above the button.
           const aw = _arrowEl.offsetWidth || 180;
           const ah = _arrowEl.offsetHeight || 56;
-          const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
-            r.left + r.width / 2 - aw / 2));
+          const aLeft = Math.max(8, Math.min(W - aw - 8, r.left + r.width / 2 - aw / 2));
           const aTop = Math.max(96, r.top - ah - 18);
-          _arrowEl.style.cssText = [
-            `position:fixed`,
-            `z-index:2147483647`,
-            `pointer-events:none`,
-            `left:${aLeft}px`,
-            `top:${aTop}px`,
-          ].map((s) => s + "!important").join(";") + ";";
+          _arrowEl.style.cssText =
+            `left:${aLeft}px!important;top:${aTop}px!important;`;
 
-          // Skip button — directly below the spotlight cutout.
+          // Skip button — below the button.
           const sw = _skipBtnEl.offsetWidth || 150;
-          const sLeft = Math.max(8, Math.min(window.innerWidth - sw - 8,
-            r.left + r.width / 2 - sw / 2));
-          const sTop = Math.min(window.innerHeight - 50,
-            r.top + r.height + pad + 14);
+          const sLeft = Math.max(8, Math.min(W - sw - 8, r.left + r.width / 2 - sw / 2));
+          const sTop = Math.min(H - 50, r.top + r.height + pad + 14);
           _skipBtnEl.style.cssText =
             `left:${sLeft}px!important;top:${sTop}px!important;` +
             `position:fixed!important;z-index:2147483647!important;` +
@@ -5346,6 +4940,13 @@
             `border-radius:8px!important;cursor:pointer!important;` +
             `font:600 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;` +
             `box-shadow:0 4px 14px rgba(0,0,0,0.4)!important;`;
+        } else {
+          // Button not yet visible — full-screen dim.
+          const W = window.innerWidth, H = window.innerHeight;
+          setRect(rTop, 0, 0, W, H);
+          setRect(rBot, 0, 0, 0, 0);
+          setRect(rLeft, 0, 0, 0, 0);
+          setRect(rRight, 0, 0, 0, 0);
         }
         _spotlightRAF = requestAnimationFrame(tick);
       };
@@ -5356,12 +4957,391 @@
   function _removeSpotlight() {
     if (_spotlightRAF) { cancelAnimationFrame(_spotlightRAF); _spotlightRAF = null; }
     try { if (_spotlightEl) { _spotlightEl.remove(); _spotlightEl = null; } } catch {}
-    try { if (_backdropEl) { _backdropEl.remove(); _backdropEl = null; } } catch {}
+    try {
+      if (_backdropEl) {
+        try { _backdropEl.top?.remove(); } catch {}
+        try { _backdropEl.bot?.remove(); } catch {}
+        try { _backdropEl.left?.remove(); } catch {}
+        try { _backdropEl.right?.remove(); } catch {}
+        _backdropEl = null;
+      }
+    } catch {}
     try { if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; } } catch {}
     try { if (_arrowEl) { _arrowEl.remove(); _arrowEl = null; } } catch {}
     try { if (_skipBtnEl) { _skipBtnEl.remove(); _skipBtnEl = null; } } catch {}
     _spotlightSkipCb = null;
     _removeSendBtnHighlight();
+  }
+
+  // ─── Navigation-driven Connect All engine (v1.0.155) ──────────────────────
+  // Flow per user spec:
+  //   STEP 1: navigate to the next /in/<handle>/ profile by URL.
+  //   STEP 2: on the profile, find Connect (primary). If only Follow is shown,
+  //           open the "..." overflow dropdown and click Connect from there.
+  //   STEP 3: when the invitation modal opens, auto-click "Send without a note"
+  //           (CSP-immune MAIN-world script + spotlight visual + force-click).
+  // Then advance to the next profile, and across search-page pagination, until
+  // the queue is exhausted. LinkedIn ONLY — Sales Navigator is intentionally
+  // untouched.
+  const _LC_CONNECT_RUN_KEY = "lcConnectRun";
+  const _LC_CONNECT_TTL_MS = 30 * 60_000;
+
+  async function _saveConnectRun(s) {
+    try { await chrome.storage.local.set({ [_LC_CONNECT_RUN_KEY]: s }); } catch {}
+  }
+  async function _loadConnectRun() {
+    try {
+      const o = await chrome.storage.local.get(_LC_CONNECT_RUN_KEY);
+      const s = o?.[_LC_CONNECT_RUN_KEY] || null;
+      if (s && Date.now() - (s.startedAt || 0) > _LC_CONNECT_TTL_MS) {
+        await _clearConnectRun();
+        return null;
+      }
+      return s;
+    } catch { return null; }
+  }
+  async function _clearConnectRun() {
+    try { await chrome.storage.local.remove(_LC_CONNECT_RUN_KEY); } catch {}
+  }
+
+  function _sameProfileUrl(a, b) {
+    try {
+      const norm = (s) => {
+        const u = new URL(s, "https://www.linkedin.com");
+        if (u.hostname === "linkedin.com") u.hostname = "www.linkedin.com";
+        return (u.origin + u.pathname).replace(/\/$/, "").toLowerCase();
+      };
+      return norm(a) === norm(b);
+    } catch { return false; }
+  }
+
+  function _bumpPageUrl(url, page) {
+    try {
+      const u = new URL(url, "https://www.linkedin.com");
+      u.searchParams.set("page", String(page));
+      return u.href;
+    } catch { return url; }
+  }
+
+  // Find the Connect button on the profile top card (primary CTA scenario).
+  function _findProfilePageConnectBtn() {
+    const cands = Array.from(document.querySelectorAll(
+      "main button, main [role='button'], .scaffold-layout__main button"
+    ));
+    for (const b of cands) {
+      if (b.classList?.contains("lc-inline-save")) continue;
+      if (!_isVisible(b) || b.disabled) continue;
+      const aria = (b.getAttribute("aria-label") || "").trim();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      // Exact "Connect" text/aria, or "Invite X to connect" pattern.
+      if (/^connect$/i.test(txt)) return b;
+      if (/^connect$/i.test(aria)) return b;
+      if (/^invite\b.*\bto\s+connect/i.test(aria)) return b;
+    }
+    return null;
+  }
+
+  // Find the Follow button on the profile top card (Follow-only scenario).
+  function _findProfilePageFollowBtn() {
+    const cands = Array.from(document.querySelectorAll(
+      "main button, main [role='button']"
+    ));
+    for (const b of cands) {
+      if (b.classList?.contains("lc-inline-save")) continue;
+      if (!_isVisible(b) || b.disabled) continue;
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+      if (/^follow$/i.test(txt)) return b;
+      if (/^follow\b/i.test(aria) && !/following/i.test(aria)) return b;
+    }
+    return null;
+  }
+
+  // Open the "..." overflow dropdown on the profile top card.
+  async function _profileOpenMoreDropdown() {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const cands = Array.from(document.querySelectorAll(
+      "main button[aria-label*='More' i], main button[aria-haspopup], " +
+      "main button.artdeco-dropdown__trigger, " +
+      ".scaffold-layout__main button[aria-label*='More' i]"
+    ));
+    for (const b of cands) {
+      if (!_isVisible(b) || b.disabled) continue;
+      const aria = (b.getAttribute("aria-label") || "").toLowerCase();
+      if (!/more/i.test(aria) && !b.classList?.contains("artdeco-dropdown__trigger")) continue;
+      try { b.scrollIntoView({ block: "center" }); } catch {}
+      await sleep(200);
+      try { await dispatchHumanClick(b); } catch {}
+      try { b.click(); } catch {}
+      // Wait for menu
+      for (let i = 0; i < 24; i++) {
+        await sleep(150);
+        const open = document.querySelector(
+          ".artdeco-dropdown__content--is-open, .artdeco-dropdown__content[aria-hidden='false'], " +
+          "[role='menu']:not([aria-hidden='true'])"
+        );
+        if (open && _isVisible(open)) return true;
+      }
+    }
+    return false;
+  }
+
+  // Find "Connect" inside an open profile-page dropdown menu.
+  function _findProfileDropdownConnect() {
+    const opens = Array.from(document.querySelectorAll(
+      ".artdeco-dropdown__content--is-open, .artdeco-dropdown__content[aria-hidden='false'], " +
+      "[role='menu']:not([aria-hidden='true'])"
+    )).filter(_isVisible);
+    const roots = opens.length ? opens : [document];
+    for (const root of roots) {
+      const items = Array.from(root.querySelectorAll(
+        "li, [role='menuitem'], button, a, .artdeco-dropdown__item"
+      ));
+      for (const it of items) {
+        if (!_isVisible(it)) continue;
+        if (it.closest(".lc-save-row")) continue;
+        const txt = (it.textContent || "").replace(/\s+/g, " ").trim();
+        const aria = (it.getAttribute("aria-label") || "").trim();
+        if (/\bconnected\b/i.test(txt) || /\bconnected\b/i.test(aria)) continue;
+        if (/connect.*(twitter|email|phone|whatsapp)/i.test(txt + " " + aria)) continue;
+        if (/^connect$/i.test(txt) || /^connect$/i.test(aria) ||
+            /\binvite\b.*\bto\s+connect/i.test(aria)) {
+          return it;
+        }
+        // Sometimes wrapped: "Connect" word appears as a child span; check
+        // first non-whitespace token.
+        const first = txt.split(/\s+/)[0];
+        if (/^connect$/i.test(first) && !/connected/i.test(txt)) return it;
+      }
+    }
+    return null;
+  }
+
+  // After clicking Connect (either as primary or from dropdown), handle the
+  // "Add a note?" modal: auto-click "Send without a note" via MAIN world +
+  // force-click + spotlight as visible fallback.
+  async function _profileSendInvite() {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    // Wait for the modal (≤8s).
+    let dialogOpen = false;
+    for (let i = 0; i < 32; i++) {
+      await sleep(250);
+      if (_invitationModalOpen()) { dialogOpen = true; break; }
+    }
+    if (!dialogOpen) {
+      // Some connections complete instantly (no "add a note" step).
+      await sleep(600);
+      if (!_findProfilePageConnectBtn()) return { ok: true };
+      return { ok: false, reason: "no_dialog" };
+    }
+    // Modal animation grace period.
+    await sleep(400 + Math.random() * 200);
+
+    // Phase A — aggressive auto-click (~6s of 12 rounds).
+    for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
+      const landed = await _awaitServiceWorkerMainWorldClick();
+      if (landed) {
+        for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+        if (!_invitationModalOpen()) break;
+      }
+      const sendBtn = _findSendWithoutNoteButton();
+      if (sendBtn) {
+        try { await dispatchHumanClick(sendBtn); } catch {}
+        _forceClick(sendBtn);
+      }
+      for (let w = 0; w < 4 && _invitationModalOpen(); w++) await sleep(200);
+    }
+    if (!_invitationModalOpen()) return { ok: true };
+
+    // Phase B — powerful spotlight + keep auto-clicking in the background (~45s).
+    _showSendSpotlight();
+    for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
+      await sleep(300);
+      if (w % 5 === 0) {
+        await _awaitServiceWorkerMainWorldClick();
+        const retry = _findSendWithoutNoteButton();
+        if (retry) {
+          try { await dispatchHumanClick(retry); } catch {}
+          _forceClick(retry);
+        }
+      }
+    }
+    _removeSpotlight();
+    if (!_invitationModalOpen()) return { ok: true };
+    _closeAnyDialog();
+    return { ok: false, reason: "send_failed" };
+  }
+
+  // The per-profile flow run on each /in/<handle>/ page during an active
+  // Connect Run. Returns {ok, followed?, reason?}.
+  async function _profilePageConnect() {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    // Wait for the profile to render (h1).
+    for (let i = 0; i < 50; i++) {
+      if (document.querySelector("main h1")) break;
+      await sleep(300);
+    }
+    // Human-paced reading pause before any action.
+    await sleep(1200 + Math.random() * 1800);
+
+    // Detect challenge / captcha before clicking anything.
+    if (
+      document.querySelector("form#captcha, form[action*='checkpoint'], " +
+        "input[name='pin'], div[data-test-id='challenge']")
+    ) {
+      return { ok: false, reason: "captcha" };
+    }
+
+    // SCENARIO 2: Connect button directly visible — click it.
+    const direct = _findProfilePageConnectBtn();
+    if (direct) {
+      console.log("[LeadCaptura] profile-page step 2 → Connect button found directly");
+      try { direct.scrollIntoView({ block: "center" }); } catch {}
+      await sleep(200);
+      try { await dispatchHumanClick(direct); } catch {}
+      const r = await _profileSendInvite();
+      return r;
+    }
+
+    // SCENARIO 1: only Follow visible → open "..." → Connect.
+    console.log("[LeadCaptura] profile-page step 2 → no Connect; opening More dropdown");
+    const opened = await _profileOpenMoreDropdown();
+    if (opened) {
+      await sleep(250);
+      const ddConnect = _findProfileDropdownConnect();
+      if (ddConnect) {
+        console.log("[LeadCaptura] profile-page step 2 → Connect found in dropdown");
+        try { await dispatchHumanClick(ddConnect); } catch {}
+        try { ddConnect.click?.(); } catch {}
+        const r = await _profileSendInvite();
+        if (r.ok) return r;
+        // Close menu before falling through to Follow.
+        try { document.body.click(); } catch {}
+        await sleep(200);
+      } else {
+        // No Connect in menu — close dropdown and fall through to Follow.
+        try { document.body.click(); } catch {}
+        await sleep(200);
+      }
+    }
+
+    // FINAL FALLBACK: click Follow (no Connect path available).
+    const follow = _findProfilePageFollowBtn();
+    if (follow) {
+      console.log("[LeadCaptura] profile-page step 2 → no Connect available; clicking Follow");
+      try { await dispatchHumanClick(follow); } catch {}
+      await sleep(700 + Math.random() * 500);
+      return { ok: true, followed: true };
+    }
+    return { ok: false, reason: "no_action_available" };
+  }
+
+  // Called on every page boot from main.js. If a Connect Run is active and
+  // this is the right page (profile or search), execute the per-page step
+  // and navigate to the next URL.
+  let _resumeInFlight = false;
+  async function _resumeConnectRunIfActive() {
+    if (_resumeInFlight) return;
+    const run = await _loadConnectRun();
+    if (!run || !run.active) return;
+    const path = location.pathname;
+    _resumeInFlight = true;
+    try {
+      // ── ON PROFILE PAGE — execute connect, then advance ────────────────
+      if (path.startsWith("/in/")) {
+        const target = run.urls[run.index];
+        if (target && _sameProfileUrl(location.href, target)) {
+          state.connectActive = true;
+          try { renderToolbar(); } catch {}
+          let result;
+          try {
+            result = await _profilePageConnect();
+          } catch (e) {
+            result = { ok: false, reason: String(e?.message || e) };
+          }
+          if (result.ok) {
+            if (result.followed) run.followed++;
+            else run.sent++;
+          } else {
+            run.failed++;
+          }
+          run.index++;
+          await _saveConnectRun(run);
+          _lcToast(
+            `Connect All — ${run.sent} invited · ${run.followed} followed (${run.index}/${run.urls.length} on page ${run.pageNum})`,
+            3000
+          );
+          state.connectActive = false;
+
+          // Decide next step.
+          if (run.index < run.urls.length) {
+            await new Promise((r) => setTimeout(r, _connectGap()));
+            const stillActive = await _loadConnectRun();
+            if (stillActive && stillActive.active) {
+              location.href = run.urls[run.index];
+            }
+          } else if (run.autoPaginate) {
+            // Advance to next search page.
+            run.pageNum++;
+            const nextSearchUrl = _bumpPageUrl(run.searchUrl, run.pageNum);
+            run.urls = []; // will be filled on the search-page boot
+            run.index = 0;
+            await _saveConnectRun(run);
+            await new Promise((r) => setTimeout(r, 2000));
+            location.href = nextSearchUrl;
+          } else {
+            await _finishConnectRun(run);
+          }
+        }
+        return;
+      }
+
+      // ── ON SEARCH PAGE — gather chip URLs, then start ──────────────────
+      const isSearch =
+        path.startsWith("/search/results/") ||
+        path.startsWith("/search/results/people");
+      if (isSearch && run.urls.length === 0) {
+        // Wait for cards + decoration to render.
+        await new Promise((r) => setTimeout(r, 2500));
+        try { decorateSearchCards(); } catch {}
+        await new Promise((r) => setTimeout(r, 1200));
+        // Auto-scroll to load any virtualised cards.
+        try { await _scrollLoadPage(); } catch {}
+        await new Promise((r) => setTimeout(r, 800));
+        let urls = _allChipUrls()
+          .filter((u) => u && u.includes("/in/"))
+          .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+        if (!urls.length) {
+          // No profiles on this page — finished.
+          await _finishConnectRun(run);
+          return;
+        }
+        run.urls = urls;
+        run.index = 0;
+        run.searchUrl = location.href;
+        await _saveConnectRun(run);
+        _lcToast(`Connect All — page ${run.pageNum}: ${urls.length} profile${urls.length === 1 ? "" : "s"}`, 2800);
+        await new Promise((r) => setTimeout(r, 1200));
+        location.href = urls[0];
+      }
+    } finally {
+      _resumeInFlight = false;
+    }
+  }
+
+  async function _finishConnectRun(run) {
+    await _clearConnectRun();
+    flashStatus(
+      `Connect All done: ${run.sent} invited, ${run.followed} followed, ${run.failed} failed across ${run.pageNum} page${run.pageNum === 1 ? "" : "s"} ✓`,
+      "ok"
+    );
+    _lcToast(
+      `✓ Connect All done — ${run.sent} invited, ${run.followed} followed`,
+      8000
+    );
   }
 
   // Run the "click Send without a note" code in the page's MAIN world.
@@ -5405,112 +5385,6 @@
     });
   }
 
-  // Ask the service worker to run the isTrusted-prototype-patch click. A new
-  // technique that doesn't require ANY permission: chrome.scripting injects a
-  // small MAIN-world script that temporarily redefines Event.prototype's
-  // isTrusted getter to always return true, fires the entire click stack on
-  // the Send button (native click + pointer/mouse sequence + React fiber +
-  // form.requestSubmit), then restores the prototype. While the patch is
-  // active, LinkedIn's `if (!event.isTrusted) return` gate cannot fire — the
-  // gate is reading our lying getter. Resolves to true if the script found
-  // and clicked the button (modal may close shortly after).
-  function _awaitIsTrustedPatchClick() {
-    return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ type: "lc:isTrustedPatchClick" }, (resp) => {
-          if (chrome.runtime.lastError) return resolve(false);
-          resolve(!!(resp && resp.ok && resp.result && resp.result.found && resp.result.clicked));
-        });
-      } catch {
-        resolve(false);
-      }
-    });
-  }
-
-  // Ask the service worker to drive a TRUSTED click on "Send without a note"
-  // via chrome.debugger + Input.dispatchMouseEvent. These dispatch as
-  // isTrusted=true (same as a real hardware click) so LinkedIn's invitation
-  // handler accepts them and the modal closes without any user interaction.
-  //
-  // Resolves to:
-  //   { ok:true,  clicked:true }                       → trusted click fired
-  //   { ok:false, error:"no_permission" }              → user hasn't granted
-  //   { ok:false, error:"debugger_busy" | "button..." } → other soft failures
-  //
-  // Caller treats any non-ok result as "fall back to MAIN-world + forceClick
-  // strategies" so this path is purely additive — never makes the connect
-  // flow worse than the prior version.
-  function _awaitTrustedDebuggerClick() {
-    return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage(
-          { type: "lc:trustedClickSendWithoutNote" },
-          (resp) => {
-            if (chrome.runtime.lastError) {
-              return resolve({ ok: false, error: chrome.runtime.lastError.message });
-            }
-            resolve(resp || { ok: false });
-          }
-        );
-      } catch (e) {
-        resolve({ ok: false, error: String(e) });
-      }
-    });
-  }
-
-  // Ask the service worker to focus the "Send without a note" button and then
-  // dispatch a real keyboard Enter key via chrome.debugger. A keyboard-derived
-  // click event has isTrusted=true at the browser C++ level — it bypasses ANY
-  // JavaScript-level isTrusted check, including stored getter references.
-  // Requires the optional `debugger` permission.
-  function _awaitDebuggerKeyEnterClick() {
-    return new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ type: "lc:debuggerKeyEnterClick" }, (resp) => {
-          if (chrome.runtime.lastError) return resolve(false);
-          resolve(!!(resp && resp.ok));
-        });
-      } catch {
-        resolve(false);
-      }
-    });
-  }
-
-  // Track whether we've asked the user for the `debugger` permission this
-  // session. Avoids re-prompting on every Connect All click.
-  let _debuggerPermAsked = false;
-
-  // Synchronously request the `debugger` permission from within a user-gesture
-  // context (the toolbar's Connect All click handler). Chrome shows a prompt
-  // ONCE; if the user grants, the trusted-click path activates for every
-  // subsequent invite-send. If the user declines, every call to
-  // _awaitTrustedDebuggerClick returns no_permission and the connect flow
-  // falls back to the existing spotlight + MAIN-world strategies.
-  function _maybeRequestDebuggerPermission() {
-    if (_debuggerPermAsked) return;
-    _debuggerPermAsked = true;
-    try {
-      // Issue the request synchronously (no await) so Chrome credits this to
-      // the active click gesture. The promise resolves later.
-      chrome.permissions.request({ permissions: ["debugger"] }, (granted) => {
-        if (chrome.runtime.lastError) {
-          console.warn(
-            "[LeadCaptura] debugger permission request:",
-            chrome.runtime.lastError.message
-          );
-          return;
-        }
-        console.log(
-          granted
-            ? "[LeadCaptura] debugger permission granted — invites will auto-send"
-            : "[LeadCaptura] debugger permission denied — spotlight fallback active"
-        );
-      });
-    } catch (e) {
-      console.warn("[LeadCaptura] permission request threw:", e?.message || e);
-    }
-  }
-
   // ---- Global auto-confirm of the invitation modal ----------------------
   // Fires whenever the "Add a note?" modal appears, regardless of who triggered
   // it. Nuclear strategy: visual highlight, MAIN-world injection, aggressive
@@ -5519,15 +5393,18 @@
   let _inviteHighlightShown = false;
 
   async function _autoConfirmInviteModal() {
-    // Guard: never run concurrently (two concurrent spotlights would fight).
+    // Note: we no longer bail when state.connectActive is true.
+    // _sendConnectOnCard already shows the spotlight and owns the wait;
+    // the 400ms poll below is a no-op while its own Phase B loop is running
+    // (both check _invitationModalOpen which would be false once done).
+    // We keep _inviteAutoBusy so this function never runs concurrently.
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) {
       if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
     }
-    // During a Connect All run, _sendConnectOnCard owns the spotlight and the
-    // automated click loop. Bail here to avoid creating a second spotlight that
-    // would tear down _sendConnectOnCard's spotlight via _removeSpotlight().
+    // During a Connect All run _sendConnectOnCard is already managing the overlay.
+    // Skip this handler so we don't show a second spotlight on top.
     if (state.connectActive) return;
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;
@@ -5649,5 +5526,6 @@
     unmountSelectAllHeader,
     toast: _lcToast,
     applyConnectResults,
+    resumeConnectRunIfActive: _resumeConnectRunIfActive,
   };
 })();

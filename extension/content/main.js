@@ -1403,4 +1403,13 @@
   try { Automate.resumePendingMessage?.().catch(() => {}); } catch {}
   startAutopilot();
   maybeRunEnrichmentTrigger();
+
+  // Connect Run resume (v1.0.155):
+  // If a Connect All run was in progress when the previous page unloaded,
+  // pick up here. On a /in/ profile page → run profile-page connect; on a
+  // /search/ page with empty queue → gather chip URLs and start. Delayed
+  // 1.8s so the overlay finishes mounting and the page hydrates.
+  setTimeout(() => {
+    try { globalThis.__lcOverlay?.resumeConnectRunIfActive?.().catch(() => {}); } catch {}
+  }, 1800);
 })();
