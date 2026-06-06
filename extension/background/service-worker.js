@@ -353,24 +353,34 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           // It lives on Event.prototype as a configurable getter — we
           // intentionally don't delete the property after, we put the
           // original descriptor back.
+          // NOTE: If LinkedIn has made isTrusted non-configurable, the
+          // defineProperty below will throw — we catch it and still proceed
+          // with the React-fiber direct call which uses a plain object event
+          // (bypassing the native getter entirely).
           const origDesc =
             Object.getOwnPropertyDescriptor(Event.prototype, "isTrusted") || null;
 
+          let _patchActive = false;
           const restore = () => {
+            if (!_patchActive || !origDesc) return;
             try {
-              if (origDesc) {
-                Object.defineProperty(Event.prototype, "isTrusted", origDesc);
-              }
+              Object.defineProperty(Event.prototype, "isTrusted", origDesc);
             } catch (_) {}
           };
 
           let clicked = false;
           try {
             // Patch the getter so EVERY event in this turn reports isTrusted=true.
-            Object.defineProperty(Event.prototype, "isTrusted", {
-              configurable: true,
-              get() { return true; },
-            });
+            try {
+              Object.defineProperty(Event.prototype, "isTrusted", {
+                configurable: true,
+                get() { return true; },
+              });
+              _patchActive = true;
+            } catch (_patchErr) {
+              // LinkedIn may have locked Event.prototype.isTrusted — proceed
+              // without the patch; the React-fiber call below still works.
+            }
 
             btn.scrollIntoView({ block: "center", inline: "center" });
             try { btn.focus(); } catch (_) {}
@@ -417,7 +427,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                         type: "click", bubbles: true, cancelable: true,
                         isTrusted: true, target: btn, currentTarget: btn,
                         preventDefault: () => {}, stopPropagation: () => {},
-                        nativeEvent: Object.assign(new Event("click", { bubbles: true, cancelable: true }), { isTrusted: true }),
+                        stopImmediatePropagation: () => {},
+                        // Plain object for nativeEvent so .isTrusted is a real
+                        // writable property — Object.assign on an actual Event
+                        // silently fails because isTrusted is read-only there.
+                        nativeEvent: {
+                          isTrusted: true, type: "click",
+                          bubbles: true, cancelable: true,
+                          preventDefault() {}, stopPropagation() {},
+                          stopImmediatePropagation() {},
+                        },
                       });
                     } catch (_) {}
                     break;

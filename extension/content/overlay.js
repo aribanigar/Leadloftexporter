@@ -1678,7 +1678,7 @@
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return false;
     const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+    if (cs.visibility === "hidden" || cs.display === "none") return false;
     return true;
   }
 
@@ -5109,16 +5109,39 @@
           // Skip if the button has zero size (not yet rendered)
           if (r.width < 2 || r.height < 2) { _spotlightRAF = requestAnimationFrame(tick); return; }
           const pad = 14;
+          // All critical styles are set inline — no dependency on CSS animation
+          // or stylesheet injection. The box-shadow creates the full-page dark
+          // overlay; position:fixed keeps it locked to the viewport.
           _spotlightEl.style.cssText = [
-            `left:${r.left - pad}px`, `top:${r.top - pad}px`,
-            `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
-          ].join("!important;") + "!important;";
+            `position:fixed`,
+            `z-index:2147483647`,
+            `background:transparent`,
+            `pointer-events:none`,
+            `border-radius:8px`,
+            `box-shadow:0 0 0 9999px rgba(0,0,0,0.76),0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)`,
+            `left:${r.left - pad}px`,
+            `top:${r.top - pad}px`,
+            `width:${r.width + pad * 2}px`,
+            `height:${r.height + pad * 2}px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Top banner — fixed near top of viewport, centred horizontally.
           const bw = _bannerEl.offsetWidth || 460;
           const bLeft = Math.max(8, (window.innerWidth - bw) / 2);
-          _bannerEl.style.cssText =
-            `left:${bLeft}px!important;top:24px!important;`;
+          _bannerEl.style.cssText = [
+            `position:fixed`,
+            `z-index:2147483647`,
+            `pointer-events:none`,
+            `background:#0a66c2`,
+            `color:#fff`,
+            `font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`,
+            `padding:12px 22px`,
+            `border-radius:10px`,
+            `box-shadow:0 6px 28px rgba(0,0,0,0.55)`,
+            `white-space:nowrap`,
+            `left:${bLeft}px`,
+            `top:24px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Arrow — directly above the spotlight cutout, pointing down at it.
           const aw = _arrowEl.offsetWidth || 180;
@@ -5126,8 +5149,13 @@
           const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
             r.left + r.width / 2 - aw / 2));
           const aTop = Math.max(96, r.top - ah - 18);
-          _arrowEl.style.cssText =
-            `left:${aLeft}px!important;top:${aTop}px!important;`;
+          _arrowEl.style.cssText = [
+            `position:fixed`,
+            `z-index:2147483647`,
+            `pointer-events:none`,
+            `left:${aLeft}px`,
+            `top:${aTop}px`,
+          ].map((s) => s + "!important").join(";") + ";";
 
           // Skip button — directly below the spotlight cutout.
           const sw = _skipBtnEl.offsetWidth || 150;
