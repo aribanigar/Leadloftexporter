@@ -5450,70 +5450,120 @@
 
     await sleep(readingPause());
 
-    const _MSG_SELS = [
-      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
-      "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
-      "main button.message-anywhere-button",
-      "[class*='message-anywhere-button']",
-      "button[data-control-name*='message' i]",
-    ];
-
-    let msgBtn = null;
-    for (const sel of _MSG_SELS) {
-      msgBtn = document.querySelector(sel);
-      if (msgBtn) break;
-    }
-    if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 5000 }); } catch {}
-    }
-    // Text-content fallback: find any visible non-disabled button/link whose
-    // visible label is exactly "Message" and isn't an InMail/recruiter variant.
-    if (!msgBtn) {
-      const candidates = document.querySelectorAll(
-        "main button:not([disabled]), main a[role='button'], " +
-        ".pvs-profile-actions button:not([disabled]), .pvs-profile-actions a"
-      );
-      for (const el of candidates) {
-        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-        const txt = (el.textContent || "").trim().toLowerCase();
-        if (
-          (/\bmessage\b/.test(lbl) || txt === "message") &&
-          !/your team|recruiter|inmail/i.test(lbl + " " + txt)
-        ) {
-          msgBtn = el;
-          break;
-        }
-      }
-    }
-    if (!msgBtn) return { ok: false, reason: "no_message_button" };
-
-    try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-    await sleep(300 + Math.random() * 300);
-    await dispatchHumanClick(msgBtn);
-
-    const editor = await waitFor([
+    // ── Step 1: click the Message button (unless compose dialog already open) ──
+    const _editorSels = [
       "div.msg-form__contenteditable[contenteditable='true']",
       "div[role='textbox'][contenteditable='true']",
       ".msg-form__compose-box [contenteditable='true']",
-    ], { timeout: 8000 }).catch(() => null);
+      ".msg-overlay-conversation-bubble [contenteditable='true']",
+      ".msg-overlay-list-bubble [contenteditable='true']",
+      "[contenteditable='true'][data-placeholder*='rite' i]",
+    ];
 
-    if (!editor) return { ok: false, reason: "no_editor" };
+    let editor = document.querySelector(_editorSels.join(","));
+
+    if (!editor) {
+      // Find the Message button — try aria-label / class selectors first.
+      const _MSG_SELS = [
+        "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
+        "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
+        "main button.message-anywhere-button",
+        "[class*='message-anywhere-button']",
+        "button[data-control-name*='message' i]",
+      ];
+
+      let msgBtn = null;
+      for (const sel of _MSG_SELS) {
+        try {
+          for (const b of document.querySelectorAll(sel)) {
+            if (_isVisible(b) && !b.disabled) { msgBtn = b; break; }
+          }
+        } catch {}
+        if (msgBtn) break;
+      }
+
+      // Text-content fallback — broad scan, no container restriction.
+      if (!msgBtn) {
+        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+          if (el.classList?.contains("lc-inline-save")) continue;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+          if (!_isVisible(el) || el.disabled) continue;
+          const lbl = (el.getAttribute("aria-label") || "").trim().toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const hay = lbl + " " + txt;
+          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) {
+            msgBtn = el;
+            break;
+          }
+        }
+      }
+
+      if (!msgBtn) {
+        console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
+        return { ok: false, reason: "no_message_button" };
+      }
+
+      console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
+      try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+      await sleep(300 + Math.random() * 300);
+      // Use _forceClick (5-strategy: native click + pointer seq + inner span + keyboard + React fiber).
+      _forceClick(msgBtn);
+      // Also fire the human-cursor sequence so bot-detection sees realistic movement.
+      await dispatchHumanClick(msgBtn);
+
+      // Wait for compose dialog to mount.
+      editor = await waitFor(_editorSels, { timeout: 8000 });
+    }
+
+    if (!editor) {
+      console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
+      return { ok: false, reason: "no_editor" };
+    }
+
+    // ── Step 2: focus editor and type the message ──
+    try { editor.click(); } catch {}
+    try { editor.focus(); } catch {}
+    await sleep(250);
 
     await typeIntoEditable(editor, messageText);
     await sleep(350 + Math.random() * 350);
 
-    const sendBtn = (
-      document.querySelector("button.msg-form__send-button") ||
-      document.querySelector("button[aria-label*='Send' i].artdeco-button--primary") ||
-      (() => {
-        for (const b of document.querySelectorAll(".msg-form__footer button, .msg-compose-form__footer button")) {
-          if (!b.disabled && (b.textContent || "").trim().toLowerCase() === "send") return b;
+    // ── Step 3: find and click the Send button ──
+    // Search inside the overlay bubble first, then fall back to document-wide.
+    const _findSendBtn = () => {
+      const scopes = [
+        document.querySelector(".msg-overlay-conversation-bubble"),
+        document.querySelector(".msg-overlay-list-bubble"),
+        document.querySelector(".msg-form__container"),
+        document,
+      ];
+      for (const scope of scopes) {
+        if (!scope) continue;
+        for (const [sel, check] of [
+          ["button.msg-form__send-button:not([disabled])", null],
+          ["button[aria-label='Send']:not([disabled])", null],
+          ["button[aria-label*='Send' i].artdeco-button--primary:not([disabled])", null],
+        ]) {
+          const b = scope.querySelector?.(sel);
+          if (b && _isVisible(b)) return b;
         }
-        return null;
-      })()
-    );
-    if (!sendBtn || sendBtn.disabled) return { ok: false, reason: "send_disabled" };
+        // Text-content "send" fallback.
+        for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
+          const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+          if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
+        }
+      }
+      return null;
+    };
+    const sendBtn = _findSendBtn();
 
+    if (!sendBtn || sendBtn.disabled) {
+      console.log("[LeadCaptura] Message All: Send button not found or disabled");
+      return { ok: false, reason: "send_disabled" };
+    }
+
+    console.log("[LeadCaptura] Message All: clicking Send");
     await dispatchHumanClick(sendBtn);
     await sleep(1200);
     return { ok: true };
