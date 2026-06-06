@@ -908,25 +908,32 @@
     // profile URL loads. The overlay watches the h1 for name mutations and
     // re-renders as soon as LinkedIn hydrates the correct person's name.
     if (isProfile) {
-      // Check for an active Connect All queue BEFORE deciding to auto-save.
+      // Check for an active Connect All run BEFORE deciding to auto-save.
       // triggerAutoSave() → saveCurrentProfile() → scrapeContactInfo() CLICKS
-      // the "Contact info" link. If a connect queue is running that click races
-      // with _ccConnectOnProfile() trying to click the Connect button, causing
-      // the extension to hit "Contact info" instead. Suppress auto-save for the
-      // entire duration of any connect queue run.
-      const _launchProfile = (inConnectQueue) => {
+      // the "Contact info" link. If Connect All is running that click races
+      // with the connect action, causing the extension to hit "Contact info"
+      // instead of the Connect button. Suppress auto-save for the entire
+      // duration of any connect run — both the legacy queue key and the
+      // navigation-driven run key (added v1.0.155).
+      const _launchProfile = (inConnectRun) => {
         setTimeout(() => {
           Overlay.renderProfilePanel();
-          if (!inConnectQueue) Overlay.triggerAutoSave?.();
+          if (!inConnectRun) Overlay.triggerAutoSave?.();
           maybeRunConnectQueue().catch((e) =>
             console.warn("[LeadCaptura] connect queue error", e?.message || e)
           );
         }, 50);
       };
       try {
-        chrome.storage.local.get("lc_connect_queue", (qData) => {
-          _launchProfile(!!(qData?.lc_connect_queue?.urls?.length > 0));
-        });
+        chrome.storage.local.get(
+          ["lc_connect_queue", "lcConnectRun", "lcMessageRun"],
+          (data) => {
+            const legacyActive = !!(data?.lc_connect_queue?.urls?.length > 0);
+            const connectNavActive = !!(data?.lcConnectRun?.active);
+            const messageNavActive = !!(data?.lcMessageRun?.active);
+            _launchProfile(legacyActive || connectNavActive || messageNavActive);
+          }
+        );
       } catch {
         // Storage unavailable (stale context) — assume no queue, normal flow.
         _launchProfile(false);

@@ -734,6 +734,17 @@
     if (new URLSearchParams(location.search).has("lc_enrich")) return;
     if (location.pathname.includes("/overlay/")) return;
 
+    // Never auto-save while a Connect All or Message All run is in progress.
+    // saveCurrentProfile() clicks the "Contact info" link which races with the
+    // Connect/Message button click and opens the wrong UI.
+    if (state.connectActive || state.messageActive) return;
+    try {
+      const d = await new Promise((res) =>
+        chrome.storage.local.get(["lcConnectRun", "lcMessageRun"], res)
+      );
+      if (d?.lcConnectRun?.active || d?.lcMessageRun?.active) return;
+    } catch {}
+
     const path = location.pathname;
     if (_autoSavedPaths.has(path)) return;
     _autoSavedPaths.add(path);
