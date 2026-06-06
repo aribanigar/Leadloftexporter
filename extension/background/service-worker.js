@@ -808,8 +808,28 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true; // async
 });
 
-chrome.runtime.onInstalled.addListener(({ reason }) => {
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === "install") chrome.runtime.openOptionsPage();
+  // One-time migration to v1.0.141+: pre-existing users had autopilot
+  // defaulted OFF in v1.0.140 and earlier. Without this flip, the CRM's bulk
+  // "Send to N leads" button queued jobs that nothing ever claimed — the
+  // progress bar sat at "0 sent · N in progress" indefinitely. Flip it ON
+  // once for every install/update so the next time the user has a LinkedIn
+  // tab open, queued messages start flowing. Users who explicitly want
+  // manual control can still toggle it back off in the popup.
+  try {
+    const { settings } = await chrome.storage.local.get("settings");
+    if (settings && settings.autopilot === false && !settings.lcAutopilotMigratedToOn) {
+      await chrome.storage.local.set({
+        settings: { ...settings, autopilot: true, lcAutopilotMigratedToOn: true },
+      });
+    } else if (settings && !settings.lcAutopilotMigratedToOn) {
+      // Mark migration done even when already-true to avoid re-running.
+      await chrome.storage.local.set({
+        settings: { ...settings, lcAutopilotMigratedToOn: true },
+      });
+    }
+  } catch {}
 });
 
 // Tiny periodic heartbeat to keep the worker alive while the user is on LI

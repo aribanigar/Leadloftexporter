@@ -253,7 +253,19 @@
   }
 
   async function executeOne(job) {
-    if (!tabIsForeground()) await waitUntilForeground();
+    // Connect / Follow / SearchScraper all touch high-risk surfaces (invite
+    // modal, scroll-load) so still gate on foreground — matches the
+    // bot-avoidance rule in CLAUDE.md ("Never automate in a hidden tab for
+    // write actions"). MESSAGE jobs are different: the user explicitly
+    // clicked "Send to N leads" in the CRM, so they're consciously driving
+    // the action. Running message jobs without waiting for the LinkedIn tab
+    // to be visible is what makes "send N messages in real-time" actually
+    // work — otherwise the user clicks Send in the CRM, the LinkedIn tab is
+    // backgrounded, executeOne hangs on waitUntilForeground, and the
+    // progress bar sits at 0% forever.
+    if (job.kind !== "message") {
+      if (!tabIsForeground()) await waitUntilForeground();
+    }
     try {
       let result;
       if (job.kind === "connect") result = await doConnect(job);

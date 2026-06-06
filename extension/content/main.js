@@ -1053,7 +1053,11 @@
         autopilotInterval = null;
         return;
       }
-      if (!Human.tabIsForeground()) return;
+      // No longer short-circuit when the tab is backgrounded. Automate.tick()
+      // now polls jobs and inside executeOne it only gates connect/follow on
+      // foreground — message jobs flow regardless. This is what makes the
+      // CRM's "Send to N leads" actually deliver while the user is looking at
+      // the CRM tab (LinkedIn tab in background).
       try {
         await Automate.tick();
       } catch (e) {
