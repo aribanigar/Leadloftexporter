@@ -29,6 +29,10 @@ export default function ProspectingPage() {
   const q = (searchParams.get("q") || "").trim();
   const [page, setPage] = useState(1);
   const [stageFilter, setStageFilter] = useState<string>("");
+  const [viewSegment, setViewSegment] = useState<string>("");
+  const [viewMine, setViewMine] = useState<boolean>(false);
+  const [viewNoActivityDays, setViewNoActivityDays] = useState<number | null>(null);
+  const [viewStageSlugs, setViewStageSlugs] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
@@ -60,11 +64,17 @@ export default function ProspectingPage() {
     queryFn: () => api("/workspaces/current/views"),
   });
   const { data: leads, isLoading } = useQuery<LeadList>({
-    queryKey: ["leads", page, stageFilter, q],
-    queryFn: () =>
-      api(
-        `/leads?page=${page}&page_size=50${stageFilter ? `&stage_id=${stageFilter}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`
-      ),
+    queryKey: ["leads", page, stageFilter, q, viewSegment, viewMine, viewNoActivityDays, viewStageSlugs],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), page_size: "50" });
+      if (stageFilter) params.set("stage_id", stageFilter);
+      if (q) params.set("q", q);
+      if (viewSegment) params.set("segment", viewSegment);
+      if (viewMine) params.set("mine", "true");
+      if (viewNoActivityDays !== null) params.set("no_activity_days", String(viewNoActivityDays));
+      viewStageSlugs.forEach((s) => params.append("stage_slug", s));
+      return api(`/leads?${params.toString()}`);
+    },
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
@@ -78,9 +88,21 @@ export default function ProspectingPage() {
   );
   const [columns, setColumns] = useState<string[] | null>(null);
   useEffect(() => {
-    if (!activeView) return;
-    const sid = (activeView.filters?.stage_id as string) || "";
-    setStageFilter(sid);
+    if (!activeView) {
+      setStageFilter("");
+      setViewSegment("");
+      setViewMine(false);
+      setViewNoActivityDays(null);
+      setViewStageSlugs([]);
+      return;
+    }
+    const f = activeView.filters || {};
+    setStageFilter((f.stage_id as string) || "");
+    setViewSegment((f.segment as string) || "");
+    setViewMine(f.mine === true);
+    setViewNoActivityDays(typeof f.no_activity_days === "number" ? (f.no_activity_days as number) : null);
+    const slugs = f.stage_slug;
+    setViewStageSlugs(Array.isArray(slugs) ? (slugs as string[]) : slugs ? [slugs as string] : []);
     setPage(1);
     if (activeView.columns?.length) setColumns(activeView.columns);
   }, [activeView]);
@@ -113,7 +135,7 @@ export default function ProspectingPage() {
   // Clear selection whenever the visible result set changes.
   useEffect(() => {
     setSelected(new Set());
-  }, [page, stageFilter, q]);
+  }, [page, stageFilter, q, viewSegment, viewMine, viewNoActivityDays, viewStageSlugs]);
 
   const pageIds = useMemo(() => (leads?.items || []).map((l) => l.id), [leads]);
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));

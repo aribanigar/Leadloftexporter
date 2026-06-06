@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
+from typing import List
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
@@ -53,8 +54,11 @@ def list_leads(
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     stage_id: Optional[str] = None,
+    stage_slug: Optional[List[str]] = Query(None),
     owner_id: Optional[str] = None,
+    mine: bool = False,
     segment: Optional[str] = None,
+    no_activity_days: Optional[int] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     sort: str = "created_at",
@@ -77,10 +81,31 @@ def list_leads(
         )
     if stage_id:
         base = base.filter(Lead.stage_id == stage_id)
-    if owner_id:
+    if stage_slug:
+        slug_ids = [
+            r[0]
+            for r in db.query(PipelineStage.id)
+            .filter(
+                PipelineStage.workspace_id == ctx.workspace_id,
+                PipelineStage.slug.in_(stage_slug),
+            )
+            .all()
+        ]
+        if slug_ids:
+            base = base.filter(Lead.stage_id.in_(slug_ids))
+        else:
+            base = base.filter(False)
+    if mine:
+        base = base.filter(Lead.owner_id == ctx.user_id)
+    elif owner_id:
         base = base.filter(Lead.owner_id == owner_id)
     if segment:
         base = base.filter(Lead.custom["segment"].astext == segment)
+    if no_activity_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=no_activity_days)
+        base = base.filter(
+            or_(Lead.last_activity_at.is_(None), Lead.last_activity_at < cutoff)
+        )
 
     total = base.count()
     sort_col = getattr(Lead, sort, Lead.created_at)
