@@ -1274,6 +1274,10 @@
           if (!profile.phone && fromText.phone) profile.phone = fromText.phone;
         } catch {}
       }
+      // Normalize phone to E.164 using the profile location to infer country code.
+      if (profile.phone && Scraper.normalizePhoneCountryCode) {
+        try { profile.phone = Scraper.normalizePhoneCountryCode(profile.phone, profile.location); } catch {}
+      }
       profile.raw = { ...(profile.raw || {}), contact_info_scraped: true };
       // Carry the segment the user picked in the toolbar through the bulk
       // enrichment tab (passed as ?lc_segment= by the service worker).
@@ -1411,5 +1415,6 @@
   // 1.8s so the overlay finishes mounting and the page hydrates.
   setTimeout(() => {
     try { globalThis.__lcOverlay?.resumeConnectRunIfActive?.().catch(() => {}); } catch {}
+    try { globalThis.__lcOverlay?.resumeMessageRunIfActive?.().catch(() => {}); } catch {}
   }, 1800);
 })();

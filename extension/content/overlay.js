@@ -68,6 +68,7 @@
     applyProgress: null,
     avoidDuplicates: true, // "Avoid Duplicate Outreach" toggle
     toolbarCollapsed: false, // pill ↑/↓ collapse state
+    messageActive: false,   // Message All navigation run in progress
   };
 
   // ── Contacted-URL registry ──────────────────────────────────────────────────
@@ -1222,7 +1223,7 @@
               )
             : el("div", { class: "lc-status-slot" }),
           // Connect Selected — people pages only, hidden during any active run.
-          _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive
+          _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive || state.messageActive
             ? null
             : el(
                 "button",
@@ -1236,9 +1237,25 @@
                   ? `Connect ${state.selectedUrls.size}`
                   : "Connect All"
               ),
+          // Message All — people pages only, hidden during any active run.
+          _isJobsPage() || state.bulkActive || state.connectActive || state.applyActive || state.messageActive
+            ? null
+            : el(
+                "button",
+                {
+                  class: "lc-btn lc-btn-connect",
+                  style: "background:linear-gradient(135deg,#0a66c2,#004182)!important;color:#fff!important;",
+                  onclick: () => _showMessageComposer(),
+                  title:
+                    "Send LinkedIn messages to selected (or all visible) 1st-degree connections. Navigates to each profile and sends at a human pace.",
+                },
+                state.selectedUrls.size > 0
+                  ? `Message ${state.selectedUrls.size}`
+                  : "Message All"
+              ),
           // Primary action. During any run → Stop. Otherwise → Apply All on Jobs
           // pages, Save All Leads on people pages.
-          state.bulkActive || state.connectActive || state.applyActive
+          state.bulkActive || state.connectActive || state.applyActive || state.messageActive
             ? el(
                 "button",
                 {
@@ -1247,6 +1264,10 @@
                     if (state.bulkActive) state.bulkCancel = true;
                     if (state.connectActive) state.connectCancel = true;
                     if (state.applyActive) state.applyCancel = true;
+                    if (state.messageActive) {
+                      state.messageActive = false;
+                      _clearMsgRun().catch(() => {});
+                    }
                     flashStatus("Stopping…", "warn");
                     try { _lcToast("⏹ Stopping…"); } catch {}
                   },
@@ -5344,6 +5365,298 @@
     );
   }
 
+  // ── Message All (navigation-driven bulk messaging from the extension) ────────
+  // Exactly like Connect All but sends a LinkedIn message to each profile.
+  // Works for 1st-degree connections only (LinkedIn only shows the Message
+  // button for connections). Non-connections are silently skipped (skipped++).
+  // LinkedIn ONLY — Sales Navigator untouched.
+  const _LC_MSG_RUN_KEY = "lcMessageRun";
+  const _LC_MSG_RUN_TTL_MS = 30 * 60_000;
+
+  async function _saveMsgRun(s) {
+    try { await chrome.storage.local.set({ [_LC_MSG_RUN_KEY]: s }); } catch {}
+  }
+  async function _loadMsgRun() {
+    try {
+      const o = await chrome.storage.local.get(_LC_MSG_RUN_KEY);
+      const s = o?.[_LC_MSG_RUN_KEY] || null;
+      if (s && Date.now() - (s.startedAt || 0) > _LC_MSG_RUN_TTL_MS) {
+        await _clearMsgRun();
+        return null;
+      }
+      return s;
+    } catch { return null; }
+  }
+  async function _clearMsgRun() {
+    try { await chrome.storage.local.remove(_LC_MSG_RUN_KEY); } catch {}
+  }
+
+  // Fill in {first_name} / {last_name} / {full_name} / {title} / {company}
+  function _renderMsgTemplate(tpl, profile) {
+    const first = ((profile.first_name || (profile.full_name || "").split(" ")[0] || "").trim()) || "there";
+    const last = (profile.last_name || "").trim();
+    const full = (profile.full_name || first).trim();
+    const title = (profile.title || "").trim();
+    const company = (profile.company_name || "").trim();
+    return tpl
+      .replace(/\{first_name\}/gi, first)
+      .replace(/\{last_name\}/gi, last)
+      .replace(/\{full_name\}/gi, full)
+      .replace(/\{title\}/gi, title)
+      .replace(/\{company\}/gi, company);
+  }
+
+  // Human-paced gap between message sends — longer than Connect All because
+  // typing a message is a bigger signal than an invite click.
+  function _msgGap() {
+    const r = Math.random();
+    return r < 0.55 ? 10000 + Math.random() * 15000    // 10-25s  (55%)
+      : r < 0.80 ? 28000 + Math.random() * 22000       // 28-50s  (25%)
+      : r < 0.93 ? 55000 + Math.random() * 35000       // 55-90s  (13%)
+      : 95000 + Math.random() * 45000;                   // 95-140s (7%)
+  }
+
+  // Send a LinkedIn message on the current profile page.
+  // Returns { ok, reason }.
+  async function _sendProfilePageMessage(messageText) {
+    const { sleep, readingPause } = globalThis.__lcHuman;
+    const { waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+
+    await sleep(readingPause());
+
+    const _MSG_SELS = [
+      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
+      "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
+      "main button.message-anywhere-button",
+    ];
+
+    let msgBtn = null;
+    for (const sel of _MSG_SELS) {
+      msgBtn = document.querySelector(sel);
+      if (msgBtn) break;
+    }
+    if (!msgBtn) {
+      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
+    }
+    if (!msgBtn) return { ok: false, reason: "no_message_button" };
+
+    try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+    await sleep(300 + Math.random() * 300);
+    await dispatchHumanClick(msgBtn);
+
+    const editor = await waitFor([
+      "div.msg-form__contenteditable[contenteditable='true']",
+      "div[role='textbox'][contenteditable='true']",
+      ".msg-form__compose-box [contenteditable='true']",
+    ], { timeout: 8000 }).catch(() => null);
+
+    if (!editor) return { ok: false, reason: "no_editor" };
+
+    await typeIntoEditable(editor, messageText);
+    await sleep(350 + Math.random() * 350);
+
+    const sendBtn = (
+      document.querySelector("button.msg-form__send-button") ||
+      document.querySelector("button[aria-label*='Send' i].artdeco-button--primary") ||
+      (() => {
+        for (const b of document.querySelectorAll(".msg-form__footer button, .msg-compose-form__footer button")) {
+          if (!b.disabled && (b.textContent || "").trim().toLowerCase() === "send") return b;
+        }
+        return null;
+      })()
+    );
+    if (!sendBtn || sendBtn.disabled) return { ok: false, reason: "send_disabled" };
+
+    await dispatchHumanClick(sendBtn);
+    await sleep(1200);
+    return { ok: true };
+  }
+
+  // ── Message composer modal (shown above toolbar when "Message All" is clicked)
+  let _msgComposerEl = null;
+  function _showMessageComposer() {
+    if (_msgComposerEl && document.documentElement.contains(_msgComposerEl)) {
+      _msgComposerEl.remove();
+      _msgComposerEl = null;
+      return;
+    }
+
+    const wrap = document.createElement("div");
+    Object.assign(wrap.style, {
+      position: "fixed", bottom: "60px", left: "50%",
+      transform: "translateX(-50%)", zIndex: "2147483640",
+      background: "#fff", border: "1px solid #e2e8f0",
+      borderRadius: "14px", boxShadow: "0 8px 36px rgba(0,0,0,0.18)",
+      padding: "16px 18px", width: "440px",
+      maxWidth: "calc(100vw - 20px)", fontFamily: "inherit",
+    });
+    _msgComposerEl = wrap;
+
+    const title = document.createElement("div");
+    title.style.cssText = "font-size:13px;font-weight:600;color:#1e293b;margin-bottom:10px;";
+    title.textContent = "Message All — compose your message";
+    wrap.appendChild(title);
+
+    const tokens = document.createElement("div");
+    tokens.style.cssText = "display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;";
+    ["{first_name}", "{last_name}", "{company}", "{title}"].forEach((tok) => {
+      const b = document.createElement("button");
+      b.textContent = tok;
+      b.type = "button";
+      b.style.cssText =
+        "font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid #cbd5e1;" +
+        "background:#f8fafc;cursor:pointer;color:#475569;font-family:inherit;";
+      b.onclick = (e) => {
+        e.stopPropagation();
+        const ta = wrap.querySelector("textarea");
+        if (!ta) return;
+        const s = ta.selectionStart ?? ta.value.length;
+        const en = ta.selectionEnd ?? ta.value.length;
+        ta.value = ta.value.slice(0, s) + tok + ta.value.slice(en);
+        ta.focus();
+        ta.setSelectionRange(s + tok.length, s + tok.length);
+      };
+      tokens.appendChild(b);
+    });
+    wrap.appendChild(tokens);
+
+    const ta = document.createElement("textarea");
+    ta.placeholder = "Hi {first_name}, I wanted to reach out…";
+    ta.style.cssText =
+      "width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;" +
+      "padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;" +
+      "outline:none;font-family:inherit;color:#1e293b;";
+    ta.onfocus = () => { ta.style.borderColor = "#0a66c2"; };
+    ta.onblur = () => { ta.style.borderColor = "#cbd5e1"; };
+    wrap.appendChild(ta);
+
+    const footer = document.createElement("div");
+    footer.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:10px;";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.type = "button";
+    cancelBtn.style.cssText =
+      "padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;" +
+      "background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;";
+    cancelBtn.onclick = () => { wrap.remove(); _msgComposerEl = null; };
+
+    const startBtn = document.createElement("button");
+    startBtn.textContent = "Start Messaging";
+    startBtn.type = "button";
+    startBtn.style.cssText =
+      "padding:7px 16px;border-radius:8px;border:none;" +
+      "background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;" +
+      "font-size:13px;color:#fff;font-weight:600;font-family:inherit;";
+    startBtn.onclick = async () => {
+      const msg = ta.value.trim();
+      if (!msg) { ta.focus(); return; }
+      wrap.remove();
+      _msgComposerEl = null;
+      await _startMessageAll(msg);
+    };
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(startBtn);
+    wrap.appendChild(footer);
+    document.documentElement.appendChild(wrap);
+    ta.focus();
+  }
+
+  async function _startMessageAll(message) {
+    const userSelected = state.selectedUrls.size > 0;
+    let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
+      .filter((u) => u && u.includes("/in/"));
+    if (!urls.length) { flashStatus("No profiles to message", "warn"); return; }
+    urls = urls.map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+
+    const run = {
+      active: true, message, urls, index: 0, searchUrl: location.href,
+      sent: 0, failed: 0, skipped: 0, startedAt: Date.now(),
+    };
+    await _saveMsgRun(run);
+    flashStatus(`Message All started — ${urls.length} profile${urls.length === 1 ? "" : "s"}`, "ok");
+    _lcToast(`⚡ Message All — opening profile 1/${urls.length}`, 2800);
+    await new Promise((r) => setTimeout(r, 1500));
+    location.href = urls[0];
+  }
+
+  // Called on every page boot from main.js. If a Message Run is active and
+  // this is a /in/ profile page matching the next URL, send the message and advance.
+  let _msgResumeInFlight = false;
+  async function _resumeMessageRunIfActive() {
+    if (_msgResumeInFlight) return;
+    const run = await _loadMsgRun();
+    if (!run || !run.active) return;
+    if (!location.pathname.startsWith("/in/")) return;
+
+    const target = run.urls[run.index];
+    if (!target || !_sameProfileUrl(location.href, target)) return;
+
+    _msgResumeInFlight = true;
+    state.messageActive = true;
+    try { renderToolbar(); } catch {}
+
+    try {
+      // Wait for page to hydrate
+      await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1500));
+
+      // Render template vars from scraped profile
+      let profile = {};
+      try { profile = globalThis.__lcScraper?.scrapeProfile?.() || {}; } catch {}
+      const renderedMsg = _renderMsgTemplate(run.message, profile);
+
+      const result = await _sendProfilePageMessage(renderedMsg);
+      if (result.ok) {
+        run.sent++;
+      } else if (result.reason === "no_message_button") {
+        run.skipped++; // not connected — skip silently
+      } else {
+        run.failed++;
+      }
+    } catch (e) {
+      run.failed++;
+    }
+
+    run.index++;
+    _lcToast(
+      `Message All — ${run.sent} sent · ${run.skipped} skipped (${run.index}/${run.urls.length})`,
+      2500
+    );
+
+    const stillActive = await _loadMsgRun();
+    if (!stillActive || !stillActive.active) {
+      // User clicked Stop while we were messaging
+      state.messageActive = false;
+      try { renderToolbar(); } catch {}
+      _msgResumeInFlight = false;
+      return;
+    }
+
+    if (run.index < run.urls.length) {
+      await _saveMsgRun(run);
+      state.messageActive = false;
+      try { renderToolbar(); } catch {}
+      await new Promise((r) => setTimeout(r, _msgGap()));
+      const check = await _loadMsgRun();
+      if (check && check.active) location.href = run.urls[run.index];
+    } else {
+      await _clearMsgRun();
+      state.messageActive = false;
+      try { renderToolbar(); } catch {}
+      flashStatus(
+        `Message All done: ${run.sent} sent, ${run.skipped} skipped (not connected), ${run.failed} failed ✓`,
+        "ok"
+      );
+      _lcToast(`✓ Message All done — ${run.sent} sent`, 8000);
+      if (run.searchUrl) {
+        await new Promise((r) => setTimeout(r, 2000));
+        location.href = run.searchUrl;
+      }
+    }
+    _msgResumeInFlight = false;
+  }
+
   // Run the "click Send without a note" code in the page's MAIN world.
   //
   // This MUST go through the service worker's chrome.scripting.executeScript({
@@ -5527,5 +5840,6 @@
     toast: _lcToast,
     applyConnectResults,
     resumeConnectRunIfActive: _resumeConnectRunIfActive,
+    resumeMessageRunIfActive: _resumeMessageRunIfActive,
   };
 })();
