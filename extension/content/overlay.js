@@ -2096,11 +2096,90 @@
 
     _removeSpotlight();
     if (!_invitationModalOpen()) {
-      console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓");
-      return { ok: true };
+      // Verify the invite actually went out by checking the card's button
+      // state. Modal closing is NOT proof of success — the user (or LinkedIn
+      // animation, or our own clicks landing on X/Cancel) can dismiss the
+      // modal without sending. The original Connect button flips to
+      // "Pending" within ~1.5s of a real send; if it's still "Connect", we
+      // know the invite was NOT sent and must NOT mark this URL as contacted.
+      const verified = await _verifyInviteSent(connectBtn, card);
+      if (verified) {
+        console.log("[LeadCaptura] step 4 → dialog closed, invitation sent ✓ (verified)");
+        return { ok: true };
+      }
+      console.log("[LeadCaptura] step 4 → dialog closed but button state unchanged — NOT sent");
+      return { ok: false, reason: "modal_closed_not_sent" };
     }
     console.log("[LeadCaptura] step 3/4 → timed out — no click received");
     return { ok: false, reason: "send_failed" };
+  }
+
+  // Verify a connection invitation actually went out by checking the original
+  // action button's state. LinkedIn changes the button from "Connect" to
+  // "Pending" within ~1-2s of a real send. If the button is still "Connect"
+  // (or the modal was simply X'd out), this returns false and the caller MUST
+  // report ok:false so the URL is not marked as contacted.
+  //
+  // This is the load-bearing fix for the "fake Connected ✓ on profiles I never
+  // actually invited" bug. Never short-circuit it.
+  async function _verifyInviteSent(connectBtn, card) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    // Wait for LinkedIn to update the DOM. The button class flip happens
+    // within ~600ms of a successful send; we give it a generous 1.8s.
+    await sleep(1200);
+    // Try the original button reference first.
+    if (connectBtn && document.body.contains(connectBtn)) {
+      try {
+        const cls = _classifyButton(connectBtn);
+        if (cls === "pending" || cls === "connected") return true;
+      } catch {}
+    }
+    // Then re-scan the card — LinkedIn often replaces the entire button node.
+    if (card && document.body.contains(card)) {
+      try {
+        const btns = card.querySelectorAll("button, [role='button']");
+        for (const b of btns) {
+          if (b.classList?.contains("lc-inline-save")) continue;
+          const cls = _classifyButton(b);
+          if (cls === "pending" || cls === "connected") return true;
+        }
+      } catch {}
+    }
+    // Last resort: success toast from LinkedIn confirming the send.
+    try {
+      const toast = document.querySelector(
+        ".artdeco-toast-item--visible, [data-test-artdeco-toast-item]"
+      );
+      const t = ((toast && toast.textContent) || "").toLowerCase();
+      if (/invitation\s*sent|connection\s*sent|invite.*sent|pending invitation/i.test(t)) {
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  // Verify a Follow actually went through by checking the button changed
+  // from "Follow" to "Following". Same idea as _verifyInviteSent — prevents
+  // marking profiles as "Followed ✓" when the click never registered.
+  async function _verifyFollowSent(followBtn, card) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    await sleep(900);
+    const isFollowing = (b) => {
+      if (!b) return false;
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const aria = (b.getAttribute("aria-label") || "").trim();
+      return /^following\b/i.test(txt) || /^following\b/i.test(aria);
+    };
+    if (followBtn && document.body.contains(followBtn) && isFollowing(followBtn)) return true;
+    if (card && document.body.contains(card)) {
+      try {
+        for (const b of card.querySelectorAll("button, [role='button']")) {
+          if (b.classList?.contains("lc-inline-save")) continue;
+          if (isFollowing(b)) return true;
+        }
+      } catch {}
+    }
+    return false;
   }
 
   // Click a card's native "Follow" button (no modal). Used by Connect All for
@@ -2121,6 +2200,9 @@
     if (!btn) return { ok: false, reason: "no_follow_button" };
     await dispatchHumanClick(btn);
     await sleep(450 + Math.random() * 400);
+    // Verify the follow actually registered before marking success.
+    const verified = await _verifyFollowSent(btn, card);
+    if (!verified) return { ok: false, reason: "follow_not_registered" };
     return { ok: true, followed: true };
   }
 
@@ -2378,8 +2460,16 @@
 
     _removeSpotlight();
     if (!_invitationModalOpen()) {
-      console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent");
-      return { ok: true };
+      // Verify before reporting success: the modal closing does not prove the
+      // invite was actually sent (the X button also closes it). Check for the
+      // success toast or a card button state flip.
+      const verified = await _verifyInviteSent(null, card);
+      if (verified) {
+        console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent (verified)");
+        return { ok: true };
+      }
+      console.log("[LeadCaptura] salesNav step 5 ✗ modal closed but invite NOT verified");
+      return { ok: false, reason: "modal_closed_not_sent" };
     }
     console.log("[LeadCaptura] salesNav step 5 ✗ timed out waiting for Send click");
     return { ok: false, reason: "send_failed" };
@@ -5027,6 +5117,7 @@
   // a soft "ding" beep when first shown, and a Skip button below the cutout.
   let _spotlightRAF = null;
   let _spotlightEl = null;
+  let _backdropEl = null;
   let _bannerEl = null;
   let _arrowEl = null;
   let _skipBtnEl = null;
@@ -5059,26 +5150,58 @@
     _spotlightSkipCb = typeof opts.onSkip === "function" ? opts.onSkip : null;
     const remaining = typeof opts.remaining === "number" ? opts.remaining : null;
     try {
+      // ── Standalone full-viewport DARK BACKDROP ──────────────────────────
+      // LinkedIn locks page scroll while a modal is open by setting body
+      // { overflow: hidden }. A box-shadow trick (9999px spread from a 2×2
+      // anchor on document.body) gets clipped by that overflow, which is why
+      // the backdrop was invisible on regular LinkedIn even though it worked
+      // on Sales Navigator (their modal lives in a different container).
+      //
+      // The fix: render the dark backdrop as its OWN element with
+      // position:fixed + inset:0 + background:rgba(0,0,0,0.76). Fixed-position
+      // sizing is relative to the viewport, not the body's box, so
+      // overflow:hidden cannot clip it. We also append to
+      // document.documentElement (the <html>) so even body display/transform
+      // tricks can't break it.
+      const backdrop = document.createElement("div");
+      backdrop.id = "lc-send-backdrop";
+      backdrop.style.cssText = [
+        "position:fixed",
+        "left:0",
+        "top:0",
+        "right:0",
+        "bottom:0",
+        "width:100vw",
+        "height:100vh",
+        "background:rgba(0,0,0,0.76)",
+        "pointer-events:none",
+        "z-index:2147483646",
+        "margin:0",
+        "padding:0",
+        "border:0",
+      ].map((s) => s + "!important").join(";") + ";";
+      document.documentElement.appendChild(backdrop);
+      _backdropEl = backdrop;
+
+      // ── Cutout / glow ring around the Send button ───────────────────────
+      // Sits on top of the backdrop. We start it off-screen; tick() repositions
+      // it the moment the "Send without a note" button is located. The glow
+      // (3px white + 6px blue ring) is what tells the user where to tap.
       const spot = document.createElement("div");
       spot.id = "lc-send-spotlight";
-      // Apply the dark full-screen overlay immediately via inline style so it
-      // is visible the instant this function is called — do NOT wait for tick()
-      // to find the button. A 9999px box-shadow spread from a 2×2 anchor at
-      // (0,0) covers the entire viewport. tick() replaces this with precise
-      // positioning once the button is located.
       spot.style.cssText = [
         "position:fixed",
         "z-index:2147483647",
         "background:transparent",
         "pointer-events:none",
         "border-radius:8px",
-        "box-shadow:0 0 0 9999px rgba(0,0,0,0.76)",
-        "left:0px",
-        "top:0px",
+        "box-shadow:0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)",
+        "left:-9999px",
+        "top:-9999px",
         "width:2px",
         "height:2px",
       ].map((s) => s + "!important").join(";") + ";";
-      document.body.appendChild(spot);
+      document.documentElement.appendChild(spot);
       _spotlightEl = spot;
 
       // Top banner — large, fixed at viewport top centre.
@@ -5107,7 +5230,7 @@
         `left:${_bLeft0}px`,
         "top:24px",
       ].map((s) => s + "!important").join(";") + ";";
-      document.body.appendChild(banner);
+      document.documentElement.appendChild(banner);
       _bannerEl = banner;
 
       // Bouncing arrow above the cutout.
@@ -5119,7 +5242,7 @@
           <span>Click this button</span>
         </div>
         <div class="lc-arrow-tail"></div>`;
-      document.body.appendChild(arrow);
+      document.documentElement.appendChild(arrow);
       _arrowEl = arrow;
 
       // Skip button below the cutout, real clickable element.
@@ -5141,7 +5264,7 @@
         _removeSpotlight();
         if (cb) try { cb(); } catch {}
       });
-      document.body.appendChild(skip);
+      document.documentElement.appendChild(skip);
       _skipBtnEl = skip;
 
       // Audio cue — one soft ding so it's obvious even out of focus.
@@ -5161,13 +5284,16 @@
           // All critical styles are set inline — no dependency on CSS animation
           // or stylesheet injection. The box-shadow creates the full-page dark
           // overlay; position:fixed keeps it locked to the viewport.
+          // Cutout: dropped the 9999px backdrop shadow — _backdropEl handles
+          // the full-screen dark layer. This element is purely the glow ring
+          // around the target button.
           _spotlightEl.style.cssText = [
             `position:fixed`,
             `z-index:2147483647`,
             `background:transparent`,
             `pointer-events:none`,
             `border-radius:8px`,
-            `box-shadow:0 0 0 9999px rgba(0,0,0,0.76),0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)`,
+            `box-shadow:0 0 0 3px #fff,0 0 0 6px #0a66c2,0 0 24px rgba(10,102,194,0.9)`,
             `left:${r.left - pad}px`,
             `top:${r.top - pad}px`,
             `width:${r.width + pad * 2}px`,
@@ -5230,6 +5356,7 @@
   function _removeSpotlight() {
     if (_spotlightRAF) { cancelAnimationFrame(_spotlightRAF); _spotlightRAF = null; }
     try { if (_spotlightEl) { _spotlightEl.remove(); _spotlightEl = null; } } catch {}
+    try { if (_backdropEl) { _backdropEl.remove(); _backdropEl = null; } } catch {}
     try { if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; } } catch {}
     try { if (_arrowEl) { _arrowEl.remove(); _arrowEl = null; } } catch {}
     try { if (_skipBtnEl) { _skipBtnEl.remove(); _skipBtnEl = null; } } catch {}
