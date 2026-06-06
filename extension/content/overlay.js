@@ -5350,6 +5350,11 @@
       }
     } finally {
       _resumeInFlight = false;
+      // Safety net: connectActive must never be left true after this function returns
+      if (state.connectActive) {
+        state.connectActive = false;
+        try { renderToolbar(); } catch {}
+      }
     }
   }
 
@@ -5530,6 +5535,25 @@
     ta.onblur = () => { ta.style.borderColor = "#cbd5e1"; };
     wrap.appendChild(ta);
 
+    // AI personalisation row
+    const aiRow = document.createElement("div");
+    aiRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
+    const aiCheck = document.createElement("input");
+    aiCheck.type = "checkbox";
+    aiCheck.id = "lc-ai-personalise";
+    aiCheck.style.cssText = "cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;";
+    const aiLabel = document.createElement("label");
+    aiLabel.htmlFor = "lc-ai-personalise";
+    aiLabel.style.cssText = "font-size:12px;color:#475569;cursor:pointer;user-select:none;";
+    aiLabel.textContent = "Use AI to personalise each message based on profile";
+    const aiNote = document.createElement("span");
+    aiNote.style.cssText = "font-size:11px;color:#94a3b8;margin-left:2px;";
+    aiNote.textContent = "(requires Claude/Gemini key in Options)";
+    aiLabel.appendChild(aiNote);
+    aiRow.appendChild(aiCheck);
+    aiRow.appendChild(aiLabel);
+    wrap.appendChild(aiRow);
+
     const footer = document.createElement("div");
     footer.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:10px;";
 
@@ -5551,9 +5575,10 @@
     startBtn.onclick = async () => {
       const msg = ta.value.trim();
       if (!msg) { ta.focus(); return; }
+      const useAI = aiCheck.checked;
       wrap.remove();
       _msgComposerEl = null;
-      await _startMessageAll(msg);
+      await _startMessageAll(msg, useAI);
     };
 
     footer.appendChild(cancelBtn);
@@ -5563,7 +5588,7 @@
     ta.focus();
   }
 
-  async function _startMessageAll(message) {
+  async function _startMessageAll(message, useAI = false) {
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
@@ -5571,7 +5596,7 @@
     urls = urls.map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
 
     const run = {
-      active: true, message, urls, index: 0, searchUrl: location.href,
+      active: true, message, useAI, urls, index: 0, searchUrl: location.href,
       sent: 0, failed: 0, skipped: 0, startedAt: Date.now(),
     };
     await _saveMsgRun(run);
@@ -5601,12 +5626,20 @@
       // Wait for page to hydrate
       await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1500));
 
-      // Render template vars from scraped profile
+      // Scrape profile for template vars and AI personalization
       let profile = {};
       try { profile = globalThis.__lcScraper?.scrapeProfile?.() || {}; } catch {}
-      const renderedMsg = _renderMsgTemplate(run.message, profile);
 
-      const result = await _sendProfilePageMessage(renderedMsg);
+      let finalMsg;
+      if (run.useAI) {
+        // Ask service worker to call AI with profile context + user template
+        finalMsg = await _aiPersonalizeMessage(run.message, profile).catch(() => null);
+        if (!finalMsg) finalMsg = _renderMsgTemplate(run.message, profile); // fallback
+      } else {
+        finalMsg = _renderMsgTemplate(run.message, profile);
+      }
+
+      const result = await _sendProfilePageMessage(finalMsg);
       if (result.ok) {
         run.sent++;
       } else if (result.reason === "no_message_button") {
@@ -5618,43 +5651,62 @@
       run.failed++;
     }
 
-    run.index++;
-    _lcToast(
-      `Message All — ${run.sent} sent · ${run.skipped} skipped (${run.index}/${run.urls.length})`,
-      2500
-    );
-
-    const stillActive = await _loadMsgRun();
-    if (!stillActive || !stillActive.active) {
-      // User clicked Stop while we were messaging
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      _msgResumeInFlight = false;
-      return;
-    }
-
-    if (run.index < run.urls.length) {
-      await _saveMsgRun(run);
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      await new Promise((r) => setTimeout(r, _msgGap()));
-      const check = await _loadMsgRun();
-      if (check && check.active) location.href = run.urls[run.index];
-    } else {
-      await _clearMsgRun();
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      flashStatus(
-        `Message All done: ${run.sent} sent, ${run.skipped} skipped (not connected), ${run.failed} failed ✓`,
-        "ok"
+    try {
+      run.index++;
+      _lcToast(
+        `Message All — ${run.sent} sent · ${run.skipped} skipped (${run.index}/${run.urls.length})`,
+        2500
       );
-      _lcToast(`✓ Message All done — ${run.sent} sent`, 8000);
-      if (run.searchUrl) {
-        await new Promise((r) => setTimeout(r, 2000));
-        location.href = run.searchUrl;
+
+      const stillActive = await _loadMsgRun();
+      if (!stillActive || !stillActive.active) {
+        // User clicked Stop while we were messaging
+        return;
       }
+
+      if (run.index < run.urls.length) {
+        await _saveMsgRun(run);
+        try { renderToolbar(); } catch {}
+        await new Promise((r) => setTimeout(r, _msgGap()));
+        const check = await _loadMsgRun();
+        if (check && check.active) location.href = run.urls[run.index];
+      } else {
+        await _clearMsgRun();
+        try { renderToolbar(); } catch {}
+        flashStatus(
+          `Message All done: ${run.sent} sent, ${run.skipped} skipped (not connected), ${run.failed} failed ✓`,
+          "ok"
+        );
+        _lcToast(`✓ Message All done — ${run.sent} sent`, 8000);
+        if (run.searchUrl) {
+          await new Promise((r) => setTimeout(r, 2000));
+          location.href = run.searchUrl;
+        }
+      }
+    } finally {
+      state.messageActive = false;
+      _msgResumeInFlight = false;
+      try { renderToolbar(); } catch {}
     }
-    _msgResumeInFlight = false;
+  }
+
+  // Ask the service worker to call Claude/Gemini to personalise a message
+  // for the given profile. Returns the personalised string, or rejects on error.
+  function _aiPersonalizeMessage(template, profile) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "lc:personalizeMessage", template, profile },
+          (response) => {
+            if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+            if (!response || !response.ok) { reject(new Error(response?.error || "no_response")); return; }
+            resolve(response.message);
+          }
+        );
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 
   // Run the "click Send without a note" code in the page's MAIN world.
