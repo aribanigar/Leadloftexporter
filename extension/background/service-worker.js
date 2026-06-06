@@ -306,6 +306,126 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     );
     return true;
   }
+
+  // ── Trusted "Send without a note" click via the Chrome DevTools Protocol ──
+  // The CSP-immune MAIN-world click above dispatches events with
+  // isTrusted=false. LinkedIn's invitation modal handler rejects those in many
+  // sessions — which is why the "Send without a note" step would stall and
+  // require a manual user click.
+  //
+  // The fix: attach chrome.debugger to the tab and dispatch OS-level mouse
+  // events via Input.dispatchMouseEvent. These arrive at the page with
+  // isTrusted=true — the same flag a physical click sets — and LinkedIn
+  // accepts them without question.
+  //
+  // Cost: the `debugger` permission, requested ONCE on the user's first
+  // Connect All click in a content-script user gesture. If the user declines,
+  // the call returns { ok:false, error:"no_permission" } and overlay.js falls
+  // back to the spotlight + manual click path.
+  if (msg?.type === "lc:trustedClickSendWithoutNote") {
+    const tabId = _sender?.tab?.id;
+    if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    (async () => {
+      // Permission check first — avoids the loud "debugger.attach without
+      // permission" error message in the Errors panel.
+      let hasPerm = false;
+      try {
+        hasPerm = await new Promise((resolve) => {
+          chrome.permissions.contains({ permissions: ["debugger"] }, resolve);
+        });
+      } catch {}
+      if (!hasPerm) { sendResponse({ ok: false, error: "no_permission" }); return; }
+
+      let attached = false;
+      const detach = () => {
+        if (!attached) return;
+        try {
+          chrome.debugger.detach({ tabId }, () => { void chrome.runtime.lastError; });
+        } catch {}
+        attached = false;
+      };
+      try {
+        await new Promise((resolve, reject) => {
+          chrome.debugger.attach({ tabId }, "1.3", () => {
+            const err = chrome.runtime.lastError;
+            // "Another debugger is already attached" → DevTools is open. In
+            // that case we can't drive CDP. Fall back to the SW MAIN-world
+            // path by returning a soft error.
+            if (err && /already attached|cannot attach/i.test(err.message || "")) {
+              return reject(new Error("debugger_busy"));
+            }
+            if (err) return reject(new Error(err.message || "attach_failed"));
+            attached = true;
+            resolve();
+          });
+        });
+
+        // Find the button's centre coordinate inside the page. We do this via
+        // Runtime.evaluate (which runs in the page world) rather than
+        // chrome.scripting because we want the same CDP session that will
+        // dispatch the click — keeps coords consistent if the page reflows.
+        const evalResult = await new Promise((resolve, reject) => {
+          chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+            expression: `(()=>{
+              const all = Array.from(document.querySelectorAll('button,[role="button"],a[role="button"]'));
+              const visible = (el) => {
+                const r = el.getBoundingClientRect();
+                if (r.width < 1 || r.height < 1) return null;
+                const cs = getComputedStyle(el);
+                if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') return null;
+                return r;
+              };
+              const matches = (el) => {
+                const t = (el.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                const a = (el.getAttribute('aria-label') || '').toLowerCase();
+                return /send without a note/i.test(t) || /send without a note/i.test(a);
+              };
+              for (const el of all) {
+                if (!matches(el)) continue;
+                const r = visible(el);
+                if (!r) continue;
+                return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+              }
+              return null;
+            })()`,
+            returnByValue: true,
+            awaitPromise: false,
+          }, (result) => {
+            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+            resolve(result);
+          });
+        });
+
+        const coords = evalResult?.result?.value;
+        if (!coords) { sendResponse({ ok: false, error: "button_not_found" }); return; }
+
+        // Dispatch mousePressed + mouseReleased. These produce a real trusted
+        // click on the page — same path a hardware mouse takes.
+        for (const type of ["mousePressed", "mouseReleased"]) {
+          await new Promise((resolve, reject) => {
+            chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+              type,
+              x: coords.x,
+              y: coords.y,
+              button: "left",
+              buttons: type === "mousePressed" ? 1 : 0,
+              clickCount: 1,
+            }, () => {
+              if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+              resolve();
+            });
+          });
+        }
+        sendResponse({ ok: true, clicked: true, x: coords.x, y: coords.y });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      } finally {
+        detach();
+      }
+    })();
+    return true;
+  }
+
   // Open a profile in a background tab for contact-info enrichment.
   // Key improvements vs the old approach:
   //   1. Navigate directly to /overlay/contact-info/ so LinkedIn's SPA router

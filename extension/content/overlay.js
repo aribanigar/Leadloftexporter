@@ -1922,16 +1922,39 @@
     _showSendSpotlight();
     console.log("[LeadCaptura] step 3 → spotlight shown, auto-clicking 'Send without a note'");
 
-    // Phase A: aggressive auto-click with spotlight already visible. If
-    // auto-click lands within ~6 s the spotlight is removed before the user
-    // has time to react — totally silent send. Otherwise the spotlight is
-    // already there guiding the user to tap.
+    // Phase A: aggressive auto-click with spotlight already visible. Each
+    // round tries strategies in DESCENDING order of reliability:
+    //   1. chrome.debugger Input.dispatchMouseEvent → isTrusted=true,
+    //      accepted by LinkedIn unconditionally. Only available if the user
+    //      granted the optional `debugger` permission.
+    //   2. CSP-immune MAIN-world click via chrome.scripting (isTrusted=false
+    //      but bypasses page CSP and can reach React fiber tree).
+    //   3. dispatchHumanClick + _forceClick (isolated-world fallbacks).
+    // If ANY strategy closes the modal, the spotlight disappears within
+    // ~150 ms and the user never sees a manual prompt.
+    let _noPermSeen = false;
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
+      // Strategy 1: trusted OS-level click. Skip the round-trip if a previous
+      // attempt told us the permission isn't granted.
+      if (!_noPermSeen) {
+        const trusted = await _awaitTrustedDebuggerClick();
+        if (trusted.ok && trusted.clicked) {
+          // Wait ≤1.2 s for the modal to close before declaring success.
+          for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+          if (!_invitationModalOpen()) break;
+        } else if (trusted.error === "no_permission") {
+          _noPermSeen = true;
+        }
+      }
+
+      // Strategy 2: SW MAIN-world click (CSP-immune).
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
         for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
         if (!_invitationModalOpen()) break;
       }
+
+      // Strategy 3: isolated-world fallbacks.
       const sendBtn = _findSendWithoutNoteButton();
       if (sendBtn) {
         try { await dispatchHumanClick(sendBtn); } catch {}
@@ -1947,11 +1970,20 @@
     }
 
     // Phase B: spotlight stays up while we keep hammering the automated
-    // click every ~2 s, for up to 45 s — gives the user time to tap.
+    // click every ~2 s, for up to 45 s — gives the user time to tap. Still
+    // tries the trusted-click first in case the permission was granted mid-run.
     console.log("[LeadCaptura] step 3 → awaiting click (auto-retrying every 2 s)");
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w % 6 === 0) {
+        if (!_noPermSeen) {
+          const trusted = await _awaitTrustedDebuggerClick();
+          if (trusted.error === "no_permission") _noPermSeen = true;
+          if (trusted.ok && trusted.clicked) {
+            for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
+            if (!_invitationModalOpen()) break;
+          }
+        }
         await _awaitServiceWorkerMainWorldClick();
         const retryBtn = _findSendWithoutNoteButton();
         if (retryBtn) _forceClick(retryBtn);
@@ -2375,6 +2407,15 @@
   }
 
   async function connectAllVisible() {
+    // Request the `debugger` optional permission ONCE while we're still
+    // running inside the toolbar button's user-gesture context. If the user
+    // grants it, every subsequent "Send without a note" click is dispatched
+    // as a real trusted OS-level mouse event — LinkedIn accepts those
+    // unconditionally and the entire connect loop completes autonomously.
+    // If the user declines, we silently fall back to the existing spotlight
+    // + MAIN-world strategies (zero regression).
+    _maybeRequestDebuggerPermission();
+
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
     const Api = globalThis.__lcApi;
@@ -5054,6 +5095,72 @@
         resolve(false);
       }
     });
+  }
+
+  // Ask the service worker to drive a TRUSTED click on "Send without a note"
+  // via chrome.debugger + Input.dispatchMouseEvent. These dispatch as
+  // isTrusted=true (same as a real hardware click) so LinkedIn's invitation
+  // handler accepts them and the modal closes without any user interaction.
+  //
+  // Resolves to:
+  //   { ok:true,  clicked:true }                       → trusted click fired
+  //   { ok:false, error:"no_permission" }              → user hasn't granted
+  //   { ok:false, error:"debugger_busy" | "button..." } → other soft failures
+  //
+  // Caller treats any non-ok result as "fall back to MAIN-world + forceClick
+  // strategies" so this path is purely additive — never makes the connect
+  // flow worse than the prior version.
+  function _awaitTrustedDebuggerClick() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "lc:trustedClickSendWithoutNote" },
+          (resp) => {
+            if (chrome.runtime.lastError) {
+              return resolve({ ok: false, error: chrome.runtime.lastError.message });
+            }
+            resolve(resp || { ok: false });
+          }
+        );
+      } catch (e) {
+        resolve({ ok: false, error: String(e) });
+      }
+    });
+  }
+
+  // Track whether we've asked the user for the `debugger` permission this
+  // session. Avoids re-prompting on every Connect All click.
+  let _debuggerPermAsked = false;
+
+  // Synchronously request the `debugger` permission from within a user-gesture
+  // context (the toolbar's Connect All click handler). Chrome shows a prompt
+  // ONCE; if the user grants, the trusted-click path activates for every
+  // subsequent invite-send. If the user declines, every call to
+  // _awaitTrustedDebuggerClick returns no_permission and the connect flow
+  // falls back to the existing spotlight + MAIN-world strategies.
+  function _maybeRequestDebuggerPermission() {
+    if (_debuggerPermAsked) return;
+    _debuggerPermAsked = true;
+    try {
+      // Issue the request synchronously (no await) so Chrome credits this to
+      // the active click gesture. The promise resolves later.
+      chrome.permissions.request({ permissions: ["debugger"] }, (granted) => {
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "[LeadCaptura] debugger permission request:",
+            chrome.runtime.lastError.message
+          );
+          return;
+        }
+        console.log(
+          granted
+            ? "[LeadCaptura] debugger permission granted — invites will auto-send"
+            : "[LeadCaptura] debugger permission denied — spotlight fallback active"
+        );
+      });
+    } catch (e) {
+      console.warn("[LeadCaptura] permission request threw:", e?.message || e);
+    }
   }
 
   // ---- Global auto-confirm of the invitation modal ----------------------
