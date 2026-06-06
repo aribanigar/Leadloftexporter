@@ -1972,10 +1972,12 @@
     }
     console.log("[LeadCaptura] step 2 → invite modal detected");
 
-    // Wait for React to finish mounting the modal's button handlers.
-    // LinkedIn binds click handlers ~250–400ms after the dialog appears;
-    // clicking before that is a reliable no-op.
-    await sleep(400 + Math.random() * 150);
+    // Wait for React to finish mounting the modal's button handlers and
+    // for LinkedIn's CSS animation to complete. LinkedIn binds click handlers
+    // ~250–400ms after the dialog appears; clicking before that is a no-op.
+    // 600ms ensures the animation (typically 300ms) has fully completed AND
+    // React has bound all handlers before we attempt the first click.
+    await sleep(600 + Math.random() * 150);
 
     // ---- STEP 3 + 4: click "Send without a note", confirm it closes -------
     //
@@ -5313,18 +5315,15 @@
   let _inviteHighlightShown = false;
 
   async function _autoConfirmInviteModal() {
-    // Note: we no longer bail when state.connectActive is true.
-    // _sendConnectOnCard already shows the spotlight and owns the wait;
-    // the 400ms poll below is a no-op while its own Phase B loop is running
-    // (both check _invitationModalOpen which would be false once done).
-    // We keep _inviteAutoBusy so this function never runs concurrently.
+    // Guard: never run concurrently (two concurrent spotlights would fight).
     if (_inviteAutoBusy) return;
     if (!_invitationModalOpen()) {
       if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
     }
-    // During a Connect All run _sendConnectOnCard is already managing the overlay.
-    // Skip this handler so we don't show a second spotlight on top.
+    // During a Connect All run, _sendConnectOnCard owns the spotlight and the
+    // automated click loop. Bail here to avoid creating a second spotlight that
+    // would tear down _sendConnectOnCard's spotlight via _removeSpotlight().
     if (state.connectActive) return;
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;

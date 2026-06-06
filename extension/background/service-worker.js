@@ -344,7 +344,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             const r = b.getBoundingClientRect();
             if (r.width < 1 || r.height < 1) return false;
             const cs = getComputedStyle(b);
-            if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+            if (cs.visibility === "hidden" || cs.display === "none") return false;
             return true;
           });
           if (!btn) return { found: false };
@@ -515,7 +515,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                 const r = el.getBoundingClientRect();
                 if (r.width < 1 || r.height < 1) return null;
                 const cs = getComputedStyle(el);
-                if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') return null;
+                if (cs.visibility === 'hidden' || cs.display === 'none') return null;
                 return r;
               };
               const matches = (el) => {
