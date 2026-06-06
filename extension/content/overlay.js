@@ -1721,15 +1721,24 @@
     return null;
   }
 
-  // True while the invitation modal is on screen. We consider it open if either
-  // a matching dialog node is visible OR a "Send without a note" button is
-  // visible — whichever our heuristics catch first. This prevents the watcher
-  // from bailing when the dialog's role attribute changes but the button is
-  // clearly there.
+  // True while the invitation modal is on screen.
+  // v1.0.146: No longer requires the button to be "visible" — LinkedIn's modal
+  // animation can keep the button in the DOM with opacity=0 or partially
+  // off-screen during the open/close transition, which caused _isVisible() to
+  // return false and the detection to fail. We now return true as soon as the
+  // "Send without a note" button EXISTS anywhere in the DOM (or a structural
+  // modal selector matches). This matches how the Sales Nav path works.
   function _invitationModalOpen() {
     if (_findInvitationModal()) return true;
-    const b = _findSendWithoutNoteButton();
-    return !!(b && _isVisible(b));
+    // Scan all buttons — no visibility requirement, just presence in DOM.
+    const all = document.querySelectorAll("button, [role='button'], a[role='button']");
+    for (const b of all) {
+      if (b.classList?.contains("lc-inline-save")) continue;
+      const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
+    }
+    return false;
   }
 
   // Find the "Send without a note" button. Searches the WHOLE document (not
@@ -1908,21 +1917,60 @@
     await dispatchHumanClick(connectBtn);
 
     // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
-    let dialogOpen = false;
-    for (let i = 0; i < 32; i++) {
-      await sleep(250);
-      if (_invitationModalOpen()) { dialogOpen = true; break; }
-    }
-    if (!dialogOpen) {
-      // No dialog appeared. Some connections (e.g. people who already follow
-      // you) complete instantly with no "add a note" step — if the row no
-      // longer offers Connect, treat it as done; otherwise report no-dialog.
-      const cls = _classifyButton(connectBtn);
-      if (cls === "pending" || cls === "connected") return { ok: true };
-      console.log("[LeadCaptura] step 2 → no dialog opened after 8s");
+    // v1.0.146: MutationObserver fires the instant "Send without a note" text
+    // appears anywhere in the DOM — much faster and more reliable than the
+    // previous 250ms polling which missed the button during LinkedIn's fade-in
+    // animation. The observer also catches the case where the modal is already
+    // in the DOM before the first poll tick.
+    const dialogFound = await new Promise((resolve) => {
+      // Raw DOM scan — no visibility check needed; just presence in DOM.
+      const hasSendBtn = () => {
+        const all = document.querySelectorAll("button, [role='button'], a[role='button']");
+        for (const b of all) {
+          if (b.classList?.contains("lc-inline-save")) continue;
+          const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+          const a = b.getAttribute("aria-label") || "";
+          if (/send without a note/i.test(t) || /send without a note/i.test(a)) return true;
+        }
+        // Fallback: modal title text in body
+        return /send without a note|add a note to your invitation/i.test(
+          document.body?.textContent || ""
+        );
+      };
+      // Immediate check (modal might already be mounted)
+      if (hasSendBtn()) { resolve(true); return; }
+      let done = false;
+      const to = setTimeout(() => {
+        if (done) return;
+        done = true;
+        obs.disconnect();
+        if (hasSendBtn()) { resolve(true); return; }
+        // Direct connection? Button state changed to pending/connected.
+        try {
+          const cls2 = connectBtn ? _classifyButton(connectBtn) : null;
+          if (cls2 === "pending" || cls2 === "connected") { resolve("direct"); return; }
+        } catch {}
+        resolve(false);
+      }, 8000);
+      const obs = new MutationObserver(() => {
+        if (done) return;
+        if (hasSendBtn()) {
+          done = true;
+          clearTimeout(to);
+          obs.disconnect();
+          resolve(true);
+        }
+      });
+      try { obs.observe(document.body, { childList: true, subtree: true }); } catch {}
+    });
+
+    if (dialogFound === "direct") return { ok: true };
+    if (!dialogFound) {
+      // No dialog appeared. Log for debugging.
+      console.log("[LeadCaptura] step 2 → no dialog found after 8s");
       return { ok: false, reason: "no_dialog" };
     }
-    console.log("[LeadCaptura] step 2 → dialog opened");
+    console.log("[LeadCaptura] step 2 → invite modal detected");
 
     // Wait for React to finish mounting the modal's button handlers.
     // LinkedIn binds click handlers ~250–400ms after the dialog appears;
@@ -1947,18 +1995,15 @@
     _showSendSpotlight();
     console.log("[LeadCaptura] step 3 → spotlight shown, auto-clicking 'Send without a note'");
 
-    // Phase A: aggressive auto-click with spotlight already visible. Each
-    // round tries strategies in DESCENDING order of reliability:
-    //   1. isTrusted-prototype-patch click → forges isTrusted=true on every
-    //      synthetic event, defeats LinkedIn's `if (!event.isTrusted) return`
-    //      gate. No permission needed. NEW in v1.0.145.
-    //   2. chrome.debugger Input.dispatchMouseEvent → real OS-level click.
-    //      Only available if the user granted the optional `debugger` perm.
-    //   3. CSP-immune MAIN-world click via chrome.scripting (CSP-immune but
-    //      isTrusted=false — gets through if LinkedIn doesn't gate).
-    //   4. dispatchHumanClick + _forceClick (isolated-world fallbacks).
-    // If ANY strategy closes the modal, the spotlight disappears within
-    // ~150 ms and the user never sees a manual prompt.
+    // Phase A: aggressive auto-click with spotlight visible. Five strategies:
+    //   1. isTrusted-prototype-patch → patches Event.prototype.isTrusted getter
+    //      to return true for the duration of the click, defeating the gate.
+    //   2. chrome.debugger mouse → OS-level mousePressed/mouseReleased (truly trusted).
+    //   3. chrome.debugger keyboard Enter → focus button + dispatch Enter key.
+    //      Keyboard-derived clicks have isTrusted=true at the C++ level, bypassing
+    //      even stored getter references (most robust of all approaches).
+    //   4. CSP-immune MAIN-world click via chrome.scripting.
+    //   5. dispatchHumanClick + _forceClick (isolated-world fallbacks).
     let _noPermSeen = false;
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
       // Strategy 1: isTrusted-patch click — no permission required, runs first.
@@ -1968,9 +2013,8 @@
         if (!_invitationModalOpen()) break;
       }
 
-      // Strategy 2: trusted OS-level click. Skip the round-trip if a previous
-      // attempt told us the permission isn't granted.
       if (!_noPermSeen) {
+        // Strategy 2: trusted OS-level mouse click via chrome.debugger.
         const trusted = await _awaitTrustedDebuggerClick();
         if (trusted.ok && trusted.clicked) {
           for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
@@ -1978,16 +2022,28 @@
         } else if (trusted.error === "no_permission") {
           _noPermSeen = true;
         }
+        if (!_invitationModalOpen()) break;
+
+        // Strategy 3: keyboard Enter via chrome.debugger — generates a trusted
+        // keyboard-derived click at the C++ level. Most reliable when isTrusted
+        // is checked via a stored getter reference.
+        if (!_noPermSeen) {
+          const keyed = await _awaitDebuggerKeyEnterClick();
+          if (keyed) {
+            for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
+            if (!_invitationModalOpen()) break;
+          }
+        }
       }
 
-      // Strategy 3: SW MAIN-world click (CSP-immune).
+      // Strategy 4: SW MAIN-world click (CSP-immune).
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
         for (let w = 0; w < 8 && _invitationModalOpen(); w++) await sleep(150);
         if (!_invitationModalOpen()) break;
       }
 
-      // Strategy 4: isolated-world fallbacks.
+      // Strategy 5: isolated-world fallbacks.
       const sendBtn = _findSendWithoutNoteButton();
       if (sendBtn) {
         try { await dispatchHumanClick(sendBtn); } catch {}
@@ -2020,6 +2076,14 @@
           if (trusted.ok && trusted.clicked) {
             for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
             if (!_invitationModalOpen()) break;
+          }
+          // Keyboard Enter (most trusted path)
+          if (!_noPermSeen) {
+            const keyed = await _awaitDebuggerKeyEnterClick();
+            if (keyed) {
+              for (let i = 0; i < 8 && _invitationModalOpen(); i++) await sleep(150);
+              if (!_invitationModalOpen()) break;
+            }
           }
         }
         await _awaitServiceWorkerMainWorldClick();
@@ -5184,6 +5248,24 @@
         );
       } catch (e) {
         resolve({ ok: false, error: String(e) });
+      }
+    });
+  }
+
+  // Ask the service worker to focus the "Send without a note" button and then
+  // dispatch a real keyboard Enter key via chrome.debugger. A keyboard-derived
+  // click event has isTrusted=true at the browser C++ level — it bypasses ANY
+  // JavaScript-level isTrusted check, including stored getter references.
+  // Requires the optional `debugger` permission.
+  function _awaitDebuggerKeyEnterClick() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "lc:debuggerKeyEnterClick" }, (resp) => {
+          if (chrome.runtime.lastError) return resolve(false);
+          resolve(!!(resp && resp.ok));
+        });
+      } catch {
+        resolve(false);
       }
     });
   }

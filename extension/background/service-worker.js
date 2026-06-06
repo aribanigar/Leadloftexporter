@@ -567,7 +567,115 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             });
           });
         }
+        // Also focus + keyboard Enter for belt-and-suspenders: a keyboard-derived
+        // click has isTrusted=true even when the handler stores the original getter.
+        try {
+          await new Promise((res) => chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+            expression: `(()=>{
+              const btn = Array.from(document.querySelectorAll('button,[role="button"],a[role="button"]'))
+                .find(b => /send without a note/i.test((b.textContent||'').replace(/\\s+/g,' ').trim()) ||
+                           /send without a note/i.test(b.getAttribute('aria-label')||''));
+              if (btn) { btn.scrollIntoView({block:'center'}); btn.focus(); return true; }
+              return false;
+            })()`,
+            returnByValue: true, awaitPromise: false,
+          }, () => res()));
+          await new Promise(r => setTimeout(r, 100));
+          for (const kType of ["keyDown", "keyUp"]) {
+            await new Promise((res) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+              type: kType, windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13,
+              key: "Enter", code: "Enter", text: kType === "keyDown" ? "\r" : "", modifiers: 0,
+            }, () => res()));
+            await new Promise(r => setTimeout(r, 50));
+          }
+        } catch (_) {}
         sendResponse({ ok: true, clicked: true, x: coords.x, y: coords.y });
+      } catch (e) {
+        sendResponse({ ok: false, error: e?.message || String(e) });
+      } finally {
+        detach();
+      }
+    })();
+    return true;
+  }
+
+  // ── Keyboard Enter click via chrome.debugger ─────────────────────────────
+  // Focus the "Send without a note" button and dispatch a keyboard Enter key.
+  // A keyboard-derived click event is created by Chrome at the C++ level with
+  // isTrusted=true — this is the most robust approach because it bypasses
+  // BOTH the `if (!event.isTrusted) return` check AND any stored getter
+  // references that would defeat the Event.prototype patch.
+  if (msg?.type === "lc:debuggerKeyEnterClick") {
+    const tabId = _sender?.tab?.id;
+    if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    (async () => {
+      let hasPerm = false;
+      try {
+        hasPerm = await new Promise((r) => chrome.permissions.contains({ permissions: ["debugger"] }, r));
+      } catch {}
+      if (!hasPerm) { sendResponse({ ok: false, error: "no_permission" }); return; }
+
+      let attached = false;
+      const detach = () => {
+        if (!attached) return;
+        try { chrome.debugger.detach({ tabId }, () => void chrome.runtime.lastError); } catch {}
+        attached = false;
+      };
+      try {
+        await new Promise((res, rej) => chrome.debugger.attach({ tabId }, "1.3", () => {
+          const e = chrome.runtime.lastError;
+          if (e && /already attached|cannot attach/i.test(e.message || "")) return rej(new Error("debugger_busy"));
+          if (e) return rej(new Error(e.message || "attach_failed"));
+          attached = true; res();
+        }));
+
+        // Focus the button inside the page via Runtime.evaluate
+        const focusResult = await new Promise((res) =>
+          chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+            expression: `(()=>{
+              const all = Array.from(document.querySelectorAll('button,[role="button"],a[role="button"]'));
+              const btn = all.find(b => {
+                if (b.classList?.contains('lc-inline-save')) return false;
+                const t = (b.textContent||'').replace(/\\s+/g,' ').trim();
+                const a = b.getAttribute('aria-label')||'';
+                return /send without a note/i.test(t) || /send without a note/i.test(a);
+              });
+              if (!btn) return false;
+              btn.scrollIntoView({ block: 'center' });
+              btn.focus();
+              return true;
+            })()`,
+            returnByValue: true,
+            awaitPromise: false,
+          }, (r) => res(r))
+        );
+
+        if (!focusResult?.result?.value) {
+          sendResponse({ ok: false, error: "button_not_found" });
+          return;
+        }
+
+        // Small pause for focus to settle before key dispatch
+        await new Promise((r) => setTimeout(r, 120));
+
+        // Dispatch Enter keydown then keyup. Chrome synthesises a click event
+        // on the focused button with isTrusted=true — same as a physical keyboard.
+        for (const kType of ["keyDown", "keyUp"]) {
+          await new Promise((res) =>
+            chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+              type: kType,
+              windowsVirtualKeyCode: 13,
+              nativeVirtualKeyCode: 13,
+              key: "Enter",
+              code: "Enter",
+              text: kType === "keyDown" ? "\r" : "",
+              modifiers: 0,
+            }, () => res())
+          );
+          await new Promise((r) => setTimeout(r, 60));
+        }
+
+        sendResponse({ ok: true });
       } catch (e) {
         sendResponse({ ok: false, error: e?.message || String(e) });
       } finally {
