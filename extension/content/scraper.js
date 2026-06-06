@@ -972,6 +972,89 @@
     }
   }
 
+  // ── Phone-number country-code normalisation ─────────────────────────────────
+  // Many LinkedIn profiles store phone numbers in local format (e.g. "0551234567"
+  // for a Saudi number or "01116203919" for an Egyptian one). We infer the dial
+  // code from the profile's location string and prepend it so WhatsApp links and
+  // CRM integrations always get E.164-style numbers.
+  const _COUNTRY_DIAL_CODES = [
+    // Multi-word / specific first to prevent partial false-matches.
+    ["united states", "+1"], ["united kingdom", "+44"],
+    ["saudi arabia", "+966"], ["south africa", "+27"],
+    ["south korea", "+82"], ["new zealand", "+64"],
+    ["united arab emirates", "+971"], ["czech republic", "+420"],
+    ["czechia", "+420"], ["ivory coast", "+225"], ["côte d'ivoire", "+225"],
+    // UAE cities — checked before generic "uae/emirates"
+    ["dubai", "+971"], ["abu dhabi", "+971"], ["sharjah", "+971"],
+    ["ajman", "+971"], ["ras al-khaimah", "+971"], ["fujairah", "+971"],
+    // Other GCC cities
+    ["riyadh", "+966"], ["jeddah", "+966"], ["mecca", "+966"], ["medina", "+966"],
+    ["dammam", "+966"], ["doha", "+974"], ["muscat", "+968"],
+    ["kuwait city", "+965"], ["manama", "+973"], ["amman", "+962"],
+    // Abbreviations & common city/country names
+    ["uae", "+971"], ["emirates", "+971"], ["usa", "+1"], ["us", "+1"],
+    ["uk", "+44"], ["qatar", "+974"], ["bahrain", "+973"], ["kuwait", "+965"],
+    ["oman", "+968"], ["jordan", "+962"], ["egypt", "+20"],
+    ["cairo", "+20"], ["alexandria", "+20"],
+    ["india", "+91"], ["bangalore", "+91"], ["mumbai", "+91"],
+    ["delhi", "+91"], ["hyderabad", "+91"], ["chennai", "+91"],
+    ["pakistan", "+92"], ["karachi", "+92"], ["lahore", "+92"],
+    ["bangladesh", "+880"], ["sri lanka", "+94"], ["nepal", "+977"],
+    ["germany", "+49"], ["berlin", "+49"], ["munich", "+49"],
+    ["france", "+33"], ["paris", "+33"],
+    ["italy", "+39"], ["spain", "+34"],
+    ["netherlands", "+31"], ["belgium", "+32"], ["austria", "+43"],
+    ["switzerland", "+41"], ["sweden", "+46"], ["norway", "+47"],
+    ["denmark", "+45"], ["finland", "+358"], ["poland", "+48"],
+    ["portugal", "+351"], ["greece", "+30"], ["ukraine", "+380"],
+    ["russia", "+7"], ["turkey", "+90"],
+    ["australia", "+61"], ["sydney", "+61"], ["melbourne", "+61"],
+    ["canada", "+1"], ["brazil", "+55"], ["argentina", "+54"],
+    ["mexico", "+52"], ["colombia", "+57"], ["chile", "+56"],
+    ["china", "+86"], ["beijing", "+86"], ["shanghai", "+86"],
+    ["japan", "+81"], ["tokyo", "+81"],
+    ["singapore", "+65"], ["malaysia", "+60"], ["kuala lumpur", "+60"],
+    ["indonesia", "+62"], ["jakarta", "+62"],
+    ["philippines", "+63"], ["manila", "+63"],
+    ["thailand", "+66"], ["bangkok", "+66"],
+    ["vietnam", "+84"], ["myanmar", "+95"], ["cambodia", "+855"],
+    ["hong kong", "+852"], ["taiwan", "+886"],
+    ["israel", "+972"], ["tel aviv", "+972"],
+    ["lebanon", "+961"], ["beirut", "+961"],
+    ["iraq", "+964"], ["iran", "+98"], ["syria", "+963"],
+    ["yemen", "+967"], ["nigeria", "+234"], ["lagos", "+234"],
+    ["kenya", "+254"], ["nairobi", "+254"], ["ghana", "+233"],
+    ["ethiopia", "+251"], ["tanzania", "+255"], ["uganda", "+256"],
+    ["rwanda", "+250"], ["zambia", "+260"], ["zimbabwe", "+263"],
+    ["algeria", "+213"], ["morocco", "+212"], ["tunisia", "+216"],
+    ["libya", "+218"], ["sudan", "+249"], ["senegal", "+221"],
+    ["cameroon", "+237"], ["maldives", "+960"], ["mauritius", "+230"],
+  ];
+
+  function _inferDialCode(locationStr) {
+    if (!locationStr) return null;
+    const loc = locationStr.toLowerCase();
+    for (const [name, code] of _COUNTRY_DIAL_CODES) {
+      if (loc.includes(name)) return code;
+    }
+    return null;
+  }
+
+  // Exported as Scraper.normalizePhoneCountryCode(phone, locationHint).
+  // Adds the inferred country dial code when the number lacks one.
+  function normalizePhoneCountryCode(phone, locationHint) {
+    if (!phone) return phone;
+    const p = phone.trim();
+    if (!p) return phone;
+    if (p.startsWith("+")) return p;           // already has country code
+    if (p.startsWith("00")) return "+" + p.slice(2); // 00xx → +xx
+    const code = _inferDialCode(locationHint);
+    if (!code) return p;
+    // Strip leading zero that most countries use for the local trunk prefix.
+    const local = p.startsWith("0") ? p.slice(1) : p;
+    return code + local;
+  }
+
   async function scrapeContactInfo({
     timeoutMs = 3000,
     settleMs = 400,
@@ -1288,6 +1371,11 @@
         const fromText = _scrapeFromProfileText();
         if (!base.email && fromText.email) base.email = fromText.email;
         if (!base.phone && fromText.phone) base.phone = fromText.phone;
+      }
+
+      // Normalize phone country code now that both phone and location are known.
+      if (base.phone) {
+        base.phone = normalizePhoneCountryCode(base.phone, base.location);
       }
 
       base.raw = {
@@ -1956,6 +2044,7 @@
     pageType,
     scrapeProfile,
     scrapeProfileWithContact,
+    normalizePhoneCountryCode,
     scrapeContactInfo,
     scrapeContactInfoViaIframe,
     scrapeSalesNavProfile,
