@@ -188,8 +188,23 @@ def bulk_message(
         base = base.filter(Lead.stage_id == body.stage_id)
     leads = base.all()
 
-    # Skip leads that already have a pending/claimed message job so an
+    now = datetime.now(timezone.utc)
+
+    # Expire stale message jobs older than 24 h — jobs that were never picked up
+    # (or claimed but never finished) block all future resends permanently.
+    # The 10-min reclaim in /extension/jobs/next only runs when the extension is
+    # active; if it's been offline for a day the queued/claimed rows linger.
+    stale_cutoff = now - timedelta(hours=24)
+    db.query(ExtensionJob).filter(
+        ExtensionJob.workspace_id == ctx.workspace_id,
+        ExtensionJob.kind == "message",
+        ExtensionJob.status.in_(("queued", "claimed")),
+        ExtensionJob.created_at < stale_cutoff,
+    ).update({ExtensionJob.status: "expired"}, synchronize_session=False)
+
+    # Skip leads that already have a RECENT pending/claimed message job so an
     # accidental double-click doesn't queue the same message twice.
+    # Only jobs from the last 24 h count — older ones were expired above.
     already_pending = {
         r[0]
         for r in db.query(ExtensionJob.lead_id)
@@ -197,11 +212,10 @@ def bulk_message(
             ExtensionJob.workspace_id == ctx.workspace_id,
             ExtensionJob.kind == "message",
             ExtensionJob.status.in_(("queued", "claimed")),
+            ExtensionJob.created_at >= stale_cutoff,
         )
         .all()
     }
-
-    now = datetime.now(timezone.utc)
     queued = 0
     skipped_no_linkedin = 0
     skipped_pending = 0
