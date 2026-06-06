@@ -476,16 +476,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "lc:trustedClickSendWithoutNote") {
     const tabId = _sender?.tab?.id;
     if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    // debugger is now a required manifest permission — always available.
     (async () => {
-      // Permission check first — avoids the loud "debugger.attach without
-      // permission" error message in the Errors panel.
-      let hasPerm = false;
-      try {
-        hasPerm = await new Promise((resolve) => {
-          chrome.permissions.contains({ permissions: ["debugger"] }, resolve);
-        });
-      } catch {}
-      if (!hasPerm) { sendResponse({ ok: false, error: "no_permission" }); return; }
 
       let attached = false;
       const detach = () => {
@@ -608,13 +600,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "lc:debuggerKeyEnterClick") {
     const tabId = _sender?.tab?.id;
     if (!tabId) { sendResponse({ ok: false, error: "no_tab_id" }); return true; }
+    // debugger is now a required manifest permission — always available.
     (async () => {
-      let hasPerm = false;
-      try {
-        hasPerm = await new Promise((r) => chrome.permissions.contains({ permissions: ["debugger"] }, r));
-      } catch {}
-      if (!hasPerm) { sendResponse({ ok: false, error: "no_permission" }); return; }
-
       let attached = false;
       const detach = () => {
         if (!attached) return;

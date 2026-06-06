@@ -2512,12 +2512,7 @@
     // Request the `debugger` optional permission ONCE while we're still
     // running inside the toolbar button's user-gesture context. If the user
     // grants it, every subsequent "Send without a note" click is dispatched
-    // as a real trusted OS-level mouse event — LinkedIn accepts those
-    // unconditionally and the entire connect loop completes autonomously.
-    // If the user declines, we silently fall back to the existing spotlight
-    // + MAIN-world strategies (zero regression).
-    _maybeRequestDebuggerPermission();
-
+    // debugger is now a required permission (manifest v1.0.147) — always available.
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
     const Api = globalThis.__lcApi;
@@ -5103,9 +5098,14 @@
 
       const tick = () => {
         if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        // v1.0.147: no longer require _isVisible — the button may have opacity:0
+        // during LinkedIn's modal fade-in animation, causing _isVisible to return
+        // false and the cutout to never get positioned.
         const btn = _findSendWithoutNoteButton();
-        if (btn && _isVisible(btn)) {
+        if (btn) {
           const r = btn.getBoundingClientRect();
+          // Skip if the button has zero size (not yet rendered)
+          if (r.width < 2 || r.height < 2) { _spotlightRAF = requestAnimationFrame(tick); return; }
           const pad = 14;
           _spotlightEl.style.cssText = [
             `left:${r.left - pad}px`, `top:${r.top - pad}px`,
