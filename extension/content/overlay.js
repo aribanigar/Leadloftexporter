@@ -2199,34 +2199,43 @@
       aria: moreBtn.getAttribute("aria-label"),
       cls: moreBtn.className,
     });
-    // Spotlight on the "..." button so the user can visually track the run.
-    _showButtonSpotlight(moreBtn, "⚡ Opening menu", "auto-clicking '...'", 700);
-    await sleep(500 + Math.random() * 200);
+    // No spotlight on the "..." button — the dropdown appears within ~300ms
+    // and a spotlight here would either block the dropdown visually or get
+    // dismissed by the dropdown's own open animation. The Connect-item
+    // spotlight in STEP 3 is the one users need to see.
+    await sleep(200 + Math.random() * 200);
     // Click via human pointer sequence first.
     try { await dispatchHumanClick(moreBtn); } catch {}
 
     // STEP 2: wait for the dropdown to open AND for "Connect" to appear.
     // Sales Nav can take ~1s to mount the dropdown content portal.
+    //
+    // Critical: DO NOT re-click the "..." button once the dropdown is open —
+    // that would close it again. Only retry the trigger click while the
+    // dropdown is still closed.
     let connectItem = null;
     let dropdownOpened = false;
+    const _dropdownVisible = () => {
+      const expanded = moreBtn.getAttribute("aria-expanded");
+      if (expanded === "true") return true;
+      const sel =
+        ".artdeco-dropdown__content--is-open, " +
+        ".artdeco-dropdown__content[aria-hidden='false'], " +
+        ".artdeco-hoverable-content--visible, " +
+        ".artdeco-hoverable-content, " +
+        "[data-test-popover], " +
+        "[class*='popover']:not([aria-hidden='true']), " +
+        "[role='menu']:not([aria-hidden='true'])";
+      return Array.from(document.querySelectorAll(sel)).some(_isVisible);
+    };
     for (let i = 0; i < 40 && !connectItem; i++) {
       await sleep(150);
-      // Dropdown open signal — Artdeco toggles aria-expanded or content--is-open.
-      if (!dropdownOpened) {
-        const expanded = moreBtn.getAttribute("aria-expanded");
-        dropdownOpened =
-          expanded === "true" ||
-          !!document.querySelector(
-            ".artdeco-dropdown__content--is-open, " +
-            ".artdeco-hoverable-content--visible, " +
-            "[data-test-popover]"
-          );
-      }
+      if (!dropdownOpened && _dropdownVisible()) dropdownOpened = true;
       connectItem = _findSalesNavConnectMenuItem();
-      // Retry the trigger click periodically — some Sales Nav builds need a
-      // second click. Three retries spread across the 6s wait.
+      // Retry the trigger click ONLY if the dropdown still isn't open. Three
+      // retries spread across the 6s wait. Never re-click once it's open.
       if (!dropdownOpened && (i === 8 || i === 16 || i === 24)) {
-        console.log(`[LeadCaptura] salesNav step 1.${i / 8} → retry '...' click + _forceClick`);
+        console.log(`[LeadCaptura] salesNav step 1.${i / 8} → retry '...' click`);
         try { _forceClick(moreBtn); } catch {}
         try { await dispatchHumanClick(moreBtn); } catch {}
       }
