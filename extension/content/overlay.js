@@ -2403,6 +2403,14 @@
   }
 
   async function connectAllVisible() {
+    // Sales Navigator path — in-place dropdown flow, no navigation.
+    // SalesNav lacks the simple Connect button on cards; the only path is the
+    // "..." More options dropdown → Connect → invitation modal. Restored in
+    // v1.0.165 after the v1.0.155 nav-driven rewrite accidentally dropped it.
+    if (location.pathname.startsWith("/sales/")) {
+      return await _connectAllVisibleSalesNav();
+    }
+
     const userSelected = state.selectedUrls.size > 0;
     const autoPaginate = !userSelected;
 
@@ -2434,6 +2442,139 @@
     _lcToast(`⚡ Connect All — opening profile 1/${urls.length}`, 2800);
     await new Promise((r) => setTimeout(r, 1500));
     location.href = urls[0];
+  }
+
+  // Sales Navigator in-place Connect All (restored from pre-v1.0.155).
+  // No navigation: walks visible chip URLs on the current SalesNav page,
+  // opens each card's "..." dropdown, clicks Connect, then handles the
+  // invitation modal via the existing _showSendSpotlight + force-click loop.
+  async function _connectAllVisibleSalesNav() {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const Api = globalThis.__lcApi;
+
+    const userSelected = state.selectedUrls.size > 0;
+    const autoPage = !userSelected;
+
+    let urls = (
+      userSelected ? Array.from(state.selectedUrls) : _allChipUrls()
+    ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
+
+    if (!urls.length) {
+      flashStatus("No profiles selected to connect with", "warn");
+      return;
+    }
+    urls = urls.map((u) => {
+      try { return new URL(u, "https://www.linkedin.com").href; }
+      catch { return u; }
+    });
+
+    state.connectActive = true;
+    state.connectCancel = false;
+    try { unmountSelectAllHeader(); } catch {}
+    try { renderToolbar(); } catch {}
+
+    let sent = 0, followed = 0, skipped = 0, failed = 0, processed = 0, pageNum = 1;
+    const summarise = () =>
+      `Connect All: ${sent} invited` +
+      (followed ? `, ${followed} followed` : "") +
+      `, ${skipped} skipped` +
+      (failed ? `, ${failed} failed` : "");
+
+    try {
+      outer:
+      while (true) {
+        for (const url of urls) {
+          if (state.connectCancel) break outer;
+
+          if (state.avoidDuplicates && _isContacted(url)) {
+            skipped++;
+            _setChipState(url, "saved", "Already contacted");
+            continue;
+          }
+
+          const card = _cardForUrl(url);
+          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+
+          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+          if (cls === "unknown" || !card) { skipped++; continue; }
+
+          processed++;
+          _setChipState(url, "saving", "Connecting…");
+
+          let result;
+          if (cls === "follow") {
+            // Follow-only cards: try Connect via overflow first, fall back to Follow.
+            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
+            if (_overflowResult.ok) {
+              result = _overflowResult;
+            } else if (
+              _overflowResult.reason === "no_more_btn" ||
+              _overflowResult.reason === "no_connect_in_dropdown" ||
+              _overflowResult.reason === "dropdown_did_not_open"
+            ) {
+              result = await _sendFollowOnCard(card, presetBtn);
+            } else {
+              result = _overflowResult;
+            }
+          } else if (cls === "salesnav-connectable") {
+            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 400);
+            result = await _sendConnectViaSalesNavDropdown(card);
+          } else {
+            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 300);
+            result = await _sendConnectOnCard(card, presetBtn);
+          }
+
+          if (result.ok) {
+            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+            _markContacted(url);
+            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+          } else {
+            failed++;
+            _setChipState(url, "error", "Skipped");
+            if (_invitationModalOpen()) _closeAnyDialog();
+          }
+
+          flashStatus(`${summarise()} (${processed})`);
+          if (state.connectCancel) break outer;
+          await sleep(_connectGap());
+        }
+
+        if (!autoPage || state.connectCancel) break;
+        const nextBtn = _findNextPageButton();
+        if (!nextBtn) break;
+        const sig = _pageSignature();
+        try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+        await sleep(400 + Math.random() * 400);
+        await dispatchHumanClick(nextBtn);
+        let changed = false;
+        for (let i = 0; i < 40 && !state.connectCancel; i++) {
+          await sleep(300);
+          if (_pageSignature() !== sig) { changed = true; break; }
+        }
+        if (!changed || state.connectCancel) break;
+        await _scrollLoadPage();
+        try { decorateSearchCards(); } catch {}
+        await sleep(800 + Math.random() * 600);
+        pageNum++;
+        urls = _allChipUrls()
+          .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
+          .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+        if (!urls.length) break;
+      }
+    } finally {
+      state.connectActive = false;
+      state.connectCancel = false;
+      try { mountSelectAllHeader(); } catch {}
+      try { renderToolbar(); } catch {}
+    }
+    const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
+    flashStatus(`Connect All done: ${summarise()}${pageLabel} ✓`, "ok");
   }
 
   // ====================================================================
@@ -5009,6 +5150,75 @@
     _removeSendBtnHighlight();
   }
 
+  // Lightweight generic-button spotlight: a transparent cutout + banner + arrow
+  // anchored on an arbitrary element for `durationMs` ms, then auto-cleared.
+  // Used by Message All to announce "I'm about to click this button" right
+  // before the actual click. Pure visual — pointer-events:none on overlays so
+  // clicks fall through to the real button.
+  // LinkedIn ONLY — Sales Navigator paths never call this.
+  function _showButtonSpotlight(targetEl, title, subtitle, durationMs = 1100) {
+    if (!targetEl || !_isVisible(targetEl)) return;
+    _removeSpotlight();
+    try {
+      const spot = document.createElement("div");
+      spot.id = "lc-send-spotlight";
+      document.body.appendChild(spot);
+      _spotlightEl = spot;
+
+      const banner = document.createElement("div");
+      banner.id = "lc-send-banner";
+      banner.innerHTML =
+        `<div style="font-size:16px!important;font-weight:800!important;margin-bottom:3px!important;">${title}</div>` +
+        `<div id="lc-send-banner-sub" style="font-size:12px!important;font-weight:500!important;opacity:0.92!important;">${subtitle}</div>`;
+      document.body.appendChild(banner);
+      _bannerEl = banner;
+
+      const arrow = document.createElement("div");
+      arrow.id = "lc-send-btn-arrow";
+      arrow.innerHTML =
+        `<div class="lc-arrow-inner"><span class="lc-arrow-emoji">👇</span><span>Click target</span></div>` +
+        `<div class="lc-arrow-tail"></div>`;
+      document.body.appendChild(arrow);
+      _arrowEl = arrow;
+
+      _playSpotlightBeep();
+
+      const tick = () => {
+        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        if (!targetEl.isConnected || !_isVisible(targetEl)) {
+          _removeSpotlight();
+          return;
+        }
+        const r = targetEl.getBoundingClientRect();
+        const pad = 12;
+        _spotlightEl.style.cssText = [
+          `left:${r.left - pad}px`, `top:${r.top - pad}px`,
+          `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
+        ].join("!important;") + "!important;";
+
+        const bw = _bannerEl.offsetWidth || 460;
+        _bannerEl.style.cssText =
+          `left:${Math.max(8, (window.innerWidth - bw) / 2)}px!important;top:24px!important;`;
+
+        const aw = _arrowEl.offsetWidth || 180;
+        const ah = _arrowEl.offsetHeight || 56;
+        const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
+          r.left + r.width / 2 - aw / 2));
+        const aTop = Math.max(96, r.top - ah - 18);
+        _arrowEl.style.cssText = `left:${aLeft}px!important;top:${aTop}px!important;`;
+
+        _spotlightRAF = requestAnimationFrame(tick);
+      };
+      _spotlightRAF = requestAnimationFrame(tick);
+
+      if (durationMs > 0) {
+        setTimeout(() => { try { _removeSpotlight(); } catch {} }, durationMs);
+      }
+    } catch (e) {
+      console.warn("[LeadCaptura] _showButtonSpotlight error", e);
+    }
+  }
+
   // ─── Navigation-driven Connect All engine (v1.0.155) ──────────────────────
   // Flow per user spec:
   //   STEP 1: navigate to the next /in/<handle>/ profile by URL.
@@ -5463,27 +5673,22 @@
     let editor = document.querySelector(_editorSels.join(","));
 
     if (!editor) {
-      // Find the Message button — try aria-label / class selectors first.
-      const _MSG_SELS = [
-        "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
-        "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
-        "main button.message-anywhere-button",
-        "[class*='message-anywhere-button']",
-        "button[data-control-name*='message' i]",
-      ];
-
-      let msgBtn = null;
-      for (const sel of _MSG_SELS) {
-        try {
-          for (const b of document.querySelectorAll(sel)) {
-            if (_isVisible(b) && !b.disabled) { msgBtn = b; break; }
-          }
-        } catch {}
-        if (msgBtn) break;
-      }
-
-      // Text-content fallback — broad scan, no container restriction.
-      if (!msgBtn) {
+      const _findMsgBtn = () => {
+        const _MSG_SELS = [
+          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
+          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
+          "main button.message-anywhere-button",
+          "[class*='message-anywhere-button']",
+          "button[data-control-name*='message' i]",
+        ];
+        for (const sel of _MSG_SELS) {
+          try {
+            for (const b of document.querySelectorAll(sel)) {
+              if (_isVisible(b) && !b.disabled) return b;
+            }
+          } catch {}
+        }
+        // Text-content fallback — broad scan, exclude our own UI.
         for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
           if (el.classList?.contains("lc-inline-save")) continue;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
@@ -5491,11 +5696,17 @@
           const lbl = (el.getAttribute("aria-label") || "").trim().toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
           const hay = lbl + " " + txt;
-          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) {
-            msgBtn = el;
-            break;
-          }
+          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) return el;
         }
+        return null;
+      };
+
+      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
+      let msgBtn = null;
+      for (let i = 0; i < 20; i++) {
+        msgBtn = _findMsgBtn();
+        if (msgBtn) break;
+        await sleep(300);
       }
 
       if (!msgBtn) {
@@ -5505,14 +5716,26 @@
 
       console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await sleep(300 + Math.random() * 300);
-      // Use _forceClick (5-strategy: native click + pointer seq + inner span + keyboard + React fiber).
-      _forceClick(msgBtn);
-      // Also fire the human-cursor sequence so bot-detection sees realistic movement.
-      await dispatchHumanClick(msgBtn);
+      await sleep(450 + Math.random() * 350);
 
-      // Wait for compose dialog to mount.
-      editor = await waitFor(_editorSels, { timeout: 8000 });
+      // Spotlight the Message button briefly so the user can see what's happening.
+      _showButtonSpotlight(msgBtn, "⚡ Opening Message", "auto-clicking now", 900);
+      await sleep(600 + Math.random() * 250);
+
+      // Click with dispatchHumanClick first (realistic pointer sequence — what
+      // LinkedIn's bot detection expects to see leading up to a click).
+      await dispatchHumanClick(msgBtn);
+      editor = await waitFor(_editorSels, { timeout: 3500 });
+
+      // Fallback: _forceClick (5-strategy including React fiber onClick) when
+      // pointer events alone don't trigger LinkedIn's handlers.
+      if (!editor) {
+        console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
+        _forceClick(msgBtn);
+        editor = await waitFor(_editorSels, { timeout: 5000 });
+      }
+
+      _removeSpotlight();
     }
 
     if (!editor) {
@@ -5523,10 +5746,10 @@
     // ── Step 2: focus editor and type the message ──
     try { editor.click(); } catch {}
     try { editor.focus(); } catch {}
-    await sleep(250);
+    await sleep(280 + Math.random() * 220);
 
     await typeIntoEditable(editor, messageText);
-    await sleep(350 + Math.random() * 350);
+    await sleep(400 + Math.random() * 400);
 
     // ── Step 3: find and click the Send button ──
     // Search inside the overlay bubble first, then fall back to document-wide.
@@ -5539,15 +5762,14 @@
       ];
       for (const scope of scopes) {
         if (!scope) continue;
-        for (const [sel, check] of [
-          ["button.msg-form__send-button:not([disabled])", null],
-          ["button[aria-label='Send']:not([disabled])", null],
-          ["button[aria-label*='Send' i].artdeco-button--primary:not([disabled])", null],
+        for (const sel of [
+          "button.msg-form__send-button:not([disabled])",
+          "button[aria-label='Send']:not([disabled])",
+          "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
         ]) {
           const b = scope.querySelector?.(sel);
           if (b && _isVisible(b)) return b;
         }
-        // Text-content "send" fallback.
         for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
           const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
           const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
@@ -5556,7 +5778,14 @@
       }
       return null;
     };
-    const sendBtn = _findSendBtn();
+    // Poll for the Send button to become enabled (LinkedIn enables it ~50-200ms
+    // after the last input event fires).
+    let sendBtn = null;
+    for (let i = 0; i < 12; i++) {
+      sendBtn = _findSendBtn();
+      if (sendBtn && !sendBtn.disabled) break;
+      await sleep(200);
+    }
 
     if (!sendBtn || sendBtn.disabled) {
       console.log("[LeadCaptura] Message All: Send button not found or disabled");
@@ -5564,8 +5793,19 @@
     }
 
     console.log("[LeadCaptura] Message All: clicking Send");
+    _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
+    await sleep(400 + Math.random() * 200);
     await dispatchHumanClick(sendBtn);
-    await sleep(1200);
+    // Verify the editor cleared (= send actually went through). If not, retry once.
+    await sleep(900);
+    const stillHasText = (editor.textContent || "").trim().length > 0;
+    if (stillHasText) {
+      console.log("[LeadCaptura] Message All: editor not cleared — retrying Send via _forceClick");
+      const retryBtn = _findSendBtn();
+      if (retryBtn) _forceClick(retryBtn);
+      await sleep(800);
+    }
+    _removeSpotlight();
     return { ok: true };
   }
 
