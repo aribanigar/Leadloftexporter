@@ -3209,7 +3209,18 @@
       !!x.closest(".artdeco-pagination, [class*='pagination']") ||
       /pagination/i.test(x.getAttribute("data-testid") || "") ||
       /view next page|view previous page|^page \d+$/i.test(x.getAttribute("aria-label") || "");
-    const ok = (b) => b && _isVisible(b) && !isPagination(b);
+    // The job detail pane's Save/Saved toggle must NEVER be clicked — when
+    // _easyApplyModal() falls back to a broad container (full-page layout
+    // resolves to <main>, which includes the detail pane), a bare "Save"
+    // text-match would unsave the job ("This job is no longer saved" toast).
+    const isJobSave = (x) => {
+      if (x.closest(".jobs-save-button, [class*='jobs-save'], [data-job-save]")) return true;
+      const aria = (x.getAttribute("aria-label") || "").trim();
+      if (/^(un)?save .+ at .+/i.test(aria)) return true; // "Save <title> at <company>"
+      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim();
+      return /^saved?$/i.test(t); // bare Save/Saved — never a legit apply action
+    };
+    const ok = (b) => b && _isVisible(b) && !isPagination(b) && !isJobSave(b);
     const pick = (scope) => {
       if (!scope) return null;
       // Stable fast paths from LinkedIn's live DOM (data attrs + exact labels).
@@ -3225,11 +3236,13 @@
         scope.querySelector("button[aria-label*='Continue to next step' i]");
       if (ok(b)) return { type: "next", btn: b };
 
-      // Text-based fallback (excludes Back and pagination).
-      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x) && !isPagination(x));
+      // Text-based fallback (excludes Back, pagination, and the job Save toggle).
+      const btns = Array.from(scope.querySelectorAll("button")).filter(
+        (x) => _isVisible(x) && !isBack(x) && !isPagination(x) && !isJobSave(x)
+      );
       if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
       if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-      if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
+      if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step/i)))) return { type: "next", btn: b };
       const primary = btns.find(
         (x) => x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3")
       );
@@ -3247,10 +3260,10 @@
     const result = pick(footer) || pick(modal);
     if (result) return result;
 
-    // Absolute last resort: any visible non-dismiss, non-back button.
+    // Absolute last resort: any visible non-dismiss, non-back, non-save button.
     const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x);
+      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x) && !isJobSave(x);
     });
     return fallback ? { type: "next", btn: fallback } : null;
   }
