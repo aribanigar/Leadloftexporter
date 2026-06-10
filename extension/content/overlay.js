@@ -3561,32 +3561,54 @@
     return found || boolish;
   }
 
-  // Option A: deterministic answers from the user's saved profile.
+  // Deterministic answers from the user's saved profile + universal safe defaults.
+  // Called for EVERY field on every step — profile values win; safe defaults apply
+  // to common required fields that appear even without a fully configured profile.
   function _matchProfileAnswer(label, profile, kind, options) {
     const l = (label || "").toLowerCase();
     if (!l) return null;
     const p = profile || {};
+
+    // ---- Profile-based answers ----
     if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || null;
     if (/phone|mobile|cell|contact number|whatsapp/i.test(l)) return p.phone || null;
     if (/e-?mail/i.test(l)) return p.email || null;
     if (/full name|your name/i.test(l)) return p.fullName || null;
     if (/first name/i.test(l)) return (p.fullName || "").split(" ")[0] || null;
     if (/last name|surname|family name/i.test(l)) return (p.fullName || "").split(" ").slice(1).join(" ") || null;
+    if (/linkedin|linkedin url|linkedin profile/i.test(l)) return p.linkedin || null;
+    if (/portfolio|website|personal url|github|behance/i.test(l)) return p.website || null;
     if (/expected[^a-z]{0,10}(salary|compensation|ctc|pay)|salary[^a-z]{0,10}expectation|desired[^a-z]{0,10}salary/i.test(l)) return p.expectedSalary || null;
     if (/current[^a-z]{0,10}(salary|compensation|ctc)/i.test(l)) return p.currentSalary || null;
     if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || null;
+    if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
+    if (/\bcountry\b/i.test(l)) return p.country || null;
+    if (/nationality|citizen(ship)?/i.test(l)) return p.nationality || null;
+    if (/highest.*degree|level.*education|qualification/i.test(l) && options) return p.education || null;
+    if (/gender|pronouns/i.test(l) && options) return p.gender || null;
+    if (/race|ethnicity|veteran|disability/i.test(l) && options) return p.diversity || null;
+
+    // ---- Safe universal defaults for required compliance questions ----
     if (/relocat/i.test(l)) return _yesNoOption(p.relocate || "Yes", options);
     if (/sponsor|require[^a-z]{0,10}visa|visa sponsor/i.test(l)) return _yesNoOption(p.sponsorship || "No", options);
     if (/authoriz|authoris|right to work|legally[^a-z]{0,15}work|eligible to work|work permit/i.test(l)) return _yesNoOption(p.workAuth || "Yes", options);
-    if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
-    if (/\bcountry\b/i.test(l)) return p.country || null;
-    // Generic Yes/No leaning positive when only Yes/No options exist
+    if (/willing to travel|travel[^a-z]{0,10}required|travel[^a-z]{0,10}(percent|%)/i.test(l)) return _yesNoOption(p.travel || "Yes", options);
+    if (/background check|drug test|criminal/i.test(l)) return _yesNoOption("Yes", options);
+    if (/hybrid|on-?site|remote|in.?person|office/i.test(l) && options) return p.workMode || null;
+    if (/how did you (hear|find|learn)|referral|source/i.test(l) && options) return p.referralSource || null;
+
+    // ---- Generic Yes/No — lean Yes for ability/willingness questions ----
     if (options && options.length && options.length <= 3) {
       const lo = options.map((o) => o.toLowerCase().trim());
-      if (lo.includes("yes") && lo.includes("no") && /(do you|are you|have you|can you|will you|willing|comfortable|able to)/i.test(l)) {
+      if (lo.includes("yes") && lo.includes("no") &&
+          /(do you|are you|have you|can you|will you|willing|comfortable|able to|agree|confirm)/i.test(l)) {
         return _yesNoOption("Yes", options);
       }
     }
+
+    // ---- Number fields with no profile value — use 0 as a placeholder ----
+    if (kind === "number" && p.years && /(experience|years)/i.test(l)) return p.years;
+
     return null;
   }
 
@@ -3761,13 +3783,17 @@
   }
 
   // Step through the open Easy Apply modal. Returns {ok, reason}.
+  // Design rules:
+  //   - Poll for advancement (every 300ms, up to 4s) instead of fixed sleep + single check.
+  //   - Compare .innerText (visible text) to detect step changes — more reliable than
+  //     innerHTML slices which can mismatch when the container reference changes.
+  //   - Always re-resolve the modal + action button fresh before each click attempt.
+  //   - Scroll the modal content before clicking so required fields are visible.
   async function _runEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
 
-    // Poll for the apply form to appear — modal OR full-page /apply/ — up to 12s.
-    // _easyApplyModal understands both layouts, so this catches the form the
-    // instant it renders no matter how LinkedIn opened it.
+    // ---- Wait for modal to appear (up to 12 s) ----
     let modal = null;
     const _waitStart = Date.now();
     while (Date.now() - _waitStart < 12000) {
@@ -3778,189 +3804,213 @@
       await sleep(300);
     }
     if (!modal) {
-      console.log(`[LeadCaptura] easy-apply: form not found after click (url=${location.pathname}) — skipping job`);
+      console.log(`[LeadCaptura] easy-apply: form not found (url=${location.pathname})`);
       return { ok: false, reason: "modal_not_found" };
     }
-    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName}) class="${(modal.className||"").slice(0,80)}"`);
-    // Verify the container includes a footer/action button — if not, it's likely
-    // just the content section and _modalActionButton will find nothing.
-    const _detectsAction = () => !!_modalActionButton(modal);
-    if (!_detectsAction()) {
-      // Try climbing one level up — the content section's parent often IS the wrapper.
-      const parent = modal.parentElement;
-      if (parent && parent.tagName !== "MAIN" && parent.tagName !== "BODY") {
-        const parentAction = _modalActionButton(parent);
-        if (parentAction) {
-          console.log(`[LeadCaptura] easy-apply: widened container to parent (${parent.getAttribute?.("role") || parent.tagName})`);
-          modal = parent;
-        }
+
+    // Widen container if it's too narrow (content-only, no footer).
+    if (!_modalActionButton(modal)) {
+      let p = modal.parentElement;
+      for (let i = 0; i < 5 && p && p.tagName !== "MAIN" && p.tagName !== "BODY"; i++, p = p.parentElement) {
+        if (_modalActionButton(p)) { modal = p; break; }
       }
     }
-    // Extra settle time — LinkedIn animates the form in.
-    await sleep(600 + Math.random() * 400);
+    console.log(`[LeadCaptura] easy-apply: modal ready — "${(modal.className||modal.tagName).slice(0,60)}"`);
+    await sleep(700 + Math.random() * 300);
 
-    const MAX_STEPS = 20;
+    // ---- Snapshot helpers (innerText-based, not innerHTML) ----
+    // innerText compares what the USER SEES — completely different per step regardless
+    // of whether LinkedIn renames its internal CSS classes.
+    const _modalText = (m) => {
+      if (!m) return "";
+      // Prefer the scrollable content area (more focused); fall back to full modal.
+      const content = m.querySelector(
+        ".jobs-easy-apply-content, .jobs-easy-apply-form, " +
+        "[class*='easy-apply-content'], [class*='easy-apply-form'], " +
+        ".artdeco-modal__content, .artdeco-modal-overlay__content"
+      );
+      return ((content || m).innerText || "").trim();
+    };
+
+    // Poll until the modal's visible text changes from `before` or until `timeoutMs`.
+    // Returns the fresh modal element when advanced (or null if modal closed).
+    const _waitAdvanced = async (before, timeoutMs = 4000) => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        await sleep(300);
+        const m = _easyApplyModal();
+        if (!m || !document.body.contains(m)) return null; // modal gone = advanced
+        const cur = _modalText(m);
+        if (cur !== before) return m; // text changed = stepped forward
+      }
+      return _easyApplyModal(); // timed out, return whatever is there
+    };
+
+    const MAX_STEPS = 25;
     let consecutiveStuck = 0;
+
     for (let step = 0; step < MAX_STEPS; step++) {
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
       if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
-      modal = _easyApplyModal() || modal;
-      if (!modal) return { ok: false, reason: "modal_closed" };
 
-      // Keep a resume selected + don't auto-follow companies.
+      // Always refresh modal reference — LinkedIn can re-render between steps.
+      const freshModal = _easyApplyModal();
+      if (freshModal && document.body.contains(freshModal)) modal = freshModal;
+      if (!modal || !document.body.contains(modal)) return { ok: false, reason: "modal_closed" };
+
+      // --- Auto-fill this step's fields ---
       _ensureResumeSelected(modal);
       _uncheckFollow(modal);
-      // Auto-fill this step's questions.
-      try { await _answerModalQuestions(modal); }
-      catch (e) { console.warn("[LeadCaptura] question auto-fill failed", e?.message); }
-      await sleep(500 + Math.random() * 500);
+      try { await _answerModalQuestions(modal); } catch (e) {
+        console.warn("[LeadCaptura] auto-fill error", e?.message);
+      }
+      // Scroll the modal content down so all fields (and the footer button) are rendered.
+      try {
+        const scrollable = modal.querySelector(
+          ".artdeco-modal__content, .jobs-easy-apply-content, .artdeco-modal-overlay__content"
+        ) || modal;
+        scrollable.scrollTop = scrollable.scrollHeight;
+      } catch {}
+      await sleep(400 + Math.random() * 300);
 
+      // --- Find the action button ---
       const action = _modalActionButton(modal);
-      const _pageName = _modalHeading(modal) || `step ${step + 1}`;
-      console.log(`[LeadCaptura] easy-apply step ${step + 1}: page="${_modalHeading(modal) || "?"}" progress=${_modalProgress(modal)}% action=${action ? action.type : "NONE"}`);
-      try { _lcToast(`Auto Apply — ${_pageName}${action ? " → " + action.type : ""}`); } catch {}
+      const heading = _modalHeading(modal) || `step ${step + 1}`;
+      const progress = _modalProgress(modal);
+      const totalHint = _pageTotalHint() || "?";
+
+      console.log(`[LeadCaptura] easy-apply step ${step + 1}: "${heading}" ${progress != null ? progress + "%" : "(no progress bar)"} → ${action ? action.type.toUpperCase() : "NO ACTION"}`);
+      try { _lcToast(`Step ${step + 1}/${totalHint} — ${heading}${action ? " → " + action.type : ""}`); } catch {}
+
       if (!action) {
-        const modalClass = (modal?.className || "").slice(0, 80);
-        const btnsInModal = Array.from(modal?.querySelectorAll("button") || []).map((b) => (b.innerText || b.textContent || "").trim().slice(0, 20)).join(", ");
-        console.log(`[LeadCaptura] easy-apply: no Next/Submit button — modal="${modalClass}" buttons=[${btnsInModal}]`);
-        await _dismissEasyApplyModal();
-        return { ok: false, reason: "no_action_button" };
+        // Diagnose: log every button in the modal to help trace what's there.
+        const btnLabels = Array.from(modal.querySelectorAll("button"))
+          .map((b) => `"${(b.innerText || b.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30)}"`)
+          .join(", ");
+        console.log(`[LeadCaptura] easy-apply: NO action button found. Buttons in modal: [${btnLabels}]`);
+        // Scroll down — the footer might be hidden below the fold.
+        try {
+          const scrollable = modal.querySelector(".artdeco-modal__content, .jobs-easy-apply-content") || modal;
+          scrollable.scrollTop = scrollable.scrollHeight;
+          modal.scrollTop = modal.scrollHeight;
+        } catch {}
+        await sleep(600);
+        // One retry after scrolling.
+        const retried = _modalActionButton(_easyApplyModal() || modal);
+        if (!retried) {
+          await _dismissEasyApplyModal();
+          return { ok: false, reason: "no_action_button" };
+        }
+        continue; // re-enter the loop with the now-visible button
       }
 
-      // Snapshot helper — used to tell whether a click actually moved the modal.
-      const snap = (m) => ({
-        progress: _modalProgress(m),
-        heading: _modalHeading(m),
-        html: m?.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 300) || "",
-      });
-
-      // Stop pressed? Bail before firing any further click (never submit/advance
-      // after the user hit Stop).
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
+      // ---- SUBMIT step ----
       if (action.type === "submit") {
-        // Show the same top-banner used for Next so the user has consistent
-        // feedback through the whole Easy Apply flow.
-        _showApplyBanner("📤 Submitting application", "auto-clicking 'Submit application'");
-        await sleep(550 + Math.random() * 250);
-        // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
-        // handlers reliably honour. Escalate to _forceClick only if it didn't land.
+        _showApplyBanner("📤 Submitting application…", `"${heading}"`);
+        await sleep(400 + Math.random() * 300);
         await dispatchHumanClick(action.btn);
-        await sleep(1800 + Math.random() * 1200);
-        let after = _easyApplyModal();
-        if (after && _modalActionButton(after)?.type === "submit") {
-          _forceClick(action.btn);
-          await sleep(1800 + Math.random() * 1200);
-          after = _easyApplyModal();
+        // Poll up to 4s for modal to close or show success confirmation.
+        let confirmed = false;
+        for (let t = 0; t < 14; t++) {
+          await sleep(300);
+          const m = _easyApplyModal();
+          if (!m) { confirmed = true; break; }
+          const txt = (m.innerText || "").toLowerCase();
+          if (/application was sent|you.ve applied|submitted|successfully applied/i.test(txt) ||
+              m.querySelector(".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], progress[value='100']")) {
+            confirmed = true; break;
+          }
+          // Modal still on submit step — escalate with _forceClick once.
+          if (t === 5 && _modalActionButton(m)?.type === "submit") {
+            _forceClick(action.btn);
+          }
         }
         _hideApplyBanner();
-        if (!after) return { ok: true }; // modal closed = submitted
-        const txt = (after.innerText || after.textContent || "").toLowerCase();
-        const isSuccess =
-          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(txt) ||
-          !!after.querySelector(
-            ".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], " +
-            "[class*='success-banner'], progress[value='100']"
-          );
+        if (confirmed) { await _dismissEasyApplyModal(); return { ok: true }; }
+        // Check once more — modal may have closed.
+        if (!_easyApplyModal()) return { ok: true };
         await _dismissEasyApplyModal();
-        return isSuccess ? { ok: true } : { ok: false, reason: "submit_failed" };
+        return { ok: false, reason: "submit_failed" };
       }
 
-      // Advance (next / review). Snapshot first so we can detect movement.
-      const before = snap(modal);
-      // Reading pause before clicking — interruptible by Stop.
-      await _cancellableSleep(600 + Math.random() * 700);
+      // ---- NEXT / REVIEW step ----
+      const beforeText = _modalText(modal);
+      const beforeProgress = _modalProgress(modal);
+
+      await _cancellableSleep(500 + Math.random() * 400);
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
-      // Did the modal move past `before`?
-      const progressed = (m) => {
-        if (!m) return true; // modal gone = advanced/closed
-        const act = _modalActionButton(m);
-        const movedToSubmit = act && (act.type === "submit" || act.type === "review") && action.type === "next";
-        const cur = snap(m);
-        return (
-          movedToSubmit ||
-          (before.progress != null && cur.progress != null && cur.progress > before.progress) ||
-          (before.heading && cur.heading && cur.heading !== before.heading) ||
-          (cur.html !== before.html)
-        );
-      };
-
-      // Top-of-viewport banner — sits above LinkedIn's modal regardless of
-      // stacking context (root-level <html> child + max z-index + inline
-      // !important). Shown for the whole click sequence so the user has
-      // continuous feedback during the multi-strategy click attempts.
-      const pageNumStr = `${step + 1}/${_pageTotalHint() || "?"}`;
-      const actLabel = action.type === "review" ? "Review" : "Next";
-      _showApplyBanner(`➡ Auto Apply — Page ${pageNumStr}`,
-        `Filling "${_pageName}" → clicking '${actLabel}'`);
-      console.log(`[LeadCaptura] apply step ${step + 1} → banner shown, attempting click`);
-
-      // Helper: click the action button with the freshest reference each time.
-      // LinkedIn sometimes re-renders the footer between our attempts, so we
-      // always re-find via _modalActionButton(_easyApplyModal()).
-      const clickFreshAction = (strategy) => {
-        const m = _easyApplyModal();
-        if (!m) return false;
-        const a = _modalActionButton(m);
-        if (!a) return false;
-        try {
-          if (strategy === "human") return dispatchHumanClick(a.btn);
-          if (strategy === "force") return _forceClick(a.btn);
-          if (strategy === "enter") {
-            try { a.btn.focus(); } catch {}
-            const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
-            a.btn.dispatchEvent(new KeyboardEvent("keydown", k));
-            a.btn.dispatchEvent(new KeyboardEvent("keyup", k));
-            return true;
-          }
-        } catch {}
-        return false;
-      };
-
-      // Strategy 1: human-paced pointer click.
-      await clickFreshAction("human");
-      await sleep(1300 + Math.random() * 900);
-      let after = _easyApplyModal();
-      if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
-
-      // Strategy 2: forceClick (5-strategy including React fiber onClick).
-      if (!progressed(after)) {
-        console.log(`[LeadCaptura] apply step ${step + 1} → human click didn't advance, _forceClick`);
-        clickFreshAction("force");
-        await sleep(1300 + Math.random() * 900);
-        after = _easyApplyModal();
-        if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
-      }
-
-      const errorShown = !!after.querySelector(
-        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
-        ".jobs-easy-apply-form-element__error, [class*='error-text']"
+      _showApplyBanner(
+        `⏩ Step ${step + 1}/${totalHint} — ${heading}`,
+        `clicking '${action.type === "review" ? "Review" : "Next"}'`
       );
 
-      // Strategy 3: focus + Enter keypress (newer React handlers honour this).
-      if (!progressed(after)) {
-        console.log(`[LeadCaptura] apply step ${step + 1} → _forceClick didn't advance, focus+Enter`);
-        clickFreshAction("enter");
-        await sleep(1200);
-        after = _easyApplyModal();
-        if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
+      // Strategy 1: human pointer click (fires pointer events LinkedIn SPA listens for).
+      const freshBtn1 = _modalActionButton(_easyApplyModal() || modal);
+      if (freshBtn1) await dispatchHumanClick(freshBtn1.btn);
+
+      // Poll up to 4s for the form to advance.
+      // _waitAdvanced returns null (modal closed → advanced), the new modal element
+      // (text changed → advanced), or the timed-out modal (no change detected).
+      let afterModal = await _waitAdvanced(beforeText, 4000);
+      // advanced = true if modal closed OR visible text changed from before.
+      let advanced = !afterModal || _modalText(afterModal) !== beforeText;
+
+      if (!advanced) {
+        console.log(`[LeadCaptura] step ${step + 1}: human click didn't advance — trying _forceClick`);
+        // Strategy 2: _forceClick (native .click() + pointer sequence + React fiber).
+        const freshBtn2 = _modalActionButton(_easyApplyModal() || modal);
+        if (freshBtn2) _forceClick(freshBtn2.btn);
+        afterModal = await _waitAdvanced(beforeText, 3000);
+        advanced = !afterModal || _modalText(afterModal) !== beforeText;
+
+        if (!advanced) {
+          // Strategy 3: focus + Enter key.
+          console.log(`[LeadCaptura] step ${step + 1}: _forceClick didn't advance — trying Enter key`);
+          const freshBtn3 = _modalActionButton(_easyApplyModal() || modal);
+          if (freshBtn3) {
+            try { freshBtn3.btn.focus(); } catch {}
+            const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+            freshBtn3.btn.dispatchEvent(new KeyboardEvent("keydown", k));
+            freshBtn3.btn.dispatchEvent(new KeyboardEvent("keyup", k));
+          }
+          afterModal = await _waitAdvanced(beforeText, 2500);
+          advanced = !afterModal || _modalText(afterModal) !== beforeText;
+        }
       }
+
       _hideApplyBanner();
-      if (!progressed(after)) {
-        // Still on the same page after three click attempts. If LinkedIn is
-        // showing a validation error, or we've been stuck several times, this
-        // job needs input we can't safely provide — discard and move on.
+
+      if (!advanced) {
+        // All 3 strategies failed. Check for validation errors in the live modal.
+        const liveModal = afterModal || _easyApplyModal() || modal;
+        const errorEl = liveModal?.querySelector(
+          ".artdeco-inline-feedback--error, [role='alert']:not([aria-hidden='true']), " +
+          ".fb-form-element__error-text, .jobs-easy-apply-form-element__error, [class*='error-text']"
+        );
         consecutiveStuck++;
-        if (errorShown || consecutiveStuck >= 3) {
+        const reason = errorEl
+          ? `validation error: "${(errorEl.innerText || "").trim().slice(0, 80)}"`
+          : `stuck (${consecutiveStuck}/3)`;
+        console.log(`[LeadCaptura] step ${step + 1}: not advancing — ${reason}`);
+        if (errorEl || consecutiveStuck >= 3) {
           await _dismissEasyApplyModal();
           return { ok: false, reason: "needs_manual_input" };
         }
-        await sleep(1000);
+        await sleep(800);
         continue;
       }
+
       consecutiveStuck = 0;
+      // Settle after LinkedIn animates the step transition.
+      await sleep(400 + Math.random() * 300);
+      // Update modal reference to the freshly rendered step.
+      const nextModal = afterModal || _easyApplyModal();
+      if (nextModal && document.body.contains(nextModal)) modal = nextModal;
     }
+
     await _dismissEasyApplyModal();
     return { ok: false, reason: "too_many_steps" };
   }
