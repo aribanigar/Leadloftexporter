@@ -304,6 +304,30 @@
     return imgs[0]?.getAttribute("src") || null;
   }
 
+  // Wait for the h1 to stop changing before we read the name. LinkedIn
+  // hydrates the profile header in two paints — the first ~200 ms can
+  // show "Berna K" or just "Berna" before the surname lands. Without
+  // this wait the scraper grabs the partial text and saves a truncated
+  // name like "Bernak" instead of "Berna Kekec". Polls every 150 ms
+  // until two consecutive reads match, capped at maxMs.
+  async function _waitForStableH1(maxMs = 1800) {
+    const start = Date.now();
+    let prev = "";
+    let stable = 0;
+    while (Date.now() - start < maxMs) {
+      const h1 = document.querySelector("main h1") || document.querySelector("h1");
+      const cur = (h1?.innerText || h1?.textContent || "").replace(/\s+/g, " ").trim();
+      if (cur && cur === prev && cur.length > 1) {
+        stable++;
+        if (stable >= 2) return;
+      } else {
+        stable = 0;
+      }
+      prev = cur;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+
   function scrapeProfile() {
     const { h1, card } = _findTopCard();
     let fullName = _cleanPersonName(_txt(h1));
@@ -495,17 +519,30 @@
    */
 
   function _findContactInfoLink() {
-    return (
-      document.querySelector("a[href*='/overlay/contact-info/']") ||
-      document.querySelector("a[href*='/details/contact-info/']") ||
-      document.querySelector("a[id*='contact-info']") ||
-      // Text fallback — slow path. Also returns any element whose aria-label
-      // mentions contact info (covers icon-only buttons LinkedIn sometimes ships).
-      Array.from(document.querySelectorAll("a, button")).find((n) =>
-        /^\s*Contact info\s*$/i.test(n.textContent || "") ||
-        /contact info/i.test(n.getAttribute("aria-label") || "")
-      )
-    );
+    // Hard reject for avatar / cover-photo overlay anchors. Without this
+    // a stray text fallback can return an `<a href=".../overlay/photo/">`
+    // whose tooltip happens to contain "contact info" — clicking it
+    // opens the avatar lightbox instead of the Contact info modal,
+    // which is the bug the user reported during enrichment runs.
+    function _isAvatarOverlay(n) {
+      const href = (n?.getAttribute?.("href") || "");
+      return /\/overlay\/(photo|edit-photo|cover)/i.test(href);
+    }
+    const strict = [
+      "a[href*='/overlay/contact-info/']",
+      "a[href*='/details/contact-info/']",
+      "a[id*='contact-info']",
+    ];
+    for (const sel of strict) {
+      const el = document.querySelector(sel);
+      if (el && !_isAvatarOverlay(el)) return el;
+    }
+    return Array.from(document.querySelectorAll("a, button")).find((n) => {
+      if (_isAvatarOverlay(n)) return false;
+      const txt = (n.textContent || "").trim();
+      const lbl = (n.getAttribute("aria-label") || "").trim();
+      return /^contact info$/i.test(txt) || /contact info/i.test(lbl);
+    });
   }
 
   // Find the element that contains the Contact info fields.
@@ -2043,6 +2080,7 @@
   globalThis.__lcScraper = {
     pageType,
     scrapeProfile,
+    _waitForStableH1,
     scrapeProfileWithContact,
     normalizePhoneCountryCode,
     scrapeContactInfo,

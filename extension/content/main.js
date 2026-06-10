@@ -1258,6 +1258,13 @@
       const longTail = Math.random() < 0.08 ? Human.rand(600, 1500) : 0;
       await Human.sleep(base + longTail);
 
+      // Block on h1 settling so the name isn't read mid-hydration —
+      // otherwise we save "Bernak" instead of "Berna Kekec" because the
+      // surname hadn't loaded yet at scrape time.
+      if (Scraper._waitForStableH1) {
+        try { await Scraper._waitForStableH1(1800); } catch {}
+      }
+
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
         settleMs: 400,
