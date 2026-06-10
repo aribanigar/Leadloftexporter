@@ -2999,49 +2999,100 @@
 
   // ---- Easy Apply modal driving ----
 
+  // Climb from a seed node to the TIGHTEST ancestor that holds the apply form's
+  // footer action button (Next/Submit/Review) — but never <main>/<body>, which
+  // also contain the search-page feedback widgets ("Are these results
+  // helpful?") that were poisoning the heading/progress reads and giving the
+  // stepper a wrong "next" button to click.
+  function _applyFormRootFromSeed(seed) {
+    if (!seed) return null;
+    let node = seed;
+    for (let i = 0; i < 12 && node; i++) {
+      const tag = node.tagName;
+      if (tag === "MAIN" || tag === "BODY" || tag === "HTML") break;
+      // Does this ancestor contain a real apply footer button?
+      const hasFooterBtn = node.querySelector(
+        "button[data-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-submit-button], " +
+        "button[aria-label*='Continue to next step' i], " +
+        "button[aria-label*='Submit application' i], " +
+        "button[aria-label*='Review your application' i]"
+      );
+      if (hasFooterBtn) return node;
+      node = node.parentElement;
+    }
+    // Fallback: the dialog/modal/form wrapper closest to the seed.
+    return (
+      seed.closest(
+        "div.jobs-easy-apply-modal, div[data-test-modal][role='dialog'], " +
+        ".artdeco-modal[role='dialog'], [role='dialog'], " +
+        ".jobs-easy-apply-content, .jobs-easy-apply-form, form"
+      ) || seed.parentElement || seed
+    );
+  }
+
   function _easyApplyModal() {
     // 1. Dialog/modal overlay — the popup form on search-results and the
-    //    inline job-view modal.
+    //    inline job-view modal. Require an apply-specific signal inside so we
+    //    never return an unrelated dialog (e.g. a survey/feedback popover).
     const dialog =
       document.querySelector("div.jobs-easy-apply-modal") ||
       document.querySelector("div[data-test-modal][role='dialog']") ||
-      document.querySelector(".artdeco-modal[role='dialog']") ||
-      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog']")).find(
+      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog'], .artdeco-modal[role='dialog']")).find(
         (d) =>
           /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
-          /easy apply|application/i.test(d.getAttribute("aria-labelledby") ? (document.getElementById(d.getAttribute("aria-labelledby"))?.innerText || "") : "") ||
-          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form")
+          /\d+\s*\/\s*\d+\s*pages?/i.test(d.textContent || "") ||
+          d.querySelector(
+            ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
+            "button[data-easy-apply-next-button], button[data-live-test-easy-apply-submit-button]"
+          )
       );
     if (dialog) return dialog;
 
-    // 2. Full-page Easy Apply (URL = /jobs/view/<id>/apply/). The form is
-    //    rendered inline, NOT inside a [role='dialog'], so the checks above miss
-    //    it and the stepper has nothing to click. Anchor on the apply content
-    //    container's nearest layout ancestor so _modalActionButton can still
-    //    reach the Next/Submit footer (which is a sibling of the form).
+    // 2. ANCHOR ON THE "N/M pages" PROGRESS LABEL. This is the most reliable
+    //    apply-form signal visible in the live DOM ("1/3 pages"). Walk every
+    //    candidate element whose OWN text is exactly that pattern, then climb to
+    //    the tight form container. This is what fixes the stepper reading
+    //    "Are these results helpful?" from <main> and clicking a wrong button.
+    const pagesLabel = Array.from(
+      document.querySelectorAll("span, p, div, h2, h3, [class*='progress']")
+    ).find((n) => {
+      const t = (n.textContent || "").replace(/\s+/g, " ").trim();
+      return /^\d+\s*\/\s*\d+\s*pages?$/i.test(t) && _isVisible(n);
+    });
+    if (pagesLabel) {
+      const root = _applyFormRootFromSeed(pagesLabel);
+      if (root) return root;
+    }
+
+    // 3. Apply content container class → tight form root.
     const content = document.querySelector(
       ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
       ".job-details-easy-apply-content, form.jobs-easy-apply-form-element"
     );
-    if (content) {
-      return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
+    if (content && _isVisible(content)) {
+      return _applyFormRootFromSeed(content) || content;
     }
-    // 3. Full-page Easy Apply where the form has no recognizable container
-    //    class: rely on the apply-progress REGION ("Your job application
-    //    progress is at N percent.") or an actual /jobs/view/<id>/apply/ URL.
-    //    Do NOT infer the form from a bare "Next"/"Submit" button — the job
-    //    SEARCH page has its own pagination "Next", and matching that made the
-    //    stepper walk start=25→50→100 instead of applying.
+
+    // 4. Apply-progress REGION ("Your job application progress is at N percent.")
     const progressRegion = document.querySelector(
       "[aria-label*='job application progress' i][role='region'], " +
       "[aria-label*='application progress' i]"
     );
     if (progressRegion) {
-      return progressRegion.closest("main, .scaffold-layout, .application-outlet, form") ||
-        progressRegion.parentElement || progressRegion;
+      return _applyFormRootFromSeed(progressRegion) || progressRegion;
     }
+
+    // 5. Last resort: a real /jobs/view/<id>/apply/ URL but no recognised
+    //    container. Anchor on the footer button itself and climb tight.
     if (/\/jobs\/view\/\d+\/apply\b/.test(location.pathname)) {
-      return document.querySelector("main") || document.body;
+      const footerBtn = document.querySelector(
+        "button[data-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-submit-button], " +
+        "button[aria-label*='Submit application' i]"
+      );
+      if (footerBtn) return _applyFormRootFromSeed(footerBtn);
     }
     return null;
   }
@@ -3180,12 +3231,21 @@
     if (prog && prog.max) return Math.round((Number(prog.value) / Number(prog.max)) * 100);
     const bar = modal.querySelector("[role='progressbar'][aria-valuenow]");
     if (bar) return Number(bar.getAttribute("aria-valuenow"));
+    // Derive from the "N/M pages" label (e.g. "1/3 pages" → 33%).
+    const m = (modal.textContent || "").match(/\b(\d+)\s*\/\s*(\d+)\s*pages?/i);
+    if (m && Number(m[2])) return Math.round((Number(m[1]) / Number(m[2])) * 100);
     return null;
   }
 
   function _modalHeading(modal) {
     if (!modal) return "";
-    return (modal.querySelector("h2, h3")?.innerText || "").replace(/\s+/g, " ").trim();
+    // Prefer the form-section heading (e.g. "Contact info"), which is the most
+    // useful step name. The "h2, h3" grab used to read the wrong heading when
+    // the container was too broad; now the container is tight so this is safe.
+    const h =
+      modal.querySelector(".jobs-easy-apply-form-section__grouping h3, " +
+        ".jobs-easy-apply-content h3, h3, h2");
+    return (h?.innerText || "").replace(/\s+/g, " ").trim();
   }
 
   // Find the footer action button + its kind. Order matters: submit/review are
