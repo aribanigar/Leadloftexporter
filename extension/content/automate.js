@@ -250,55 +250,270 @@
     //      ancestor — defence-in-depth even if a stray label slips through.
     const msgBtn = await _findProfileMessageButton(8000);
     if (!msgBtn) {
+      console.log("[LeadCaptura] msg: step1 ✗ message_button_not_found");
       _spotRemove();
       return { status: "failed", error: "message_button_not_found" };
     }
-    // Scroll the button into the viewport so (a) the spotlight ring is
-    // actually visible to the user and (b) dispatchHumanClick's coordinates
-    // land on the right element. LinkedIn's profile-header action bar is
-    // often scrolled below the fold after the user lands on the page.
+    console.log("[LeadCaptura] msg: step1 ✓ found Message button:", msgBtn.outerHTML.slice(0, 120));
     try {
       msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
       await sleep(450);
     } catch {}
     _spotUpdate({ stage: "click_message", target: msgBtn, leadName });
-    // "Noticed the button" pause before pressing — looks human.
     await sleep(300 + Math.random() * 400);
     await dispatchHumanClick(msgBtn);
+    console.log("[LeadCaptura] msg: step2 ✓ Message button clicked, waiting for composer…");
 
-    const editor = await waitFor(
-      [
-        "div.msg-form__contenteditable[contenteditable='true']",
-        "div[role='textbox'][contenteditable='true']",
-      ],
-      { timeout: 8000 }
-    );
+    // Wait for the popup composer to mount AND find its editor. Scoped to
+    // the msg-overlay container when present so we find the right editor
+    // even if a stale composer is hidden elsewhere on the page.
+    const editor = await _findComposerEditor(10000);
     if (!editor) {
+      console.log("[LeadCaptura] msg: step3 ✗ message_editor_not_found");
       _spotRemove();
       return { status: "failed", error: "message_editor_not_found" };
     }
-    _spotUpdate({ stage: "typing", target: editor, leadName });
-    await typeIntoEditable(editor, body);
-    await sleep(500 + Math.random() * 500);
+    console.log("[LeadCaptura] msg: step3 ✓ found editor:", editor.tagName + "." + (editor.className || "").slice(0, 60));
 
-    const send = first(document, [
-      "button.msg-form__send-button",
-      "button[type='submit'][class*='msg-form__send']",
-      "button[aria-label*='Send' i]:not([aria-label*='Send a connection' i]):not([aria-label*='Send invitation' i])",
-    ]);
-    if (!send || send.disabled) {
+    _spotUpdate({ stage: "typing", target: editor, leadName });
+    // LinkedIn's composer is built on Lexical (Meta's contenteditable
+    // framework) which IGNORES document.execCommand("insertText"). The
+    // ONLY reliable input path is a real clipboard paste event with a
+    // DataTransfer. _typeIntoLexicalEditor does that, then falls back
+    // through execCommand + character-by-character InputEvent for older
+    // composers.
+    const typed = await _typeIntoLexicalEditor(editor, body);
+    if (!typed) {
+      console.log("[LeadCaptura] msg: step4 ✗ typing_failed");
+      _spotRemove();
+      return { status: "failed", error: "typing_failed" };
+    }
+    console.log("[LeadCaptura] msg: step4 ✓ message typed, looking for Send button…");
+    // Wait for Lexical to update React's state — the Send button stays
+    // disabled until then. Poll up to 4 s.
+    let sendBtn = null;
+    const sendStart = Date.now();
+    while (Date.now() - sendStart < 4000) {
+      sendBtn = _findComposerSendButton(editor);
+      if (sendBtn && !sendBtn.disabled) break;
+      await sleep(200);
+    }
+    if (!sendBtn) {
+      console.log("[LeadCaptura] msg: step5 ✗ send_button_not_found");
+      _spotRemove();
+      return { status: "failed", error: "send_button_not_found" };
+    }
+    if (sendBtn.disabled) {
+      console.log("[LeadCaptura] msg: step5 ✗ send_disabled (text never registered with React)");
       _spotRemove();
       return { status: "failed", error: "send_disabled" };
     }
-    _spotUpdate({ stage: "sending", target: send, leadName });
+    console.log("[LeadCaptura] msg: step5 ✓ send button enabled, clicking…");
+    _spotUpdate({ stage: "sending", target: sendBtn, leadName });
     await sleep(200 + Math.random() * 300);
-    await dispatchHumanClick(send);
-    await sleep(1200);
+    await dispatchHumanClick(sendBtn);
+
+    // Confirm send by waiting for the editor to clear OR the composer to
+    // close. If neither happens within 4 s, the click didn't land — try
+    // a keyboard Enter as last-resort (LinkedIn binds Ctrl+Enter to send).
+    let confirmed = false;
+    for (let t = 0; t < 16; t++) {
+      await sleep(250);
+      const txt = (editor.textContent || "").trim();
+      if (!txt || !document.body.contains(editor)) { confirmed = true; break; }
+    }
+    if (!confirmed) {
+      console.log("[LeadCaptura] msg: step6 click didn't take, trying Enter key…");
+      try { editor.focus(); } catch {}
+      const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true };
+      editor.dispatchEvent(new KeyboardEvent("keydown", k));
+      editor.dispatchEvent(new KeyboardEvent("keyup", k));
+      await sleep(800);
+      const txt2 = (editor.textContent || "").trim();
+      if (!txt2 || !document.body.contains(editor)) confirmed = true;
+    }
+    if (!confirmed) {
+      console.log("[LeadCaptura] msg: step6 ✗ send did not confirm");
+      _spotRemove();
+      return { status: "failed", error: "send_did_not_confirm" };
+    }
+    console.log("[LeadCaptura] msg: step6 ✓ message sent");
     _spotUpdate({ stage: "sent", leadName });
-    // Hold the "sent ✓" toast briefly so the user sees confirmation before
-    // the next profile loads. The next page boot starts a fresh spotlight.
     setTimeout(_spotRemove, 1600);
     return { status: "done", result: { url } };
+  }
+
+  // Find the active composer's editable area. LinkedIn opens a popup
+  // composer ("msg-overlay-conversation-bubble") on profile pages and an
+  // inline composer on /messaging/<thread> pages — scope to whichever one
+  // is currently mounted so we never grab a stale empty composer.
+  async function _findComposerEditor(timeoutMs = 8000) {
+    const ROOTS = [
+      ".msg-overlay-conversation-bubble--is-active",
+      ".msg-overlay-conversation-bubble",
+      ".msg-form__contenteditable", // sometimes the editor is the root
+      ".msg-convo-wrapper",
+      ".msg-overlay-list-bubble",
+      "#message-overlay",
+    ];
+    const EDITOR_SELS = [
+      ".msg-form__contenteditable[contenteditable='true']",
+      "div[contenteditable='true'][role='textbox']",
+      "div[contenteditable='true'][aria-label*='message' i]",
+      "[contenteditable='true'][data-placeholder*='message' i]",
+    ];
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      // Prefer an editor inside a mounted composer root.
+      for (const rootSel of ROOTS) {
+        const root = document.querySelector(rootSel);
+        if (!root) continue;
+        for (const sel of EDITOR_SELS) {
+          const el = root.matches?.(sel) ? root : root.querySelector(sel);
+          if (el && _isVisible(el)) return el;
+        }
+      }
+      // Document-wide fallback.
+      for (const sel of EDITOR_SELS) {
+        const el = document.querySelector(sel);
+        if (el && _isVisible(el)) return el;
+      }
+      await sleep(250);
+    }
+    return null;
+  }
+
+  function _isVisible(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none";
+  }
+
+  // Find the SEND button for the composer that owns `editor`. Walks up to
+  // the composer root, then looks for the send button inside it — never
+  // grabs a send button from a different composer or the right-rail
+  // messaging dock.
+  function _findComposerSendButton(editor) {
+    const root = editor.closest(
+      ".msg-overlay-conversation-bubble, .msg-convo-wrapper, " +
+      ".msg-form, .msg-form__msg-content-container, " +
+      ".msg-overlay-list-bubble, [class*='msg-form']"
+    ) || document;
+    const SELS = [
+      "button.msg-form__send-button:not([disabled])",
+      "button.msg-form__send-btn:not([disabled])",
+      "button[type='submit'][class*='msg-form__send']:not([disabled])",
+      "button[aria-label*='Send' i]:not([aria-label*='Send a connection' i]):not([aria-label*='Send invitation' i])",
+      "button[type='submit']",
+    ];
+    for (const sel of SELS) {
+      const btns = root.querySelectorAll(sel);
+      for (const b of btns) {
+        if (!_isVisible(b)) continue;
+        const txt = (b.textContent || "").trim().toLowerCase();
+        const lbl = (b.getAttribute("aria-label") || "").toLowerCase();
+        if (/send/i.test(txt) || /^send\b/i.test(lbl)) return b;
+        // For form __send-button class, accept even without text (icon-only).
+        if (b.matches?.("button.msg-form__send-button,button.msg-form__send-btn")) return b;
+      }
+    }
+    return null;
+  }
+
+  // Insert `text` into a Lexical contenteditable. Lexical (LinkedIn's
+  // composer framework, formerly Draft.js) IGNORES document.execCommand
+  // and direct .textContent mutation — the only path it respects is a
+  // synthetic ClipboardEvent("paste") with a DataTransfer payload, which
+  // Lexical's onPaste handler converts into proper editor state.
+  //
+  // Returns true if the text ended up in the editor (visually), false if
+  // we couldn't get any input path to land. Caller bails on false.
+  async function _typeIntoLexicalEditor(el, text) {
+    if (!el || !text) return false;
+    try { el.focus(); } catch {}
+    el.dispatchEvent(new Event("focus", { bubbles: true }));
+    // Small human "thinking" pause before typing starts.
+    await sleep(200 + Math.random() * 300);
+
+    // STRATEGY 1: ClipboardEvent paste with DataTransfer (works on Lexical).
+    try {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      const pasteEvt = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      const accepted = el.dispatchEvent(pasteEvt);
+      // Give Lexical a tick to process + render.
+      await sleep(250);
+      if (_editorHasText(el, text)) return true;
+      // If the dispatch was cancelled (Lexical accepted), but the DOM update
+      // is async, keep polling.
+      if (!accepted) {
+        for (let i = 0; i < 12; i++) {
+          await sleep(120);
+          if (_editorHasText(el, text)) return true;
+        }
+      }
+    } catch (e) {
+      console.log("[LeadCaptura] msg: paste strategy threw:", e?.message);
+    }
+
+    // STRATEGY 2: beforeinput + insertFromPaste InputEvent (modern Chromium).
+    try {
+      const dt2 = new DataTransfer();
+      dt2.setData("text/plain", text);
+      const beforeInput = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertFromPaste",
+        data: text,
+        dataTransfer: dt2,
+      });
+      el.dispatchEvent(beforeInput);
+      await sleep(200);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    // STRATEGY 3: execCommand (works on the older classic editor).
+    try {
+      document.execCommand("insertText", false, text);
+      await sleep(150);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    // STRATEGY 4: char-by-char with InputEvent (last resort — for plain
+    // contenteditable elements without a JS-framework editor).
+    try {
+      const { typingPause } = globalThis.__lcHuman;
+      for (const ch of text) {
+        const inp = new InputEvent("input", {
+          bubbles: true, data: ch, inputType: "insertText",
+        });
+        // Try execCommand first (some non-Lexical inputs accept it).
+        try { document.execCommand("insertText", false, ch); } catch {}
+        el.dispatchEvent(inp);
+        await sleep(typingPause());
+      }
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      await sleep(150);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    return false;
+  }
+
+  // Cheap content check — does the editor's visible text contain the
+  // first ~12 chars of what we tried to type? Substring match is robust
+  // to Lexical adding wrapper spans / paragraphs around the text.
+  function _editorHasText(el, text) {
+    const visible = (el.innerText || el.textContent || "").trim();
+    if (!visible) return false;
+    const needle = text.slice(0, Math.min(12, text.length)).trim();
+    return visible.includes(needle);
   }
 
   function _sameProfile(a, b) {
