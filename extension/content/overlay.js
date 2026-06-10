@@ -2099,86 +2099,48 @@
     return buttons[0] || null;
   }
 
+
   // Find "Connect" inside the open Sales Nav dropdown. The dropdown portal is
   // mounted under <body>, NOT inside the card — so search document-wide.
   // Structural anchors first; text last and tight (^connect$).
   function _findSalesNavConnectMenuItem() {
-    // STRATEGY A: any visible artdeco-dropdown__content that opened recently,
-    // PLUS the newer floating popover containers used by Lead Lists. Sales Nav
-    // ships several different dropdown components; we accept all of them.
+    // STRATEGY A: any visible artdeco-dropdown__content that opened recently.
     const openContents = Array.from(
       document.querySelectorAll(
         ".artdeco-dropdown__content--is-open, " +
         ".artdeco-dropdown__content[aria-hidden='false'], " +
         ".artdeco-hoverable-content--visible, " +
-        ".artdeco-hoverable-content, " +
         "[role='menu']:not([aria-hidden='true']), " +
-        "[role='listbox']:not([aria-hidden='true']), " +
-        "[data-test-popover], " +
-        "[class*='popover']:not([aria-hidden='true']), " +
-        "[class*='dropdown__content']"
+        "[role='listbox']:not([aria-hidden='true'])"
       )
     ).filter(_isVisible);
 
-    const itemSelector =
-      "button, a, [role='menuitem'], [role='option'], li, .artdeco-dropdown__item, " +
-      "div[tabindex], span[role='button'], div[role='button']";
     const scanRoots = openContents.length > 0 ? openContents : [document];
-
-    // First pass: exact text match "Connect" (most specific).
+    const itemSelector =
+      "li, [role='menuitem'], [role='option'], .artdeco-dropdown__item, " +
+      "button, a";
     for (const root of scanRoots) {
       const items = Array.from(root.querySelectorAll(itemSelector));
       for (const item of items) {
         if (!_isVisible(item)) continue;
-        if (item.closest(".lc-save-row, .lc-overlay-root, #lc-overlay-root")) continue;
-        const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
-        const aria = (item.getAttribute("aria-label") || "").trim();
-        if (/\bconnected\b/i.test(txt + " " + aria)) continue;
-        if (/\bconnection/i.test(txt + " " + aria)) continue;
-        if (/connect.*(twitter|email|phone|whatsapp|instagram|facebook)/i.test(txt + " " + aria)) continue;
-        if (/^connect$/i.test(txt) || /^connect$/i.test(aria)) {
-          const inner = item.querySelector("button, a, [role='menuitem']");
-          return inner && _isVisible(inner) ? inner : item;
-        }
-      }
-    }
-
-    // Second pass: looser whole-word \bconnect\b match. Caps textContent at
-    // 24 chars so we don't pick up a paragraph that contains the word.
-    for (const root of scanRoots) {
-      const items = Array.from(root.querySelectorAll(itemSelector));
-      for (const item of items) {
-        if (!_isVisible(item)) continue;
-        if (item.closest(".lc-save-row, .lc-overlay-root, #lc-overlay-root")) continue;
+        if (item.closest(".lc-save-row")) continue;
         const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
         const aria = (item.getAttribute("aria-label") || "").trim();
         const hay = txt + " || " + aria;
+        // Exclude "Connected" / "Connection" / "Connect on Twitter" etc.
         if (/\bconnected\b/i.test(hay) || /\bconnection/i.test(hay)) continue;
-        if (/connect.*(twitter|email|phone|whatsapp|instagram|facebook)/i.test(hay)) continue;
-        if (/\bconnect\b/i.test(txt) || /\bconnect\b/i.test(aria)) {
-          if (txt.length > 24) continue;
+        if (/connect.*(twitter|email|phone|whatsapp)/i.test(hay)) continue;
+        // Accept "Connect" as a whole token (anywhere in text), or the exact
+        // word in aria. Sales Nav dropdown items often have an icon + label so
+        // textContent can include "Connect" with leading whitespace.
+        if (/^connect$/i.test(txt) || /^connect$/i.test(aria) ||
+            /\bconnect\b/i.test(txt) || /\bconnect\b/i.test(aria)) {
+          // Prefer the smallest interactive element (the menuitem itself).
+          // If item is a wrapper <li>, look for an inner button/link to click.
           const inner = item.querySelector("button, a, [role='menuitem']");
           return inner && _isVisible(inner) ? inner : item;
         }
       }
-    }
-
-    // Third pass: document-wide last-resort. Some Sales Nav popovers attach
-    // to body without our recognised container classes. Scan all visible
-    // small interactive elements for "Connect" as the entire visible label.
-    const allInteractive = Array.from(document.querySelectorAll(
-      "button, a, [role='menuitem'], [role='option'], div[tabindex], span[role='button'], div[role='button']"
-    ));
-    for (const item of allInteractive) {
-      if (!_isVisible(item)) continue;
-      if (item.closest(".lc-save-row, .lc-overlay-root, #lc-overlay-root")) continue;
-      if (item.closest("[aria-label*='More options' i]")) continue;
-      const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
-      const aria = (item.getAttribute("aria-label") || "").trim();
-      if (txt.length > 14) continue; // menu items are short
-      if (!/^connect$/i.test(txt) && !/^connect$/i.test(aria)) continue;
-      if (/connect.*(twitter|email|phone|whatsapp)/i.test(aria)) continue;
-      return item;
     }
     return null;
   }
@@ -2199,45 +2161,31 @@
       aria: moreBtn.getAttribute("aria-label"),
       cls: moreBtn.className,
     });
-    // No spotlight on the "..." button — the dropdown appears within ~300ms
-    // and a spotlight here would either block the dropdown visually or get
-    // dismissed by the dropdown's own open animation. The Connect-item
-    // spotlight in STEP 3 is the one users need to see.
-    await sleep(200 + Math.random() * 200);
     // Click via human pointer sequence first.
     try { await dispatchHumanClick(moreBtn); } catch {}
 
     // STEP 2: wait for the dropdown to open AND for "Connect" to appear.
     // Sales Nav can take ~1s to mount the dropdown content portal.
-    //
-    // Critical: DO NOT re-click the "..." button once the dropdown is open —
-    // that would close it again. Only retry the trigger click while the
-    // dropdown is still closed.
     let connectItem = null;
     let dropdownOpened = false;
-    const _dropdownVisible = () => {
-      const expanded = moreBtn.getAttribute("aria-expanded");
-      if (expanded === "true") return true;
-      const sel =
-        ".artdeco-dropdown__content--is-open, " +
-        ".artdeco-dropdown__content[aria-hidden='false'], " +
-        ".artdeco-hoverable-content--visible, " +
-        ".artdeco-hoverable-content, " +
-        "[data-test-popover], " +
-        "[class*='popover']:not([aria-hidden='true']), " +
-        "[role='menu']:not([aria-hidden='true'])";
-      return Array.from(document.querySelectorAll(sel)).some(_isVisible);
-    };
-    for (let i = 0; i < 40 && !connectItem; i++) {
+    for (let i = 0; i < 30 && !connectItem; i++) {
       await sleep(150);
-      if (!dropdownOpened && _dropdownVisible()) dropdownOpened = true;
+      // Dropdown open signal — Artdeco toggles aria-expanded or content--is-open.
+      if (!dropdownOpened) {
+        const expanded = moreBtn.getAttribute("aria-expanded");
+        dropdownOpened =
+          expanded === "true" ||
+          !!document.querySelector(
+            ".artdeco-dropdown__content--is-open, " +
+            ".artdeco-hoverable-content--visible"
+          );
+      }
       connectItem = _findSalesNavConnectMenuItem();
-      // Retry the trigger click ONLY if the dropdown still isn't open. Three
-      // retries spread across the 6s wait. Never re-click once it's open.
-      if (!dropdownOpened && (i === 8 || i === 16 || i === 24)) {
-        console.log(`[LeadCaptura] salesNav step 1.${i / 8} → retry '...' click`);
+      // Retry the trigger click once at i=8 if the dropdown still isn't open
+      // (some Sales Nav builds need a second click to register).
+      if (!dropdownOpened && i === 8) {
+        console.log("[LeadCaptura] salesNav step 1.5 → retry '...' click + _forceClick");
         try { _forceClick(moreBtn); } catch {}
-        try { await dispatchHumanClick(moreBtn); } catch {}
       }
     }
 
@@ -2245,7 +2193,6 @@
       console.log("[LeadCaptura] salesNav step 2 ✗ no 'Connect' item in dropdown", {
         dropdownOpened,
       });
-      _removeSpotlight();
       // Dismiss any open dropdown by clicking elsewhere / pressing Escape.
       try { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); } catch {}
       try { document.body.click(); } catch {}
@@ -2259,28 +2206,12 @@
       };
     }
 
-    // STEP 3: click "Connect" — spotlight + human pointer + force fallback.
+    // STEP 3: click "Connect" — human pointer sequence + force fallback.
     console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
       txt: (connectItem.textContent || "").trim().slice(0, 40),
     });
-    _showButtonSpotlight(connectItem, "⚡ Sending invite", "auto-clicking 'Connect'", 900);
-    await sleep(550 + Math.random() * 250);
     try { await dispatchHumanClick(connectItem); } catch {}
-    // After pointer click, give Sales Nav a moment to process. If the modal
-    // hasn't appeared after 600ms, force-click as a fallback (some menu items
-    // are bound to keydown rather than click in newer Sales Nav builds).
-    await sleep(600 + Math.random() * 250);
-    if (!_invitationModalOpen() && connectItem.isConnected) {
-      console.log("[LeadCaptura] salesNav step 3.5 → modal not open, _forceClick Connect");
-      try { _forceClick(connectItem); } catch {}
-      try {
-        const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
-        connectItem.dispatchEvent(new KeyboardEvent("keydown", k));
-        connectItem.dispatchEvent(new KeyboardEvent("keyup", k));
-      } catch {}
-      await sleep(500);
-    }
-    _removeSpotlight();
+    await sleep(500 + Math.random() * 400);
 
     // STEP 4: did the invitation modal open?
     const modalAppeared = await (async () => {
@@ -2346,6 +2277,7 @@
     console.log("[LeadCaptura] salesNav step 5 ✗ timed out waiting for Send click");
     return { ok: false, reason: "send_failed" };
   }
+
 
   function _cardForUrl(url) {
     // Prefer the exact card element captured when the chip was injected — it
