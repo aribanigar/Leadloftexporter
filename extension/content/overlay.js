@@ -2208,12 +2208,41 @@
     // about to be clicked, then human pointer sequence + force fallback.
     console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
       txt: (connectItem.textContent || "").trim().slice(0, 40),
+      tag: connectItem.tagName,
+      cls: connectItem.className,
     });
     // Visible spotlight cue on the Connect menu item (pointer-events:none on
-    // the overlay so the real click below still lands on the button).
-    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 900);
+    // the overlay so the real click below still lands on the button). The
+    // spotlight freezes in place if the target detaches mid-show — Sales Nav
+    // sometimes closes the dropdown the instant we insert DOM nodes near it.
+    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 1100);
+    console.log("[LeadCaptura] salesNav step 3 → spotlight requested");
     await sleep(950);
-    try { await dispatchHumanClick(connectItem); } catch {}
+
+    // If our original connectItem detached during the spotlight wait (dropdown
+    // closed), find it again. Otherwise the click below would target a node
+    // that's no longer in the DOM and silently no-op.
+    let clickTarget = connectItem;
+    if (!clickTarget.isConnected) {
+      console.log("[LeadCaptura] salesNav step 3 → connectItem detached, re-finding");
+      clickTarget = _findSalesNavConnectMenuItem();
+      if (!clickTarget) {
+        // Dropdown is gone — re-open it and try one more time.
+        console.log("[LeadCaptura] salesNav step 3 → dropdown gone, re-opening '...'");
+        try { await dispatchHumanClick(moreBtn); } catch {}
+        for (let i = 0; i < 20 && !clickTarget; i++) {
+          await sleep(150);
+          clickTarget = _findSalesNavConnectMenuItem();
+        }
+      }
+    }
+    if (clickTarget) {
+      try { await dispatchHumanClick(clickTarget); } catch {}
+    } else {
+      console.log("[LeadCaptura] salesNav step 3 ✗ Connect item unrecoverable");
+      _removeSpotlight();
+      return { ok: false, reason: "connect_item_lost" };
+    }
     _removeSpotlight();
     await sleep(500 + Math.random() * 400);
 
@@ -5301,25 +5330,17 @@
 
       _playSpotlightBeep();
 
-      const tick = () => {
-        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
-        if (!targetEl.isConnected) {
-          _removeSpotlight();
-          return;
-        }
-        const r = targetEl.getBoundingClientRect();
-        if (r.width < 1 || r.height < 1) {
-          _spotlightRAF = requestAnimationFrame(tick);
-          return;
-        }
+      // Position helper — applies ring/popup/arrow coordinates from a DOMRect.
+      // Uses setProperty(name, value, "important") so LinkedIn's global CSS
+      // can never override the inline positioning.
+      const setImp = (el, k, v) => el.style.setProperty(k, v, "important");
+      const positionFromRect = (r) => {
         const pad = 6;
-        // Position ring
-        ring.style.left = `${Math.max(0, r.left - pad)}px`;
-        ring.style.top = `${Math.max(0, r.top - pad)}px`;
-        ring.style.width = `${r.width + pad * 2}px`;
-        ring.style.height = `${r.height + pad * 2}px`;
+        setImp(ring, "left", `${Math.max(0, r.left - pad)}px`);
+        setImp(ring, "top", `${Math.max(0, r.top - pad)}px`);
+        setImp(ring, "width", `${r.width + pad * 2}px`);
+        setImp(ring, "height", `${r.height + pad * 2}px`);
 
-        // Position popup — above target if there's room, otherwise below.
         const pw = popup.offsetWidth || 260;
         const ph = popup.offsetHeight || 60;
         const aw = arrow.offsetWidth || 32;
@@ -5328,7 +5349,6 @@
         let arrowTop = r.top - ah - 6;
         let arrowEmoji = "👇";
         if (popupTop < 12) {
-          // Not enough space above — flip below.
           popupTop = r.bottom + ah + 18;
           arrowTop = r.bottom + 4;
           arrowEmoji = "☝";
@@ -5338,15 +5358,48 @@
           r.left + r.width / 2 - pw / 2));
         const arrowLeft = Math.max(4, Math.min(window.innerWidth - aw - 4,
           r.left + r.width / 2 - aw / 2));
-        popup.style.left = `${popupLeft}px`;
-        popup.style.top = `${popupTop}px`;
-        arrow.style.left = `${arrowLeft}px`;
-        arrow.style.top = `${arrowTop}px`;
+        setImp(popup, "left", `${popupLeft}px`);
+        setImp(popup, "top", `${popupTop}px`);
+        setImp(arrow, "left", `${arrowLeft}px`);
+        setImp(arrow, "top", `${arrowTop}px`);
+      };
 
+      // Position IMMEDIATELY from current rect — this guarantees the spotlight
+      // is visible right away even if the target detaches in the next frame
+      // (which happens on Sales Nav when our DOM insert closes the dropdown).
+      const initialRect = targetEl.getBoundingClientRect();
+      if (initialRect.width >= 1 && initialRect.height >= 1) {
+        positionFromRect(initialRect);
+      } else {
+        // Centre the popup as a fallback so the user still sees feedback.
+        ring.style.cssText = ring.style.cssText.replace(/box-shadow:[^;]+;/, "");
+        ring.style.display = "none";
+        popup.style.left = `${Math.max(8, (window.innerWidth - 260) / 2)}px`;
+        popup.style.top = "80px";
+      }
+
+      // Tick: re-position while target is still alive (handles scrolling).
+      // Once target detaches, STOP repositioning but DO NOT tear the spotlight
+      // down — it stays frozen at the last-known rect until the duration timeout
+      // fires. Sales Nav routinely closes the dropdown the moment we click
+      // Connect, which would otherwise nuke the spotlight before the user sees it.
+      let frozen = false;
+      const tick = () => {
+        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        if (!frozen) {
+          if (!targetEl.isConnected) {
+            frozen = true;
+          } else {
+            const r = targetEl.getBoundingClientRect();
+            if (r.width >= 1 && r.height >= 1) positionFromRect(r);
+          }
+        }
         _spotlightRAF = requestAnimationFrame(tick);
       };
       _spotlightRAF = requestAnimationFrame(tick);
 
+      // Auto-remove on timeout — this is now the SOLE removal trigger
+      // (besides explicit _removeSpotlight calls from the caller).
       if (durationMs > 0) {
         setTimeout(() => { try { _removeSpotlight(); } catch {} }, durationMs);
       }
