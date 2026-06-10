@@ -43,17 +43,72 @@ export default function EmailSendersPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["connected-accounts"] }),
   });
 
+  // Relay probe — hits /api/smtp-relay (GET handler returns
+  // {ok:true,service:"smtp-relay"}). If reachable, SMTP credentials that
+  // can't connect directly will transparently fall back through this
+  // endpoint, so users can paste their Hostinger / Zoho / etc. SMTP
+  // settings and they just work. If unreachable, the user knows direct
+  // SMTP is the only option and they need Resend / SendGrid.
+  const { data: relay } = useQuery<{ ok: boolean; service?: string }>({
+    queryKey: ["smtp-relay-probe"],
+    queryFn: async () => {
+      try {
+        const r = await fetch("/api/smtp-relay", { method: "GET" });
+        return (await r.json()) as { ok: boolean; service?: string };
+      } catch {
+        return { ok: false };
+      }
+    },
+    staleTime: 5 * 60_000,
+  });
+  const relayReady = !!relay?.ok && relay?.service === "smtp-relay";
+
   return (
     <div className="max-w-3xl">
-      <div className="mb-1 flex items-center gap-2">
-        <Mail className="h-5 w-5 text-indigo-600" />
-        <h1 className="text-lg font-semibold">Email Senders</h1>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Mail className="h-5 w-5 text-indigo-600" />
+          <h1 className="text-lg font-semibold">Email Senders</h1>
+        </div>
+        {/* Live relay status pill — also doubles as a "have I got the
+            latest deploy?" marker for users who saw a stale build. */}
+        <span
+          className={
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium " +
+            (relayReady
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-slate-50 text-slate-500")
+          }
+          title={
+            relayReady
+              ? "The Vercel SMTP relay is reachable — your SMTP creds work even on Render free tier."
+              : "Vercel SMTP relay isn't reachable from this build — direct SMTP only."
+          }
+        >
+          <span
+            className={
+              "h-1.5 w-1.5 rounded-full " +
+              (relayReady ? "bg-emerald-500" : "bg-slate-400")
+            }
+          />
+          Relay {relayReady ? "ready" : "checking…"}
+        </span>
       </div>
       <p className="mb-5 text-sm text-slate-500">
         Connect at least one sender so the Messaging composer and Playbook
         steps can actually deliver mail. Outbound is ranked
         Resend → SendGrid → Gmail → SMTP — the first active provider wins per
-        send. <Link href="/settings/outreach" className="underline">Daily quota & pacing</Link>{" "}
+        send.{" "}
+        {relayReady && (
+          <span className="text-emerald-700">
+            Direct SMTP can&apos;t connect on Render free tier, so we route
+            through the Vercel relay automatically — your Hostinger / Zoho /
+            Mailgun credentials work as-is.{" "}
+          </span>
+        )}
+        <Link href="/settings/outreach" className="underline">
+          Daily quota & pacing
+        </Link>{" "}
         are enforced server-side.
       </p>
 
