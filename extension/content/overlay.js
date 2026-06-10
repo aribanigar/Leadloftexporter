@@ -5221,56 +5221,128 @@
   // before the actual click. Pure visual — pointer-events:none on overlays so
   // clicks fall through to the real button.
   // LinkedIn ONLY — Sales Navigator paths never call this.
+  // Self-contained popup overlay anchored to a button. All inline styles with
+  // !important so it renders regardless of the page's stylesheet:
+  //   - Glowing ring around the target button
+  //   - Floating popup card (title + subtitle) above the button
+  //   - Bouncing arrow between popup and button
+  //   - Audio beep
+  // pointer-events:none on overlays so real clicks still land on the button.
   function _showButtonSpotlight(targetEl, title, subtitle, durationMs = 1100) {
-    if (!targetEl || !_isVisible(targetEl)) return;
+    if (!targetEl) return;
     _removeSpotlight();
+    const Z = "2147483647";
+    const cssAll = (obj) =>
+      Object.entries(obj).map(([k, v]) => `${k}:${v} !important`).join(";");
     try {
-      const spot = document.createElement("div");
-      spot.id = "lc-send-spotlight";
-      document.body.appendChild(spot);
-      _spotlightEl = spot;
+      // 1. Glowing ring around the target button.
+      const ring = document.createElement("div");
+      ring.id = "lc-send-spotlight";
+      ring.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        "box-shadow":
+          "0 0 0 4px rgba(10,102,194,0.95), 0 0 24px 8px rgba(10,102,194,0.6), 0 0 0 9999px rgba(0,0,0,0.55)",
+        "border-radius": "10px",
+        transition: "all 0.18s ease-out",
+      });
+      document.body.appendChild(ring);
+      _spotlightEl = ring;
 
-      const banner = document.createElement("div");
-      banner.id = "lc-send-banner";
-      banner.innerHTML =
-        `<div style="font-size:16px!important;font-weight:800!important;margin-bottom:3px!important;">${title}</div>` +
-        `<div id="lc-send-banner-sub" style="font-size:12px!important;font-weight:500!important;opacity:0.92!important;">${subtitle}</div>`;
-      document.body.appendChild(banner);
-      _bannerEl = banner;
+      // 2. Popup card with title + subtitle. Anchored above target.
+      const popup = document.createElement("div");
+      popup.id = "lc-send-banner";
+      popup.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        background: "linear-gradient(135deg,#0a66c2,#004182)",
+        color: "#fff",
+        padding: "14px 22px",
+        "border-radius": "14px",
+        "box-shadow": "0 12px 36px rgba(0,0,0,0.55), 0 0 0 2px rgba(255,255,255,0.15) inset",
+        "font-family": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+        "font-weight": "700",
+        "text-align": "center",
+        "min-width": "240px",
+        "max-width": "440px",
+        "white-space": "nowrap",
+      });
+      popup.innerHTML =
+        `<div style="font-size:16px;font-weight:800;margin-bottom:4px;">${title}</div>` +
+        `<div style="font-size:12px;font-weight:500;opacity:0.92;">${subtitle}</div>`;
+      document.body.appendChild(popup);
+      _bannerEl = popup;
 
+      // 3. Bouncing arrow pointing down at the target.
       const arrow = document.createElement("div");
       arrow.id = "lc-send-btn-arrow";
-      arrow.innerHTML =
-        `<div class="lc-arrow-inner"><span class="lc-arrow-emoji">👇</span><span>Click target</span></div>` +
-        `<div class="lc-arrow-tail"></div>`;
+      arrow.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        "font-size": "32px",
+        "line-height": "1",
+        filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.6))",
+        animation: "lc-bounce 0.7s ease-in-out infinite alternate",
+      });
+      arrow.textContent = "👇";
       document.body.appendChild(arrow);
       _arrowEl = arrow;
+
+      // Ensure the bounce keyframe exists (idempotent).
+      if (!document.getElementById("lc-bounce-style")) {
+        const st = document.createElement("style");
+        st.id = "lc-bounce-style";
+        st.textContent =
+          "@keyframes lc-bounce { from { transform: translateY(0); } to { transform: translateY(8px); } }";
+        document.head.appendChild(st);
+      }
 
       _playSpotlightBeep();
 
       const tick = () => {
         if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
-        if (!targetEl.isConnected || !_isVisible(targetEl)) {
+        if (!targetEl.isConnected) {
           _removeSpotlight();
           return;
         }
         const r = targetEl.getBoundingClientRect();
-        const pad = 12;
-        _spotlightEl.style.cssText = [
-          `left:${r.left - pad}px`, `top:${r.top - pad}px`,
-          `width:${r.width + pad * 2}px`, `height:${r.height + pad * 2}px`,
-        ].join("!important;") + "!important;";
+        if (r.width < 1 || r.height < 1) {
+          _spotlightRAF = requestAnimationFrame(tick);
+          return;
+        }
+        const pad = 6;
+        // Position ring
+        ring.style.left = `${Math.max(0, r.left - pad)}px`;
+        ring.style.top = `${Math.max(0, r.top - pad)}px`;
+        ring.style.width = `${r.width + pad * 2}px`;
+        ring.style.height = `${r.height + pad * 2}px`;
 
-        const bw = _bannerEl.offsetWidth || 460;
-        _bannerEl.style.cssText =
-          `left:${Math.max(8, (window.innerWidth - bw) / 2)}px!important;top:24px!important;`;
-
-        const aw = _arrowEl.offsetWidth || 180;
-        const ah = _arrowEl.offsetHeight || 56;
-        const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
+        // Position popup — above target if there's room, otherwise below.
+        const pw = popup.offsetWidth || 260;
+        const ph = popup.offsetHeight || 60;
+        const aw = arrow.offsetWidth || 32;
+        const ah = arrow.offsetHeight || 32;
+        let popupTop = r.top - ph - ah - 18;
+        let arrowTop = r.top - ah - 6;
+        let arrowEmoji = "👇";
+        if (popupTop < 12) {
+          // Not enough space above — flip below.
+          popupTop = r.bottom + ah + 18;
+          arrowTop = r.bottom + 4;
+          arrowEmoji = "☝";
+        }
+        if (arrow.textContent !== arrowEmoji) arrow.textContent = arrowEmoji;
+        const popupLeft = Math.max(8, Math.min(window.innerWidth - pw - 8,
+          r.left + r.width / 2 - pw / 2));
+        const arrowLeft = Math.max(4, Math.min(window.innerWidth - aw - 4,
           r.left + r.width / 2 - aw / 2));
-        const aTop = Math.max(96, r.top - ah - 18);
-        _arrowEl.style.cssText = `left:${aLeft}px!important;top:${aTop}px!important;`;
+        popup.style.left = `${popupLeft}px`;
+        popup.style.top = `${popupTop}px`;
+        arrow.style.left = `${arrowLeft}px`;
+        arrow.style.top = `${arrowTop}px`;
 
         _spotlightRAF = requestAnimationFrame(tick);
       };
