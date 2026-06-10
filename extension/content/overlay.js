@@ -2754,7 +2754,9 @@
         ".jobs-search__job-details, .jobs-search__job-details--container, " +
         ".jobs-search__job-details--wrapper, .jobs-details, .job-view-layout, " +
         ".scaffold-layout__detail, [class*='jobs-search__job-details'], " +
-        "[class*='job-details']"
+        "[class*='job-details'], .jobs-details__main-content, " +
+        ".jobs-search__right-rail, .jobs-unified-top-card, " +
+        ".job-details-jobs-unified-top-card__container--two-pane"
       );
     } catch {
       return false;
@@ -2775,10 +2777,19 @@
   function _jobCardEls() {
     const seen = new Set();
     const boxes = [];
-    // No /jobs/ anchor requirement: modern LinkedIn cards navigate via the
-    // whole-card click / data-job-id and may not expose a job <a> inside, so
-    // requiring one rejected every card but the open one. We trust the
-    // strategy selectors instead and just dedupe + exclude the detail pane.
+    // Prefer the left list pane when LinkedIn renders a split view — this
+    // prevents chips from being injected into the detail pane on the right,
+    // which also contains data-job-id / data-occludable-job-id elements and
+    // would otherwise get multiple chips.
+    const listPane =
+      document.querySelector(
+        ".scaffold-layout__list, .jobs-search-results-list, " +
+        ".jobs-search__results-list, ul.jobs-search-results__list, " +
+        "[class*='scaffold-layout__list-container'], " +
+        "div[class*='jobs-search-results-grid']"
+      ) || null;
+    const scanRoot = listPane || document;
+
     const add = (box) => {
       if (box && !seen.has(box) && !_inDetailPane(box)) {
         seen.add(box);
@@ -2786,13 +2797,9 @@
       }
     };
 
-    // STRATEGY A — explicit job-id attributes + known card containers. This is
-    // the most reliable detector and works identically on the collections
-    // ("see all") page AND the search-box results page (origin=JOB_COLLECTION_PAGE),
-    // since both set data-occludable-job-id on the list <li>. Run it ALWAYS, not
-    // just as a fallback — the Dismiss-button climb below doesn't resolve the
-    // card unit on every layout, so id-based detection must always participate.
-    document
+    // STRATEGY A — explicit job-id attributes + known card containers. Scoped
+    // to the list pane when available so detail-pane elements are never picked up.
+    scanRoot
       .querySelectorAll(
         "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
         "[data-occludable-job-id], " +
@@ -2805,7 +2812,8 @@
 
     // STRATEGY B — one card per Dismiss "X". Catches layouts where a card
     // exposes no job link or data-id. Climbs to the repeated card unit.
-    document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
+    // Also scoped to the list pane when present.
+    (listPane || document).querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
       if (_inDetailPane(btn)) return;
       add(_cardFromDismiss(btn));
     });
