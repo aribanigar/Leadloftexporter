@@ -3731,6 +3731,9 @@
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
       if (action.type === "submit") {
+        // Spotlight the Submit button so the user can visually track the run.
+        _showButtonSpotlight(action.btn, "📤 Submitting application", "auto-submit in progress", 900);
+        await sleep(550 + Math.random() * 250);
         // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
         // handlers reliably honour. Escalate to _forceClick only if it didn't land.
         await dispatchHumanClick(action.btn);
@@ -3741,6 +3744,7 @@
           await sleep(1800 + Math.random() * 1200);
           after = _easyApplyModal();
         }
+        _removeSpotlight();
         if (!after) return { ok: true }; // modal closed = submitted
         const txt = (after.innerText || after.textContent || "").toLowerCase();
         const isSuccess =
@@ -3773,19 +3777,29 @@
         );
       };
 
+      // Spotlight the Next/Review button so the user can visually track the run.
+      // Label varies by action type: "Continue" for Next, "Review" for Review.
+      const _spotTitle = action.type === "review"
+        ? "🔍 Reviewing application"
+        : "➡ Continuing application";
+      const _spotSub = `Page ${step + 1} — auto-clicking '${action.btn.getAttribute("aria-label") || action.btn.textContent?.trim() || action.type}'`;
+      _showButtonSpotlight(action.btn, _spotTitle, _spotSub, 900);
+      await sleep(550 + Math.random() * 250);
+
       // Primary: human-paced click (v1.0.47 behavior).
       await dispatchHumanClick(action.btn);
       await sleep(1300 + Math.random() * 900);
       let after = _easyApplyModal();
-      if (!after) return { ok: false, reason: "modal_vanished" };
+      if (!after) { _removeSpotlight(); return { ok: false, reason: "modal_vanished" }; }
 
       // Fallback: if it didn't move, escalate to the 5-strategy force click.
       if (!progressed(after)) {
         _forceClick(action.btn);
         await sleep(1300 + Math.random() * 900);
         after = _easyApplyModal();
-        if (!after) return { ok: false, reason: "modal_vanished" };
+        if (!after) { _removeSpotlight(); return { ok: false, reason: "modal_vanished" }; }
       }
+      _removeSpotlight();
 
       const errorShown = !!after.querySelector(
         ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
@@ -3793,7 +3807,22 @@
       );
 
       if (!progressed(after)) {
-        // Still on the same page after both click attempts. If LinkedIn is
+        // Third try: focus + Enter keypress. LinkedIn's React handlers
+        // sometimes only fire on keyboard activation when the button is
+        // focused, and our synthetic click events come in with isTrusted=false.
+        try { action.btn.focus(); } catch {}
+        await sleep(150);
+        try {
+          const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+          action.btn.dispatchEvent(new KeyboardEvent("keydown", k));
+          action.btn.dispatchEvent(new KeyboardEvent("keyup", k));
+        } catch {}
+        await sleep(1200);
+        after = _easyApplyModal();
+        if (!after) return { ok: false, reason: "modal_vanished" };
+      }
+      if (!progressed(after)) {
+        // Still on the same page after three click attempts. If LinkedIn is
         // showing a validation error, or we've been stuck several times, this
         // job needs input we can't safely provide — discard and move on.
         consecutiveStuck++;
