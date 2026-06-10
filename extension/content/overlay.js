@@ -3570,7 +3570,8 @@
     const p = profile || {};
 
     // ---- Profile-based answers ----
-    if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || null;
+    // Years/experience: always return something so required number fields don't stay empty.
+    if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || "5";
     if (/phone|mobile|cell|contact number|whatsapp/i.test(l)) return p.phone || null;
     if (/e-?mail/i.test(l)) return p.email || null;
     if (/full name|your name/i.test(l)) return p.fullName || null;
@@ -3580,7 +3581,7 @@
     if (/portfolio|website|personal url|github|behance/i.test(l)) return p.website || null;
     if (/expected[^a-z]{0,10}(salary|compensation|ctc|pay)|salary[^a-z]{0,10}expectation|desired[^a-z]{0,10}salary/i.test(l)) return p.expectedSalary || null;
     if (/current[^a-z]{0,10}(salary|compensation|ctc)/i.test(l)) return p.currentSalary || null;
-    if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || null;
+    if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || "30";
     if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
     if (/\bcountry\b/i.test(l)) return p.country || null;
     if (/nationality|citizen(ship)?/i.test(l)) return p.nationality || null;
@@ -3606,8 +3607,8 @@
       }
     }
 
-    // ---- Number fields with no profile value — use 0 as a placeholder ----
-    if (kind === "number" && p.years && /(experience|years)/i.test(l)) return p.years;
+    // ---- Any remaining number field — default to "5" (years/experience style) ----
+    if (kind === "number") return p.years || "5";
 
     return null;
   }
@@ -3659,6 +3660,7 @@
   async function _answerModalQuestions(modal) {
     if (!modal) return;
     const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
     const { profile, aiEnabled } = await _getAutoApplyConfig();
     const askGemini = async (question, kind, options) => {
       if (!aiEnabled || !question) return null;
@@ -3719,8 +3721,15 @@
         if (radio) {
           let lbl = null;
           if (radio.id) { try { lbl = document.querySelector(`label[for="${CSS.escape(radio.id)}"]`); } catch {} }
-          try { (lbl || radio).click(); }
-          catch { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+          // LinkedIn artdeco radios are visually-hidden — click the visible label wrapper,
+          // then fall back to the artdeco-looking span, then force change on the input.
+          const artdecoSpan = lbl?.querySelector(".artdeco-radio-button") || null;
+          const clickTarget = artdecoSpan || lbl || radio;
+          try { await dispatchHumanClick(clickTarget); }
+          catch {
+            try { clickTarget.click(); }
+            catch { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+          }
           await sleep(150 + Math.random() * 250);
         }
       }
@@ -3833,13 +3842,29 @@
     };
 
     // Poll until the modal's visible text changes from `before` or until `timeoutMs`.
-    // Returns the fresh modal element when advanced (or null if modal closed).
+    // Returns the fresh modal element when advanced (or null if truly closed).
+    // LinkedIn animates step transitions — modal can briefly disappear mid-advance;
+    // wait up to 2 s for it to re-render before treating absence as "closed".
     const _waitAdvanced = async (before, timeoutMs = 4000) => {
       const start = Date.now();
       while (Date.now() - start < timeoutMs) {
         await sleep(300);
         const m = _easyApplyModal();
-        if (!m || !document.body.contains(m)) return null; // modal gone = advanced
+        if (!m || !document.body.contains(m)) {
+          // Modal briefly gone — LinkedIn may be animating; give it 2 s to reappear.
+          let reappeared = null;
+          for (let t = 0; t < 7; t++) {
+            await sleep(300);
+            reappeared = _easyApplyModal();
+            if (reappeared && document.body.contains(reappeared)) break;
+            reappeared = null;
+          }
+          if (!reappeared) return null; // truly closed
+          const cur2 = _modalText(reappeared);
+          if (cur2 !== before) return reappeared; // stepped forward
+          // Same text as before — keep polling
+          continue;
+        }
         const cur = _modalText(m);
         if (cur !== before) return m; // text changed = stepped forward
       }
@@ -3854,7 +3879,17 @@
       if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
 
       // Always refresh modal reference — LinkedIn can re-render between steps.
-      const freshModal = _easyApplyModal();
+      // If the modal is temporarily absent (step transition animation), wait up to
+      // 3 s for it to reappear before concluding the form has closed.
+      let freshModal = _easyApplyModal();
+      if (!freshModal || !document.body.contains(freshModal)) {
+        for (let t = 0; t < 10; t++) {
+          await sleep(300);
+          freshModal = _easyApplyModal();
+          if (freshModal && document.body.contains(freshModal)) break;
+          freshModal = null;
+        }
+      }
       if (freshModal && document.body.contains(freshModal)) modal = freshModal;
       if (!modal || !document.body.contains(modal)) return { ok: false, reason: "modal_closed" };
 
@@ -4005,9 +4040,18 @@
 
       consecutiveStuck = 0;
       // Settle after LinkedIn animates the step transition.
-      await sleep(400 + Math.random() * 300);
+      await sleep(500 + Math.random() * 300);
       // Update modal reference to the freshly rendered step.
-      const nextModal = afterModal || _easyApplyModal();
+      // Poll up to 2 s for the next step's modal to fully appear.
+      let nextModal = afterModal && document.body.contains(afterModal) ? afterModal : _easyApplyModal();
+      if (!nextModal) {
+        for (let t = 0; t < 7; t++) {
+          await sleep(300);
+          nextModal = _easyApplyModal();
+          if (nextModal && document.body.contains(nextModal)) break;
+          nextModal = null;
+        }
+      }
       if (nextModal && document.body.contains(nextModal)) modal = nextModal;
     }
 
