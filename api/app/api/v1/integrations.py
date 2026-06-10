@@ -42,12 +42,24 @@ PROVIDER_CATALOG = [
         "description": "Pair the Chrome extension to enable LinkedIn capture & outreach.",
         "kind": "extension",
     },
-    # Gmail (App Password) and generic SMTP are intentionally not exposed in
-    # the catalog. They go through ports 25/465/587 which our backend host
-    # blocks, so every connect attempt times out. Resend / SendGrid send
-    # over HTTPS and work on every plan — that's what users get steered
-    # towards. The connect endpoints below are still mounted for legacy
-    # accounts and for self-hosted deployments where SMTP isn't blocked.
+    # Generic SMTP — exposed for users who self-host the backend or run
+    # on a plan that allows outbound SMTP. On Render free/starter it'll
+    # time out at connect-test; the error message tells the user why and
+    # points at the HTTPS alternatives (Resend / SendGrid). The connect
+    # endpoint validates the credentials before saving so a misconfigured
+    # SMTP can't silently sit "active" without ever sending.
+    {
+        "id": "smtp",
+        "name": "SMTP server",
+        "description": "Send through your existing SMTP server (Hostinger, Zoho, Mailgun relay, self-hosted). Use port 465 (implicit TLS) or 587 (STARTTLS). Verified on connect.",
+        "kind": "email",
+    },
+    {
+        "id": "gmail",
+        "name": "Gmail (App Password)",
+        "description": "Connect a personal Gmail mailbox via an App Password. Sends through smtp.gmail.com on port 587 — only works on hosts that allow outbound SMTP.",
+        "kind": "email",
+    },
     {
         "id": "hubspot",
         "name": "HubSpot",

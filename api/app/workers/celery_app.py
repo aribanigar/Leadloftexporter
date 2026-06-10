@@ -29,6 +29,13 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.tick_outreach_scheduler",
         "schedule": crontab(minute="*"),
     },
+    # Drain manually-bulk-queued emails (Messaging → Email composer). The
+    # scheduler tick above only touches Enrollment-driven sends; this task
+    # picks up ad-hoc rows queued via POST /inbox/bulk-send.
+    "drain-queued-emails": {
+        "task": "app.workers.tasks.send_queued_emails",
+        "schedule": crontab(minute="*"),
+    },
     "poll-inbound-email": {
         "task": "app.workers.tasks.poll_inbound_email",
         "schedule": crontab(minute="*/5"),

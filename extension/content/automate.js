@@ -291,6 +291,43 @@
     }
   }
 
+  /**
+   * Bridge: open the profile in a background tab where main.js's bridge
+   * trigger (mirror of the enrichment trigger) scrapes the visible profile
+   * + contact info, syncs the lead, and reports a structured snapshot back
+   * via the regular extension-job result endpoint. Same anti-bot envelope
+   * as enrichment: background tab via the service worker, foreground only
+   * for write actions.
+   */
+  async function doBridgeProfile(job) {
+    const url = job.payload?.linkedin_url;
+    if (!url || !url.includes("linkedin.com/")) {
+      return { status: "failed", error: "missing_linkedin_url" };
+    }
+    let openUrl = url;
+    try {
+      const u = new URL(url);
+      u.searchParams.set("lc_bridge", String(job.id));
+      openUrl = u.toString();
+    } catch {
+      openUrl = url + (url.includes("?") ? "&" : "?") + "lc_bridge=" + encodeURIComponent(job.id);
+    }
+    try {
+      await chrome.runtime.sendMessage({
+        type: "lc:openProfileTab",
+        url: openUrl,
+        active: false,
+        awaitClose: true,
+      });
+    } catch (e) {
+      return { status: "failed", error: "bridge_open_failed: " + (e?.message || e) };
+    }
+    // Snapshot is delivered by main.js directly to the job-result endpoint.
+    // We report "done" with an empty payload so the autopilot loop doesn't
+    // overwrite the richer payload that main.js already sent.
+    return { status: "done", result: { bridged: true } };
+  }
+
   async function executeOne(job) {
     // Connect / Follow / SearchScraper all touch high-risk surfaces (invite
     // modal, scroll-load) so still gate on foreground — matches the
@@ -310,6 +347,7 @@
       if (job.kind === "connect") result = await doConnect(job);
       else if (job.kind === "message") result = await doMessage(job);
       else if (job.kind === "scrape_search") result = await doScrapeSearch(job);
+      else if (job.kind === "bridge_profile") result = await doBridgeProfile(job);
       else result = { status: "skipped", error: "unknown_kind" };
       await Api.submitJobResult(job.id, {
         status: result.status,

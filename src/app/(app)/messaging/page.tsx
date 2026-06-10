@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Linkedin,
@@ -13,10 +13,8 @@ import {
   ExternalLink,
   ChevronRight,
   X,
+  Mail,
   Sparkles,
-  Users,
-  Zap,
-  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -38,6 +36,24 @@ interface BulkMessageResult {
   total: number;
 }
 
+interface BulkEmailResult {
+  queued: number;
+  skipped_no_email: number;
+  skipped_over_cap: number;
+  skipped_recent_dup: number;
+  daily_cap: number;
+  daily_sent: number;
+  total: number;
+}
+
+interface BulkEmailStatus {
+  queued: number;
+  sent: number;
+  failed: number;
+  daily_cap: number;
+  daily_sent: number;
+}
+
 interface MessageJobsStatus {
   pending: number;
   sent: number;
@@ -53,7 +69,14 @@ interface Template {
   channel?: string;
 }
 
-type Channel = "linkedin" | "whatsapp";
+interface AiPreview {
+  lead_id: string;
+  subject: string;
+  body_text: string;
+  body_html: string;
+}
+
+type Channel = "linkedin" | "whatsapp" | "email";
 
 const TOKENS = ["{first_name}", "{last_name}", "{full_name}", "{title}", "{company}"];
 
@@ -82,19 +105,27 @@ function waLink(phone: string | null | undefined, text: string): string {
 export default function MessagingPage() {
   const [channel, setChannel] = useState<Channel>("linkedin");
   const [message, setMessage] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  // AI mode for Email channel — when on, message+subject act as fallback.
+  const [aiMode, setAiMode] = useState(false);
+  const [aiIntent, setAiIntent] = useState("");
+  const [aiTone, setAiTone] = useState("professional");
+  const [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
   const [stageId, setStageId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BulkMessageResult | null>(null);
   const [waResult, setWaResult] = useState<WaSendResult | null>(null);
+  const [emailResult, setEmailResult] = useState<BulkEmailResult | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [sendingActive, setSendingActive] = useState(false);
-  const [stopped, setStopped] = useState(false);
+  const [emailSendingActive, setEmailSendingActive] = useState(false);
   // WhatsApp guided send-queue: a list of lead ids + a cursor.
   const [waQueue, setWaQueue] = useState<{ ids: string[]; index: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isWa = channel === "whatsapp";
+  const isEmail = channel === "email";
 
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
@@ -130,9 +161,22 @@ export default function MessagingPage() {
 
   const items = useMemo(() => leads?.items || [], [leads]);
   const reach = useCallback(
-    (l: Lead) => (isWa ? !!l.phone : !!l.linkedin_url),
-    [isWa]
+    (l: Lead) => (isEmail ? !!l.email : isWa ? !!l.phone : !!l.linkedin_url),
+    [isWa, isEmail]
   );
+
+  // Live email bulk-send progress
+  const { data: emailStatus } = useQuery<BulkEmailStatus>({
+    queryKey: ["email-bulk-status"],
+    queryFn: () => api("/inbox/bulk-status"),
+    enabled: emailSendingActive,
+    refetchInterval: (query) => {
+      const d = query.state.data as BulkEmailStatus | undefined;
+      if (!d) return 4000;
+      if (d.queued === 0) { setEmailSendingActive(false); return false; }
+      return 4000;
+    },
+  });
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -168,8 +212,11 @@ export default function MessagingPage() {
     setSelected(new Set());
     setResult(null);
     setWaResult(null);
+    setEmailResult(null);
     setWaQueue(null);
     setSendingActive(false);
+    setEmailSendingActive(false);
+    setAiPreview(null);
   }, [channel]);
 
   function toggle(id: string) {
@@ -225,17 +272,59 @@ export default function MessagingPage() {
     onSuccess: (r) => {
       setResult(r);
       setSelected(new Set());
-      setStopped(false);
       if (r.queued > 0) setSendingActive(true);
     },
   });
 
-  const stopSending = useMutation<{ stopped: number }, Error, void>({
-    mutationFn: () => api("/leads/bulk-message/stop", { method: "POST" }),
-    onSuccess: () => {
-      setSendingActive(false);
-      setStopped(true);
+  // Email — bulk queue (paced server-side by Celery + workspace daily quota).
+  const emailSend = useMutation<BulkEmailResult, Error, void>({
+    mutationFn: () =>
+      api("/inbox/bulk-send", {
+        method: "POST",
+        body: aiMode
+          ? {
+              ai: true,
+              ai_intent: aiIntent.trim(),
+              ai_tone: aiTone,
+              // Static fallback if AI fails per-lead — reuse what's in the editor.
+              subject: emailSubject.trim() || undefined,
+              body_html: message.trim()
+                ? message.replace(/\n/g, "<br/>")
+                : undefined,
+              body_text: message.trim() || undefined,
+              stage_id: usingSelection ? undefined : stageId || undefined,
+              lead_ids: usingSelection ? selectedReachable.map((l) => l.id) : undefined,
+            }
+          : {
+              subject: emailSubject.trim(),
+              body_html: message.trim()
+                ? message.replace(/\n/g, "<br/>")
+                : undefined,
+              body_text: message.trim(),
+              stage_id: usingSelection ? undefined : stageId || undefined,
+              lead_ids: usingSelection ? selectedReachable.map((l) => l.id) : undefined,
+            },
+      }),
+    onSuccess: (r) => {
+      setEmailResult(r);
+      setSelected(new Set());
+      if (r.queued > 0) setEmailSendingActive(true);
     },
+  });
+
+  // AI preview — generate one personalised draft for the first recipient so
+  // the user can sanity-check the prompt before hitting Send to a whole stage.
+  const aiPreviewMut = useMutation<AiPreview, Error, void>({
+    mutationFn: () => {
+      const lead = recipients[0];
+      if (!lead) throw new Error("Pick a recipient first.");
+      if (!aiIntent.trim()) throw new Error("Describe what you want to say.");
+      return api("/inbox/ai-preview", {
+        method: "POST",
+        body: { lead_id: lead.id, intent: aiIntent.trim(), tone: aiTone },
+      });
+    },
+    onSuccess: (r) => setAiPreview(r),
   });
 
   // WhatsApp Business API — true server-side automated send (when connected).
@@ -267,107 +356,81 @@ export default function MessagingPage() {
   }
 
   const trimmed = message.trim();
-  const canAct = trimmed.length > 0 && recipientCount > 0;
-  const progressPct =
-    jobStatus && jobStatus.total > 0
-      ? Math.round((jobStatus.sent / jobStatus.total) * 100)
-      : 0;
+  // For Email channel we need a subject AND either body or AI intent.
+  const canEmail = isEmail && recipientCount > 0 && (
+    aiMode
+      ? aiIntent.trim().length > 0
+      : emailSubject.trim().length > 0 && trimmed.length > 0
+  );
+  const canAct = isEmail ? canEmail : (trimmed.length > 0 && recipientCount > 0);
 
-  // Channel icon component, flipped with the channel.
-  const ChannelIcon = isWa ? MessageCircle : Linkedin;
 
   return (
-    <div className="mx-auto max-w-6xl p-6 lg:p-8">
-      {/* ─── Hero header ───────────────────────────────────────────────── */}
-      <header className="mb-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-              <Sparkles className="h-3 w-3" /> Outreach
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Bulk Messaging
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Compose once. Reach your whole pipeline at a human pace, in real-time.
-            </p>
-          </div>
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="mb-1 flex items-center gap-2">
+        {isEmail ? (
+          <Mail className="h-5 w-5 text-indigo-600" />
+        ) : isWa ? (
+          <MessageCircle className="h-5 w-5 text-emerald-600" />
+        ) : (
+          <Linkedin className="h-5 w-5 text-brand-600" />
+        )}
+        <h1 className="text-lg font-semibold">Bulk Messaging</h1>
+      </div>
+      <p className="mb-4 text-sm text-slate-500">
+        Write one message and reach your whole pipeline — or just the people you pick.
+      </p>
 
-          {/* Live stat strip */}
-          <div className="flex flex-wrap items-center gap-2">
-            <StatPill
-              icon={<Users className="h-3.5 w-3.5" />}
-              label="Reachable"
-              value={reachable.length}
-            />
-            <StatPill
-              icon={<Send className="h-3.5 w-3.5" />}
-              label="Sent (24h)"
-              value={jobStatus?.sent ?? 0}
-              tone="emerald"
-            />
-            <StatPill
-              icon={<Zap className="h-3.5 w-3.5" />}
-              label="In progress"
-              value={jobStatus?.pending ?? 0}
-              tone={
-                (jobStatus?.pending ?? 0) > 0 ? "brand" : "slate"
-              }
-              pulse={(jobStatus?.pending ?? 0) > 0}
-            />
-          </div>
-        </div>
+      {/* Channel switcher */}
+      <div className="mb-5 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+        <button
+          onClick={() => setChannel("email")}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+            isEmail ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Mail className="h-4 w-4" /> Email
+        </button>
+        <button
+          onClick={() => setChannel("linkedin")}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+            channel === "linkedin" ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Linkedin className="h-4 w-4" /> LinkedIn
+        </button>
+        <button
+          onClick={() => setChannel("whatsapp")}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+            isWa ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <MessageCircle className="h-4 w-4" /> WhatsApp
+        </button>
+      </div>
 
-        {/* Channel switcher — segmented control with active pill */}
-        <div className="mt-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          <ChannelButton
-            active={!isWa}
-            onClick={() => setChannel("linkedin")}
-            icon={<Linkedin className="h-4 w-4" />}
-            label="LinkedIn"
-            activeClass="bg-gradient-to-r from-brand-50 to-brand-100 text-brand-700"
-          />
-          <ChannelButton
-            active={isWa}
-            onClick={() => setChannel("whatsapp")}
-            icon={<MessageCircle className="h-4 w-4" />}
-            label="WhatsApp"
-            activeClass="bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700"
-          />
-        </div>
-      </header>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        {/* ─── Composer ─────────────────────────────────────────────── */}
-        <section className="card overflow-hidden p-0">
-          {/* Composer header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <ChannelIcon
-                className={cn(
-                  "h-4 w-4",
-                  isWa ? "text-emerald-600" : "text-brand-600"
-                )}
-              />
-              Write your message
-            </div>
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        {/* ---- Composer ---- */}
+        <div className="card p-5">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="label mb-0">Message</label>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowTemplates((s) => !s)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-soft transition hover:border-slate-300 hover:text-slate-800"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
               >
-                <Sparkles className="h-3 w-3" /> Use template
+                Use template
               </button>
               {showTemplates && (
                 <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowTemplates(false)}
-                  />
-                  <div className="absolute right-0 z-20 mt-1.5 max-h-72 w-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                  <div className="fixed inset-0 z-10" onClick={() => setShowTemplates(false)} />
+                  <div className="absolute right-0 z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg">
                     {(templates || []).length === 0 && (
-                      <div className="px-3 py-3 text-xs text-slate-400">
+                      <div className="px-3 py-2 text-xs text-slate-400">
                         No templates yet. Create them in Settings → Templates.
                       </div>
                     )}
@@ -375,7 +438,7 @@ export default function MessagingPage() {
                       <button
                         key={t.id}
                         type="button"
-                        className="block w-full truncate rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        className="block w-full truncate rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
                         title={t.body}
                         onClick={() => {
                           setMessage(t.body || "");
@@ -392,416 +455,513 @@ export default function MessagingPage() {
             </div>
           </div>
 
-          {/* Composer body */}
-          <div className="space-y-4 px-6 py-5">
-            {/* Merge-tag chips */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium text-slate-500">Personalize:</span>
-              {TOKENS.map((t) => (
+          {/* Email-only: subject + AI mode toggle. */}
+          {isEmail && (
+            <>
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  AI personalization
+                </span>
                 <button
-                  key={t}
                   type="button"
-                  onClick={() => insertToken(t)}
-                  className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs text-slate-600 shadow-soft transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                  title={`Insert ${t}`}
+                  onClick={() => {
+                    setAiMode((v) => !v);
+                    setAiPreview(null);
+                    setEmailResult(null);
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                    aiMode
+                      ? "bg-indigo-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
+                  )}
                 >
-                  <span className="font-mono">{t}</span>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {aiMode ? "AI on — Claude writes each email" : "Turn on AI"}
                 </button>
-              ))}
-            </div>
-
-            {/* Textarea */}
-            <div
-              className={cn(
-                "rounded-xl border border-slate-200 bg-white shadow-soft transition focus-within:border-transparent focus-within:ring-2",
-                isWa
-                  ? "focus-within:ring-emerald-400/30"
-                  : "focus-within:ring-brand-400/30"
-              )}
-            >
-              <textarea
-                ref={textareaRef}
-                className="block min-h-[200px] w-full resize-y rounded-xl bg-transparent px-4 py-3 text-sm leading-relaxed text-slate-800 outline-none placeholder:text-slate-400"
-                placeholder={
-                  isWa
-                    ? "Hi {first_name}, great connecting! …"
-                    : "Hi {first_name}, I came across your profile and wanted to connect…"
-                }
-                value={message}
-                onChange={(e) => {
-                  setMessage(e.target.value);
-                  setResult(null);
-                }}
-                maxLength={8000}
-              />
-              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
-                <span>Tags are filled in per person for each message.</span>
-                <span>
-                  <span className="font-medium text-slate-600">{trimmed.length}</span>
-                  /8000
-                </span>
               </div>
-            </div>
 
-            {/* Message-bubble preview */}
-            {trimmed && previewLead && (
-              <div>
-                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                  <ChannelIcon className="h-3 w-3" />
-                  Preview · what {previewLead.full_name || "the first recipient"} will see
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold uppercase text-slate-500">
-                    {initials(previewLead.full_name || previewLead.email)}
-                  </span>
-                  <div
-                    className={cn(
-                      "max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-tl-sm border px-4 py-2.5 text-sm leading-relaxed shadow-soft",
-                      isWa
-                        ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white text-slate-800"
-                        : "border-brand-200 bg-gradient-to-br from-brand-50 to-white text-slate-800"
-                    )}
-                  >
-                    {renderPreview(message, previewLead)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* How it works callout */}
-            <div
-              className={cn(
-                "flex items-start gap-2.5 rounded-xl border bg-gradient-to-br p-3 text-xs",
-                isWa
-                  ? "border-emerald-100 from-emerald-50/60 to-white text-slate-600"
-                  : "border-brand-100 from-brand-50/60 to-white text-slate-600"
-              )}
-            >
-              <Info
-                className={cn(
-                  "mt-0.5 h-4 w-4 flex-shrink-0",
-                  isWa ? "text-emerald-500" : "text-brand-500"
-                )}
-              />
-              {isWa ? (
-                <span>
-                  {waConfig?.connected ? (
-                    <>
-                      <strong>Auto-send</strong> delivers instantly via your connected
-                      WhatsApp Business API ({waConfig.display || "active"}). Or use{" "}
-                      <strong>Open chats</strong> to send manually one-by-one. Numbers
-                      must include the country code.
-                    </>
-                  ) : (
-                    <>
-                      <strong>Open chats</strong> opens each WhatsApp chat with your
-                      message pre-filled — tap Send in WhatsApp for each. Numbers
-                      must include the country code. For true automated bulk send,{" "}
-                      <Link
-                        href="/settings/whatsapp"
-                        className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
-                      >
-                        connect the WhatsApp Business API
-                      </Link>
-                      .
-                    </>
-                  )}
-                </span>
-              ) : (
-                <span>
-                  Messages send <strong>in real-time</strong>, one at a time at a
-                  human pace (45 sec – 3 min between sends) by the LeadCaptura
-                  extension running in your browser. Keep a LinkedIn tab open with{" "}
-                  <strong>Autopilot ON</strong> in the extension popup. Only
-                  1st-degree connections can be messaged.
-                </span>
-              )}
-            </div>
-
-            {/* Action bar */}
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              {!isWa && send.isError ? (
-                <span className="flex items-center gap-1.5 text-xs text-red-600">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  {send.error?.message || "Failed to queue messages."}
-                </span>
-              ) : (
-                <span className="text-xs text-slate-500">
-                  Ready to reach{" "}
-                  <span className="font-semibold text-slate-700">
-                    {recipientCount}
-                  </span>{" "}
-                  {recipientCount === 1 ? "person" : "people"}
-                </span>
-              )}
-              {isWa ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium shadow-soft transition disabled:cursor-not-allowed disabled:opacity-50",
-                      waConfig?.connected
-                        ? "border border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                        : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700"
-                    )}
-                    disabled={!canAct}
-                    onClick={startWaQueue}
-                    title="Open each chat in WhatsApp to send manually"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    {waConfig?.connected
-                      ? "Open chats"
-                      : `Open ${recipientCount} chat${recipientCount === 1 ? "" : "s"}`}
-                  </button>
-                  {waConfig?.connected && (
-                    <button
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-soft transition hover:from-emerald-600 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAct || waSend.isPending}
-                      onClick={() => waSend.mutate()}
-                      title="Send automatically via the WhatsApp Business API"
+              {aiMode ? (
+                <>
+                  <label className="label">What do you want to say?</label>
+                  <textarea
+                    className="input min-h-[80px] resize-y text-sm leading-relaxed"
+                    placeholder="Pitch our outbound CRM to FinTech founders in London — value prop is human-paced LinkedIn + email under one quota. Ask for a 15-min call next week."
+                    value={aiIntent}
+                    onChange={(e) => {
+                      setAiIntent(e.target.value);
+                      setAiPreview(null);
+                      setEmailResult(null);
+                    }}
+                    maxLength={1500}
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <label className="text-xs font-medium text-slate-500">Tone</label>
+                    <select
+                      className="input h-8 w-40 py-0 text-xs"
+                      value={aiTone}
+                      onChange={(e) => setAiTone(e.target.value)}
                     >
-                      {waSend.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                      {waSend.isPending ? "Sending…" : `Auto-send · ${recipientCount}`}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {sendingActive && (
+                      <option value="professional">Professional</option>
+                      <option value="warm">Warm</option>
+                      <option value="direct">Direct</option>
+                      <option value="playful">Playful</option>
+                      <option value="formal">Formal</option>
+                    </select>
                     <button
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-soft transition hover:bg-red-100 disabled:opacity-50"
-                      disabled={stopSending.isPending}
-                      onClick={() => stopSending.mutate()}
+                      type="button"
+                      className="ml-auto inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-50"
+                      disabled={
+                        !aiIntent.trim() ||
+                        !previewLead ||
+                        aiPreviewMut.isPending
+                      }
+                      onClick={() => aiPreviewMut.mutate()}
                     >
-                      {stopSending.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <X className="h-4 w-4" />
-                      )}
-                      Stop
-                    </button>
-                  )}
-                  <button
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-700 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-brand-600 hover:to-brand-800 disabled:cursor-not-allowed disabled:opacity-50",
-                      !send.isPending && canAct && !sendingActive && "hover:shadow-lg"
-                    )}
-                    disabled={!canAct || send.isPending || sendingActive}
-                    onClick={() => send.mutate()}
-                  >
-                    {send.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    {send.isPending
-                      ? "Queuing…"
-                      : sendingActive
-                      ? "Sending…"
-                      : `Send to ${recipientCount} ${
-                          usingSelection
-                            ? "selected"
-                            : "lead" + (recipientCount === 1 ? "" : "s")
-                        }`}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Live progress / result */}
-            {result && result.queued > 0 && (
-              <div className="overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-soft">
-                <div className="flex items-start gap-2.5 px-4 py-3">
-                  {sendingActive ? (
-                    <span className="relative mt-0.5 flex h-2.5 w-2.5 flex-shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                    </span>
-                  ) : stopped ? (
-                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
-                  ) : (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                  )}
-                  <div className="flex-1">
-                    <div className={cn("text-sm font-medium", stopped ? "text-amber-900" : "text-emerald-900")}>
-                      {sendingActive
-                        ? `Sending ${result.queued} message${result.queued === 1 ? "" : "s"} in real-time…`
-                        : stopped
-                        ? `Stopped — ${jobStatus?.sent ?? 0} sent before stopping`
-                        : `${jobStatus?.sent ?? result.queued} message${result.queued === 1 ? "" : "s"} sent`}
-                    </div>
-                    <div className={cn("mt-0.5 text-xs", stopped ? "text-amber-700" : "text-emerald-700")}>
-                      {result.skipped_no_linkedin > 0 && (
-                        <span>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </span>
-                      )}
-                      {sendingActive
-                        ? "Extension navigates each profile and sends at a human pace."
-                        : stopped
-                        ? "Remaining queued messages have been cancelled."
-                        : "Delivered by the extension at a human pace."}
-                    </div>
-                  </div>
-                  {sendingActive && (
-                    <span className="text-sm font-semibold tabular-nums text-emerald-700">
-                      {progressPct}%
-                    </span>
-                  )}
-                </div>
-
-                {sendingActive && jobStatus && jobStatus.total > 0 && (
-                  <>
-                    <div className="h-1.5 w-full overflow-hidden bg-emerald-100">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-700 ease-out"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-3 border-t border-emerald-100 bg-emerald-50/40 px-4 py-2 text-xs">
-                      <span className="inline-flex items-center gap-1.5 text-emerald-800">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span className="font-semibold tabular-nums">{jobStatus.sent}</span> sent
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                      {aiPreviewMut.isPending ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        <span className="font-semibold tabular-nums">{jobStatus.pending}</span> in progress
-                      </span>
-                      {jobStatus.failed > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-amber-700">
-                          <AlertCircle className="h-3 w-3" />
-                          <span className="font-semibold tabular-nums">{jobStatus.failed}</span> failed
-                        </span>
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
                       )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-            {result && result.queued === 0 && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-                <div>
-                  No new messages sent — all recipients were already messaged or
-                  have no LinkedIn URL.
-                </div>
-              </div>
-            )}
-
-            {isWa && waSend.isError && (
-              <div className="flex items-center gap-1.5 text-sm text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                {waSend.error?.message || "WhatsApp send failed."}
-              </div>
-            )}
-
-            {waResult && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                <div className="flex items-start gap-2.5">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-                  <div>
-                    <div className="font-medium">
-                      {waResult.sent} sent
-                      {waResult.failed ? `, ${waResult.failed} failed` : ""}
-                      {waResult.skipped_no_phone
-                        ? `, ${waResult.skipped_no_phone} skipped (no phone)`
-                        : ""}
-                      .
-                    </div>
-                    {waResult.errors.length > 0 && (
-                      <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
-                        {waResult.errors.map((e, i) => (
-                          <li key={i} className="break-all">
-                            {e}
-                          </li>
-                        ))}
-                        <li>
-                          Failures are usually Meta&apos;s 24-hour / template rule —
-                          outside the window you must use an approved template.
-                        </li>
-                      </ul>
-                    )}
+                      Preview for {previewLead?.full_name?.split(" ")[0] || "first lead"}
+                    </button>
                   </div>
-                </div>
+                  {aiPreviewMut.isError && (
+                    <p className="mt-2 text-xs text-red-600">
+                      {aiPreviewMut.error?.message || "Could not generate preview."}
+                    </p>
+                  )}
+                  {aiPreview && (
+                    <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50/60 p-3">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-indigo-600">
+                        AI preview · subject
+                      </div>
+                      <div className="mb-2 text-sm font-medium text-slate-800">
+                        {aiPreview.subject}
+                      </div>
+                      <div className="whitespace-pre-wrap text-sm text-slate-700">
+                        {aiPreview.body_text || aiPreview.body_html.replace(/<[^>]+>/g, "")}
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-3">
+                    <label className="label">Fallback subject (used if AI is offline)</label>
+                    <input
+                      className="input"
+                      placeholder="Quick idea for {company}"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      maxLength={250}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label className="label">Subject</label>
+                  <input
+                    className="input"
+                    placeholder="Quick idea for {company}"
+                    value={emailSubject}
+                    onChange={(e) => {
+                      setEmailSubject(e.target.value);
+                      setEmailResult(null);
+                    }}
+                    maxLength={250}
+                  />
+                </>
+              )}
+              <div className="mb-2 mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">
+                {aiMode ? "Fallback body" : "Body"}
               </div>
-            )}
-          </div>
-        </section>
+            </>
+          )}
 
-        {/* ─── Recipients sidebar ──────────────────────────────────── */}
-        <aside className="card flex flex-col overflow-hidden p-0">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <div>
-              <div className="text-sm font-semibold text-slate-800">Recipients</div>
-              <div className="mt-0.5 text-[11px] text-slate-500">
-                {usingSelection ? (
+          {/* Merge-tag buttons */}
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {TOKENS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => insertToken(t)}
+                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                title={`Insert ${t}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            className="input min-h-[180px] resize-y leading-relaxed"
+            placeholder={
+              isEmail
+                ? "Hi {first_name}, saw your team at {company} is hiring fast…"
+                : isWa
+                ? "Hi {first_name}, great connecting! …"
+                : "Hi {first_name}, I came across your profile and wanted to connect…"
+            }
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              setResult(null);
+              setEmailResult(null);
+            }}
+            maxLength={8000}
+          />
+          <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
+            <span>Tags are filled in per person for each message.</span>
+            <span>{trimmed.length}/8000</span>
+          </div>
+
+          {/* Live preview */}
+          {trimmed && previewLead && (
+            <div className="mt-3">
+              <div className="label">
+                Preview for {previewLead.full_name || "first recipient"}
+              </div>
+              <div className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                {renderPreview(message, previewLead)}
+              </div>
+            </div>
+          )}
+
+          {/* How it works */}
+          <div className="mt-4 flex gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+            {isEmail ? (
+              <span>
+                Emails queue immediately and dispatch from your connected SMTP
+                / Resend / SendGrid / Gmail account, paced server-side under
+                your daily quota
+                {emailStatus ? (
                   <>
-                    <span className="font-semibold text-slate-700">
-                      {selectedReachable.length}
-                    </span>{" "}
-                    selected
+                    {" "}(<strong>{emailStatus.daily_sent}</strong>/{emailStatus.daily_cap} sent today)
+                  </>
+                ) : null}.{" "}
+                {aiMode ? (
+                  <>
+                    AI mode generates a bespoke email per recipient using their
+                    profile + your stated intent.
                   </>
                 ) : (
                   <>
-                    <span className="font-semibold text-slate-700">
-                      {reachable.length}
-                    </span>{" "}
-                    reachable
+                    Merge tags fill in per person. No connected provider yet?{" "}
+                    <Link href="/settings/email" className="font-medium text-indigo-700 underline">
+                      Connect SMTP or HTTPS sender
+                    </Link>.
                   </>
                 )}
+              </span>
+            ) : isWa ? (
+              <span>
+                {waConfig?.connected ? (
+                  <>
+                    <strong>Auto-send</strong> delivers instantly via your connected WhatsApp
+                    Business API ({waConfig.display || "active"}). Or use <strong>Open chats</strong>{" "}
+                    to send manually one-by-one. Numbers must include the country code.
+                  </>
+                ) : (
+                  <>
+                    <strong>Open chats</strong> opens each WhatsApp chat with your message
+                    pre-filled — tap Send in WhatsApp for each. Numbers must include the
+                    country code. For true automated bulk send,{" "}
+                    <Link href="/settings/whatsapp" className="font-medium text-emerald-700 underline">
+                      connect the WhatsApp Business API
+                    </Link>
+                    .
+                  </>
+                )}
+              </span>
+            ) : (
+              <span>
+                Messages are sent in real-time, one at a time at a human pace (45 sec –
+                3 min between sends) by the LeadCaptura extension running in your browser.
+                Keep a LinkedIn tab open with <strong>Autopilot ON</strong> in the extension
+                popup. Only 1st-degree connections can be messaged.
+              </span>
+            )}
+          </div>
+
+          {/* Action */}
+          <div className="mt-5 flex items-center justify-end gap-3">
+            {channel === "linkedin" && send.isError && (
+              <span className="mr-auto text-xs text-red-600">
+                {send.error?.message || "Failed to queue messages."}
+              </span>
+            )}
+            {isEmail && emailSend.isError && (
+              <span className="mr-auto text-xs text-red-600">
+                {emailSend.error?.message || "Failed to queue emails."}
+              </span>
+            )}
+            {isEmail ? (
+              <button
+                className="btn bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canAct || emailSend.isPending}
+                onClick={() => emailSend.mutate()}
+              >
+                {emailSend.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : aiMode ? (
+                  <Sparkles className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {emailSend.isPending
+                  ? "Queuing…"
+                  : `${aiMode ? "AI-send" : "Send"} to ${recipientCount} ${
+                      usingSelection ? "selected" : recipientCount === 1 ? "lead" : "leads"
+                    }`}
+              </button>
+            ) : isWa ? (
+              <div className="flex items-center gap-2">
+                {waConfig?.connected && (
+                  <span className="mr-1 hidden text-xs text-slate-400 sm:inline">
+                    open chats manually, or
+                  </span>
+                )}
+                <button
+                  className={cn(
+                    waConfig?.connected
+                      ? "btn-secondary"
+                      : "btn bg-emerald-600 text-white hover:bg-emerald-700",
+                    "disabled:cursor-not-allowed disabled:opacity-50"
+                  )}
+                  disabled={!canAct}
+                  onClick={startWaQueue}
+                  title="Open each chat in WhatsApp to send manually"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {waConfig?.connected
+                    ? "Open chats"
+                    : `Open ${recipientCount} chat${recipientCount === 1 ? "" : "s"}`}
+                </button>
+                {waConfig?.connected && (
+                  <button
+                    className="btn bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!canAct || waSend.isPending}
+                    onClick={() => waSend.mutate()}
+                    title="Send automatically via the WhatsApp Business API"
+                  >
+                    {waSend.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {waSend.isPending
+                      ? "Sending…"
+                      : `Auto-send · ${recipientCount}`}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canAct || send.isPending}
+                onClick={() => send.mutate()}
+              >
+                {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {send.isPending
+                  ? "Sending…"
+                  : `Send to ${recipientCount} ${usingSelection ? "selected" : "lead" + (recipientCount === 1 ? "" : "s")}`}
+              </button>
+            )}
+          </div>
+
+          {channel === "linkedin" && result && result.queued > 0 && (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+              {/* Header row */}
+              <div className="flex items-start gap-2 text-emerald-800">
+                {sendingActive
+                  ? <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-emerald-600" />
+                  : <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                }
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {sendingActive
+                      ? `Sending ${result.queued} message${result.queued === 1 ? "" : "s"} in real-time…`
+                      : `${jobStatus?.sent ?? result.queued} message${result.queued === 1 ? "" : "s"} sent ✓`}
+                  </div>
+                  <div className="mt-0.5 text-xs text-emerald-700">
+                    {result.skipped_no_linkedin > 0 && (
+                      <span>{result.skipped_no_linkedin} skipped (no LinkedIn URL). </span>
+                    )}
+                    {result.skipped_pending > 0 && (
+                      <span>{result.skipped_pending} already had a message in-flight. </span>
+                    )}
+                    {sendingActive
+                      ? "Keep a LinkedIn tab open with Autopilot ON in the extension."
+                      : "Delivered by the extension at a human pace."}
+                  </div>
+                </div>
+              </div>
+              {/* Live progress bar */}
+              {sendingActive && jobStatus && jobStatus.total > 0 && (
+                <div className="mt-3">
+                  <div className="mb-1 flex justify-between text-xs text-emerald-700">
+                    <span>{jobStatus.sent} sent · {jobStatus.pending} in progress</span>
+                    <span>{Math.round((jobStatus.sent / jobStatus.total) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-200">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                      style={{ width: `${(jobStatus.sent / jobStatus.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {channel === "linkedin" && result && result.queued === 0 && (
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+              <div>No new messages sent — all recipients were already messaged or have no LinkedIn URL.</div>
+            </div>
+          )}
+
+          {isEmail && emailResult && (
+            <div className="mt-4 rounded-md border border-indigo-200 bg-indigo-50/60 p-3 text-sm">
+              <div className="flex items-start gap-2 text-indigo-900">
+                {emailSendingActive ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-indigo-600" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-600" />
+                )}
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {emailSendingActive
+                      ? `${emailResult.queued} email${emailResult.queued === 1 ? "" : "s"} queued — sending in real-time…`
+                      : `${emailResult.queued} email${emailResult.queued === 1 ? "" : "s"} queued ✓`}
+                  </div>
+                  <div className="mt-0.5 text-xs text-indigo-800/80">
+                    {emailResult.skipped_no_email > 0 && (
+                      <span>{emailResult.skipped_no_email} skipped (no email). </span>
+                    )}
+                    {emailResult.skipped_recent_dup > 0 && (
+                      <span>{emailResult.skipped_recent_dup} skipped (already sent in last 24h). </span>
+                    )}
+                    {emailResult.skipped_over_cap > 0 && (
+                      <span>{emailResult.skipped_over_cap} skipped (over daily cap). </span>
+                    )}
+                    Daily cap: {emailResult.daily_cap}. Paced server-side at the workspace&apos;s drain rate.
+                  </div>
+                </div>
+              </div>
+              {emailSendingActive && emailStatus && (
+                <div className="mt-3">
+                  <div className="mb-1 flex justify-between text-xs text-indigo-800">
+                    <span>{emailStatus.sent} sent · {emailStatus.queued} queued</span>
+                    <span>
+                      {emailStatus.sent + emailStatus.queued > 0
+                        ? Math.round((emailStatus.sent / (emailStatus.sent + emailStatus.queued)) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-indigo-200">
+                    <div
+                      className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                      style={{
+                        width: `${
+                          emailStatus.sent + emailStatus.queued > 0
+                            ? (emailStatus.sent / (emailStatus.sent + emailStatus.queued)) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isWa && waSend.isError && (
+            <p className="mt-3 text-sm text-red-600">
+              {waSend.error?.message || "WhatsApp send failed."}
+            </p>
+          )}
+
+          {waResult && (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                <div>
+                  <div className="font-medium">
+                    {waResult.sent} sent{waResult.failed ? `, ${waResult.failed} failed` : ""}
+                    {waResult.skipped_no_phone ? `, ${waResult.skipped_no_phone} skipped (no phone)` : ""}.
+                  </div>
+                  {waResult.errors.length > 0 && (
+                    <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
+                      {waResult.errors.map((e, i) => (
+                        <li key={i} className="break-all">{e}</li>
+                      ))}
+                      <li>
+                        Failures are usually Meta&apos;s 24-hour / template rule — outside the
+                        window you must use an approved template.
+                      </li>
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* ---- Recipients ---- */}
+        <div className="card flex flex-col p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Recipients</span>
             <button
               type="button"
               onClick={selectAllShown}
-              className={cn(
-                "rounded-md px-2 py-1 text-xs font-medium transition",
-                isWa
-                  ? "text-emerald-600 hover:bg-emerald-50"
-                  : "text-brand-600 hover:bg-brand-50"
-              )}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700"
             >
-              {shown.filter(reach).length > 0 &&
-              shown.filter(reach).every((l) => selected.has(l.id))
+              {shown.filter(reach).length > 0 && shown.filter(reach).every((l) => selected.has(l.id))
                 ? "Clear"
                 : "Select all"}
             </button>
           </div>
 
-          <div className="space-y-2 px-4 py-3">
-            <select
-              className="input"
-              value={stageId}
-              onChange={(e) => {
-                setStageId(e.target.value);
-                setResult(null);
-              }}
-            >
-              <option value="">All stages</option>
-              {(stages || []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  Stage: {s.name}
-                </option>
-              ))}
-            </select>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                className="input pl-8"
-                placeholder="Search name, company, title…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+          <select
+            className="input mb-2"
+            value={stageId}
+            onChange={(e) => {
+              setStageId(e.target.value);
+              setResult(null);
+            }}
+          >
+            <option value="">All stages</option>
+            {(stages || []).map((s) => (
+              <option key={s.id} value={s.id}>
+                Stage: {s.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="relative mb-2">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              className="input pl-8"
+              placeholder="Search name, company, title…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p className="mb-2 text-xs text-slate-500">
+            {usingSelection ? (
+              <>
+                <span className="font-semibold text-slate-700">{selectedReachable.length}</span> selected
+              </>
+            ) : (
+              <>
+                Will reach{" "}
+                <span className="font-semibold text-slate-700">{reachable.length}</span>{" "}
+                lead{reachable.length === 1 ? "" : "s"} with{" "}
+                {isEmail ? "an email" : isWa ? "a phone number" : "LinkedIn"}
+              </>
+            )}
+          </p>
+
+          <div className="-mx-1 max-h-[460px] flex-1 overflow-y-auto px-1">
             {shown.length === 0 && (
-              <div className="py-10 text-center">
-                <Users className="mx-auto mb-2 h-6 w-6 text-slate-300" />
-                <div className="text-sm text-slate-400">No leads to show.</div>
-              </div>
+              <div className="py-6 text-center text-sm text-slate-400">No leads.</div>
             )}
             {shown.map((l) => {
               const ok = reach(l);
@@ -811,21 +971,20 @@ export default function MessagingPage() {
                   key={l.id}
                   onClick={() => ok && toggle(l.id)}
                   className={cn(
-                    "group mb-0.5 flex items-center gap-2.5 rounded-lg px-2 py-2 text-left transition",
+                    "mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left",
                     !ok
                       ? "cursor-not-allowed opacity-50"
                       : on
-                      ? cn(
-                          "cursor-pointer",
-                          isWa
-                            ? "bg-emerald-50 ring-1 ring-emerald-200"
-                            : "bg-brand-50 ring-1 ring-brand-200"
-                        )
+                      ? isEmail
+                        ? "cursor-pointer bg-indigo-50"
+                        : "cursor-pointer bg-brand-50"
                       : "cursor-pointer hover:bg-slate-50"
                   )}
                   title={
                     ok
                       ? ""
+                      : isEmail
+                      ? "No email address"
                       : isWa
                       ? "No phone number — can't WhatsApp"
                       : "No LinkedIn URL — can't message"
@@ -833,39 +992,32 @@ export default function MessagingPage() {
                 >
                   <span
                     className={cn(
-                      "grid h-4 w-4 flex-shrink-0 place-items-center rounded border text-[10px] transition",
-                      on
-                        ? isWa
-                          ? "border-emerald-600 bg-emerald-600 text-white"
-                          : "border-brand-600 bg-brand-600 text-white"
-                        : "border-slate-300 bg-white group-hover:border-slate-400"
+                      "grid h-4 w-4 flex-shrink-0 place-items-center rounded border text-[10px]",
+                      on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
                     )}
                   >
                     {on ? "✓" : ""}
                   </span>
-                  <span
-                    className={cn(
-                      "grid h-8 w-8 flex-shrink-0 place-items-center rounded-full text-[11px] font-semibold uppercase",
-                      on
-                        ? isWa
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-brand-100 text-brand-700"
-                        : "bg-slate-100 text-slate-500"
-                    )}
-                  >
+                  <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold uppercase text-slate-500">
                     {initials(l.full_name || l.email)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-slate-800">
-                      {l.full_name || "Unknown"}
-                    </span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {isWa
+                    <span className="block truncate text-sm">{l.full_name || "Unknown"}</span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {isEmail
+                        ? l.email || "no email"
+                        : isWa
                         ? l.phone || "no phone"
                         : l.company?.name || l.title || "—"}
                     </span>
                   </span>
-                  {isWa ? (
+                  {isEmail ? (
+                    ok ? (
+                      <Mail className="h-3.5 w-3.5 flex-shrink-0 text-indigo-500" />
+                    ) : (
+                      <span className="flex-shrink-0 text-[10px] text-slate-400">no @</span>
+                    )
+                  ) : isWa ? (
                     ok ? (
                       <button
                         type="button"
@@ -873,28 +1025,24 @@ export default function MessagingPage() {
                           e.stopPropagation();
                           openWhatsApp(l);
                         }}
-                        className="flex-shrink-0 rounded-md p-1.5 text-emerald-600 transition hover:bg-emerald-100"
+                        className="flex-shrink-0 rounded p-1 text-emerald-600 hover:bg-emerald-50"
                         title="Open this chat in WhatsApp now"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
-                        no #
-                      </span>
+                      <span className="flex-shrink-0 text-[10px] text-slate-400">no #</span>
                     )
                   ) : ok ? (
-                    <Linkedin className="h-4 w-4 flex-shrink-0 text-brand-500" />
+                    <Linkedin className="h-3.5 w-3.5 flex-shrink-0 text-brand-500" />
                   ) : (
-                    <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
-                      no LI
-                    </span>
+                    <span className="flex-shrink-0 text-[10px] text-slate-400">no LI</span>
                   )}
                 </div>
               );
             })}
           </div>
-        </aside>
+        </div>
       </div>
 
       {/* WhatsApp guided send-queue */}
@@ -911,72 +1059,6 @@ export default function MessagingPage() {
         />
       )}
     </div>
-  );
-}
-
-// ─── Small presentational helpers ──────────────────────────────────────────
-
-function StatPill({
-  icon,
-  label,
-  value,
-  tone = "slate",
-  pulse = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-  tone?: "slate" | "brand" | "emerald";
-  pulse?: boolean;
-}) {
-  const toneClass =
-    tone === "brand"
-      ? "border-brand-200 bg-brand-50 text-brand-700"
-      : tone === "emerald"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : "border-slate-200 bg-white text-slate-600";
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-soft",
-        toneClass
-      )}
-    >
-      <span className={cn("flex h-4 w-4 items-center justify-center", pulse && "animate-pulse")}>
-        {icon}
-      </span>
-      <span className="text-slate-500">{label}</span>
-      <span className="tabular-nums font-semibold">{value}</span>
-    </div>
-  );
-}
-
-function ChannelButton({
-  active,
-  onClick,
-  icon,
-  label,
-  activeClass,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: ReactNode;
-  label: string;
-  activeClass: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition",
-        active
-          ? `${activeClass} shadow-sm`
-          : "text-slate-500 hover:text-slate-800"
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 
