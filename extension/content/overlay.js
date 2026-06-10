@@ -3704,8 +3704,9 @@
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
       if (action.type === "submit") {
-        // Spotlight the Submit button so the user can visually track the run.
-        _showButtonSpotlight(action.btn, "📤 Submitting application", "auto-submit in progress", 900);
+        // Show the same top-banner used for Next so the user has consistent
+        // feedback through the whole Easy Apply flow.
+        _showApplyBanner("📤 Submitting application", "auto-clicking 'Submit application'");
         await sleep(550 + Math.random() * 250);
         // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
         // handlers reliably honour. Escalate to _forceClick only if it didn't land.
@@ -3717,7 +3718,7 @@
           await sleep(1800 + Math.random() * 1200);
           after = _easyApplyModal();
         }
-        _removeSpotlight();
+        _hideApplyBanner();
         if (!after) return { ok: true }; // modal closed = submitted
         const txt = (after.innerText || after.textContent || "").toLowerCase();
         const isSuccess =
@@ -3750,50 +3751,67 @@
         );
       };
 
-      // Spotlight the Next/Review button so the user can visually track the run.
-      // Label varies by action type: "Continue" for Next, "Review" for Review.
-      const _spotTitle = action.type === "review"
-        ? "🔍 Reviewing application"
-        : "➡ Continuing application";
-      const _spotSub = `Page ${step + 1} — auto-clicking '${action.btn.getAttribute("aria-label") || action.btn.textContent?.trim() || action.type}'`;
-      _showButtonSpotlight(action.btn, _spotTitle, _spotSub, 900);
-      await sleep(550 + Math.random() * 250);
+      // Top-of-viewport banner — sits above LinkedIn's modal regardless of
+      // stacking context (root-level <html> child + max z-index + inline
+      // !important). Shown for the whole click sequence so the user has
+      // continuous feedback during the multi-strategy click attempts.
+      const pageNumStr = `${step + 1}/${_pageTotalHint() || "?"}`;
+      const actLabel = action.type === "review" ? "Review" : "Next";
+      _showApplyBanner(`➡ Auto Apply — Page ${pageNumStr}`,
+        `Filling "${_pageName}" → clicking '${actLabel}'`);
+      console.log(`[LeadCaptura] apply step ${step + 1} → banner shown, attempting click`);
 
-      // Primary: human-paced click (v1.0.47 behavior).
-      await dispatchHumanClick(action.btn);
+      // Helper: click the action button with the freshest reference each time.
+      // LinkedIn sometimes re-renders the footer between our attempts, so we
+      // always re-find via _modalActionButton(_easyApplyModal()).
+      const clickFreshAction = (strategy) => {
+        const m = _easyApplyModal();
+        if (!m) return false;
+        const a = _modalActionButton(m);
+        if (!a) return false;
+        try {
+          if (strategy === "human") return dispatchHumanClick(a.btn);
+          if (strategy === "force") return _forceClick(a.btn);
+          if (strategy === "enter") {
+            try { a.btn.focus(); } catch {}
+            const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+            a.btn.dispatchEvent(new KeyboardEvent("keydown", k));
+            a.btn.dispatchEvent(new KeyboardEvent("keyup", k));
+            return true;
+          }
+        } catch {}
+        return false;
+      };
+
+      // Strategy 1: human-paced pointer click.
+      await clickFreshAction("human");
       await sleep(1300 + Math.random() * 900);
       let after = _easyApplyModal();
-      if (!after) { _removeSpotlight(); return { ok: false, reason: "modal_vanished" }; }
+      if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
 
-      // Fallback: if it didn't move, escalate to the 5-strategy force click.
+      // Strategy 2: forceClick (5-strategy including React fiber onClick).
       if (!progressed(after)) {
-        _forceClick(action.btn);
+        console.log(`[LeadCaptura] apply step ${step + 1} → human click didn't advance, _forceClick`);
+        clickFreshAction("force");
         await sleep(1300 + Math.random() * 900);
         after = _easyApplyModal();
-        if (!after) { _removeSpotlight(); return { ok: false, reason: "modal_vanished" }; }
+        if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
       }
-      _removeSpotlight();
 
       const errorShown = !!after.querySelector(
         ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
         ".jobs-easy-apply-form-element__error, [class*='error-text']"
       );
 
+      // Strategy 3: focus + Enter keypress (newer React handlers honour this).
       if (!progressed(after)) {
-        // Third try: focus + Enter keypress. LinkedIn's React handlers
-        // sometimes only fire on keyboard activation when the button is
-        // focused, and our synthetic click events come in with isTrusted=false.
-        try { action.btn.focus(); } catch {}
-        await sleep(150);
-        try {
-          const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
-          action.btn.dispatchEvent(new KeyboardEvent("keydown", k));
-          action.btn.dispatchEvent(new KeyboardEvent("keyup", k));
-        } catch {}
+        console.log(`[LeadCaptura] apply step ${step + 1} → _forceClick didn't advance, focus+Enter`);
+        clickFreshAction("enter");
         await sleep(1200);
         after = _easyApplyModal();
-        if (!after) return { ok: false, reason: "modal_vanished" };
+        if (!after) { _hideApplyBanner(); return { ok: false, reason: "modal_vanished" }; }
       }
+      _hideApplyBanner();
       if (!progressed(after)) {
         // Still on the same page after three click attempts. If LinkedIn is
         // showing a validation error, or we've been stuck several times, this
@@ -4168,10 +4186,14 @@
       }
     } finally {
       state.applyActive = false;
+      state.applyCancel = false;
       state.applyProgress = null;
       if (!singleJob) state.selectedJobUrls.clear();
       // Run finished — show the per-card chips again.
       try { document.documentElement.classList.remove("lc-applying"); } catch {}
+      // Ensure no stale Apply banner is left on screen.
+      try { _hideApplyBanner(); } catch {}
+      try { _removeSpotlight(); } catch {}
       mountSelectAllHeader();
       renderToolbar();
       try { decorateJobCards(); } catch {}
@@ -5252,6 +5274,62 @@
   // Self-contained popup overlay anchored to a button. All inline styles with
   // !important so it renders regardless of the page's stylesheet:
   //   - Glowing ring around the target button
+  // Top-of-viewport status banner used by Auto Apply for each Next/Submit
+  // step. Appended to <html> (not <body>) so it sits in the root stacking
+  // context — visible above LinkedIn's Easy Apply modal regardless of any
+  // page CSS. Every style is inline + !important. pointer-events:none so
+  // it never blocks the click below it.
+  let _applyBannerEl = null;
+  function _showApplyBanner(title, subtitle) {
+    _hideApplyBanner();
+    try {
+      const Z = "2147483647";
+      const setImp = (el, k, v) => el.style.setProperty(k, v, "important");
+      const bar = document.createElement("div");
+      bar.id = "lc-apply-banner";
+      setImp(bar, "position", "fixed");
+      setImp(bar, "top", "20px");
+      setImp(bar, "left", "50%");
+      setImp(bar, "transform", "translateX(-50%)");
+      setImp(bar, "z-index", Z);
+      setImp(bar, "pointer-events", "none");
+      setImp(bar, "background", "linear-gradient(135deg,#0a66c2,#004182)");
+      setImp(bar, "color", "#fff");
+      setImp(bar, "padding", "14px 26px");
+      setImp(bar, "border-radius", "14px");
+      setImp(bar, "box-shadow", "0 14px 44px rgba(0,0,0,0.55), 0 0 0 2px rgba(255,255,255,0.18) inset");
+      setImp(bar, "font-family", "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif");
+      setImp(bar, "font-weight", "700");
+      setImp(bar, "text-align", "center");
+      setImp(bar, "min-width", "320px");
+      setImp(bar, "max-width", "560px");
+      setImp(bar, "white-space", "nowrap");
+      bar.innerHTML =
+        `<div style="font-size:17px;font-weight:800;margin-bottom:4px;">${title}</div>` +
+        `<div style="font-size:13px;font-weight:500;opacity:0.92;">${subtitle}</div>`;
+      // Root of the stacking context — bypasses any modal's transform/filter
+      // stacking ancestor that would otherwise clip a body-level overlay.
+      document.documentElement.appendChild(bar);
+      _applyBannerEl = bar;
+      try { _playSpotlightBeep(); } catch {}
+    } catch (e) {
+      console.warn("[LeadCaptura] _showApplyBanner error", e);
+    }
+  }
+  function _hideApplyBanner() {
+    try { if (_applyBannerEl) _applyBannerEl.remove(); } catch {}
+    _applyBannerEl = null;
+  }
+  // Best-effort total page count for the Easy Apply wizard. Reads the
+  // "1/4 pages" text near the progress bar; falls back to null.
+  function _pageTotalHint() {
+    const modal = _easyApplyModal();
+    if (!modal) return null;
+    const txt = (modal.textContent || "").match(/\b(\d+)\s*\/\s*(\d+)\s*pages?/i);
+    if (txt && txt[2]) return parseInt(txt[2], 10);
+    return null;
+  }
+
   //   - Floating popup card (title + subtitle) above the button
   //   - Bouncing arrow between popup and button
   //   - Audio beep
