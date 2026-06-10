@@ -2099,7 +2099,6 @@
     return buttons[0] || null;
   }
 
-
   // Find "Connect" inside the open Sales Nav dropdown. The dropdown portal is
   // mounted under <body>, NOT inside the card — so search document-wide.
   // Structural anchors first; text last and tight (^connect$).
@@ -2142,29 +2141,6 @@
         }
       }
     }
-
-    // STRATEGY B (added v1.0.171): fallback for the newer Lead Lists "..."
-    // popover. The new dropdown doesn't use any artdeco-dropdown / role=menu
-    // container class, so Strategy A's scanRoots fall back to [document] and
-    // the button/a item selector misses items rendered as plain <div> wrappers.
-    // Scan every visible small interactive element document-wide for an EXACT
-    // "Connect" label. Caps length at 14 chars and excludes Connect on Twitter
-    // / phone / email variants so we don't false-match link items.
-    const allInteractive = Array.from(document.querySelectorAll(
-      "button, a, [role='menuitem'], [role='option'], div[tabindex], " +
-      "div[role='button'], span[role='button']"
-    ));
-    for (const item of allInteractive) {
-      if (!_isVisible(item)) continue;
-      if (item.closest(".lc-save-row, .lc-overlay-root, #lc-overlay-root")) continue;
-      if (item.closest("[aria-label*='More options' i]")) continue;
-      const txt = (item.textContent || "").replace(/\s+/g, " ").trim();
-      const aria = (item.getAttribute("aria-label") || "").trim();
-      if (txt.length > 14 && aria.length > 14) continue;
-      if (!/^connect$/i.test(txt) && !/^connect$/i.test(aria)) continue;
-      if (/connect.*(twitter|email|phone|whatsapp|instagram|facebook)/i.test(aria)) continue;
-      return item;
-    }
     return null;
   }
 
@@ -2184,10 +2160,6 @@
       aria: moreBtn.getAttribute("aria-label"),
       cls: moreBtn.className,
     });
-    // STEP 1 spotlight — visible cue on the "..." trigger before the click.
-    _showButtonSpotlight(moreBtn, "⚡ Step 1 — Opening menu", "auto-clicking '...'", 700);
-    await sleep(750);
-    _removeSpotlight();
     // Click via human pointer sequence first.
     try { await dispatchHumanClick(moreBtn); } catch {}
 
@@ -2233,28 +2205,12 @@
       };
     }
 
-    // STEP 3: click "Connect" — spotlight + human pointer + force fallback.
+    // STEP 3: click "Connect" — human pointer sequence + force fallback.
     console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
       txt: (connectItem.textContent || "").trim().slice(0, 40),
     });
-    // STEP 2 spotlight — visible cue on the Connect menu item before click.
-    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 900);
-    await sleep(950);
     try { await dispatchHumanClick(connectItem); } catch {}
     await sleep(500 + Math.random() * 400);
-    // Fallback: if the invitation modal didn't open, escalate to _forceClick
-    // + keyboard Enter — newer Sales Nav builds bind handlers to keydown.
-    if (!_invitationModalOpen() && connectItem.isConnected) {
-      console.log("[LeadCaptura] salesNav step 3.5 → modal not open, _forceClick Connect");
-      try { _forceClick(connectItem); } catch {}
-      try {
-        const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
-        connectItem.dispatchEvent(new KeyboardEvent("keydown", k));
-        connectItem.dispatchEvent(new KeyboardEvent("keyup", k));
-      } catch {}
-      await sleep(500);
-    }
-    _removeSpotlight();
 
     // STEP 4: did the invitation modal open?
     const modalAppeared = await (async () => {
@@ -2283,12 +2239,11 @@
       return { ok: false, reason: "no_modal_no_toast" };
     }
 
-    // STEP 5: invitation modal — STEP 3 spotlight on "Send invitation".
-    // Wait ~1s so the user can SEE the spotlight before we attempt the click,
-    // otherwise the auto-click closes the modal before the spotlight renders.
+    // STEP 5: invitation modal — same spotlight flow as the regular LinkedIn
+    // connect path. Auto-click is tried but isTrusted=false means LinkedIn
+    // gates this on a real user click; the spotlight makes it one-tap.
     _showSendSpotlight();
     console.log("[LeadCaptura] salesNav step 5 → modal opened, spotlight shown");
-    await sleep(1000);
 
     for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
       const sendBtn = _findSendWithoutNoteButton();
@@ -2321,7 +2276,6 @@
     console.log("[LeadCaptura] salesNav step 5 ✗ timed out waiting for Send click");
     return { ok: false, reason: "send_failed" };
   }
-
 
   function _cardForUrl(url) {
     // Prefer the exact card element captured when the chip was injected — it
