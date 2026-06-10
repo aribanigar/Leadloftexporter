@@ -55,26 +55,139 @@ def _pick_account(db: Session, workspace_id: str, user_id: str) -> Optional[Conn
     )
 
 
+def _looks_like_render_smtp_block(error: str) -> bool:
+    """Heuristic for 'Render blocked the SMTP port' so we know to fall back
+    to the Vercel relay. aiosmtplib surfaces it as a TCP timeout; some
+    hosts surface 'Network is unreachable' or 'Connection refused' instead."""
+    if not error:
+        return False
+    e = error.lower()
+    return any(
+        s in e
+        for s in (
+            "timed out", "timeout", "network is unreachable",
+            "no route to host", "connection refused",
+        )
+    )
+
+
+def _smtp_relay_send(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    from_email: str,
+    to_email: str,
+    subject: str,
+    body_text: str,
+    body_html: Optional[str],
+) -> SendResult:
+    """Send via the Vercel SMTP relay (Next.js /api/smtp-relay route).
+
+    Render's free + starter tiers block outbound SMTP — the relay performs
+    the actual TCP from Vercel's network where SMTP isn't blocked. Same
+    user-supplied SMTP credentials, same destination server, different
+    egress IP.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    relay_url = settings.resolved_smtp_relay_url
+    if not relay_url:
+        return SendResult(False, error="smtp_relay_not_configured")
+    headers = {"Content-Type": "application/json"}
+    if settings.smtp_relay_secret:
+        headers["X-LC-Relay-Secret"] = settings.smtp_relay_secret
+    payload = {
+        "host": host, "port": port,
+        "username": username, "password": password,
+        "from": from_email, "to": to_email,
+        "subject": subject,
+        "text": body_text or "",
+        "html": body_html or None,
+    }
+    try:
+        with httpx.Client(timeout=35) as client:
+            r = client.post(relay_url, json=payload, headers=headers)
+        data = {}
+        try:
+            data = r.json() or {}
+        except Exception:
+            pass
+        if r.status_code < 300 and data.get("ok"):
+            return SendResult(True, provider_message_id=str(data.get("message_id") or ""))
+        return SendResult(False, error=f"smtp_relay: {data.get('error') or f'relay_http_{r.status_code}'}")
+    except Exception as exc:  # noqa: BLE001
+        return SendResult(False, error=f"smtp_relay_request_failed: {exc}")
+
+
+def _extract_email_bodies(msg: PyEmail) -> tuple[str, Optional[str]]:
+    """Pull the text + html bodies back out of a py-email so the relay
+    can reconstruct the message verbatim."""
+    body_text = ""
+    body_html: Optional[str] = None
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/plain" and not body_text:
+                try: body_text = part.get_content()
+                except Exception: body_text = ""
+            elif ct == "text/html" and not body_html:
+                try: body_html = part.get_content()
+                except Exception: body_html = None
+    else:
+        try:
+            payload = msg.get_content()
+        except Exception:
+            payload = ""
+        if msg.get_content_type() == "text/html":
+            body_html = payload
+        else:
+            body_text = payload
+    return body_text, body_html
+
+
 async def _smtp_send(account: ConnectedAccount, msg: PyEmail) -> SendResult:
+    """Try a direct SMTP send; on TCP-level failure (Render's port block)
+    fall back to the Vercel HTTPS relay so the user's send goes through
+    without any further config. When the account was previously verified
+    via the relay (`config.via == "relay"`) we skip the direct attempt
+    so subsequent sends don't burn 15 s on a known-blocked port."""
     cfg = account.config or {}
     host = cfg.get("host", "smtp.gmail.com")
     port = int(cfg.get("port", 587))
-    username = account.external_id or cfg.get("username")
-    password = account.access_token
-    try:
-        await aiosmtplib.send(
-            msg,
-            hostname=host,
-            port=port,
-            start_tls=(port != 465),
-            use_tls=(port == 465),
-            username=username,
-            password=password,
-            timeout=20,
-        )
-        return SendResult(True, provider_message_id=msg["Message-ID"])
-    except Exception as exc:  # noqa: BLE001
-        return SendResult(False, error=str(exc))
+    username = account.external_id or cfg.get("username") or ""
+    password = account.access_token or ""
+    via = (cfg.get("via") or "direct").lower()
+
+    if via != "relay":
+        try:
+            await aiosmtplib.send(
+                msg,
+                hostname=host,
+                port=port,
+                start_tls=(port != 465),
+                use_tls=(port == 465),
+                username=username,
+                password=password,
+                timeout=15,
+            )
+            return SendResult(True, provider_message_id=msg["Message-ID"])
+        except Exception as exc:  # noqa: BLE001
+            err = str(exc)
+            if not _looks_like_render_smtp_block(err):
+                return SendResult(False, error=err)
+            # fall through to relay
+    # Relay path
+    body_text, body_html = _extract_email_bodies(msg)
+    return _smtp_relay_send(
+        host=host, port=port,
+        username=username, password=password,
+        from_email=msg["From"] or username,
+        to_email=msg["To"] or "",
+        subject=msg["Subject"] or "",
+        body_text=body_text, body_html=body_html,
+    )
 
 
 def _gmail_send(account: ConnectedAccount, msg: PyEmail) -> SendResult:

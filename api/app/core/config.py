@@ -33,9 +33,34 @@ class Settings(BaseSettings):
 
     sentry_dsn: str = ""
 
+    # ---- SMTP relay (Render → Vercel egress) ----
+    # Render's free + starter tiers block outbound SMTP ports 25/465/587 so
+    # `aiosmtplib.send()` to e.g. smtp.hostinger.com just times out. The
+    # relay is a tiny Next.js endpoint on Vercel (src/app/api/smtp-relay)
+    # that performs the SMTP send from Vercel's network instead — Vercel
+    # doesn't block outbound SMTP. `email_sender.py` falls back to it
+    # automatically, and `integrations.py:smtp_connect` uses it to verify
+    # creds on save. Both URL and secret default to sensible auto-derived
+    # values so no extra env vars are required for the default deploy.
+    smtp_relay_url: str = ""
+    smtp_relay_secret: str = ""
+
     @property
     def cors_origins(self) -> List[str]:
         return [o.strip() for o in self.frontend_origins.split(",") if o.strip()]
+
+    @property
+    def resolved_smtp_relay_url(self) -> str:
+        """Use the explicitly-configured relay URL, or derive '<first-frontend>/api/smtp-relay'."""
+        if self.smtp_relay_url:
+            return self.smtp_relay_url.rstrip("/")
+        origins = self.cors_origins
+        for o in origins:
+            if "localhost" not in o and "127.0.0.1" not in o:
+                return o.rstrip("/") + "/api/smtp-relay"
+        if origins:
+            return origins[0].rstrip("/") + "/api/smtp-relay"
+        return ""
 
 
 @lru_cache

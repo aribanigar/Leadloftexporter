@@ -250,12 +250,51 @@ async def _smtp_verify(host: str, port: int, username: str, password: str) -> No
             pass
 
 
+def _smtp_verify_via_relay(host: str, port: int, username: str, password: str) -> tuple[bool, str]:
+    """Verify SMTP credentials via the Vercel HTTPS relay so Render's
+    outbound-SMTP block never stops a user from saving a working sender.
+    Returns (ok, error_message)."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    relay_url = settings.resolved_smtp_relay_url
+    if not relay_url:
+        return False, "smtp_relay_not_configured"
+    headers = {"Content-Type": "application/json"}
+    if settings.smtp_relay_secret:
+        headers["X-LC-Relay-Secret"] = settings.smtp_relay_secret
+    payload = {
+        "host": host, "port": port,
+        "username": username, "password": password,
+        "verify_only": True,
+        # nodemailer requires these even for verify; supply placeholders.
+        "from": username, "to": username,
+    }
+    try:
+        with httpx.Client(timeout=30) as client:
+            r = client.post(relay_url, json=payload, headers=headers)
+        data = {}
+        try:
+            data = r.json() or {}
+        except Exception:
+            pass
+        if r.status_code < 300 and data.get("ok"):
+            return True, ""
+        return False, str(data.get("error") or f"relay_http_{r.status_code}")
+    except Exception as exc:  # noqa: BLE001
+        return False, f"relay_request_failed: {exc}"
+
+
 @router.post("/smtp/connect")
 def smtp_connect(
     body: dict,
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    """Connect an SMTP sender. Tries direct first; if Render's outbound port
+    block trips the connection, automatically falls back to verifying via the
+    Vercel relay and persists `via=relay` so subsequent sends skip the doomed
+    direct attempt. User sees a single Connect button and it just works."""
     host = (body.get("host") or "").strip()
     port = int(body.get("port") or 587)
     username = (body.get("username") or "").strip()
@@ -263,29 +302,46 @@ def smtp_connect(
     from_email = (body.get("from_email") or username).strip()
     if not host or not username or not password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "host_username_password_required")
+
+    direct_ok = False
+    direct_err = ""
     try:
         asyncio.run(_smtp_verify(host, port, username, password))
+        direct_ok = True
     except Exception as exc:  # noqa: BLE001
-        # Detect Render's outbound-SMTP block (manifests as a TCP timeout)
-        # and rewrite the error so the user knows it's a hosting limit,
-        # not a config typo. Render's free/starter tier blocks ports 25,
-        # 465, and 587 to prevent customers from spamming. The only way
-        # around it is an HTTP-based mail relay (Gmail OAuth, SendGrid,
-        # Postmark, Mailgun) — or upgrading the Render plan.
-        msg = str(exc)
-        if "timed out" in msg.lower() or "TimeoutError" in msg:
+        direct_err = str(exc)
+
+    if not direct_ok:
+        is_block = any(
+            s in direct_err.lower()
+            for s in ("timed out", "timeout", "network is unreachable", "no route to host")
+        )
+        if not is_block:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"smtp_connect_failed: {direct_err}")
+        # Render port block — try the Vercel relay with the same credentials.
+        relay_ok, relay_err = _smtp_verify_via_relay(host, port, username, password)
+        if not relay_ok:
+            # The relay returned a real auth/host error — bubble it back so
+            # the user knows whether to fix creds vs. infrastructure.
+            if "auth" in relay_err.lower() or "535" in relay_err:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"smtp_auth_failed: {relay_err} — double-check the username + password.",
+                )
+            if "not_configured" in relay_err:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    (
+                        f"smtp_blocked_by_host: connecting to {host}:{port} timed out, and the "
+                        "Vercel SMTP relay isn't configured on this deploy. Use Resend or SendGrid, "
+                        "or set FRONTEND_ORIGINS / SMTP_RELAY_URL on the backend so it can use the relay."
+                    ),
+                )
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                (
-                    f"smtp_blocked_by_host: connecting to {host}:{port} timed out — "
-                    "your backend host (Render) blocks outbound SMTP ports on its "
-                    "free/starter plan. Use the Gmail connector (App Password — uses "
-                    "Gmail's HTTPS API, not SMTP) or sign up for SendGrid/Postmark/"
-                    "Mailgun and connect via their SMTP relay on port 2525 (which "
-                    "Render allows). Or upgrade your Render plan to unblock 25/465/587."
-                ),
+                f"smtp_verify_failed_via_relay: {relay_err}",
             )
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"smtp_connect_failed: {exc}")
+
     acct = _upsert_account(
         db,
         ctx,
@@ -293,9 +349,22 @@ def smtp_connect(
         label=f"SMTP ({from_email})",
         external_id=from_email,
         access_token=password,
-        config={"host": host, "port": port, "username": username, "from_email": from_email},
+        config={
+            "host": host,
+            "port": port,
+            "username": username,
+            "from_email": from_email,
+            # Persist the egress path so email_sender.py skips the doomed
+            # direct attempt on every subsequent send.
+            "via": "direct" if direct_ok else "relay",
+        },
     )
-    return {"id": acct.id, "status": acct.status, "label": acct.label}
+    return {
+        "id": acct.id,
+        "status": acct.status,
+        "label": acct.label,
+        "via": acct.config.get("via", "direct"),
+    }
 
 
 # ---------- Gmail (app password, no OAuth) ---------------------------------
