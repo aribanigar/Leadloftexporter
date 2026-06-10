@@ -4799,21 +4799,51 @@
     const handled = new Set(); // canonical urls chipped this pass
 
     const cardFromButton = (btn) => {
+      // Climb up and return the SMALLEST ancestor that contains a profile link.
+      // On standard search pages this is the row (<li>) since rows have a link
+      // and direct children of the row don't. On the My Network connections
+      // page the inline-action-row sits next to the link inside the row, so we
+      // also want a single ancestor that owns exactly one /in/ link. If we
+      // stopped at the first ancestor with ANY /in/ link, we'd hit a giant
+      // wrapper that contains all 50 rows on My Network — every Message button
+      // would map to the FIRST profile's URL and only the first chip injects.
       let node = btn.parentElement;
+      let firstHit = null;
       for (
         let i = 0;
         i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
         i++
       ) {
-        // The FIRST ancestor (climbing from a single button) that contains a
-        // profile link IS that button's own row — every result row has exactly
-        // one profile link of its own. Return it directly; no button-count
-        // guard needed (and the guard wrongly rejected rows once a row exposed
-        // a Message icon alongside Connect).
-        if (node.querySelector(linkSel)) return node;
+        if (node.querySelector(linkSel)) {
+          if (!firstHit) firstHit = node;
+          // Count distinct owner URLs in this ancestor. If more than one, we've
+          // climbed past the row boundary — return the previous (smaller) hit.
+          const owners = new Set();
+          for (const l of node.querySelectorAll(linkSel)) {
+            if (_isInsightLink(l) || _isMutualConnectionContext(l)) continue;
+            const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
+            if (u) owners.add(u);
+            if (owners.size > 1) break;
+          }
+          if (owners.size > 1) {
+            return firstHit; // smaller (deeper) ancestor was correct
+          }
+          // Prefer semantic row containers (li/tr/article/role=listitem|row)
+          // — these are the canonical card boundaries. Returning here keeps
+          // us from over-climbing when the row's parent also owns one link.
+          if (
+            node.tagName === "LI" ||
+            node.tagName === "ARTICLE" ||
+            node.tagName === "TR" ||
+            node.getAttribute?.("role") === "row" ||
+            node.getAttribute?.("role") === "listitem"
+          ) {
+            return node;
+          }
+        }
         node = node.parentElement;
       }
-      return null;
+      return firstHit;
     };
 
     const tryInject = (card, anchorBtn) => {
