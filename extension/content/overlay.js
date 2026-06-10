@@ -3004,30 +3004,53 @@
   // also contain the search-page feedback widgets ("Are these results
   // helpful?") that were poisoning the heading/progress reads and giving the
   // stepper a wrong "next" button to click.
+  // Walk UP from seed to the tightest ancestor that is either:
+  //   (a) the modal/dialog wrapper itself, or
+  //   (b) an ancestor that contains a real apply footer button.
+  // Stops before <main>/<body>/<html>. The fallback ONLY returns a dialog
+  // wrapper or the immediate parent — never the content section itself,
+  // which would exclude the sibling footer and cause _modalActionButton to
+  // return null ("no Next button found").
   function _applyFormRootFromSeed(seed) {
     if (!seed) return null;
     let node = seed;
-    for (let i = 0; i < 12 && node; i++) {
+    for (let i = 0; i < 20 && node; i++) {
       const tag = node.tagName;
       if (tag === "MAIN" || tag === "BODY" || tag === "HTML") break;
+      // Stop immediately at a modal/dialog wrapper — it contains the full form
+      // including the footer, so _modalActionButton can find the Next button.
+      const cls = node.className || "";
+      if (
+        cls.includes("jobs-easy-apply-modal") ||
+        node.getAttribute?.("role") === "dialog" ||
+        node.getAttribute?.("role") === "alertdialog" ||
+        node.hasAttribute?.("data-test-modal")
+      ) return node;
       // Does this ancestor contain a real apply footer button?
+      // Covers specific data-attrs, aria-labels, AND the LinkedIn action-bar /
+      // footer container (which always holds the Next/Submit button even when
+      // the button itself has no special attrs — just "Next" text).
       const hasFooterBtn = node.querySelector(
         "button[data-easy-apply-next-button], " +
         "button[data-live-test-easy-apply-next-button], " +
         "button[data-live-test-easy-apply-submit-button], " +
         "button[aria-label*='Continue to next step' i], " +
         "button[aria-label*='Submit application' i], " +
-        "button[aria-label*='Review your application' i]"
+        "button[aria-label*='Review your application' i], " +
+        ".jobs-easy-apply-modal__footer button, " +
+        ".artdeco-modal__actionbar button, " +
+        "[data-test-modal-footer] button, " +
+        "footer.artdeco-modal__footer button"
       );
       if (hasFooterBtn) return node;
       node = node.parentElement;
     }
-    // Fallback: the dialog/modal/form wrapper closest to the seed.
+    // Fallback: prefer the dialog/modal wrapper — never return the content
+    // section itself (that excludes the sibling footer).
     return (
       seed.closest(
-        "div.jobs-easy-apply-modal, div[data-test-modal][role='dialog'], " +
-        ".artdeco-modal[role='dialog'], [role='dialog'], " +
-        ".jobs-easy-apply-content, .jobs-easy-apply-form, form"
+        "div.jobs-easy-apply-modal, div[data-test-modal], " +
+        ".artdeco-modal[role='dialog'], [role='dialog']"
       ) || seed.parentElement || seed
     );
   }
@@ -3039,6 +3062,7 @@
     const dialog =
       document.querySelector("div.jobs-easy-apply-modal") ||
       document.querySelector("div[data-test-modal][role='dialog']") ||
+      document.querySelector("div[data-test-modal].jobs-easy-apply-modal") ||
       Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog'], .artdeco-modal[role='dialog']")).find(
         (d) =>
           /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
@@ -3050,11 +3074,8 @@
       );
     if (dialog) return dialog;
 
-    // 2. ANCHOR ON THE "N/M pages" PROGRESS LABEL. This is the most reliable
-    //    apply-form signal visible in the live DOM ("1/3 pages"). Walk every
-    //    candidate element whose OWN text is exactly that pattern, then climb to
-    //    the tight form container. This is what fixes the stepper reading
-    //    "Are these results helpful?" from <main> and clicking a wrong button.
+    // 2. ANCHOR ON THE "N/M pages" OR percentage PROGRESS LABEL. Climb to the
+    //    full modal container (never tight content-only section).
     const pagesLabel = Array.from(
       document.querySelectorAll("span, p, div, h2, h3, [class*='progress']")
     ).find((n) => {
@@ -3066,13 +3087,22 @@
       if (root) return root;
     }
 
-    // 3. Apply content container class → tight form root.
+    // 3. Apply content container — climb to the MODAL WRAPPER (not the content
+    //    section itself) so the footer's Next/Submit button is included.
     const content = document.querySelector(
       ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
       ".job-details-easy-apply-content, form.jobs-easy-apply-form-element"
     );
     if (content && _isVisible(content)) {
-      return _applyFormRootFromSeed(content) || content;
+      // Walk straight to the modal wrapper. _applyFormRootFromSeed checks for
+      // role=dialog / jobs-easy-apply-modal on the first iterations, so this
+      // is equivalent but makes the intent explicit.
+      const wrapper = content.closest(
+        "div.jobs-easy-apply-modal, div[data-test-modal], " +
+        ".artdeco-modal[role='dialog'], [role='dialog']"
+      );
+      if (wrapper) return wrapper;
+      return _applyFormRootFromSeed(content) || content.parentElement || content;
     }
 
     // 4. Apply-progress REGION ("Your job application progress is at N percent.")
@@ -3084,8 +3114,8 @@
       return _applyFormRootFromSeed(progressRegion) || progressRegion;
     }
 
-    // 5. Last resort: a real /jobs/view/<id>/apply/ URL but no recognised
-    //    container. Anchor on the footer button itself and climb tight.
+    // 5. Last resort: a real /jobs/view/<id>/apply/ URL. Try footer button first;
+    //    then any form container with a primary action button visible on the page.
     if (/\/jobs\/view\/\d+\/apply\b/.test(location.pathname)) {
       const footerBtn = document.querySelector(
         "button[data-easy-apply-next-button], " +
@@ -3093,6 +3123,14 @@
         "button[aria-label*='Submit application' i]"
       );
       if (footerBtn) return _applyFormRootFromSeed(footerBtn);
+      // Broader: any visible primary action button that's NOT pagination/save
+      const anyPrimary = Array.from(
+        document.querySelectorAll("button.artdeco-button--primary")
+      ).find(
+        (b) => _isVisible(b) && !b.closest(".artdeco-pagination") &&
+          !/^(un)?save/i.test((b.innerText || "").trim())
+      );
+      if (anyPrimary) return _applyFormRootFromSeed(anyPrimary);
     }
     return null;
   }
@@ -3735,7 +3773,21 @@
       console.log(`[LeadCaptura] easy-apply: form not found after click (url=${location.pathname}) — skipping job`);
       return { ok: false, reason: "modal_not_found" };
     }
-    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName})`);
+    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName}) class="${(modal.className||"").slice(0,80)}"`);
+    // Verify the container includes a footer/action button — if not, it's likely
+    // just the content section and _modalActionButton will find nothing.
+    const _detectsAction = () => !!_modalActionButton(modal);
+    if (!_detectsAction()) {
+      // Try climbing one level up — the content section's parent often IS the wrapper.
+      const parent = modal.parentElement;
+      if (parent && parent.tagName !== "MAIN" && parent.tagName !== "BODY") {
+        const parentAction = _modalActionButton(parent);
+        if (parentAction) {
+          console.log(`[LeadCaptura] easy-apply: widened container to parent (${parent.getAttribute?.("role") || parent.tagName})`);
+          modal = parent;
+        }
+      }
+    }
     // Extra settle time — LinkedIn animates the form in.
     await sleep(600 + Math.random() * 400);
 
@@ -3760,7 +3812,9 @@
       console.log(`[LeadCaptura] easy-apply step ${step + 1}: page="${_modalHeading(modal) || "?"}" progress=${_modalProgress(modal)}% action=${action ? action.type : "NONE"}`);
       try { _lcToast(`Auto Apply — ${_pageName}${action ? " → " + action.type : ""}`); } catch {}
       if (!action) {
-        console.log("[LeadCaptura] easy-apply: no Next/Submit button found on this page — discarding");
+        const modalClass = (modal?.className || "").slice(0, 80);
+        const btnsInModal = Array.from(modal?.querySelectorAll("button") || []).map((b) => (b.innerText || b.textContent || "").trim().slice(0, 20)).join(", ");
+        console.log(`[LeadCaptura] easy-apply: no Next/Submit button — modal="${modalClass}" buttons=[${btnsInModal}]`);
         await _dismissEasyApplyModal();
         return { ok: false, reason: "no_action_button" };
       }
