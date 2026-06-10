@@ -37,6 +37,10 @@ def outreach_settings(workspace: Workspace) -> dict:
         "email_limit_per_day": 80,
         "linkedin_connect_limit": 15,
         "linkedin_message_limit": 30,
+        "whatsapp_limit_per_day": 50,
+        # Maximum emails the Celery drainer dispatches per minute so a 500-row
+        # bulk send doesn't burst through SendGrid/Resend's rate limits.
+        "email_drain_per_minute": 6,
     }
     base.update((workspace.settings or {}).get("outreach", {}))
     return base
@@ -58,6 +62,25 @@ def emails_sent_today(db: Session, workspace_id: str) -> int:
             EmailMessage.direction == "outbound",
             EmailMessage.sent_at.isnot(None),
             EmailMessage.sent_at >= _start_of_day_utc(),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def whatsapp_sent_today(db: Session, workspace_id: str) -> int:
+    """Count WhatsApp messages sent today for daily-quota enforcement.
+
+    WhatsApp sends are recorded as Activity rows of type ``whatsapp_sent`` —
+    we don't (yet) have a dedicated WhatsApp message model, and Activity is
+    already the system-wide audit table, so this keeps the schema small.
+    """
+    return (
+        db.query(func.count(Activity.id))
+        .filter(
+            Activity.workspace_id == workspace_id,
+            Activity.type == "whatsapp_sent",
+            Activity.created_at >= _start_of_day_utc(),
         )
         .scalar()
         or 0

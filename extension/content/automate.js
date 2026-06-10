@@ -150,10 +150,28 @@
       "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
       "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
       "main button.message-anywhere-button",
+      "[class*='message-anywhere-button']",
+      "button[data-control-name*='message' i]",
     ];
     let msgBtn = first(document, _MSG_SELS);
     if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
+      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 5000 }); } catch {}
+    }
+    // Text-content fallback: find a visible "Message" button/link that isn't
+    // an InMail or recruiter variant.
+    if (!msgBtn) {
+      const candidates = document.querySelectorAll(
+        "main button:not([disabled]), main a[role='button'], " +
+        ".pvs-profile-actions button:not([disabled]), .pvs-profile-actions a"
+      );
+      for (const el of candidates) {
+        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+        const txt = (el.textContent || "").trim().toLowerCase();
+        if (
+          (/\bmessage\b/.test(lbl) || txt === "message") &&
+          !/your team|recruiter|inmail/i.test(lbl + " " + txt)
+        ) { msgBtn = el; break; }
+      }
     }
     if (!msgBtn) return { status: "failed", error: "message_button_not_found" };
     await dispatchHumanClick(msgBtn);
@@ -201,35 +219,14 @@
     const body = job.payload?.body;
     if (!url || !body) return { status: "failed", error: "missing_url_or_body" };
 
-    // Already on the target profile? Send in-place, no navigation required.
-    if (_sameProfile(location.href, url)) {
-      return _sendMessageInPlace(body, url);
+    // Only send if already on the target profile. Never auto-navigate — that
+    // would disrupt the user's browsing without any action on their part.
+    // The job stays claimed; the backend reclaims it after ~10 min and retries.
+    if (!_sameProfile(location.href, url)) {
+      return { status: "skipped", error: "not_on_target_profile" };
     }
 
-    // Alert the user before the tab navigates to a recipient profile so they're
-    // not surprised by the auto-navigation. Give a 2 s window to react.
-    try {
-      if (globalThis.__lcOverlay?.toast) {
-        globalThis.__lcOverlay.toast("⚡ Sending message — opening recipient profile…", 4000);
-      }
-    } catch {}
-    await sleep(2000);
-
-    // Persist the job FIRST so the new page can pick it up after this
-    // content-script context dies, then trigger the hard navigation.
-    // The post-resolve code is never reached — by design.
-    await _persistPending(job);
-    try {
-      const target = new URL(url, "https://www.linkedin.com");
-      location.href = target.href;
-    } catch {
-      await _clearPending();
-      return { status: "failed", error: "bad_linkedin_url" };
-    }
-    // Block forever — the page is unloading. resumePendingMessage() in the
-    // new page context submits the result.
-    await new Promise(() => {});
-    return { status: "skipped", error: "navigated" }; // unreachable
+    return _sendMessageInPlace(body, url);
   }
 
   // Called from main.js on every page boot. If a message job is pending and
@@ -294,6 +291,43 @@
     }
   }
 
+  /**
+   * Bridge: open the profile in a background tab where main.js's bridge
+   * trigger (mirror of the enrichment trigger) scrapes the visible profile
+   * + contact info, syncs the lead, and reports a structured snapshot back
+   * via the regular extension-job result endpoint. Same anti-bot envelope
+   * as enrichment: background tab via the service worker, foreground only
+   * for write actions.
+   */
+  async function doBridgeProfile(job) {
+    const url = job.payload?.linkedin_url;
+    if (!url || !url.includes("linkedin.com/")) {
+      return { status: "failed", error: "missing_linkedin_url" };
+    }
+    let openUrl = url;
+    try {
+      const u = new URL(url);
+      u.searchParams.set("lc_bridge", String(job.id));
+      openUrl = u.toString();
+    } catch {
+      openUrl = url + (url.includes("?") ? "&" : "?") + "lc_bridge=" + encodeURIComponent(job.id);
+    }
+    try {
+      await chrome.runtime.sendMessage({
+        type: "lc:openProfileTab",
+        url: openUrl,
+        active: false,
+        awaitClose: true,
+      });
+    } catch (e) {
+      return { status: "failed", error: "bridge_open_failed: " + (e?.message || e) };
+    }
+    // Snapshot is delivered by main.js directly to the job-result endpoint.
+    // We report "done" with an empty payload so the autopilot loop doesn't
+    // overwrite the richer payload that main.js already sent.
+    return { status: "done", result: { bridged: true } };
+  }
+
   async function executeOne(job) {
     // Connect / Follow / SearchScraper all touch high-risk surfaces (invite
     // modal, scroll-load) so still gate on foreground — matches the
@@ -313,6 +347,7 @@
       if (job.kind === "connect") result = await doConnect(job);
       else if (job.kind === "message") result = await doMessage(job);
       else if (job.kind === "scrape_search") result = await doScrapeSearch(job);
+      else if (job.kind === "bridge_profile") result = await doBridgeProfile(job);
       else result = { status: "skipped", error: "unknown_kind" };
       await Api.submitJobResult(job.id, {
         status: result.status,
@@ -395,6 +430,7 @@
       const jobs = await Api.nextJobs(1).catch(() => []);
       if (!jobs?.length) return;
       const [job] = jobs;
+
       await executeOne(job);
       // Human pause before next action
       await sleep(paceBetweenActions());

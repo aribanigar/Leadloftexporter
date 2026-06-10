@@ -985,6 +985,104 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+  // Personalise a LinkedIn message for a specific profile using Claude or Gemini.
+  // Called from overlay.js _resumeMessageRunIfActive when run.useAI is true.
+  if (msg?.type === "lc:personalizeMessage") {
+    (async () => {
+      try {
+        const s = await getSettings();
+        const provider = s.aiProvider || "gemini";
+        const template = String(msg.template || "").slice(0, 1000);
+        const p = msg.profile || {};
+
+        const name = (p.full_name || [p.first_name, p.last_name].filter(Boolean).join(" ") || "this person").trim();
+        const firstName = (p.first_name || name.split(" ")[0] || "there").trim();
+        const title = (p.title || "").trim();
+        const company = (p.company_name || "").trim();
+        const location = (p.location || "").trim();
+        const summary = (p.summary || p.about || "").slice(0, 400).trim();
+
+        const profileDesc = [
+          `Name: ${name}`,
+          title && `Job title: ${title}`,
+          company && `Company: ${company}`,
+          location && `Location: ${location}`,
+          summary && `About: ${summary}`,
+        ].filter(Boolean).join("\n");
+
+        const prompt =
+          `You are writing a personalized LinkedIn message on behalf of a sales professional.\n\n` +
+          `RECIPIENT PROFILE:\n${profileDesc}\n\n` +
+          `MESSAGE TEMPLATE (use as a starting point or inspiration):\n${template}\n\n` +
+          `TASK: Write a short, natural LinkedIn message to ${firstName}. ` +
+          `Keep it under 300 characters. Be genuine, not spammy. ` +
+          `Reference something specific from their profile if possible. ` +
+          `Do NOT add any preamble, labels, or quotes — output ONLY the message text itself.`;
+
+        let message = "";
+        if (provider === "claude") {
+          if (!s.claudeApiKey) { sendResponse({ ok: false, error: "no_claude_key" }); return; }
+          const model = s.claudeModel || "claude-haiku-4-5-20251001";
+          let res;
+          try {
+            res = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": s.claudeApiKey,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-browser-access": "true",
+              },
+              body: JSON.stringify({
+                model,
+                max_tokens: 200,
+                messages: [{ role: "user", content: prompt }],
+              }),
+            });
+          } catch (e) {
+            sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` }); return;
+          }
+          if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            sendResponse({ ok: false, error: `claude_http_${res.status}: ${t.slice(0, 160)}` }); return;
+          }
+          const data = await res.json();
+          message = (data?.content?.[0]?.text || "").trim();
+        } else {
+          if (!s.geminiApiKey) { sendResponse({ ok: false, error: "no_gemini_key" }); return; }
+          const model = s.geminiModel || "gemini-2.5-flash";
+          let res;
+          try {
+            res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(s.geminiApiKey)}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { temperature: 0.7, maxOutputTokens: 200 },
+                }),
+              }
+            );
+          } catch (e) {
+            sendResponse({ ok: false, error: `fetch_failed: ${e?.message || e}` }); return;
+          }
+          if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            sendResponse({ ok: false, error: `gemini_http_${res.status}: ${t.slice(0, 160)}` }); return;
+          }
+          const data = await res.json();
+          message = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+        }
+
+        if (!message) { sendResponse({ ok: false, error: "empty_response" }); return; }
+        sendResponse({ ok: true, message });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
   // Fetch company website(s) and extract contact info (emails, phones) from
   // the raw HTML. Strategies in priority order:
   //   1. JSON-LD schema.org (structured, most reliable)

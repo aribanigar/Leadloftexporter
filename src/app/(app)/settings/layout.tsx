@@ -11,6 +11,7 @@ const SECTIONS = [
   ]},
   { title: "My Workspace Settings", items: [
     { href: "/settings/accounts", label: "Connected Accounts" },
+    { href: "/settings/email", label: "Email Senders" },
     { href: "/settings/outreach", label: "Outreach Settings" },
     { href: "/settings/templates", label: "Email Templates" },
     { href: "/settings/ai-writer", label: "AI Writer" },

@@ -908,25 +908,32 @@
     // profile URL loads. The overlay watches the h1 for name mutations and
     // re-renders as soon as LinkedIn hydrates the correct person's name.
     if (isProfile) {
-      // Check for an active Connect All queue BEFORE deciding to auto-save.
+      // Check for an active Connect All run BEFORE deciding to auto-save.
       // triggerAutoSave() → saveCurrentProfile() → scrapeContactInfo() CLICKS
-      // the "Contact info" link. If a connect queue is running that click races
-      // with _ccConnectOnProfile() trying to click the Connect button, causing
-      // the extension to hit "Contact info" instead. Suppress auto-save for the
-      // entire duration of any connect queue run.
-      const _launchProfile = (inConnectQueue) => {
+      // the "Contact info" link. If Connect All is running that click races
+      // with the connect action, causing the extension to hit "Contact info"
+      // instead of the Connect button. Suppress auto-save for the entire
+      // duration of any connect run — both the legacy queue key and the
+      // navigation-driven run key (added v1.0.155).
+      const _launchProfile = (inConnectRun) => {
         setTimeout(() => {
           Overlay.renderProfilePanel();
-          if (!inConnectQueue) Overlay.triggerAutoSave?.();
+          if (!inConnectRun) Overlay.triggerAutoSave?.();
           maybeRunConnectQueue().catch((e) =>
             console.warn("[LeadCaptura] connect queue error", e?.message || e)
           );
         }, 50);
       };
       try {
-        chrome.storage.local.get("lc_connect_queue", (qData) => {
-          _launchProfile(!!(qData?.lc_connect_queue?.urls?.length > 0));
-        });
+        chrome.storage.local.get(
+          ["lc_connect_queue", "lcConnectRun", "lcMessageRun"],
+          (data) => {
+            const legacyActive = !!(data?.lc_connect_queue?.urls?.length > 0);
+            const connectNavActive = !!(data?.lcConnectRun?.active);
+            const messageNavActive = !!(data?.lcMessageRun?.active);
+            _launchProfile(legacyActive || connectNavActive || messageNavActive);
+          }
+        );
       } catch {
         // Storage unavailable (stale context) — assume no queue, normal flow.
         _launchProfile(false);
@@ -1398,6 +1405,109 @@
   // Also drain whenever the user navigates to /messaging/ SPA route.
   const _origOnPathChange = onPathChange;
 
+  // Bridge trigger: when a tab opens with ?lc_bridge=<job_id> we scrape the
+  // visible profile + contact info and POST a structured snapshot to the
+  // LinkedIn-bridge job-result endpoint so the CRM's side-panel can render
+  // it in real time. Same anti-bot envelope as the enrichment trigger.
+  async function maybeRunBridgeTrigger() {
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get("lc_bridge");
+    if (!jobId) return;
+    if (window.__lcBridgeRan) return;
+    window.__lcBridgeRan = true;
+
+    const closeSelf = () => {
+      try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
+      setTimeout(() => { try { window.close(); } catch {} }, 250);
+    };
+    const safetyTimer = setTimeout(closeSelf, 18_000);
+
+    try {
+      // Sales-Navigator redirect: bridge only works on /in/ profile pages.
+      if (location.pathname.startsWith("/sales/lead/")) {
+        const liLink = await globalThis.__lcDom.waitFor(
+          [
+            "a[data-control-name='visit_linkedin_profile']",
+            "a[data-control-name='profile_lockup_view_full_profile']",
+            "a[href*='/in/']",
+          ],
+          { timeout: 12000 }
+        );
+        if (liLink?.href && liLink.href.includes("/in/")) {
+          const u = new URL(liLink.href, location.origin);
+          u.searchParams.set("lc_bridge", jobId);
+          clearTimeout(safetyTimer);
+          location.replace(u.toString());
+          return;
+        }
+        return;
+      }
+      if (!location.pathname.startsWith("/in/")) return;
+
+      await globalThis.__lcDom.waitFor(["main h1", "h1"], { timeout: 8000 });
+      const base = Human.rand(300, 700);
+      await Human.sleep(base);
+
+      const profile = Scraper.scrapeProfile();
+      let contact = {};
+      try {
+        contact = await Scraper.scrapeContactInfo({
+          settleMs: 400,
+          allowPushStateFallback: true,
+        }) || {};
+      } catch {}
+      const snapshot = {
+        linkedin_url: profile.linkedin_url || location.href.split("?")[0],
+        full_name: profile.full_name || null,
+        first_name: profile.first_name || null,
+        last_name: profile.last_name || null,
+        headline: profile.headline || null,
+        title: profile.title || null,
+        company: profile.company_name || null,
+        location: profile.location || null,
+        about: profile.about || null,
+        photo_url: profile.photo_url || null,
+        email: contact.email || profile.email || null,
+        phone: contact.phone || profile.phone || null,
+        website: contact.website || null,
+        experience: profile.experience || [],
+        captured_at: new Date().toISOString(),
+      };
+
+      // POST the snapshot back via the regular job-result endpoint so the
+      // bridge polling endpoint serves it. The backend stores result JSON
+      // verbatim and the frontend reads result.snapshot.
+      try {
+        await globalThis.__lcApi.submitJobResult(jobId, {
+          status: "done",
+          result: { snapshot },
+        });
+      } catch (e) {
+        console.warn("[LeadCaptura] bridge: result submit failed", e?.message);
+      }
+
+      // Also sync the profile to the regular Lead row so the CRM-wide data
+      // stays fresh — no point in only feeding the side panel.
+      try {
+        if (contact.email) profile.email = contact.email;
+        if (contact.phone) profile.phone = contact.phone;
+        profile.raw = { ...(profile.raw || {}), contact_source: "linkedin_bridge" };
+        await globalThis.__lcApi.syncProfile(profile);
+      } catch {}
+    } catch (e) {
+      console.warn("[LeadCaptura] bridge trigger failed", e?.message);
+      try {
+        await globalThis.__lcApi.submitJobResult(jobId, {
+          status: "failed",
+          error: String(e?.message || e),
+        });
+      } catch {}
+    } finally {
+      clearTimeout(safetyTimer);
+      closeSelf();
+    }
+  }
+
   // Boot
   onPathChange();
   // Resume a bulk-message job that was mid-navigation when the previous
@@ -1407,6 +1517,7 @@
   try { Automate.resumePendingMessage?.().catch(() => {}); } catch {}
   startAutopilot();
   maybeRunEnrichmentTrigger();
+  maybeRunBridgeTrigger();
 
   // Connect Run resume (v1.0.155):
   // If a Connect All run was in progress when the previous page unloaded,

@@ -734,6 +734,17 @@
     if (new URLSearchParams(location.search).has("lc_enrich")) return;
     if (location.pathname.includes("/overlay/")) return;
 
+    // Never auto-save while a Connect All or Message All run is in progress.
+    // saveCurrentProfile() clicks the "Contact info" link which races with the
+    // Connect/Message button click and opens the wrong UI.
+    if (state.connectActive || state.messageActive) return;
+    try {
+      const d = await new Promise((res) =>
+        chrome.storage.local.get(["lcConnectRun", "lcMessageRun"], res)
+      );
+      if (d?.lcConnectRun?.active || d?.lcMessageRun?.active) return;
+    } catch {}
+
     const path = location.pathname;
     if (_autoSavedPaths.has(path)) return;
     _autoSavedPaths.add(path);
@@ -1410,6 +1421,7 @@
     let cancelled = false;
     let pageNum = 1;
 
+    try {
     // Outer loop: one iteration per search-results page.
     // In "Save X Selected" mode this runs exactly once.
     outerLoop: while (true) {
@@ -1565,15 +1577,19 @@
       flashStatus(`Page ${pageNum}: saving ${enrichable.length} profile(s)…`);
       renderToolbar();
     }
-
-    state.bulkActive = false;
-    state.bulkProgress = null;
-    // Clear selections so the toolbar resets to "Save All Leads" and the top
-    // pill resets to "☐ Select All" — ready for the next batch immediately.
-    state.selectedUrls.clear();
-    // Bring the top pill back so the user can run another batch immediately.
-    mountSelectAllHeader();
-    renderToolbar();
+    } finally {
+      // Always reset state so the toolbar can't get stuck on "Stop" if any
+      // unhandled exception was thrown above.
+      state.bulkActive = false;
+      state.bulkCancel = false;
+      state.bulkProgress = null;
+      // Clear selections so the toolbar resets to "Save All Leads" and the top
+      // pill resets to "☐ Select All" — ready for the next batch immediately.
+      state.selectedUrls.clear();
+      // Bring the top pill back so the user can run another batch immediately.
+      try { mountSelectAllHeader(); } catch {}
+      try { renderToolbar(); } catch {}
+    }
 
     const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
     let summary;
@@ -1694,14 +1710,8 @@
   // An element the user can actually see and click (rules out the stale,
   // hidden, detached modal duplicates LinkedIn can leave in the DOM — clicking
   // one of those does nothing while the real visible modal stays open).
-  function _isVisible(el) {
-    if (!el || !el.isConnected) return false;
-    const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) return false;
-    const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
-    return true;
-  }
+  // _isVisible is defined later in the file (line ~2608) and shadowed via
+  // function-hoisting. The strict version that lived here was dead code.
 
   // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
   function _findInvitationModal() {
@@ -1746,7 +1756,11 @@
       (s) => /^send without a note$/i.test(s),
       (s) => /\bsend without a note\b/i.test(s),
       (s) => /^send now$/i.test(s),
-      (s) => /^send( invitation)?$/i.test(s),
+      // "Send invitation" only (not bare "Send") — bare "Send" is used by the
+      // LinkedIn Messaging page's compose button and would false-trigger on it.
+      // Bare "Send" is still matched below, but only when _findInvitationModal()
+      // confirms the Connect invitation dialog is actually open.
+      (s) => /^send invitation$/i.test(s),
     ];
     for (const test of tests) {
       const matches = all.filter((b) => {
@@ -2190,11 +2204,46 @@
       };
     }
 
-    // STEP 3: click "Connect" — human pointer sequence + force fallback.
+    // STEP 3: click "Connect" — spotlight first so the user sees what is
+    // about to be clicked, then human pointer sequence + force fallback.
     console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
       txt: (connectItem.textContent || "").trim().slice(0, 40),
+      tag: connectItem.tagName,
+      cls: connectItem.className,
     });
-    try { await dispatchHumanClick(connectItem); } catch {}
+    // Visible spotlight cue on the Connect menu item (pointer-events:none on
+    // the overlay so the real click below still lands on the button). The
+    // spotlight freezes in place if the target detaches mid-show — Sales Nav
+    // sometimes closes the dropdown the instant we insert DOM nodes near it.
+    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 1100);
+    console.log("[LeadCaptura] salesNav step 3 → spotlight requested");
+    await sleep(950);
+
+    // If our original connectItem detached during the spotlight wait (dropdown
+    // closed), find it again. Otherwise the click below would target a node
+    // that's no longer in the DOM and silently no-op.
+    let clickTarget = connectItem;
+    if (!clickTarget.isConnected) {
+      console.log("[LeadCaptura] salesNav step 3 → connectItem detached, re-finding");
+      clickTarget = _findSalesNavConnectMenuItem();
+      if (!clickTarget) {
+        // Dropdown is gone — re-open it and try one more time.
+        console.log("[LeadCaptura] salesNav step 3 → dropdown gone, re-opening '...'");
+        try { await dispatchHumanClick(moreBtn); } catch {}
+        for (let i = 0; i < 20 && !clickTarget; i++) {
+          await sleep(150);
+          clickTarget = _findSalesNavConnectMenuItem();
+        }
+      }
+    }
+    if (clickTarget) {
+      try { await dispatchHumanClick(clickTarget); } catch {}
+    } else {
+      console.log("[LeadCaptura] salesNav step 3 ✗ Connect item unrecoverable");
+      _removeSpotlight();
+      return { ok: false, reason: "connect_item_lost" };
+    }
+    _removeSpotlight();
     await sleep(500 + Math.random() * 400);
 
     // STEP 4: did the invitation modal open?
@@ -2388,6 +2437,14 @@
   }
 
   async function connectAllVisible() {
+    // Sales Navigator path — in-place dropdown flow, no navigation.
+    // SalesNav lacks the simple Connect button on cards; the only path is the
+    // "..." More options dropdown → Connect → invitation modal. Restored in
+    // v1.0.165 after the v1.0.155 nav-driven rewrite accidentally dropped it.
+    if (location.pathname.startsWith("/sales/")) {
+      return await _connectAllVisibleSalesNav();
+    }
+
     const userSelected = state.selectedUrls.size > 0;
     const autoPaginate = !userSelected;
 
@@ -2419,6 +2476,139 @@
     _lcToast(`⚡ Connect All — opening profile 1/${urls.length}`, 2800);
     await new Promise((r) => setTimeout(r, 1500));
     location.href = urls[0];
+  }
+
+  // Sales Navigator in-place Connect All (restored from pre-v1.0.155).
+  // No navigation: walks visible chip URLs on the current SalesNav page,
+  // opens each card's "..." dropdown, clicks Connect, then handles the
+  // invitation modal via the existing _showSendSpotlight + force-click loop.
+  async function _connectAllVisibleSalesNav() {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
+    const Api = globalThis.__lcApi;
+
+    const userSelected = state.selectedUrls.size > 0;
+    const autoPage = !userSelected;
+
+    let urls = (
+      userSelected ? Array.from(state.selectedUrls) : _allChipUrls()
+    ).filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")));
+
+    if (!urls.length) {
+      flashStatus("No profiles selected to connect with", "warn");
+      return;
+    }
+    urls = urls.map((u) => {
+      try { return new URL(u, "https://www.linkedin.com").href; }
+      catch { return u; }
+    });
+
+    state.connectActive = true;
+    state.connectCancel = false;
+    try { unmountSelectAllHeader(); } catch {}
+    try { renderToolbar(); } catch {}
+
+    let sent = 0, followed = 0, skipped = 0, failed = 0, processed = 0, pageNum = 1;
+    const summarise = () =>
+      `Connect All: ${sent} invited` +
+      (followed ? `, ${followed} followed` : "") +
+      `, ${skipped} skipped` +
+      (failed ? `, ${failed} failed` : "");
+
+    try {
+      outer:
+      while (true) {
+        for (const url of urls) {
+          if (state.connectCancel) break outer;
+
+          if (state.avoidDuplicates && _isContacted(url)) {
+            skipped++;
+            _setChipState(url, "saved", "Already contacted");
+            continue;
+          }
+
+          const card = _cardForUrl(url);
+          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+
+          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+          if (cls === "unknown" || !card) { skipped++; continue; }
+
+          processed++;
+          _setChipState(url, "saving", "Connecting…");
+
+          let result;
+          if (cls === "follow") {
+            // Follow-only cards: try Connect via overflow first, fall back to Follow.
+            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
+            if (_overflowResult.ok) {
+              result = _overflowResult;
+            } else if (
+              _overflowResult.reason === "no_more_btn" ||
+              _overflowResult.reason === "no_connect_in_dropdown" ||
+              _overflowResult.reason === "dropdown_did_not_open"
+            ) {
+              result = await _sendFollowOnCard(card, presetBtn);
+            } else {
+              result = _overflowResult;
+            }
+          } else if (cls === "salesnav-connectable") {
+            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 400);
+            result = await _sendConnectViaSalesNavDropdown(card);
+          } else {
+            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 300);
+            result = await _sendConnectOnCard(card, presetBtn);
+          }
+
+          if (result.ok) {
+            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+            _markContacted(url);
+            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+          } else {
+            failed++;
+            _setChipState(url, "error", "Skipped");
+            if (_invitationModalOpen()) _closeAnyDialog();
+          }
+
+          flashStatus(`${summarise()} (${processed})`);
+          if (state.connectCancel) break outer;
+          await sleep(_connectGap());
+        }
+
+        if (!autoPage || state.connectCancel) break;
+        const nextBtn = _findNextPageButton();
+        if (!nextBtn) break;
+        const sig = _pageSignature();
+        try { nextBtn.scrollIntoView({ block: "center" }); } catch {}
+        await sleep(400 + Math.random() * 400);
+        await dispatchHumanClick(nextBtn);
+        let changed = false;
+        for (let i = 0; i < 40 && !state.connectCancel; i++) {
+          await sleep(300);
+          if (_pageSignature() !== sig) { changed = true; break; }
+        }
+        if (!changed || state.connectCancel) break;
+        await _scrollLoadPage();
+        try { decorateSearchCards(); } catch {}
+        await sleep(800 + Math.random() * 600);
+        pageNum++;
+        urls = _allChipUrls()
+          .filter((u) => u && (u.includes("/in/") || u.includes("/sales/lead/")))
+          .map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
+        if (!urls.length) break;
+      }
+    } finally {
+      state.connectActive = false;
+      state.connectCancel = false;
+      try { mountSelectAllHeader(); } catch {}
+      try { renderToolbar(); } catch {}
+    }
+    const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
+    flashStatus(`Connect All done: ${summarise()}${pageLabel} ✓`, "ok");
   }
 
   // ====================================================================
@@ -2564,7 +2754,9 @@
         ".jobs-search__job-details, .jobs-search__job-details--container, " +
         ".jobs-search__job-details--wrapper, .jobs-details, .job-view-layout, " +
         ".scaffold-layout__detail, [class*='jobs-search__job-details'], " +
-        "[class*='job-details']"
+        "[class*='job-details'], .jobs-details__main-content, " +
+        ".jobs-search__right-rail, .jobs-unified-top-card, " +
+        ".job-details-jobs-unified-top-card__container--two-pane"
       );
     } catch {
       return false;
@@ -2585,10 +2777,19 @@
   function _jobCardEls() {
     const seen = new Set();
     const boxes = [];
-    // No /jobs/ anchor requirement: modern LinkedIn cards navigate via the
-    // whole-card click / data-job-id and may not expose a job <a> inside, so
-    // requiring one rejected every card but the open one. We trust the
-    // strategy selectors instead and just dedupe + exclude the detail pane.
+    // Prefer the left list pane when LinkedIn renders a split view — this
+    // prevents chips from being injected into the detail pane on the right,
+    // which also contains data-job-id / data-occludable-job-id elements and
+    // would otherwise get multiple chips.
+    const listPane =
+      document.querySelector(
+        ".scaffold-layout__list, .jobs-search-results-list, " +
+        ".jobs-search__results-list, ul.jobs-search-results__list, " +
+        "[class*='scaffold-layout__list-container'], " +
+        "div[class*='jobs-search-results-grid']"
+      ) || null;
+    const scanRoot = listPane || document;
+
     const add = (box) => {
       if (box && !seen.has(box) && !_inDetailPane(box)) {
         seen.add(box);
@@ -2596,13 +2797,9 @@
       }
     };
 
-    // STRATEGY A — explicit job-id attributes + known card containers. This is
-    // the most reliable detector and works identically on the collections
-    // ("see all") page AND the search-box results page (origin=JOB_COLLECTION_PAGE),
-    // since both set data-occludable-job-id on the list <li>. Run it ALWAYS, not
-    // just as a fallback — the Dismiss-button climb below doesn't resolve the
-    // card unit on every layout, so id-based detection must always participate.
-    document
+    // STRATEGY A — explicit job-id attributes + known card containers. Scoped
+    // to the list pane when available so detail-pane elements are never picked up.
+    scanRoot
       .querySelectorAll(
         "li[data-occludable-job-id], li[data-job-id], div[data-job-id], " +
         "[data-occludable-job-id], " +
@@ -2615,7 +2812,8 @@
 
     // STRATEGY B — one card per Dismiss "X". Catches layouts where a card
     // exposes no job link or data-id. Climbs to the repeated card unit.
-    document.querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
+    // Also scoped to the list pane when present.
+    (listPane || document).querySelectorAll("button[aria-label*='Dismiss' i]").forEach((btn) => {
       if (_inDetailPane(btn)) return;
       add(_cardFromDismiss(btn));
     });
@@ -2809,49 +3007,138 @@
 
   // ---- Easy Apply modal driving ----
 
+  // Climb from a seed node to the TIGHTEST ancestor that holds the apply form's
+  // footer action button (Next/Submit/Review) — but never <main>/<body>, which
+  // also contain the search-page feedback widgets ("Are these results
+  // helpful?") that were poisoning the heading/progress reads and giving the
+  // stepper a wrong "next" button to click.
+  // Walk UP from seed to the tightest ancestor that is either:
+  //   (a) the modal/dialog wrapper itself, or
+  //   (b) an ancestor that contains a real apply footer button.
+  // Stops before <main>/<body>/<html>. The fallback ONLY returns a dialog
+  // wrapper or the immediate parent — never the content section itself,
+  // which would exclude the sibling footer and cause _modalActionButton to
+  // return null ("no Next button found").
+  function _applyFormRootFromSeed(seed) {
+    if (!seed) return null;
+    let node = seed;
+    for (let i = 0; i < 20 && node; i++) {
+      const tag = node.tagName;
+      if (tag === "MAIN" || tag === "BODY" || tag === "HTML") break;
+      // Stop immediately at a modal/dialog wrapper — it contains the full form
+      // including the footer, so _modalActionButton can find the Next button.
+      const cls = node.className || "";
+      if (
+        cls.includes("jobs-easy-apply-modal") ||
+        node.getAttribute?.("role") === "dialog" ||
+        node.getAttribute?.("role") === "alertdialog" ||
+        node.hasAttribute?.("data-test-modal")
+      ) return node;
+      // Does this ancestor contain a real apply footer button?
+      // Covers specific data-attrs, aria-labels, AND the LinkedIn action-bar /
+      // footer container (which always holds the Next/Submit button even when
+      // the button itself has no special attrs — just "Next" text).
+      const hasFooterBtn = node.querySelector(
+        "button[data-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-submit-button], " +
+        "button[aria-label*='Continue to next step' i], " +
+        "button[aria-label*='Submit application' i], " +
+        "button[aria-label*='Review your application' i], " +
+        ".jobs-easy-apply-modal__footer button, " +
+        ".artdeco-modal__actionbar button, " +
+        "[data-test-modal-footer] button, " +
+        "footer.artdeco-modal__footer button"
+      );
+      if (hasFooterBtn) return node;
+      node = node.parentElement;
+    }
+    // Fallback: prefer the dialog/modal wrapper — never return the content
+    // section itself (that excludes the sibling footer).
+    return (
+      seed.closest(
+        "div.jobs-easy-apply-modal, div[data-test-modal], " +
+        ".artdeco-modal[role='dialog'], [role='dialog']"
+      ) || seed.parentElement || seed
+    );
+  }
+
   function _easyApplyModal() {
     // 1. Dialog/modal overlay — the popup form on search-results and the
-    //    inline job-view modal.
+    //    inline job-view modal. Require an apply-specific signal inside so we
+    //    never return an unrelated dialog (e.g. a survey/feedback popover).
     const dialog =
       document.querySelector("div.jobs-easy-apply-modal") ||
       document.querySelector("div[data-test-modal][role='dialog']") ||
-      document.querySelector(".artdeco-modal[role='dialog']") ||
-      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog']")).find(
+      document.querySelector("div[data-test-modal].jobs-easy-apply-modal") ||
+      Array.from(document.querySelectorAll("div[role='dialog'], [role='alertdialog'], .artdeco-modal[role='dialog']")).find(
         (d) =>
           /easy apply|application|apply to/i.test(d.getAttribute("aria-label") || "") ||
-          /easy apply|application/i.test(d.getAttribute("aria-labelledby") ? (document.getElementById(d.getAttribute("aria-labelledby"))?.innerText || "") : "") ||
-          d.querySelector(".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form")
+          /\d+\s*\/\s*\d+\s*pages?/i.test(d.textContent || "") ||
+          d.querySelector(
+            ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
+            "button[data-easy-apply-next-button], button[data-live-test-easy-apply-submit-button]"
+          )
       );
     if (dialog) return dialog;
 
-    // 2. Full-page Easy Apply (URL = /jobs/view/<id>/apply/). The form is
-    //    rendered inline, NOT inside a [role='dialog'], so the checks above miss
-    //    it and the stepper has nothing to click. Anchor on the apply content
-    //    container's nearest layout ancestor so _modalActionButton can still
-    //    reach the Next/Submit footer (which is a sibling of the form).
+    // 2. ANCHOR ON THE "N/M pages" OR percentage PROGRESS LABEL. Climb to the
+    //    full modal container (never tight content-only section).
+    const pagesLabel = Array.from(
+      document.querySelectorAll("span, p, div, h2, h3, [class*='progress']")
+    ).find((n) => {
+      const t = (n.textContent || "").replace(/\s+/g, " ").trim();
+      return /^\d+\s*\/\s*\d+\s*pages?$/i.test(t) && _isVisible(n);
+    });
+    if (pagesLabel) {
+      const root = _applyFormRootFromSeed(pagesLabel);
+      if (root) return root;
+    }
+
+    // 3. Apply content container — climb to the MODAL WRAPPER (not the content
+    //    section itself) so the footer's Next/Submit button is included.
     const content = document.querySelector(
       ".jobs-easy-apply-content, .jobs-easy-apply-form, .jobs-apply-form, " +
       ".job-details-easy-apply-content, form.jobs-easy-apply-form-element"
     );
-    if (content) {
-      return content.closest("main, .scaffold-layout, .application-outlet") || content.parentElement || content;
+    if (content && _isVisible(content)) {
+      // Walk straight to the modal wrapper. _applyFormRootFromSeed checks for
+      // role=dialog / jobs-easy-apply-modal on the first iterations, so this
+      // is equivalent but makes the intent explicit.
+      const wrapper = content.closest(
+        "div.jobs-easy-apply-modal, div[data-test-modal], " +
+        ".artdeco-modal[role='dialog'], [role='dialog']"
+      );
+      if (wrapper) return wrapper;
+      return _applyFormRootFromSeed(content) || content.parentElement || content;
     }
-    // 3. Full-page Easy Apply where the form has no recognizable container
-    //    class: rely on the apply-progress REGION ("Your job application
-    //    progress is at N percent.") or an actual /jobs/view/<id>/apply/ URL.
-    //    Do NOT infer the form from a bare "Next"/"Submit" button — the job
-    //    SEARCH page has its own pagination "Next", and matching that made the
-    //    stepper walk start=25→50→100 instead of applying.
+
+    // 4. Apply-progress REGION ("Your job application progress is at N percent.")
     const progressRegion = document.querySelector(
       "[aria-label*='job application progress' i][role='region'], " +
       "[aria-label*='application progress' i]"
     );
     if (progressRegion) {
-      return progressRegion.closest("main, .scaffold-layout, .application-outlet, form") ||
-        progressRegion.parentElement || progressRegion;
+      return _applyFormRootFromSeed(progressRegion) || progressRegion;
     }
+
+    // 5. Last resort: a real /jobs/view/<id>/apply/ URL. Try footer button first;
+    //    then any form container with a primary action button visible on the page.
     if (/\/jobs\/view\/\d+\/apply\b/.test(location.pathname)) {
-      return document.querySelector("main") || document.body;
+      const footerBtn = document.querySelector(
+        "button[data-easy-apply-next-button], " +
+        "button[data-live-test-easy-apply-submit-button], " +
+        "button[aria-label*='Submit application' i]"
+      );
+      if (footerBtn) return _applyFormRootFromSeed(footerBtn);
+      // Broader: any visible primary action button that's NOT pagination/save
+      const anyPrimary = Array.from(
+        document.querySelectorAll("button.artdeco-button--primary")
+      ).find(
+        (b) => _isVisible(b) && !b.closest(".artdeco-pagination") &&
+          !/^(un)?save/i.test((b.innerText || "").trim())
+      );
+      if (anyPrimary) return _applyFormRootFromSeed(anyPrimary);
     }
     return null;
   }
@@ -2990,12 +3277,21 @@
     if (prog && prog.max) return Math.round((Number(prog.value) / Number(prog.max)) * 100);
     const bar = modal.querySelector("[role='progressbar'][aria-valuenow]");
     if (bar) return Number(bar.getAttribute("aria-valuenow"));
+    // Derive from the "N/M pages" label (e.g. "1/3 pages" → 33%).
+    const m = (modal.textContent || "").match(/\b(\d+)\s*\/\s*(\d+)\s*pages?/i);
+    if (m && Number(m[2])) return Math.round((Number(m[1]) / Number(m[2])) * 100);
     return null;
   }
 
   function _modalHeading(modal) {
     if (!modal) return "";
-    return (modal.querySelector("h2, h3")?.innerText || "").replace(/\s+/g, " ").trim();
+    // Prefer the form-section heading (e.g. "Contact info"), which is the most
+    // useful step name. The "h2, h3" grab used to read the wrong heading when
+    // the container was too broad; now the container is tight so this is safe.
+    const h =
+      modal.querySelector(".jobs-easy-apply-form-section__grouping h3, " +
+        ".jobs-easy-apply-content h3, h3, h2");
+    return (h?.innerText || "").replace(/\s+/g, " ").trim();
   }
 
   // Find the footer action button + its kind. Order matters: submit/review are
@@ -3019,7 +3315,18 @@
       !!x.closest(".artdeco-pagination, [class*='pagination']") ||
       /pagination/i.test(x.getAttribute("data-testid") || "") ||
       /view next page|view previous page|^page \d+$/i.test(x.getAttribute("aria-label") || "");
-    const ok = (b) => b && _isVisible(b) && !isPagination(b);
+    // The job detail pane's Save/Saved toggle must NEVER be clicked — when
+    // _easyApplyModal() falls back to a broad container (full-page layout
+    // resolves to <main>, which includes the detail pane), a bare "Save"
+    // text-match would unsave the job ("This job is no longer saved" toast).
+    const isJobSave = (x) => {
+      if (x.closest(".jobs-save-button, [class*='jobs-save'], [data-job-save]")) return true;
+      const aria = (x.getAttribute("aria-label") || "").trim();
+      if (/^(un)?save .+ at .+/i.test(aria)) return true; // "Save <title> at <company>"
+      const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim();
+      return /^saved?$/i.test(t); // bare Save/Saved — never a legit apply action
+    };
+    const ok = (b) => b && _isVisible(b) && !isPagination(b) && !isJobSave(b);
     const pick = (scope) => {
       if (!scope) return null;
       // Stable fast paths from LinkedIn's live DOM (data attrs + exact labels).
@@ -3035,11 +3342,13 @@
         scope.querySelector("button[aria-label*='Continue to next step' i]");
       if (ok(b)) return { type: "next", btn: b };
 
-      // Text-based fallback (excludes Back and pagination).
-      const btns = Array.from(scope.querySelectorAll("button")).filter((x) => _isVisible(x) && !isBack(x) && !isPagination(x));
+      // Text-based fallback (excludes Back, pagination, and the job Save toggle).
+      const btns = Array.from(scope.querySelectorAll("button")).filter(
+        (x) => _isVisible(x) && !isBack(x) && !isPagination(x) && !isJobSave(x)
+      );
       if ((b = btns.find((x) => match(x, /submit application|^submit$/i)))) return { type: "submit", btn: b };
       if ((b = btns.find((x) => match(x, /review your application|^review$/i)))) return { type: "review", btn: b };
-      if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step|^save$/i)))) return { type: "next", btn: b };
+      if ((b = btns.find((x) => match(x, /continue to next step|^next$|^continue$|^done$|next step/i)))) return { type: "next", btn: b };
       const primary = btns.find(
         (x) => x.classList.contains("artdeco-button--primary") || x.classList.contains("artdeco-button--3")
       );
@@ -3057,10 +3366,10 @@
     const result = pick(footer) || pick(modal);
     if (result) return result;
 
-    // Absolute last resort: any visible non-dismiss, non-back button.
+    // Absolute last resort: any visible non-dismiss, non-back, non-save button.
     const fallback = Array.from(modal.querySelectorAll("button")).filter(_isVisible).find((x) => {
       const t = (x.innerText || x.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x);
+      return !!t && !SKIP.has(t) && !isBack(x) && !isPagination(x) && !isJobSave(x);
     });
     return fallback ? { type: "next", btn: fallback } : null;
   }
@@ -3252,32 +3561,55 @@
     return found || boolish;
   }
 
-  // Option A: deterministic answers from the user's saved profile.
+  // Deterministic answers from the user's saved profile + universal safe defaults.
+  // Called for EVERY field on every step — profile values win; safe defaults apply
+  // to common required fields that appear even without a fully configured profile.
   function _matchProfileAnswer(label, profile, kind, options) {
     const l = (label || "").toLowerCase();
     if (!l) return null;
     const p = profile || {};
-    if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || null;
+
+    // ---- Profile-based answers ----
+    // Years/experience: always return something so required number fields don't stay empty.
+    if (/(years|yrs)[^a-z]{0,20}(experience|exp)|how many years|experience[^a-z]{0,10}(do you have|in)/i.test(l)) return p.years || "5";
     if (/phone|mobile|cell|contact number|whatsapp/i.test(l)) return p.phone || null;
     if (/e-?mail/i.test(l)) return p.email || null;
     if (/full name|your name/i.test(l)) return p.fullName || null;
     if (/first name/i.test(l)) return (p.fullName || "").split(" ")[0] || null;
     if (/last name|surname|family name/i.test(l)) return (p.fullName || "").split(" ").slice(1).join(" ") || null;
+    if (/linkedin|linkedin url|linkedin profile/i.test(l)) return p.linkedin || null;
+    if (/portfolio|website|personal url|github|behance/i.test(l)) return p.website || null;
     if (/expected[^a-z]{0,10}(salary|compensation|ctc|pay)|salary[^a-z]{0,10}expectation|desired[^a-z]{0,10}salary/i.test(l)) return p.expectedSalary || null;
     if (/current[^a-z]{0,10}(salary|compensation|ctc)/i.test(l)) return p.currentSalary || null;
-    if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || null;
+    if (/notice period|when can you (start|join)|availability|available to start|earliest start/i.test(l)) return p.notice || "30";
+    if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
+    if (/\bcountry\b/i.test(l)) return p.country || null;
+    if (/nationality|citizen(ship)?/i.test(l)) return p.nationality || null;
+    if (/highest.*degree|level.*education|qualification/i.test(l) && options) return p.education || null;
+    if (/gender|pronouns/i.test(l) && options) return p.gender || null;
+    if (/race|ethnicity|veteran|disability/i.test(l) && options) return p.diversity || null;
+
+    // ---- Safe universal defaults for required compliance questions ----
     if (/relocat/i.test(l)) return _yesNoOption(p.relocate || "Yes", options);
     if (/sponsor|require[^a-z]{0,10}visa|visa sponsor/i.test(l)) return _yesNoOption(p.sponsorship || "No", options);
     if (/authoriz|authoris|right to work|legally[^a-z]{0,15}work|eligible to work|work permit/i.test(l)) return _yesNoOption(p.workAuth || "Yes", options);
-    if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
-    if (/\bcountry\b/i.test(l)) return p.country || null;
-    // Generic Yes/No leaning positive when only Yes/No options exist
+    if (/willing to travel|travel[^a-z]{0,10}required|travel[^a-z]{0,10}(percent|%)/i.test(l)) return _yesNoOption(p.travel || "Yes", options);
+    if (/background check|drug test|criminal/i.test(l)) return _yesNoOption("Yes", options);
+    if (/hybrid|on-?site|remote|in.?person|office/i.test(l) && options) return p.workMode || null;
+    if (/how did you (hear|find|learn)|referral|source/i.test(l) && options) return p.referralSource || null;
+
+    // ---- Generic Yes/No — lean Yes for ability/willingness questions ----
     if (options && options.length && options.length <= 3) {
       const lo = options.map((o) => o.toLowerCase().trim());
-      if (lo.includes("yes") && lo.includes("no") && /(do you|are you|have you|can you|will you|willing|comfortable|able to)/i.test(l)) {
+      if (lo.includes("yes") && lo.includes("no") &&
+          /(do you|are you|have you|can you|will you|willing|comfortable|able to|agree|confirm)/i.test(l)) {
         return _yesNoOption("Yes", options);
       }
     }
+
+    // ---- Any remaining number field — default to "5" (years/experience style) ----
+    if (kind === "number") return p.years || "5";
+
     return null;
   }
 
@@ -3328,6 +3660,7 @@
   async function _answerModalQuestions(modal) {
     if (!modal) return;
     const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick } = globalThis.__lcDom;
     const { profile, aiEnabled } = await _getAutoApplyConfig();
     const askGemini = async (question, kind, options) => {
       if (!aiEnabled || !question) return null;
@@ -3388,8 +3721,15 @@
         if (radio) {
           let lbl = null;
           if (radio.id) { try { lbl = document.querySelector(`label[for="${CSS.escape(radio.id)}"]`); } catch {} }
-          try { (lbl || radio).click(); }
-          catch { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+          // LinkedIn artdeco radios are visually-hidden — click the visible label wrapper,
+          // then fall back to the artdeco-looking span, then force change on the input.
+          const artdecoSpan = lbl?.querySelector(".artdeco-radio-button") || null;
+          const clickTarget = artdecoSpan || lbl || radio;
+          try { await dispatchHumanClick(clickTarget); }
+          catch {
+            try { clickTarget.click(); }
+            catch { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+          }
           await sleep(150 + Math.random() * 250);
         }
       }
@@ -3452,13 +3792,17 @@
   }
 
   // Step through the open Easy Apply modal. Returns {ok, reason}.
+  // Design rules:
+  //   - Poll for advancement (every 300ms, up to 4s) instead of fixed sleep + single check.
+  //   - Compare .innerText (visible text) to detect step changes — more reliable than
+  //     innerHTML slices which can mismatch when the container reference changes.
+  //   - Always re-resolve the modal + action button fresh before each click attempt.
+  //   - Scroll the modal content before clicking so required fields are visible.
   async function _runEasyApplyModal() {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick } = globalThis.__lcDom;
 
-    // Poll for the apply form to appear — modal OR full-page /apply/ — up to 12s.
-    // _easyApplyModal understands both layouts, so this catches the form the
-    // instant it renders no matter how LinkedIn opened it.
+    // ---- Wait for modal to appear (up to 12 s) ----
     let modal = null;
     const _waitStart = Date.now();
     while (Date.now() - _waitStart < 12000) {
@@ -3469,126 +3813,248 @@
       await sleep(300);
     }
     if (!modal) {
-      console.log(`[LeadCaptura] easy-apply: form not found after click (url=${location.pathname}) — skipping job`);
+      console.log(`[LeadCaptura] easy-apply: form not found (url=${location.pathname})`);
       return { ok: false, reason: "modal_not_found" };
     }
-    console.log(`[LeadCaptura] easy-apply: form detected (${modal.getAttribute?.("role") || modal.tagName})`);
-    // Extra settle time — LinkedIn animates the form in.
-    await sleep(600 + Math.random() * 400);
 
-    const MAX_STEPS = 20;
+    // Widen container if it's too narrow (content-only, no footer).
+    if (!_modalActionButton(modal)) {
+      let p = modal.parentElement;
+      for (let i = 0; i < 5 && p && p.tagName !== "MAIN" && p.tagName !== "BODY"; i++, p = p.parentElement) {
+        if (_modalActionButton(p)) { modal = p; break; }
+      }
+    }
+    console.log(`[LeadCaptura] easy-apply: modal ready — "${(modal.className||modal.tagName).slice(0,60)}"`);
+    await sleep(700 + Math.random() * 300);
+
+    // ---- Snapshot helpers (innerText-based, not innerHTML) ----
+    // innerText compares what the USER SEES — completely different per step regardless
+    // of whether LinkedIn renames its internal CSS classes.
+    const _modalText = (m) => {
+      if (!m) return "";
+      // Prefer the scrollable content area (more focused); fall back to full modal.
+      const content = m.querySelector(
+        ".jobs-easy-apply-content, .jobs-easy-apply-form, " +
+        "[class*='easy-apply-content'], [class*='easy-apply-form'], " +
+        ".artdeco-modal__content, .artdeco-modal-overlay__content"
+      );
+      return ((content || m).innerText || "").trim();
+    };
+
+    // Poll until the modal's visible text changes from `before` or until `timeoutMs`.
+    // Returns the fresh modal element when advanced (or null if truly closed).
+    // LinkedIn animates step transitions — modal can briefly disappear mid-advance;
+    // wait up to 2 s for it to re-render before treating absence as "closed".
+    const _waitAdvanced = async (before, timeoutMs = 4000) => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        await sleep(300);
+        const m = _easyApplyModal();
+        if (!m || !document.body.contains(m)) {
+          // Modal briefly gone — LinkedIn may be animating; give it 2 s to reappear.
+          let reappeared = null;
+          for (let t = 0; t < 7; t++) {
+            await sleep(300);
+            reappeared = _easyApplyModal();
+            if (reappeared && document.body.contains(reappeared)) break;
+            reappeared = null;
+          }
+          if (!reappeared) return null; // truly closed
+          const cur2 = _modalText(reappeared);
+          if (cur2 !== before) return reappeared; // stepped forward
+          // Same text as before — keep polling
+          continue;
+        }
+        const cur = _modalText(m);
+        if (cur !== before) return m; // text changed = stepped forward
+      }
+      return _easyApplyModal(); // timed out, return whatever is there
+    };
+
+    const MAX_STEPS = 25;
     let consecutiveStuck = 0;
+
     for (let step = 0; step < MAX_STEPS; step++) {
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
       if (_challengeOnPage()) return { ok: false, reason: "captcha_or_checkpoint" };
-      modal = _easyApplyModal() || modal;
-      if (!modal) return { ok: false, reason: "modal_closed" };
 
-      // Keep a resume selected + don't auto-follow companies.
+      // Always refresh modal reference — LinkedIn can re-render between steps.
+      // If the modal is temporarily absent (step transition animation), wait up to
+      // 3 s for it to reappear before concluding the form has closed.
+      let freshModal = _easyApplyModal();
+      if (!freshModal || !document.body.contains(freshModal)) {
+        for (let t = 0; t < 10; t++) {
+          await sleep(300);
+          freshModal = _easyApplyModal();
+          if (freshModal && document.body.contains(freshModal)) break;
+          freshModal = null;
+        }
+      }
+      if (freshModal && document.body.contains(freshModal)) modal = freshModal;
+      if (!modal || !document.body.contains(modal)) return { ok: false, reason: "modal_closed" };
+
+      // --- Auto-fill this step's fields ---
       _ensureResumeSelected(modal);
       _uncheckFollow(modal);
-      // Auto-fill this step's questions.
-      try { await _answerModalQuestions(modal); }
-      catch (e) { console.warn("[LeadCaptura] question auto-fill failed", e?.message); }
-      await sleep(500 + Math.random() * 500);
+      try { await _answerModalQuestions(modal); } catch (e) {
+        console.warn("[LeadCaptura] auto-fill error", e?.message);
+      }
+      // Scroll the modal content down so all fields (and the footer button) are rendered.
+      try {
+        const scrollable = modal.querySelector(
+          ".artdeco-modal__content, .jobs-easy-apply-content, .artdeco-modal-overlay__content"
+        ) || modal;
+        scrollable.scrollTop = scrollable.scrollHeight;
+      } catch {}
+      await sleep(400 + Math.random() * 300);
 
+      // --- Find the action button ---
       const action = _modalActionButton(modal);
-      const _pageName = _modalHeading(modal) || `step ${step + 1}`;
-      console.log(`[LeadCaptura] easy-apply step ${step + 1}: page="${_modalHeading(modal) || "?"}" progress=${_modalProgress(modal)}% action=${action ? action.type : "NONE"}`);
-      try { _lcToast(`Auto Apply — ${_pageName}${action ? " → " + action.type : ""}`); } catch {}
+      const heading = _modalHeading(modal) || `step ${step + 1}`;
+      const progress = _modalProgress(modal);
+      const totalHint = _pageTotalHint() || "?";
+
+      console.log(`[LeadCaptura] easy-apply step ${step + 1}: "${heading}" ${progress != null ? progress + "%" : "(no progress bar)"} → ${action ? action.type.toUpperCase() : "NO ACTION"}`);
+      try { _lcToast(`Step ${step + 1}/${totalHint} — ${heading}${action ? " → " + action.type : ""}`); } catch {}
+
       if (!action) {
-        console.log("[LeadCaptura] easy-apply: no Next/Submit button found on this page — discarding");
-        await _dismissEasyApplyModal();
-        return { ok: false, reason: "no_action_button" };
-      }
-
-      // Snapshot helper — used to tell whether a click actually moved the modal.
-      const snap = (m) => ({
-        progress: _modalProgress(m),
-        heading: _modalHeading(m),
-        html: m?.querySelector("form, .jobs-easy-apply-form-section, [class*='content']")?.innerHTML?.slice(0, 300) || "",
-      });
-
-      // Stop pressed? Bail before firing any further click (never submit/advance
-      // after the user hit Stop).
-      if (state.applyCancel) return { ok: false, reason: "cancelled" };
-
-      if (action.type === "submit") {
-        // Human-paced click first — this is what v1.0.47 used and what LinkedIn's
-        // handlers reliably honour. Escalate to _forceClick only if it didn't land.
-        await dispatchHumanClick(action.btn);
-        await sleep(1800 + Math.random() * 1200);
-        let after = _easyApplyModal();
-        if (after && _modalActionButton(after)?.type === "submit") {
-          _forceClick(action.btn);
-          await sleep(1800 + Math.random() * 1200);
-          after = _easyApplyModal();
+        // Diagnose: log every button in the modal to help trace what's there.
+        const btnLabels = Array.from(modal.querySelectorAll("button"))
+          .map((b) => `"${(b.innerText || b.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30)}"`)
+          .join(", ");
+        console.log(`[LeadCaptura] easy-apply: NO action button found. Buttons in modal: [${btnLabels}]`);
+        // Scroll down — the footer might be hidden below the fold.
+        try {
+          const scrollable = modal.querySelector(".artdeco-modal__content, .jobs-easy-apply-content") || modal;
+          scrollable.scrollTop = scrollable.scrollHeight;
+          modal.scrollTop = modal.scrollHeight;
+        } catch {}
+        await sleep(600);
+        // One retry after scrolling.
+        const retried = _modalActionButton(_easyApplyModal() || modal);
+        if (!retried) {
+          await _dismissEasyApplyModal();
+          return { ok: false, reason: "no_action_button" };
         }
-        if (!after) return { ok: true }; // modal closed = submitted
-        const txt = (after.innerText || after.textContent || "").toLowerCase();
-        const isSuccess =
-          /application was sent|you.ve applied|application submitted|successfully applied|your application/i.test(txt) ||
-          !!after.querySelector(
-            ".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], " +
-            "[class*='success-banner'], progress[value='100']"
-          );
-        await _dismissEasyApplyModal();
-        return isSuccess ? { ok: true } : { ok: false, reason: "submit_failed" };
+        continue; // re-enter the loop with the now-visible button
       }
 
-      // Advance (next / review). Snapshot first so we can detect movement.
-      const before = snap(modal);
-      // Reading pause before clicking — interruptible by Stop.
-      await _cancellableSleep(600 + Math.random() * 700);
       if (state.applyCancel) return { ok: false, reason: "cancelled" };
 
-      // Did the modal move past `before`?
-      const progressed = (m) => {
-        if (!m) return true; // modal gone = advanced/closed
-        const act = _modalActionButton(m);
-        const movedToSubmit = act && (act.type === "submit" || act.type === "review") && action.type === "next";
-        const cur = snap(m);
-        return (
-          movedToSubmit ||
-          (before.progress != null && cur.progress != null && cur.progress > before.progress) ||
-          (before.heading && cur.heading && cur.heading !== before.heading) ||
-          (cur.html !== before.html)
-        );
-      };
-
-      // Primary: human-paced click (v1.0.47 behavior).
-      await dispatchHumanClick(action.btn);
-      await sleep(1300 + Math.random() * 900);
-      let after = _easyApplyModal();
-      if (!after) return { ok: false, reason: "modal_vanished" };
-
-      // Fallback: if it didn't move, escalate to the 5-strategy force click.
-      if (!progressed(after)) {
-        _forceClick(action.btn);
-        await sleep(1300 + Math.random() * 900);
-        after = _easyApplyModal();
-        if (!after) return { ok: false, reason: "modal_vanished" };
+      // ---- SUBMIT step ----
+      if (action.type === "submit") {
+        _showApplyBanner("📤 Submitting application…", `"${heading}"`);
+        await sleep(400 + Math.random() * 300);
+        await dispatchHumanClick(action.btn);
+        // Poll up to 4s for modal to close or show success confirmation.
+        let confirmed = false;
+        for (let t = 0; t < 14; t++) {
+          await sleep(300);
+          const m = _easyApplyModal();
+          if (!m) { confirmed = true; break; }
+          const txt = (m.innerText || "").toLowerCase();
+          if (/application was sent|you.ve applied|submitted|successfully applied/i.test(txt) ||
+              m.querySelector(".jobs-easy-apply-modal--confirmation, [class*='application-confirmation'], progress[value='100']")) {
+            confirmed = true; break;
+          }
+          // Modal still on submit step — escalate with _forceClick once.
+          if (t === 5 && _modalActionButton(m)?.type === "submit") {
+            _forceClick(action.btn);
+          }
+        }
+        _hideApplyBanner();
+        if (confirmed) { await _dismissEasyApplyModal(); return { ok: true }; }
+        // Check once more — modal may have closed.
+        if (!_easyApplyModal()) return { ok: true };
+        await _dismissEasyApplyModal();
+        return { ok: false, reason: "submit_failed" };
       }
 
-      const errorShown = !!after.querySelector(
-        ".artdeco-inline-feedback--error, [role='alert'], .fb-form-element__error-text, " +
-        ".jobs-easy-apply-form-element__error, [class*='error-text']"
+      // ---- NEXT / REVIEW step ----
+      const beforeText = _modalText(modal);
+      const beforeProgress = _modalProgress(modal);
+
+      await _cancellableSleep(500 + Math.random() * 400);
+      if (state.applyCancel) return { ok: false, reason: "cancelled" };
+
+      _showApplyBanner(
+        `⏩ Step ${step + 1}/${totalHint} — ${heading}`,
+        `clicking '${action.type === "review" ? "Review" : "Next"}'`
       );
 
-      if (!progressed(after)) {
-        // Still on the same page after both click attempts. If LinkedIn is
-        // showing a validation error, or we've been stuck several times, this
-        // job needs input we can't safely provide — discard and move on.
+      // Strategy 1: human pointer click (fires pointer events LinkedIn SPA listens for).
+      const freshBtn1 = _modalActionButton(_easyApplyModal() || modal);
+      if (freshBtn1) await dispatchHumanClick(freshBtn1.btn);
+
+      // Poll up to 4s for the form to advance.
+      // _waitAdvanced returns null (modal closed → advanced), the new modal element
+      // (text changed → advanced), or the timed-out modal (no change detected).
+      let afterModal = await _waitAdvanced(beforeText, 4000);
+      // advanced = true if modal closed OR visible text changed from before.
+      let advanced = !afterModal || _modalText(afterModal) !== beforeText;
+
+      if (!advanced) {
+        console.log(`[LeadCaptura] step ${step + 1}: human click didn't advance — trying _forceClick`);
+        // Strategy 2: _forceClick (native .click() + pointer sequence + React fiber).
+        const freshBtn2 = _modalActionButton(_easyApplyModal() || modal);
+        if (freshBtn2) _forceClick(freshBtn2.btn);
+        afterModal = await _waitAdvanced(beforeText, 3000);
+        advanced = !afterModal || _modalText(afterModal) !== beforeText;
+
+        if (!advanced) {
+          // Strategy 3: focus + Enter key.
+          console.log(`[LeadCaptura] step ${step + 1}: _forceClick didn't advance — trying Enter key`);
+          const freshBtn3 = _modalActionButton(_easyApplyModal() || modal);
+          if (freshBtn3) {
+            try { freshBtn3.btn.focus(); } catch {}
+            const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+            freshBtn3.btn.dispatchEvent(new KeyboardEvent("keydown", k));
+            freshBtn3.btn.dispatchEvent(new KeyboardEvent("keyup", k));
+          }
+          afterModal = await _waitAdvanced(beforeText, 2500);
+          advanced = !afterModal || _modalText(afterModal) !== beforeText;
+        }
+      }
+
+      _hideApplyBanner();
+
+      if (!advanced) {
+        // All 3 strategies failed. Check for validation errors in the live modal.
+        const liveModal = afterModal || _easyApplyModal() || modal;
+        const errorEl = liveModal?.querySelector(
+          ".artdeco-inline-feedback--error, [role='alert']:not([aria-hidden='true']), " +
+          ".fb-form-element__error-text, .jobs-easy-apply-form-element__error, [class*='error-text']"
+        );
         consecutiveStuck++;
-        if (errorShown || consecutiveStuck >= 3) {
+        const reason = errorEl
+          ? `validation error: "${(errorEl.innerText || "").trim().slice(0, 80)}"`
+          : `stuck (${consecutiveStuck}/3)`;
+        console.log(`[LeadCaptura] step ${step + 1}: not advancing — ${reason}`);
+        if (errorEl || consecutiveStuck >= 3) {
           await _dismissEasyApplyModal();
           return { ok: false, reason: "needs_manual_input" };
         }
-        await sleep(1000);
+        await sleep(800);
         continue;
       }
+
       consecutiveStuck = 0;
+      // Settle after LinkedIn animates the step transition.
+      await sleep(500 + Math.random() * 300);
+      // Update modal reference to the freshly rendered step.
+      // Poll up to 2 s for the next step's modal to fully appear.
+      let nextModal = afterModal && document.body.contains(afterModal) ? afterModal : _easyApplyModal();
+      if (!nextModal) {
+        for (let t = 0; t < 7; t++) {
+          await sleep(300);
+          nextModal = _easyApplyModal();
+          if (nextModal && document.body.contains(nextModal)) break;
+          nextModal = null;
+        }
+      }
+      if (nextModal && document.body.contains(nextModal)) modal = nextModal;
     }
+
     await _dismissEasyApplyModal();
     return { ok: false, reason: "too_many_steps" };
   }
@@ -3949,10 +4415,14 @@
       }
     } finally {
       state.applyActive = false;
+      state.applyCancel = false;
       state.applyProgress = null;
       if (!singleJob) state.selectedJobUrls.clear();
       // Run finished — show the per-card chips again.
       try { document.documentElement.classList.remove("lc-applying"); } catch {}
+      // Ensure no stale Apply banner is left on screen.
+      try { _hideApplyBanner(); } catch {}
+      try { _removeSpotlight(); } catch {}
       mountSelectAllHeader();
       renderToolbar();
       try { decorateJobCards(); } catch {}
@@ -4582,21 +5052,51 @@
     const handled = new Set(); // canonical urls chipped this pass
 
     const cardFromButton = (btn) => {
+      // Climb up and return the SMALLEST ancestor that contains a profile link.
+      // On standard search pages this is the row (<li>) since rows have a link
+      // and direct children of the row don't. On the My Network connections
+      // page the inline-action-row sits next to the link inside the row, so we
+      // also want a single ancestor that owns exactly one /in/ link. If we
+      // stopped at the first ancestor with ANY /in/ link, we'd hit a giant
+      // wrapper that contains all 50 rows on My Network — every Message button
+      // would map to the FIRST profile's URL and only the first chip injects.
       let node = btn.parentElement;
+      let firstHit = null;
       for (
         let i = 0;
         i < 16 && node && node.tagName !== "BODY" && node.tagName !== "HTML";
         i++
       ) {
-        // The FIRST ancestor (climbing from a single button) that contains a
-        // profile link IS that button's own row — every result row has exactly
-        // one profile link of its own. Return it directly; no button-count
-        // guard needed (and the guard wrongly rejected rows once a row exposed
-        // a Message icon alongside Connect).
-        if (node.querySelector(linkSel)) return node;
+        if (node.querySelector(linkSel)) {
+          if (!firstHit) firstHit = node;
+          // Count distinct owner URLs in this ancestor. If more than one, we've
+          // climbed past the row boundary — return the previous (smaller) hit.
+          const owners = new Set();
+          for (const l of node.querySelectorAll(linkSel)) {
+            if (_isInsightLink(l) || _isMutualConnectionContext(l)) continue;
+            const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
+            if (u) owners.add(u);
+            if (owners.size > 1) break;
+          }
+          if (owners.size > 1) {
+            return firstHit; // smaller (deeper) ancestor was correct
+          }
+          // Prefer semantic row containers (li/tr/article/role=listitem|row)
+          // — these are the canonical card boundaries. Returning here keeps
+          // us from over-climbing when the row's parent also owns one link.
+          if (
+            node.tagName === "LI" ||
+            node.tagName === "ARTICLE" ||
+            node.tagName === "TR" ||
+            node.getAttribute?.("role") === "row" ||
+            node.getAttribute?.("role") === "listitem"
+          ) {
+            return node;
+          }
+        }
         node = node.parentElement;
       }
-      return null;
+      return firstHit;
     };
 
     const tryInject = (card, anchorBtn) => {
@@ -4994,6 +5494,227 @@
     _removeSendBtnHighlight();
   }
 
+  // Lightweight generic-button spotlight: a transparent cutout + banner + arrow
+  // anchored on an arbitrary element for `durationMs` ms, then auto-cleared.
+  // Used by Message All to announce "I'm about to click this button" right
+  // before the actual click. Pure visual — pointer-events:none on overlays so
+  // clicks fall through to the real button.
+  // LinkedIn ONLY — Sales Navigator paths never call this.
+  // Self-contained popup overlay anchored to a button. All inline styles with
+  // !important so it renders regardless of the page's stylesheet:
+  //   - Glowing ring around the target button
+  // Top-of-viewport status banner used by Auto Apply for each Next/Submit
+  // step. Appended to <html> (not <body>) so it sits in the root stacking
+  // context — visible above LinkedIn's Easy Apply modal regardless of any
+  // page CSS. Every style is inline + !important. pointer-events:none so
+  // it never blocks the click below it.
+  let _applyBannerEl = null;
+  function _showApplyBanner(title, subtitle) {
+    _hideApplyBanner();
+    try {
+      const Z = "2147483647";
+      const setImp = (el, k, v) => el.style.setProperty(k, v, "important");
+      const bar = document.createElement("div");
+      bar.id = "lc-apply-banner";
+      setImp(bar, "position", "fixed");
+      setImp(bar, "top", "20px");
+      setImp(bar, "left", "50%");
+      setImp(bar, "transform", "translateX(-50%)");
+      setImp(bar, "z-index", Z);
+      setImp(bar, "pointer-events", "none");
+      setImp(bar, "background", "linear-gradient(135deg,#0a66c2,#004182)");
+      setImp(bar, "color", "#fff");
+      setImp(bar, "padding", "14px 26px");
+      setImp(bar, "border-radius", "14px");
+      setImp(bar, "box-shadow", "0 14px 44px rgba(0,0,0,0.55), 0 0 0 2px rgba(255,255,255,0.18) inset");
+      setImp(bar, "font-family", "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif");
+      setImp(bar, "font-weight", "700");
+      setImp(bar, "text-align", "center");
+      setImp(bar, "min-width", "320px");
+      setImp(bar, "max-width", "560px");
+      setImp(bar, "white-space", "nowrap");
+      bar.innerHTML =
+        `<div style="font-size:17px;font-weight:800;margin-bottom:4px;">${title}</div>` +
+        `<div style="font-size:13px;font-weight:500;opacity:0.92;">${subtitle}</div>`;
+      // Root of the stacking context — bypasses any modal's transform/filter
+      // stacking ancestor that would otherwise clip a body-level overlay.
+      document.documentElement.appendChild(bar);
+      _applyBannerEl = bar;
+      try { _playSpotlightBeep(); } catch {}
+    } catch (e) {
+      console.warn("[LeadCaptura] _showApplyBanner error", e);
+    }
+  }
+  function _hideApplyBanner() {
+    try { if (_applyBannerEl) _applyBannerEl.remove(); } catch {}
+    _applyBannerEl = null;
+  }
+  // Best-effort total page count for the Easy Apply wizard. Reads the
+  // "1/4 pages" text near the progress bar; falls back to null.
+  function _pageTotalHint() {
+    const modal = _easyApplyModal();
+    if (!modal) return null;
+    const txt = (modal.textContent || "").match(/\b(\d+)\s*\/\s*(\d+)\s*pages?/i);
+    if (txt && txt[2]) return parseInt(txt[2], 10);
+    return null;
+  }
+
+  //   - Floating popup card (title + subtitle) above the button
+  //   - Bouncing arrow between popup and button
+  //   - Audio beep
+  // pointer-events:none on overlays so real clicks still land on the button.
+  function _showButtonSpotlight(targetEl, title, subtitle, durationMs = 1100) {
+    if (!targetEl) return;
+    _removeSpotlight();
+    const Z = "2147483647";
+    const cssAll = (obj) =>
+      Object.entries(obj).map(([k, v]) => `${k}:${v} !important`).join(";");
+    try {
+      // 1. Glowing ring around the target button.
+      const ring = document.createElement("div");
+      ring.id = "lc-send-spotlight";
+      ring.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        "box-shadow":
+          "0 0 0 4px rgba(10,102,194,0.95), 0 0 24px 8px rgba(10,102,194,0.6), 0 0 0 9999px rgba(0,0,0,0.55)",
+        "border-radius": "10px",
+        transition: "all 0.18s ease-out",
+      });
+      document.body.appendChild(ring);
+      _spotlightEl = ring;
+
+      // 2. Popup card with title + subtitle. Anchored above target.
+      const popup = document.createElement("div");
+      popup.id = "lc-send-banner";
+      popup.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        background: "linear-gradient(135deg,#0a66c2,#004182)",
+        color: "#fff",
+        padding: "14px 22px",
+        "border-radius": "14px",
+        "box-shadow": "0 12px 36px rgba(0,0,0,0.55), 0 0 0 2px rgba(255,255,255,0.15) inset",
+        "font-family": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+        "font-weight": "700",
+        "text-align": "center",
+        "min-width": "240px",
+        "max-width": "440px",
+        "white-space": "nowrap",
+      });
+      popup.innerHTML =
+        `<div style="font-size:16px;font-weight:800;margin-bottom:4px;">${title}</div>` +
+        `<div style="font-size:12px;font-weight:500;opacity:0.92;">${subtitle}</div>`;
+      document.body.appendChild(popup);
+      _bannerEl = popup;
+
+      // 3. Bouncing arrow pointing down at the target.
+      const arrow = document.createElement("div");
+      arrow.id = "lc-send-btn-arrow";
+      arrow.style.cssText = cssAll({
+        position: "fixed",
+        "pointer-events": "none",
+        "z-index": Z,
+        "font-size": "32px",
+        "line-height": "1",
+        filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.6))",
+        animation: "lc-bounce 0.7s ease-in-out infinite alternate",
+      });
+      arrow.textContent = "👇";
+      document.body.appendChild(arrow);
+      _arrowEl = arrow;
+
+      // Ensure the bounce keyframe exists (idempotent).
+      if (!document.getElementById("lc-bounce-style")) {
+        const st = document.createElement("style");
+        st.id = "lc-bounce-style";
+        st.textContent =
+          "@keyframes lc-bounce { from { transform: translateY(0); } to { transform: translateY(8px); } }";
+        document.head.appendChild(st);
+      }
+
+      _playSpotlightBeep();
+
+      // Position helper — applies ring/popup/arrow coordinates from a DOMRect.
+      // Uses setProperty(name, value, "important") so LinkedIn's global CSS
+      // can never override the inline positioning.
+      const setImp = (el, k, v) => el.style.setProperty(k, v, "important");
+      const positionFromRect = (r) => {
+        const pad = 6;
+        setImp(ring, "left", `${Math.max(0, r.left - pad)}px`);
+        setImp(ring, "top", `${Math.max(0, r.top - pad)}px`);
+        setImp(ring, "width", `${r.width + pad * 2}px`);
+        setImp(ring, "height", `${r.height + pad * 2}px`);
+
+        const pw = popup.offsetWidth || 260;
+        const ph = popup.offsetHeight || 60;
+        const aw = arrow.offsetWidth || 32;
+        const ah = arrow.offsetHeight || 32;
+        let popupTop = r.top - ph - ah - 18;
+        let arrowTop = r.top - ah - 6;
+        let arrowEmoji = "👇";
+        if (popupTop < 12) {
+          popupTop = r.bottom + ah + 18;
+          arrowTop = r.bottom + 4;
+          arrowEmoji = "☝";
+        }
+        if (arrow.textContent !== arrowEmoji) arrow.textContent = arrowEmoji;
+        const popupLeft = Math.max(8, Math.min(window.innerWidth - pw - 8,
+          r.left + r.width / 2 - pw / 2));
+        const arrowLeft = Math.max(4, Math.min(window.innerWidth - aw - 4,
+          r.left + r.width / 2 - aw / 2));
+        setImp(popup, "left", `${popupLeft}px`);
+        setImp(popup, "top", `${popupTop}px`);
+        setImp(arrow, "left", `${arrowLeft}px`);
+        setImp(arrow, "top", `${arrowTop}px`);
+      };
+
+      // Position IMMEDIATELY from current rect — this guarantees the spotlight
+      // is visible right away even if the target detaches in the next frame
+      // (which happens on Sales Nav when our DOM insert closes the dropdown).
+      const initialRect = targetEl.getBoundingClientRect();
+      if (initialRect.width >= 1 && initialRect.height >= 1) {
+        positionFromRect(initialRect);
+      } else {
+        // Centre the popup as a fallback so the user still sees feedback.
+        ring.style.cssText = ring.style.cssText.replace(/box-shadow:[^;]+;/, "");
+        ring.style.display = "none";
+        popup.style.left = `${Math.max(8, (window.innerWidth - 260) / 2)}px`;
+        popup.style.top = "80px";
+      }
+
+      // Tick: re-position while target is still alive (handles scrolling).
+      // Once target detaches, STOP repositioning but DO NOT tear the spotlight
+      // down — it stays frozen at the last-known rect until the duration timeout
+      // fires. Sales Nav routinely closes the dropdown the moment we click
+      // Connect, which would otherwise nuke the spotlight before the user sees it.
+      let frozen = false;
+      const tick = () => {
+        if (!_spotlightEl || !document.body.contains(_spotlightEl)) return;
+        if (!frozen) {
+          if (!targetEl.isConnected) {
+            frozen = true;
+          } else {
+            const r = targetEl.getBoundingClientRect();
+            if (r.width >= 1 && r.height >= 1) positionFromRect(r);
+          }
+        }
+        _spotlightRAF = requestAnimationFrame(tick);
+      };
+      _spotlightRAF = requestAnimationFrame(tick);
+
+      // Auto-remove on timeout — this is now the SOLE removal trigger
+      // (besides explicit _removeSpotlight calls from the caller).
+      if (durationMs > 0) {
+        setTimeout(() => { try { _removeSpotlight(); } catch {} }, durationMs);
+      }
+    } catch (e) {
+      console.warn("[LeadCaptura] _showButtonSpotlight error", e);
+    }
+  }
+
   // ─── Navigation-driven Connect All engine (v1.0.155) ──────────────────────
   // Flow per user spec:
   //   STEP 1: navigate to the next /in/<handle>/ profile by URL.
@@ -5046,18 +5767,33 @@
 
   // Find the Connect button on the profile top card (primary CTA scenario).
   function _findProfilePageConnectBtn() {
+    // LinkedIn renders Connect as <button>, [role='button'], or
+    // <a href='/preload/custom-invite/…'>. Scan all three.
     const cands = Array.from(document.querySelectorAll(
-      "main button, main [role='button'], .scaffold-layout__main button"
+      "main button, main [role='button'], main a, " +
+      ".scaffold-layout__main button, .scaffold-layout__main a, " +
+      ".pvs-profile-actions button, .pvs-profile-actions a, " +
+      "[class*='profile-actions'] button, [class*='profile-actions'] a, " +
+      ".pv-top-card button, .pv-top-card a"
     ));
+    const seen = new Set();
     for (const b of cands) {
+      if (seen.has(b)) continue; seen.add(b);
       if (b.classList?.contains("lc-inline-save")) continue;
+      if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-save-row")) continue;
+      if (b.closest?.("[role='menu'], .artdeco-dropdown__content")) continue;
       if (!_isVisible(b) || b.disabled) continue;
-      const aria = (b.getAttribute("aria-label") || "").trim();
-      const txt = (b.textContent || "").replace(/\s+/g, " ").trim();
-      // Exact "Connect" text/aria, or "Invite X to connect" pattern.
-      if (/^connect$/i.test(txt)) return b;
-      if (/^connect$/i.test(aria)) return b;
-      if (/^invite\b.*\bto\s+connect/i.test(aria)) return b;
+      const aria = (b.getAttribute("aria-label") || "").trim().toLowerCase();
+      const txt = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const hay = txt + " " + aria;
+      // Must mention "connect" as a whole word.
+      if (!/\bconnect\b/.test(hay)) continue;
+      // Reject contexts that look like Connect but aren't the invite action.
+      if (/\bconnected\b|\bpending\b|\bfollowing\b|\bwithdraw\b/.test(hay)) continue;
+      if (/connect.*(twitter|email|phone|whatsapp|instagram|facebook)/i.test(hay)) continue;
+      // "Message" alone means already connected; only skip when Connect isn't ALSO there.
+      if (/\bmessage\b/.test(hay) && !/\bconnect\b/.test(txt) && !/\bconnect\b/.test(aria)) continue;
+      return b;
     }
     return null;
   }
@@ -5227,37 +5963,28 @@
       return r;
     }
 
-    // SCENARIO 1: only Follow visible → open "..." → Connect.
-    console.log("[LeadCaptura] profile-page step 2 → no Connect; opening More dropdown");
+    // SCENARIO 1: no direct Connect button → open "..." overflow → look for Connect inside.
+    console.log("[LeadCaptura] profile-page step 2 → no direct Connect; opening More dropdown");
     const opened = await _profileOpenMoreDropdown();
     if (opened) {
       await sleep(250);
       const ddConnect = _findProfileDropdownConnect();
       if (ddConnect) {
-        console.log("[LeadCaptura] profile-page step 2 → Connect found in dropdown");
+        console.log("[LeadCaptura] profile-page step 2 → Connect found in More dropdown");
         try { await dispatchHumanClick(ddConnect); } catch {}
         try { ddConnect.click?.(); } catch {}
         const r = await _profileSendInvite();
-        if (r.ok) return r;
-        // Close menu before falling through to Follow.
-        try { document.body.click(); } catch {}
-        await sleep(200);
-      } else {
-        // No Connect in menu — close dropdown and fall through to Follow.
-        try { document.body.click(); } catch {}
-        await sleep(200);
+        return r;
       }
+      // Close the dropdown — no Connect inside.
+      try { document.body.click(); } catch {}
+      await sleep(200);
     }
 
-    // FINAL FALLBACK: click Follow (no Connect path available).
-    const follow = _findProfilePageFollowBtn();
-    if (follow) {
-      console.log("[LeadCaptura] profile-page step 2 → no Connect available; clicking Follow");
-      try { await dispatchHumanClick(follow); } catch {}
-      await sleep(700 + Math.random() * 500);
-      return { ok: true, followed: true };
-    }
-    return { ok: false, reason: "no_action_available" };
+    // No Connect button anywhere. Per user request: Connect All only clicks
+    // Connect — never falls back to Follow. Skip this profile.
+    console.log("[LeadCaptura] profile-page step 2 → no Connect available; skipping (NOT following)");
+    return { ok: false, reason: "no_connect_button" };
   }
 
   // Called on every page boot from main.js. If a Connect Run is active and
@@ -5350,6 +6077,11 @@
       }
     } finally {
       _resumeInFlight = false;
+      // Safety net: connectActive must never be left true after this function returns
+      if (state.connectActive) {
+        state.connectActive = false;
+        try { renderToolbar(); } catch {}
+      }
     }
   }
 
@@ -5424,51 +6156,152 @@
 
     await sleep(readingPause());
 
-    const _MSG_SELS = [
-      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
-      "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
-      "main button.message-anywhere-button",
-    ];
-
-    let msgBtn = null;
-    for (const sel of _MSG_SELS) {
-      msgBtn = document.querySelector(sel);
-      if (msgBtn) break;
-    }
-    if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
-    }
-    if (!msgBtn) return { ok: false, reason: "no_message_button" };
-
-    try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-    await sleep(300 + Math.random() * 300);
-    await dispatchHumanClick(msgBtn);
-
-    const editor = await waitFor([
+    // ── Step 1: click the Message button (unless compose dialog already open) ──
+    const _editorSels = [
       "div.msg-form__contenteditable[contenteditable='true']",
       "div[role='textbox'][contenteditable='true']",
       ".msg-form__compose-box [contenteditable='true']",
-    ], { timeout: 8000 }).catch(() => null);
+      ".msg-overlay-conversation-bubble [contenteditable='true']",
+      ".msg-overlay-list-bubble [contenteditable='true']",
+      "[contenteditable='true'][data-placeholder*='rite' i]",
+    ];
 
-    if (!editor) return { ok: false, reason: "no_editor" };
+    let editor = document.querySelector(_editorSels.join(","));
 
-    await typeIntoEditable(editor, messageText);
-    await sleep(350 + Math.random() * 350);
-
-    const sendBtn = (
-      document.querySelector("button.msg-form__send-button") ||
-      document.querySelector("button[aria-label*='Send' i].artdeco-button--primary") ||
-      (() => {
-        for (const b of document.querySelectorAll(".msg-form__footer button, .msg-compose-form__footer button")) {
-          if (!b.disabled && (b.textContent || "").trim().toLowerCase() === "send") return b;
+    if (!editor) {
+      const _findMsgBtn = () => {
+        const _MSG_SELS = [
+          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
+          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
+          "main button.message-anywhere-button",
+          "[class*='message-anywhere-button']",
+          "button[data-control-name*='message' i]",
+        ];
+        for (const sel of _MSG_SELS) {
+          try {
+            for (const b of document.querySelectorAll(sel)) {
+              if (_isVisible(b) && !b.disabled) return b;
+            }
+          } catch {}
+        }
+        // Text-content fallback — broad scan, exclude our own UI.
+        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+          if (el.classList?.contains("lc-inline-save")) continue;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+          if (!_isVisible(el) || el.disabled) continue;
+          const lbl = (el.getAttribute("aria-label") || "").trim().toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const hay = lbl + " " + txt;
+          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) return el;
         }
         return null;
-      })()
-    );
-    if (!sendBtn || sendBtn.disabled) return { ok: false, reason: "send_disabled" };
+      };
 
+      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
+      let msgBtn = null;
+      for (let i = 0; i < 20; i++) {
+        msgBtn = _findMsgBtn();
+        if (msgBtn) break;
+        await sleep(300);
+      }
+
+      if (!msgBtn) {
+        console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
+        return { ok: false, reason: "no_message_button" };
+      }
+
+      console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
+      try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+      await sleep(450 + Math.random() * 350);
+
+      // Spotlight the Message button briefly so the user can see what's happening.
+      _showButtonSpotlight(msgBtn, "⚡ Opening Message", "auto-clicking now", 900);
+      await sleep(600 + Math.random() * 250);
+
+      // Click with dispatchHumanClick first (realistic pointer sequence — what
+      // LinkedIn's bot detection expects to see leading up to a click).
+      await dispatchHumanClick(msgBtn);
+      editor = await waitFor(_editorSels, { timeout: 3500 });
+
+      // Fallback: _forceClick (5-strategy including React fiber onClick) when
+      // pointer events alone don't trigger LinkedIn's handlers.
+      if (!editor) {
+        console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
+        _forceClick(msgBtn);
+        editor = await waitFor(_editorSels, { timeout: 5000 });
+      }
+
+      _removeSpotlight();
+    }
+
+    if (!editor) {
+      console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
+      return { ok: false, reason: "no_editor" };
+    }
+
+    // ── Step 2: focus editor and type the message ──
+    try { editor.click(); } catch {}
+    try { editor.focus(); } catch {}
+    await sleep(280 + Math.random() * 220);
+
+    await typeIntoEditable(editor, messageText);
+    await sleep(400 + Math.random() * 400);
+
+    // ── Step 3: find and click the Send button ──
+    // Search inside the overlay bubble first, then fall back to document-wide.
+    const _findSendBtn = () => {
+      const scopes = [
+        document.querySelector(".msg-overlay-conversation-bubble"),
+        document.querySelector(".msg-overlay-list-bubble"),
+        document.querySelector(".msg-form__container"),
+        document,
+      ];
+      for (const scope of scopes) {
+        if (!scope) continue;
+        for (const sel of [
+          "button.msg-form__send-button:not([disabled])",
+          "button[aria-label='Send']:not([disabled])",
+          "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
+        ]) {
+          const b = scope.querySelector?.(sel);
+          if (b && _isVisible(b)) return b;
+        }
+        for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
+          const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+          if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
+        }
+      }
+      return null;
+    };
+    // Poll for the Send button to become enabled (LinkedIn enables it ~50-200ms
+    // after the last input event fires).
+    let sendBtn = null;
+    for (let i = 0; i < 12; i++) {
+      sendBtn = _findSendBtn();
+      if (sendBtn && !sendBtn.disabled) break;
+      await sleep(200);
+    }
+
+    if (!sendBtn || sendBtn.disabled) {
+      console.log("[LeadCaptura] Message All: Send button not found or disabled");
+      return { ok: false, reason: "send_disabled" };
+    }
+
+    console.log("[LeadCaptura] Message All: clicking Send");
+    _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
+    await sleep(400 + Math.random() * 200);
     await dispatchHumanClick(sendBtn);
-    await sleep(1200);
+    // Verify the editor cleared (= send actually went through). If not, retry once.
+    await sleep(900);
+    const stillHasText = (editor.textContent || "").trim().length > 0;
+    if (stillHasText) {
+      console.log("[LeadCaptura] Message All: editor not cleared — retrying Send via _forceClick");
+      const retryBtn = _findSendBtn();
+      if (retryBtn) _forceClick(retryBtn);
+      await sleep(800);
+    }
+    _removeSpotlight();
     return { ok: true };
   }
 
@@ -5530,6 +6363,25 @@
     ta.onblur = () => { ta.style.borderColor = "#cbd5e1"; };
     wrap.appendChild(ta);
 
+    // AI personalisation row
+    const aiRow = document.createElement("div");
+    aiRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
+    const aiCheck = document.createElement("input");
+    aiCheck.type = "checkbox";
+    aiCheck.id = "lc-ai-personalise";
+    aiCheck.style.cssText = "cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;";
+    const aiLabel = document.createElement("label");
+    aiLabel.htmlFor = "lc-ai-personalise";
+    aiLabel.style.cssText = "font-size:12px;color:#475569;cursor:pointer;user-select:none;";
+    aiLabel.textContent = "Use AI to personalise each message based on profile";
+    const aiNote = document.createElement("span");
+    aiNote.style.cssText = "font-size:11px;color:#94a3b8;margin-left:2px;";
+    aiNote.textContent = "(requires Claude/Gemini key in Options)";
+    aiLabel.appendChild(aiNote);
+    aiRow.appendChild(aiCheck);
+    aiRow.appendChild(aiLabel);
+    wrap.appendChild(aiRow);
+
     const footer = document.createElement("div");
     footer.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:10px;";
 
@@ -5551,9 +6403,10 @@
     startBtn.onclick = async () => {
       const msg = ta.value.trim();
       if (!msg) { ta.focus(); return; }
+      const useAI = aiCheck.checked;
       wrap.remove();
       _msgComposerEl = null;
-      await _startMessageAll(msg);
+      await _startMessageAll(msg, useAI);
     };
 
     footer.appendChild(cancelBtn);
@@ -5563,7 +6416,7 @@
     ta.focus();
   }
 
-  async function _startMessageAll(message) {
+  async function _startMessageAll(message, useAI = false) {
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
@@ -5571,7 +6424,7 @@
     urls = urls.map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
 
     const run = {
-      active: true, message, urls, index: 0, searchUrl: location.href,
+      active: true, message, useAI, urls, index: 0, searchUrl: location.href,
       sent: 0, failed: 0, skipped: 0, startedAt: Date.now(),
     };
     await _saveMsgRun(run);
@@ -5601,12 +6454,20 @@
       // Wait for page to hydrate
       await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1500));
 
-      // Render template vars from scraped profile
+      // Scrape profile for template vars and AI personalization
       let profile = {};
       try { profile = globalThis.__lcScraper?.scrapeProfile?.() || {}; } catch {}
-      const renderedMsg = _renderMsgTemplate(run.message, profile);
 
-      const result = await _sendProfilePageMessage(renderedMsg);
+      let finalMsg;
+      if (run.useAI) {
+        // Ask service worker to call AI with profile context + user template
+        finalMsg = await _aiPersonalizeMessage(run.message, profile).catch(() => null);
+        if (!finalMsg) finalMsg = _renderMsgTemplate(run.message, profile); // fallback
+      } else {
+        finalMsg = _renderMsgTemplate(run.message, profile);
+      }
+
+      const result = await _sendProfilePageMessage(finalMsg);
       if (result.ok) {
         run.sent++;
       } else if (result.reason === "no_message_button") {
@@ -5618,43 +6479,62 @@
       run.failed++;
     }
 
-    run.index++;
-    _lcToast(
-      `Message All — ${run.sent} sent · ${run.skipped} skipped (${run.index}/${run.urls.length})`,
-      2500
-    );
-
-    const stillActive = await _loadMsgRun();
-    if (!stillActive || !stillActive.active) {
-      // User clicked Stop while we were messaging
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      _msgResumeInFlight = false;
-      return;
-    }
-
-    if (run.index < run.urls.length) {
-      await _saveMsgRun(run);
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      await new Promise((r) => setTimeout(r, _msgGap()));
-      const check = await _loadMsgRun();
-      if (check && check.active) location.href = run.urls[run.index];
-    } else {
-      await _clearMsgRun();
-      state.messageActive = false;
-      try { renderToolbar(); } catch {}
-      flashStatus(
-        `Message All done: ${run.sent} sent, ${run.skipped} skipped (not connected), ${run.failed} failed ✓`,
-        "ok"
+    try {
+      run.index++;
+      _lcToast(
+        `Message All — ${run.sent} sent · ${run.skipped} skipped (${run.index}/${run.urls.length})`,
+        2500
       );
-      _lcToast(`✓ Message All done — ${run.sent} sent`, 8000);
-      if (run.searchUrl) {
-        await new Promise((r) => setTimeout(r, 2000));
-        location.href = run.searchUrl;
+
+      const stillActive = await _loadMsgRun();
+      if (!stillActive || !stillActive.active) {
+        // User clicked Stop while we were messaging
+        return;
       }
+
+      if (run.index < run.urls.length) {
+        await _saveMsgRun(run);
+        try { renderToolbar(); } catch {}
+        await new Promise((r) => setTimeout(r, _msgGap()));
+        const check = await _loadMsgRun();
+        if (check && check.active) location.href = run.urls[run.index];
+      } else {
+        await _clearMsgRun();
+        try { renderToolbar(); } catch {}
+        flashStatus(
+          `Message All done: ${run.sent} sent, ${run.skipped} skipped (not connected), ${run.failed} failed ✓`,
+          "ok"
+        );
+        _lcToast(`✓ Message All done — ${run.sent} sent`, 8000);
+        if (run.searchUrl) {
+          await new Promise((r) => setTimeout(r, 2000));
+          location.href = run.searchUrl;
+        }
+      }
+    } finally {
+      state.messageActive = false;
+      _msgResumeInFlight = false;
+      try { renderToolbar(); } catch {}
     }
-    _msgResumeInFlight = false;
+  }
+
+  // Ask the service worker to call Claude/Gemini to personalise a message
+  // for the given profile. Returns the personalised string, or rejects on error.
+  function _aiPersonalizeMessage(template, profile) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "lc:personalizeMessage", template, profile },
+          (response) => {
+            if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+            if (!response || !response.ok) { reject(new Error(response?.error || "no_response")); return; }
+            resolve(response.message);
+          }
+        );
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 
   // Run the "click Send without a note" code in the page's MAIN world.
@@ -5712,13 +6592,19 @@
     // (both check _invitationModalOpen which would be false once done).
     // We keep _inviteAutoBusy so this function never runs concurrently.
     if (_inviteAutoBusy) return;
+    // Never fire on the messaging page — its "Send" button false-triggers the
+    // invitation detection heuristic. The spotlight should only appear on
+    // search/profile pages after the native "Add a note?" modal appears.
+    if (location.pathname.startsWith("/messaging/")) return;
     if (!_invitationModalOpen()) {
       if (_inviteHighlightShown) { _removeSpotlight(); _inviteHighlightShown = false; }
       return;
     }
     // During a Connect All run _sendConnectOnCard is already managing the overlay.
-    // Skip this handler so we don't show a second spotlight on top.
-    if (state.connectActive) return;
+    // During a Message All run we should NEVER auto-confirm invitations — Message
+    // All only sends messages to existing connections; an invitation dialog means
+    // the wrong button was clicked. Showing the spotlight here confuses the user.
+    if (state.connectActive || state.messageActive) return;
     let btn = _findSendWithoutNoteButton();
     if (!btn) return;
     _inviteAutoBusy = true;

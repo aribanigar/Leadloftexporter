@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import type { Lead, PipelineStage } from "@/lib/types";
 import { fmtDate, initials } from "@/lib/utils";
 import { EnrollPlaybookModal } from "@/components/enroll-playbook-modal";
+import { LinkedInBridgePanel } from "@/components/linkedin-bridge-panel";
 
 type ComposerTab = "email" | "linkedin" | "note" | "call";
 
@@ -242,6 +243,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           workspaceName={workspace?.name || "Workspace"}
           initialTab={initialTab}
         />
+        {lead.linkedin_url && (
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <LinkedInBridgePanel leadId={id} linkedinUrl={lead.linkedin_url} />
+          </div>
+        )}
         <Timeline items={timeline || []} />
       </main>
     </div>

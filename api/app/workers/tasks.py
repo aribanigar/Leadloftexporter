@@ -216,23 +216,57 @@ def tick_outreach_scheduler() -> dict:
 
 @celery_app.task
 def send_queued_emails() -> dict:
-    """Send any messages still in 'queued' that weren't sent inline (e.g., manual sends)."""
+    """Drain queued EmailMessage rows respecting per-workspace pacing + daily cap.
+
+    Runs every minute on the beat schedule. For each workspace with queued mail
+    we send at most ``email_drain_per_minute`` rows so a 500-message bulk send
+    paces out over the workspace's configured outreach window instead of
+    bursting through provider rate limits. ``send_email_message`` already
+    enforces the daily limit and stamps ``status``/``sent_at``/``error`` —
+    we just feed it queued rows in chronological order, grouped by workspace.
+    """
+    from app.services.outreach import emails_sent_today, outreach_settings
+
     sent = 0
+    skipped_throttled = 0
+    skipped_over_cap = 0
     with session_scope() as db:
+        # Group queued mail by workspace so the per-minute throttle is correctly
+        # applied even when one workspace's queue is huge and another's is small.
+        # We cap per workspace at email_drain_per_minute and at daily_cap minus
+        # already-sent today.
         rows = (
             db.query(EmailMessage)
             .filter(EmailMessage.status == "queued")
             .order_by(EmailMessage.created_at.asc())
-            .limit(50)
+            .limit(500)
             .all()
         )
-        for msg in rows:
-            ws = db.get(Workspace, msg.workspace_id)
+        per_workspace: dict[str, list[EmailMessage]] = {}
+        for r in rows:
+            per_workspace.setdefault(r.workspace_id, []).append(r)
+        for workspace_id, msgs in per_workspace.items():
+            ws = db.get(Workspace, workspace_id)
             if not ws:
                 continue
-            send_email_message(db, msg, ws)
-            sent += 1
-    return {"sent": sent}
+            settings = outreach_settings(ws)
+            per_min = int(settings.get("email_drain_per_minute", 6))
+            daily_cap = int(settings.get("email_limit_per_day", 80))
+            today = emails_sent_today(db, ws.id)
+            for msg in msgs[:per_min]:
+                if today >= daily_cap:
+                    skipped_over_cap += 1
+                    continue
+                result = send_email_message(db, msg, ws)
+                if result.ok:
+                    sent += 1
+                    today += 1
+            skipped_throttled += max(0, len(msgs) - per_min)
+    return {
+        "sent": sent,
+        "skipped_throttled": skipped_throttled,
+        "skipped_over_cap": skipped_over_cap,
+    }
 
 
 @celery_app.task

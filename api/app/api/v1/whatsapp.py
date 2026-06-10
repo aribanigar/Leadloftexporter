@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import ConnectedAccount, Lead
+from app.models import Activity, ConnectedAccount, Lead
+from app.services.outreach import outreach_settings, whatsapp_sent_today
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
@@ -168,6 +169,15 @@ def send(
     if not msg:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "message_required")
 
+    daily_cap = int(outreach_settings(ctx.workspace).get("whatsapp_limit_per_day", 50))
+    already_today = whatsapp_sent_today(db, ctx.workspace_id)
+    remaining_today = max(0, daily_cap - already_today)
+    if remaining_today == 0:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"whatsapp_daily_limit_reached: {already_today}/{daily_cap}",
+        )
+
     q = (
         db.query(Lead)
         .options(joinedload(Lead.company))  # type: ignore[attr-defined]
@@ -182,12 +192,18 @@ def send(
     sent = 0
     failed = 0
     skipped_no_phone = 0
+    skipped_over_cap = 0
     errors: list[str] = []
+    per_call_cap = min(MAX_PER_SEND, remaining_today)
 
     with httpx.Client(timeout=20) as client:
         for lead in leads:
-            if sent + failed >= MAX_PER_SEND:
-                break
+            if sent + failed >= per_call_cap:
+                # Tally the remainder so the UI can surface the throttle clearly.
+                num = re.sub(r"\D", "", lead.phone or "")
+                if num:
+                    skipped_over_cap += 1
+                continue
             num = re.sub(r"\D", "", lead.phone or "")
             if not num:
                 skipped_no_phone += 1
@@ -206,6 +222,21 @@ def send(
                 )
                 if r.status_code < 300:
                     sent += 1
+                    db.add(
+                        Activity(
+                            workspace_id=ctx.workspace_id,
+                            lead_id=lead.id,
+                            actor_id=ctx.user_id,
+                            type="whatsapp_sent",
+                            payload={
+                                "to": num,
+                                "body_preview": _render(msg, lead)[:300],
+                                "provider_message_id": (
+                                    (r.json() or {}).get("messages", [{}])[0].get("id")
+                                ),
+                            },
+                        )
+                    )
                 else:
                     failed += 1
                     if len(errors) < 3:
@@ -235,10 +266,14 @@ def send(
                 if len(errors) < 3:
                     errors.append(str(e)[:200])
 
+    db.commit()
     return {
         "sent": sent,
         "failed": failed,
         "skipped_no_phone": skipped_no_phone,
+        "skipped_over_cap": skipped_over_cap,
+        "daily_cap": daily_cap,
+        "daily_remaining": max(0, daily_cap - already_today - sent),
         "total": len(leads),
         "errors": errors,
     }

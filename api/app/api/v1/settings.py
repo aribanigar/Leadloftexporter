@@ -106,6 +106,8 @@ def get_outreach(ctx: AuthContext = Depends(get_workspace_context)):
         "email_limit_per_day": s.get("email_limit_per_day", 80),
         "linkedin_connect_limit": s.get("linkedin_connect_limit", 15),
         "linkedin_message_limit": s.get("linkedin_message_limit", 30),
+        "whatsapp_limit_per_day": s.get("whatsapp_limit_per_day", 50),
+        "email_drain_per_minute": s.get("email_drain_per_minute", 6),
     }
 
 
@@ -126,6 +128,8 @@ def update_outreach(
         "email_limit_per_day",
         "linkedin_connect_limit",
         "linkedin_message_limit",
+        "whatsapp_limit_per_day",
+        "email_drain_per_minute",
     ):
         if k in body:
             outreach[k] = body[k]
