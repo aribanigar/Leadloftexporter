@@ -6711,6 +6711,206 @@
     renderToolbar();
   }
 
+  // ───────────────────────────────────────────────────────────────────────
+  // Spotlight On Message — live visual indicator for the bulk-message engine.
+  //
+  // automate.js drives it through five stages as a send sequence plays out:
+  //   "navigating" → "opening" → "click_message" → "typing" → "sending" → "sent"
+  //
+  // The overlay anchors a pulsing ring to whatever element the current stage
+  // is acting on (Message button → composer → Send button), a banner up top
+  // shows the live status, and the ring/banner re-position via requestAnimationFrame
+  // so LinkedIn re-renders don't drop the indicator. The whole thing is
+  // pointer-events:none so it never intercepts the user's input.
+  // ───────────────────────────────────────────────────────────────────────
+  let _msgSpotBannerEl = null;
+  let _msgSpotPulseEl = null;
+  let _msgSpotArrowEl = null;
+  let _msgSpotRAF = null;
+  let _msgSpotTarget = null;
+  let _msgSpotStage = null;
+  let _msgSpotLeadName = "";
+
+  function _msgSpotStageText(stage, leadName) {
+    const name = (leadName || "").split(" ")[0];
+    switch (stage) {
+      case "navigating":
+        return { title: `Opening ${name || "next profile"}…`, sub: "Walking through your bulk message queue" };
+      case "opening":
+        return { title: `Preparing message to ${name || "this lead"}…`, sub: "Waiting for the profile to load" };
+      case "click_message":
+        return { title: `Opening chat with ${name || "this lead"}…`, sub: "Clicking the Message button" };
+      case "typing":
+        return { title: "Typing your message…", sub: "Human-paced, character by character" };
+      case "sending":
+        return { title: `Sending to ${name || "this lead"}…`, sub: "Clicking Send" };
+      case "sent":
+        return { title: `Sent to ${name || "this lead"} ✓`, sub: "Moving on to the next profile" };
+      default:
+        return { title: "Bulk message in progress", sub: "Keep this LinkedIn tab open" };
+    }
+  }
+  function _msgSpotStageColor(stage) {
+    if (stage === "sent") return "#16a34a";
+    if (stage === "sending") return "#0a66c2";
+    if (stage === "navigating") return "#7c3aed";
+    return "#0a66c2";
+  }
+  function _ensureMsgSpotStyle() {
+    if (document.getElementById("lc-msg-spot-style")) return;
+    const st = document.createElement("style");
+    st.id = "lc-msg-spot-style";
+    st.textContent = `
+@keyframes lc-msg-spin{to{transform:rotate(360deg)}}
+@keyframes lc-msg-pulse{0%{box-shadow:0 0 0 0 rgba(10,102,194,0.55)}70%{box-shadow:0 0 0 18px rgba(10,102,194,0)}100%{box-shadow:0 0 0 0 rgba(10,102,194,0)}}
+@keyframes lc-msg-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes lc-msg-banner-in{0%{opacity:0;transform:translateY(-12px)}100%{opacity:1;transform:translateY(0)}}
+`;
+    document.head.appendChild(st);
+  }
+  function showMessageSpotlight(opts = {}) {
+    _ensureMsgSpotStyle();
+    _msgSpotStage = opts.stage || "opening";
+    _msgSpotTarget = opts.target || null;
+    if (opts.leadName !== undefined) _msgSpotLeadName = opts.leadName || "";
+
+    if (!_msgSpotBannerEl) {
+      const banner = document.createElement("div");
+      banner.id = "lc-msg-spotlight-banner";
+      banner.style.cssText = [
+        "position:fixed", "top:18px", "z-index:2147483647",
+        "padding:12px 18px",
+        "background:linear-gradient(135deg,rgba(10,102,194,0.97) 0%,rgba(124,58,237,0.97) 100%)",
+        "color:white", "border-radius:14px",
+        "font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        "box-shadow:0 12px 36px rgba(10,102,194,0.45),0 2px 6px rgba(0,0,0,0.2)",
+        "min-width:320px", "max-width:480px",
+        "display:flex", "align-items:center", "gap:12px",
+        "pointer-events:none",
+        "animation:lc-msg-banner-in 220ms cubic-bezier(.2,.9,.4,1.2)",
+        "transition:background 220ms ease",
+      ].map((s) => s + " !important").join(";");
+      banner.innerHTML =
+        '<div id="lc-msg-spot-spin" style="flex-shrink:0!important;width:22px!important;height:22px!important;border:2.5px solid rgba(255,255,255,0.35)!important;border-top-color:#fff!important;border-radius:50%!important;animation:lc-msg-spin 0.9s linear infinite!important;"></div>' +
+        '<div style="flex:1!important;min-width:0!important;">' +
+        '<div id="lc-msg-spot-title" style="font-size:14px!important;font-weight:700!important;line-height:1.2!important;"></div>' +
+        '<div id="lc-msg-spot-sub" style="font-size:12px!important;font-weight:500!important;opacity:0.92!important;margin-top:2px!important;line-height:1.3!important;"></div>' +
+        '</div>';
+      document.body.appendChild(banner);
+      _msgSpotBannerEl = banner;
+    }
+    if (!_msgSpotPulseEl) {
+      const pulse = document.createElement("div");
+      pulse.id = "lc-msg-spotlight-pulse";
+      pulse.style.cssText = [
+        "position:fixed", "z-index:2147483646",
+        "border:3px solid #0a66c2", "border-radius:12px",
+        "background:transparent", "pointer-events:none",
+        "animation:lc-msg-pulse 1.4s ease-out infinite",
+        "transition:left 220ms ease,top 220ms ease,width 220ms ease,height 220ms ease,border-color 220ms ease",
+        "left:-9999px", "top:-9999px", "width:0", "height:0",
+      ].map((s) => s + " !important").join(";");
+      document.body.appendChild(pulse);
+      _msgSpotPulseEl = pulse;
+    }
+    if (!_msgSpotArrowEl) {
+      const arrow = document.createElement("div");
+      arrow.id = "lc-msg-spotlight-arrow";
+      arrow.style.cssText = [
+        "position:fixed", "z-index:2147483647",
+        "padding:5px 11px", "background:#0a66c2", "color:white",
+        "border-radius:10px",
+        "font:700 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        "box-shadow:0 4px 12px rgba(0,0,0,0.3)",
+        "animation:lc-msg-bob 1.2s ease-in-out infinite",
+        "pointer-events:none",
+        "left:-9999px", "top:-9999px",
+        "transition:left 220ms ease,top 220ms ease,background 220ms ease",
+      ].map((s) => s + " !important").join(";");
+      arrow.textContent = "▼";
+      document.body.appendChild(arrow);
+      _msgSpotArrowEl = arrow;
+    }
+
+    const { title, sub } = _msgSpotStageText(_msgSpotStage, _msgSpotLeadName);
+    const color = _msgSpotStageColor(_msgSpotStage);
+    const t = document.getElementById("lc-msg-spot-title");
+    const s = document.getElementById("lc-msg-spot-sub");
+    if (t) t.textContent = title;
+    if (s) s.textContent = sub;
+    if (_msgSpotPulseEl) _msgSpotPulseEl.style.setProperty("border-color", color, "important");
+    if (_msgSpotArrowEl) _msgSpotArrowEl.style.setProperty("background", color, "important");
+
+    const spin = document.getElementById("lc-msg-spot-spin");
+    if (spin) {
+      if (_msgSpotStage === "sent") {
+        spin.style.cssText = [
+          "flex-shrink:0", "width:22px", "height:22px",
+          "background:#16a34a", "border-radius:50%",
+          "display:flex", "align-items:center", "justify-content:center",
+          "font-size:14px", "color:white", "font-weight:900",
+          "animation:none",
+        ].map((x) => x + " !important").join(";");
+        spin.textContent = "✓";
+      } else {
+        spin.style.cssText = [
+          "flex-shrink:0", "width:22px", "height:22px",
+          "border:2.5px solid rgba(255,255,255,0.35)",
+          "border-top-color:#fff", "border-radius:50%",
+          "animation:lc-msg-spin 0.9s linear infinite",
+        ].map((x) => x + " !important").join(";");
+        spin.textContent = "";
+      }
+    }
+
+    // Centre banner horizontally on every show — handles window resize too.
+    const bw = _msgSpotBannerEl.offsetWidth || 360;
+    _msgSpotBannerEl.style.setProperty("left", `${Math.max(8, (window.innerWidth - bw) / 2)}px`, "important");
+
+    if (!_msgSpotRAF) {
+      const tick = () => {
+        if (!_msgSpotBannerEl || !document.body.contains(_msgSpotBannerEl)) {
+          _msgSpotRAF = null; return;
+        }
+        if (_msgSpotTarget && document.body.contains(_msgSpotTarget)) {
+          const r = _msgSpotTarget.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            const pad = 8;
+            _msgSpotPulseEl.style.setProperty("left", `${r.left - pad}px`, "important");
+            _msgSpotPulseEl.style.setProperty("top", `${r.top - pad}px`, "important");
+            _msgSpotPulseEl.style.setProperty("width", `${r.width + pad * 2}px`, "important");
+            _msgSpotPulseEl.style.setProperty("height", `${r.height + pad * 2}px`, "important");
+            const aw = _msgSpotArrowEl.offsetWidth || 28;
+            const ah = _msgSpotArrowEl.offsetHeight || 24;
+            const aLeft = Math.max(8, Math.min(window.innerWidth - aw - 8,
+              r.left + r.width / 2 - aw / 2));
+            const aTop = Math.max(72, r.top - ah - 8);
+            _msgSpotArrowEl.style.setProperty("left", `${aLeft}px`, "important");
+            _msgSpotArrowEl.style.setProperty("top", `${aTop}px`, "important");
+          }
+        } else {
+          // No target (e.g. navigating) — park the pulse + arrow off-screen.
+          _msgSpotPulseEl.style.setProperty("left", "-9999px", "important");
+          _msgSpotArrowEl.style.setProperty("left", "-9999px", "important");
+        }
+        _msgSpotRAF = requestAnimationFrame(tick);
+      };
+      _msgSpotRAF = requestAnimationFrame(tick);
+    }
+  }
+  function updateMessageSpotlight(opts = {}) { showMessageSpotlight(opts); }
+  function removeMessageSpotlight() {
+    if (_msgSpotRAF) { cancelAnimationFrame(_msgSpotRAF); _msgSpotRAF = null; }
+    try { _msgSpotBannerEl?.remove(); } catch {}
+    try { _msgSpotPulseEl?.remove(); } catch {}
+    try { _msgSpotArrowEl?.remove(); } catch {}
+    _msgSpotBannerEl = null;
+    _msgSpotPulseEl = null;
+    _msgSpotArrowEl = null;
+    _msgSpotStage = null;
+    _msgSpotTarget = null;
+  }
+
   globalThis.__lcOverlay = {
     renderProfilePanel,
     renderToolbar,
@@ -6727,5 +6927,9 @@
     applyConnectResults,
     resumeConnectRunIfActive: _resumeConnectRunIfActive,
     resumeMessageRunIfActive: _resumeMessageRunIfActive,
+    // Spotlight On Message — driven by automate.js's _sendMessageInPlace.
+    showMessageSpotlight,
+    updateMessageSpotlight,
+    removeMessageSpotlight,
   };
 })();

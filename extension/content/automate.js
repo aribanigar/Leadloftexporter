@@ -117,6 +117,7 @@
           jobId: job.id,
           body: job.payload?.body || "",
           url: job.payload?.linkedin_url || "",
+          leadName: job.payload?.lead_name || "",
           startedAt: Date.now(),
         },
       });
@@ -136,16 +137,24 @@
     }
   }
 
+  // Spotlight bridges — overlay.js mounts the visual indicator. Best-effort,
+  // so a missing overlay (e.g. during resume before overlay hydrates) is fine.
+  function _spotShow(opts) { try { globalThis.__lcOverlay?.showMessageSpotlight?.(opts); } catch {} }
+  function _spotUpdate(opts) { try { globalThis.__lcOverlay?.updateMessageSpotlight?.(opts); } catch {} }
+  function _spotRemove() { try { globalThis.__lcOverlay?.removeMessageSpotlight?.(); } catch {} }
+
   // The actual "open chat → type → Send" steps. Runs only when the tab is
   // already on the target profile. Used by both doMessage (when no navigation
-  // is needed) and resumePendingMessage (after a navigation).
-  async function _sendMessageInPlace(body, url) {
-    if (detectChallenge()) return { status: "failed", error: "captcha_or_checkpoint" };
+  // is needed) and resumePendingMessage (after a navigation). Drives the
+  // Spotlight On Message overlay end-to-end so the user sees every step.
+  async function _sendMessageInPlace(body, url, leadName) {
+    _spotShow({ stage: "opening", url, leadName });
+    if (detectChallenge()) {
+      _spotRemove();
+      return { status: "failed", error: "captcha_or_checkpoint" };
+    }
     await sleep(readingPause());
 
-    // Try synchronously first; then poll up to 8 s for slow SPA hydration.
-    // Removed the trailing space from 'Message ' to also match aria-label="Message"
-    // (no person name appended), which LinkedIn uses on some profile layouts.
     const _MSG_SELS = [
       "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
       "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
@@ -155,10 +164,8 @@
     ];
     let msgBtn = first(document, _MSG_SELS);
     if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 5000 }); } catch {}
+      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
     }
-    // Text-content fallback: find a visible "Message" button/link that isn't
-    // an InMail or recruiter variant.
     if (!msgBtn) {
       const candidates = document.querySelectorAll(
         "main button:not([disabled]), main a[role='button'], " +
@@ -173,7 +180,13 @@
         ) { msgBtn = el; break; }
       }
     }
-    if (!msgBtn) return { status: "failed", error: "message_button_not_found" };
+    if (!msgBtn) {
+      _spotRemove();
+      return { status: "failed", error: "message_button_not_found" };
+    }
+    _spotUpdate({ stage: "click_message", target: msgBtn, leadName });
+    // "Noticed the button" pause before pressing — looks human.
+    await sleep(300 + Math.random() * 400);
     await dispatchHumanClick(msgBtn);
 
     const editor = await waitFor(
@@ -181,20 +194,33 @@
         "div.msg-form__contenteditable[contenteditable='true']",
         "div[role='textbox'][contenteditable='true']",
       ],
-      { timeout: 6000 }
+      { timeout: 8000 }
     );
-    if (!editor) return { status: "failed", error: "message_editor_not_found" };
-
+    if (!editor) {
+      _spotRemove();
+      return { status: "failed", error: "message_editor_not_found" };
+    }
+    _spotUpdate({ stage: "typing", target: editor, leadName });
     await typeIntoEditable(editor, body);
-    await sleep(400);
+    await sleep(500 + Math.random() * 500);
 
     const send = first(document, [
       "button.msg-form__send-button",
-      "button[aria-label*='Send' i]",
+      "button[type='submit'][class*='msg-form__send']",
+      "button[aria-label*='Send' i]:not([aria-label*='Send a connection' i]):not([aria-label*='Send invitation' i])",
     ]);
-    if (!send || send.disabled) return { status: "failed", error: "send_disabled" };
+    if (!send || send.disabled) {
+      _spotRemove();
+      return { status: "failed", error: "send_disabled" };
+    }
+    _spotUpdate({ stage: "sending", target: send, leadName });
+    await sleep(200 + Math.random() * 300);
     await dispatchHumanClick(send);
     await sleep(1200);
+    _spotUpdate({ stage: "sent", leadName });
+    // Hold the "sent ✓" toast briefly so the user sees confirmation before
+    // the next profile loads. The next page boot starts a fresh spotlight.
+    setTimeout(_spotRemove, 1600);
     return { status: "done", result: { url } };
   }
 
@@ -217,16 +243,36 @@
   async function doMessage(job) {
     const url = job.payload?.linkedin_url;
     const body = job.payload?.body;
+    const leadName = job.payload?.lead_name || "";
     if (!url || !body) return { status: "failed", error: "missing_url_or_body" };
 
-    // Only send if already on the target profile. Never auto-navigate — that
-    // would disrupt the user's browsing without any action on their part.
-    // The job stays claimed; the backend reclaims it after ~10 min and retries.
-    if (!_sameProfile(location.href, url)) {
-      return { status: "skipped", error: "not_on_target_profile" };
+    // Already on the target profile → send in place immediately.
+    if (_sameProfile(location.href, url)) {
+      return _sendMessageInPlace(body, url, leadName);
     }
 
-    return _sendMessageInPlace(body, url);
+    // Off-profile: the user explicitly queued this from the CRM Bulk Messaging
+    // page (or via a playbook), so they consented to the navigation. Persist
+    // the job + navigate. After the page loads, resumePendingMessage() in
+    // main.js's boot path finishes the send and POSTs the result.
+    //
+    // Without this navigation path the autopilot would forever return
+    // "not_on_target_profile" for every queued message — which is exactly the
+    // "0 sent · 1 in progress" stuck state users were seeing.
+    _spotShow({ stage: "navigating", url, leadName });
+    await _persistPending(job);
+    await sleep(150 + Math.random() * 250);
+    try {
+      const target = new URL(url, "https://www.linkedin.com").href;
+      location.href = target;
+    } catch {
+      await _clearPending();
+      _spotRemove();
+      return { status: "failed", error: "invalid_linkedin_url" };
+    }
+    // executeOne special-cases this exact reason so we don't double-report —
+    // the resume hook owns the final POST after navigation completes.
+    return { status: "skipped", error: "navigating_to_profile" };
   }
 
   // Called from main.js on every page boot. If a message job is pending and
@@ -271,7 +317,7 @@
 
     let result;
     try {
-      result = await _sendMessageInPlace(pending.body, pending.url);
+      result = await _sendMessageInPlace(pending.body, pending.url, pending.leadName || "");
     } catch (err) {
       result = { status: "failed", error: String(err?.message || err) };
     }
@@ -349,6 +395,13 @@
       else if (job.kind === "scrape_search") result = await doScrapeSearch(job);
       else if (job.kind === "bridge_profile") result = await doBridgeProfile(job);
       else result = { status: "skipped", error: "unknown_kind" };
+
+      // When doMessage persists + navigates, the resume hook on the next page
+      // boot owns the final POST. Posting now would race the resume and
+      // either double-fire or mark the job "skipped" before the send completes.
+      if (result.status === "skipped" && result.error === "navigating_to_profile") {
+        return result;
+      }
       await Api.submitJobResult(job.id, {
         status: result.status,
         result: result.result || {},
@@ -427,13 +480,35 @@
       // respected here as a manual override.
       if (!settings.enabled) return;
       if (settings.autopilot === false) return;
+
+      // Don't claim a new job while a message send is mid-navigation —
+      // the resume hook owns the in-flight job. Claiming another now
+      // would stomp the pending slot and lose the in-flight send.
+      const pending = await _readPending();
+      if (pending && pending.jobId) {
+        // If we ARE on the target profile now, kick the resume immediately
+        // so the user doesn't wait for the next 15 s interval tick.
+        if (_sameProfile(location.href, pending.url)) {
+          resumePendingMessage().catch(() => {});
+        }
+        return;
+      }
+
       const jobs = await Api.nextJobs(1).catch(() => []);
       if (!jobs?.length) return;
       const [job] = jobs;
 
       await executeOne(job);
-      // Human pause before next action
-      await sleep(paceBetweenActions());
+      // Inter-action pause. The message channel walks profiles via
+      // location.href so the natural gap is page-load + a small post-send
+      // pause set in resumePendingMessage — keep this tight (2–4 s) so a
+      // bulk send actually feels live. Other channels keep the long-tail
+      // bot-safety wait.
+      if (job.kind === "message") {
+        await sleep(2000 + Math.random() * 2000);
+      } else {
+        await sleep(paceBetweenActions());
+      }
     } finally {
       running = false;
     }

@@ -244,11 +244,63 @@ function SmtpForm({ onSaved }: FormProps) {
         onChange={(e) => setFromEmail(e.target.value)}
       />
 
-      {save.isError && (
-        <p className="mt-3 text-sm text-red-600">
-          {save.error?.message || "Connect failed."}
-        </p>
-      )}
+      {(() => {
+        if (!save.isError) return null;
+        const errMsg = save.error?.message || "";
+        const isRenderBlock =
+          /smtp_blocked_by_host/i.test(errMsg) ||
+          /timed out/i.test(errMsg) ||
+          /blocks outbound smtp/i.test(errMsg);
+        if (!isRenderBlock) {
+          return <p className="mt-3 text-sm text-red-600">{errMsg || "Connect failed."}</p>;
+        }
+        return (
+          <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-start gap-2 text-sm font-semibold text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              SMTP is blocked on this server
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-amber-800">
+              Your backend host (Render) blocks outbound SMTP ports 25 / 465 / 587
+              on its free + starter plans, so we can&apos;t reach{" "}
+              <span className="font-mono">{host || "your SMTP server"}</span>.
+              Use one of these HTTPS senders — they work on every plan and take
+              less than a minute to set up:
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <a
+                href="https://resend.com/signup"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-purple-200 bg-white p-3 transition hover:border-purple-400 hover:shadow-sm"
+              >
+                <div className="text-sm font-semibold text-purple-700">
+                  Resend (recommended)
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-500">
+                  Free 3,000 emails/month. Paste the API key into the Resend
+                  tab above.
+                </div>
+              </a>
+              <a
+                href="https://app.sendgrid.com/signup"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-blue-200 bg-white p-3 transition hover:border-blue-400 hover:shadow-sm"
+              >
+                <div className="text-sm font-semibold text-blue-700">SendGrid</div>
+                <div className="mt-0.5 text-[11px] text-slate-500">
+                  Free 100/day forever. Verify a sender then paste the API key.
+                </div>
+              </a>
+            </div>
+            <p className="mt-3 text-[11px] text-amber-800">
+              Already on a paid Render plan with SMTP unblocked, or self-hosting?
+              Your credentials look fine — re-try Connect SMTP.
+            </p>
+          </div>
+        );
+      })()}
       {save.isSuccess && (
         <p className="mt-3 flex items-center gap-1 text-sm text-emerald-700">
           <CheckCircle2 className="h-4 w-4" /> SMTP verified and saved.
