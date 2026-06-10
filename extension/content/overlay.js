@@ -6777,18 +6777,22 @@
     if (!_msgSpotBannerEl) {
       const banner = document.createElement("div");
       banner.id = "lc-msg-spotlight-banner";
+      // Land BELOW LinkedIn's global nav (~52 px tall) so the banner is
+      // never hidden behind it. A previous version sat at top:18 and was
+      // clipped by the nav on every profile.
       banner.style.cssText = [
-        "position:fixed", "top:18px", "z-index:2147483647",
-        "padding:12px 18px",
-        "background:linear-gradient(135deg,rgba(10,102,194,0.97) 0%,rgba(124,58,237,0.97) 100%)",
+        "position:fixed", "top:72px", "z-index:2147483647",
+        "padding:13px 20px",
+        "background:linear-gradient(135deg,#0a66c2 0%,#7c3aed 100%)",
         "color:white", "border-radius:14px",
         "font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-        "box-shadow:0 12px 36px rgba(10,102,194,0.45),0 2px 6px rgba(0,0,0,0.2)",
-        "min-width:320px", "max-width:480px",
+        "box-shadow:0 14px 40px rgba(10,102,194,0.55),0 2px 6px rgba(0,0,0,0.25)",
+        "min-width:340px", "max-width:520px",
         "display:flex", "align-items:center", "gap:12px",
         "pointer-events:none",
         "animation:lc-msg-banner-in 220ms cubic-bezier(.2,.9,.4,1.2)",
         "transition:background 220ms ease",
+        "border:1.5px solid rgba(255,255,255,0.25)",
       ].map((s) => s + " !important").join(";");
       banner.innerHTML =
         '<div id="lc-msg-spot-spin" style="flex-shrink:0!important;width:22px!important;height:22px!important;border:2.5px solid rgba(255,255,255,0.35)!important;border-top-color:#fff!important;border-radius:50%!important;animation:lc-msg-spin 0.9s linear infinite!important;"></div>' +

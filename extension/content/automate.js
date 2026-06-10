@@ -143,6 +143,83 @@
   function _spotUpdate(opts) { try { globalThis.__lcOverlay?.updateMessageSpotlight?.(opts); } catch {} }
   function _spotRemove() { try { globalThis.__lcOverlay?.removeMessageSpotlight?.(); } catch {} }
 
+  // Strict Message-button finder for the profile-header action row.
+  // Returns the BLUE primary "Message" button, never the Sales Navigator
+  // sibling or the right-rail "Compose new message" pencil. Polls up to
+  // timeoutMs for slow SPA hydration.
+  async function _findProfileMessageButton(timeoutMs = 6000) {
+    // Containers known to host Message buttons we DO NOT want. Anything
+    // descended from one of these is rejected outright.
+    const REJECT_ANCESTORS = [
+      "#msg-overlay", "[data-test-conversations-container]",
+      "[class*='msg-overlay']", "[class*='msg-conversations']",
+      "[class*='sales-nav']", "[data-test-sales-nav]",
+      "[aria-label*='Sales Navigator' i]",
+    ];
+    // Containers where the real profile Message button lives.
+    const HEADER_SCOPES = [
+      ".pv-top-card", ".pv-top-card-v2",
+      ".scaffold-layout__main", ".pvs-profile-actions",
+      "main section.artdeco-card",
+      "main .ph5",
+    ];
+
+    function _isProfileHeaderMessageButton(el) {
+      if (!el || el.disabled) return false;
+      // Visible in viewport.
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) return false;
+      // Reject if inside a wrong-context container.
+      for (const sel of REJECT_ANCESTORS) {
+        try { if (el.closest(sel)) return false; } catch {}
+      }
+      const lbl = (el.getAttribute("aria-label") || "").trim();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      const lblLc = lbl.toLowerCase();
+      const txtLc = txt.toLowerCase();
+      // Hard rejects on labels that look like Message but aren't the right one.
+      if (/compose|recruiter|inmail|your team|sales navigator/i.test(lblLc + " " + txtLc)) {
+        return false;
+      }
+      // Strict positive match: aria-label starts with "Message " (e.g.
+      // "Message Kelvin Stanly") OR exact text is "Message".
+      if (/^message\b/i.test(lbl)) return true;
+      if (txtLc === "message") return true;
+      // Known stable class.
+      if (el.classList && el.classList.contains("message-anywhere-button")) return true;
+      return false;
+    }
+
+    function _scanOnce() {
+      // Scoped search inside the profile header.
+      for (const scopeSel of HEADER_SCOPES) {
+        let scopeEls;
+        try { scopeEls = document.querySelectorAll(scopeSel); } catch { continue; }
+        for (const scope of scopeEls) {
+          const cands = scope.querySelectorAll("button, a[role='button'], a.artdeco-button");
+          for (const el of cands) {
+            if (_isProfileHeaderMessageButton(el)) return el;
+          }
+        }
+      }
+      // Last-resort full-page scan (gated by _isProfileHeaderMessageButton's
+      // strict rejects so it still can't grab the compose pencil).
+      const all = document.querySelectorAll("main button, main a[role='button']");
+      for (const el of all) {
+        if (_isProfileHeaderMessageButton(el)) return el;
+      }
+      return null;
+    }
+
+    const start = Date.now();
+    let btn = _scanOnce();
+    while (!btn && Date.now() - start < timeoutMs) {
+      await sleep(300);
+      btn = _scanOnce();
+    }
+    return btn;
+  }
+
   // The actual "open chat → type → Send" steps. Runs only when the tab is
   // already on the target profile. Used by both doMessage (when no navigation
   // is needed) and resumePendingMessage (after a navigation). Drives the
@@ -155,35 +232,35 @@
     }
     await sleep(readingPause());
 
-    const _MSG_SELS = [
-      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i])",
-      "a[aria-label*='Message' i]:not([aria-label*='your team' i])",
-      "main button.message-anywhere-button",
-      "[class*='message-anywhere-button']",
-      "button[data-control-name*='message' i]",
-    ];
-    let msgBtn = first(document, _MSG_SELS);
-    if (!msgBtn) {
-      try { msgBtn = await waitFor(_MSG_SELS, { timeout: 8000 }); } catch {}
-    }
-    if (!msgBtn) {
-      const candidates = document.querySelectorAll(
-        "main button:not([disabled]), main a[role='button'], " +
-        ".pvs-profile-actions button:not([disabled]), .pvs-profile-actions a"
-      );
-      for (const el of candidates) {
-        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-        const txt = (el.textContent || "").trim().toLowerCase();
-        if (
-          (/\bmessage\b/.test(lbl) || txt === "message") &&
-          !/your team|recruiter|inmail/i.test(lbl + " " + txt)
-        ) { msgBtn = el; break; }
-      }
-    }
+    // Find the profile-header action button — the BLUE primary "Message"
+    // button next to the avatar (the one in the screenshot). Has to be
+    // strict because LinkedIn renders multiple "message-ish" controls:
+    //   - The messaging dock pencil on the right rail
+    //     (aria-label="Compose a new message") — wrong, opens blank composer.
+    //   - "View in Sales Navigator" / "Save in Sales Navigator" outline
+    //     buttons next to Message — wrong target.
+    //   - Recruiter / InMail buttons further down — wrong context.
+    //
+    // Match strategy:
+    //   1. Scope the search to the profile-header action region only.
+    //   2. Require either exact text "Message" or aria-label starting with
+    //      "Message " (LinkedIn always renders "Message <first-name>" on
+    //      1st-degree connections).
+    //   3. Reject any button inside a Sales Navigator / messaging-dock
+    //      ancestor — defence-in-depth even if a stray label slips through.
+    const msgBtn = await _findProfileMessageButton(8000);
     if (!msgBtn) {
       _spotRemove();
       return { status: "failed", error: "message_button_not_found" };
     }
+    // Scroll the button into the viewport so (a) the spotlight ring is
+    // actually visible to the user and (b) dispatchHumanClick's coordinates
+    // land on the right element. LinkedIn's profile-header action bar is
+    // often scrolled below the fold after the user lands on the page.
+    try {
+      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+      await sleep(450);
+    } catch {}
     _spotUpdate({ stage: "click_message", target: msgBtn, leadName });
     // "Noticed the button" pause before pressing — looks human.
     await sleep(300 + Math.random() * 400);
