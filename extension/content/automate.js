@@ -143,70 +143,100 @@
   function _spotUpdate(opts) { try { globalThis.__lcOverlay?.updateMessageSpotlight?.(opts); } catch {} }
   function _spotRemove() { try { globalThis.__lcOverlay?.removeMessageSpotlight?.(); } catch {} }
 
-  // Strict Message-button finder for the profile-header action row.
-  // Returns the BLUE primary "Message" button, never the Sales Navigator
-  // sibling or the right-rail "Compose new message" pencil. Polls up to
-  // timeoutMs for slow SPA hydration.
+  // Find the BLUE primary "Message" button next to the profile name.
+  //
+  // PRIOR BUG (v1.0.188/189): the finder used `closest('[class*="sales-nav"]')`
+  // to reject buttons. LinkedIn ships profile-page wrappers like
+  // `<div class="...sales-navigator-promo...">` and entire-page chrome
+  // classes containing the substring "sales-nav" — those wrappers
+  // ENCLOSED the real Message button, so `.closest()` walked up the
+  // tree, matched the wrapper, and the strict finder rejected EVERY
+  // button in the profile action bar. Result: "message_button_not_found"
+  // → the bulk send "skipped" the Message button every time.
+  //
+  // Fix: only reject based on the button's OWN attributes (aria-label /
+  // text / href) and the messaging-dock ancestor (which is a small,
+  // well-defined container). Never use wildcard class substrings on
+  // ancestors. We also log every candidate considered so the user can
+  // see exactly why a button was accepted or rejected.
   async function _findProfileMessageButton(timeoutMs = 6000) {
-    // Containers known to host Message buttons we DO NOT want. Anything
-    // descended from one of these is rejected outright.
-    const REJECT_ANCESTORS = [
-      "#msg-overlay", "[data-test-conversations-container]",
-      "[class*='msg-overlay']", "[class*='msg-conversations']",
-      "[class*='sales-nav']", "[data-test-sales-nav]",
-      "[aria-label*='Sales Navigator' i]",
-    ];
-    // Containers where the real profile Message button lives.
-    const HEADER_SCOPES = [
-      ".pv-top-card", ".pv-top-card-v2",
-      ".scaffold-layout__main", ".pvs-profile-actions",
-      "main section.artdeco-card",
-      "main .ph5",
-    ];
-
-    function _isProfileHeaderMessageButton(el) {
+    function _accept(el) {
       if (!el || el.disabled) return false;
-      // Visible in viewport.
       const r = el.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) return false;
-      // Reject if inside a wrong-context container.
-      for (const sel of REJECT_ANCESTORS) {
-        try { if (el.closest(sel)) return false; } catch {}
+
+      // Tightly-defined ancestor reject — ONLY the messaging dock. Anything
+      // broader (sales-nav class wildcard, generic data attributes) catches
+      // page-wide wrappers that contain the real Message button.
+      if (el.closest("#msg-overlay, [data-test-conversations-container], .msg-overlay-list-bubble")) {
+        return false;
       }
+
       const lbl = (el.getAttribute("aria-label") || "").trim();
       const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
       const lblLc = lbl.toLowerCase();
       const txtLc = txt.toLowerCase();
-      // Hard rejects on labels that look like Message but aren't the right one.
-      if (/compose|recruiter|inmail|your team|sales navigator/i.test(lblLc + " " + txtLc)) {
+      const href = (el.getAttribute("href") || "").toLowerCase();
+
+      // Reject on the button's OWN label/text — phrases that mean "this
+      // isn't the profile Message button" no matter where it lives.
+      const own = lblLc + " | " + txtLc;
+      if (
+        own.includes("compose") ||
+        own.includes("recruiter") ||
+        own.includes("inmail") ||
+        own.includes("your team") ||
+        own.includes("save in sales navigator") ||
+        own.includes("view in sales navigator") ||
+        own.includes("open in sales navigator") ||
+        own.includes("view profile") ||
+        own.includes("see your profile")
+      ) {
         return false;
       }
-      // Strict positive match: aria-label starts with "Message " (e.g.
-      // "Message Kelvin Stanly") OR exact text is "Message".
-      if (/^message\b/i.test(lbl)) return true;
-      if (txtLc === "message") return true;
-      // Known stable class.
+      // Reject avatar / cover overlay anchors.
+      if (/\/overlay\/(photo|edit-photo|cover)/.test(href)) return false;
+
+      // Positive matches — strict.
+      if (/^message\b/i.test(lbl)) return true;          // "Message Berna Kekec"
+      if (txtLc === "message") return true;              // icon + word
+      if (/^message\b/.test(txtLc) && txt.length < 60) return true; // "Message Berna"
       if (el.classList && el.classList.contains("message-anywhere-button")) return true;
       return false;
     }
 
-    function _scanOnce() {
-      // Scoped search inside the profile header.
+    // Scopes to look in first (preferred over a full-document scan).
+    const HEADER_SCOPES = [
+      ".pv-top-card", ".pv-top-card-v2",
+      ".pv-top-card__primary-section", ".pv-top-card__non-self",
+      ".pvs-profile-actions", ".pv-top-card__actions",
+      "main section",
+      "main",
+    ];
+
+    function _scanOnce(verbose = false) {
       for (const scopeSel of HEADER_SCOPES) {
-        let scopeEls;
-        try { scopeEls = document.querySelectorAll(scopeSel); } catch { continue; }
-        for (const scope of scopeEls) {
-          const cands = scope.querySelectorAll("button, a[role='button'], a.artdeco-button");
+        let scopes;
+        try { scopes = document.querySelectorAll(scopeSel); } catch { continue; }
+        for (const scope of scopes) {
+          const cands = scope.querySelectorAll("button, a[role='button'], a.artdeco-button, a");
           for (const el of cands) {
-            if (_isProfileHeaderMessageButton(el)) return el;
+            if (_accept(el)) return el;
           }
         }
       }
-      // Last-resort full-page scan (gated by _isProfileHeaderMessageButton's
-      // strict rejects so it still can't grab the compose pencil).
-      const all = document.querySelectorAll("main button, main a[role='button']");
-      for (const el of all) {
-        if (_isProfileHeaderMessageButton(el)) return el;
+      // Diagnostic: log everything we considered so a stuck run is traceable.
+      if (verbose) {
+        const all = document.querySelectorAll("main button, main a");
+        const candidates = [];
+        for (const el of all) {
+          const lbl = (el.getAttribute("aria-label") || "").trim();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60);
+          if (/message/i.test(lbl) || /message/i.test(txt)) {
+            candidates.push(`<${el.tagName.toLowerCase()} aria-label="${lbl}" text="${txt}" accepted=${_accept(el)}>`);
+          }
+        }
+        console.log("[LeadCaptura] msg finder DIAG — Message-ish candidates:", candidates);
       }
       return null;
     }
@@ -217,6 +247,7 @@
       await sleep(300);
       btn = _scanOnce();
     }
+    if (!btn) _scanOnce(true); // log diagnostics on failure
     return btn;
   }
 
