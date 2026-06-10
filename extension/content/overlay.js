@@ -2205,11 +2205,17 @@
       };
     }
 
-    // STEP 3: click "Connect" — human pointer sequence + force fallback.
+    // STEP 3: click "Connect" — spotlight first so the user sees what is
+    // about to be clicked, then human pointer sequence + force fallback.
     console.log("[LeadCaptura] salesNav step 3 → click 'Connect' in dropdown", {
       txt: (connectItem.textContent || "").trim().slice(0, 40),
     });
+    // Visible spotlight cue on the Connect menu item (pointer-events:none on
+    // the overlay so the real click below still lands on the button).
+    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 900);
+    await sleep(950);
     try { await dispatchHumanClick(connectItem); } catch {}
+    _removeSpotlight();
     await sleep(500 + Math.random() * 400);
 
     // STEP 4: did the invitation modal open?
