@@ -1421,6 +1421,7 @@
     let cancelled = false;
     let pageNum = 1;
 
+    try {
     // Outer loop: one iteration per search-results page.
     // In "Save X Selected" mode this runs exactly once.
     outerLoop: while (true) {
@@ -1576,15 +1577,19 @@
       flashStatus(`Page ${pageNum}: saving ${enrichable.length} profile(s)…`);
       renderToolbar();
     }
-
-    state.bulkActive = false;
-    state.bulkProgress = null;
-    // Clear selections so the toolbar resets to "Save All Leads" and the top
-    // pill resets to "☐ Select All" — ready for the next batch immediately.
-    state.selectedUrls.clear();
-    // Bring the top pill back so the user can run another batch immediately.
-    mountSelectAllHeader();
-    renderToolbar();
+    } finally {
+      // Always reset state so the toolbar can't get stuck on "Stop" if any
+      // unhandled exception was thrown above.
+      state.bulkActive = false;
+      state.bulkCancel = false;
+      state.bulkProgress = null;
+      // Clear selections so the toolbar resets to "Save All Leads" and the top
+      // pill resets to "☐ Select All" — ready for the next batch immediately.
+      state.selectedUrls.clear();
+      // Bring the top pill back so the user can run another batch immediately.
+      try { mountSelectAllHeader(); } catch {}
+      try { renderToolbar(); } catch {}
+    }
 
     const pageLabel = pageNum > 1 ? ` across ${pageNum} pages` : "";
     let summary;
@@ -1705,14 +1710,8 @@
   // An element the user can actually see and click (rules out the stale,
   // hidden, detached modal duplicates LinkedIn can leave in the DOM — clicking
   // one of those does nothing while the real visible modal stays open).
-  function _isVisible(el) {
-    if (!el || !el.isConnected) return false;
-    const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) return false;
-    const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
-    return true;
-  }
+  // _isVisible is defined later in the file (line ~2608) and shadowed via
+  // function-hoisting. The strict version that lived here was dead code.
 
   // Return the VISIBLE "Add a note to your invitation?" modal element, or null.
   function _findInvitationModal() {
