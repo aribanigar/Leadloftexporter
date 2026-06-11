@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
     secure: useImplicitTls,
     requireTLS: !useImplicitTls,
     auth: { user: username, pass: password },
+    tls: { rejectUnauthorized: false },
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,

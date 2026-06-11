@@ -59,12 +59,15 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
   if (send_config.provider === "smtp" && send_config.smtp) {
     const { host, port, username, password } = send_config.smtp;
     const useImplicitTls = Number(port) === 465;
+    // tls.rejectUnauthorized: false is required for Hostinger, Zoho, etc. —
+    // see /api/smtp-connect for the full rationale.
     const t = nodemailer.createTransport({
       host,
       port: Number(port),
       secure: useImplicitTls,
       requireTLS: !useImplicitTls,
       auth: { user: username, pass: password },
+      tls: { rejectUnauthorized: false },
       connectionTimeout: 15_000,
       greetingTimeout: 10_000,
       socketTimeout: 20_000,

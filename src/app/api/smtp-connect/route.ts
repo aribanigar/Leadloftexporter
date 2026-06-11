@@ -44,12 +44,18 @@ export async function POST(req: NextRequest) {
   }
 
   const useImplicitTls = Number(port) === 465;
+  // tls.rejectUnauthorized: false is REQUIRED for Hostinger, Zoho, and many
+  // other shared SMTP servers whose cert chain trips nodemailer's strict
+  // validation. Without this the verify() silently fails with "self signed
+  // certificate" or stalls past the timeout. The auth itself still requires
+  // the password — this only relaxes cert validation, not authentication.
   const transporter = nodemailer.createTransport({
     host,
     port: Number(port),
     secure: useImplicitTls,
     requireTLS: !useImplicitTls,
     auth: { user: username, pass: password },
+    tls: { rejectUnauthorized: false },
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
