@@ -1,398 +1,1456 @@
-"use client";
+'use client';
 
 /**
- * Campaign Detail — live progress, pause/resume/cancel, and recipient list.
+ * Campaign Detail / Report — ported from the email-marketing module, rewired
+ * to the LeadCaptura FastAPI backend (api() client only).
  *
- * The frontend POLLS /campaigns/{id}/tick every 3 s while the campaign is
- * in "sending" status. That same endpoint runs on Celery beat too, but on
- * Render free tier no worker exists, so this poll IS the send loop. Each
- * tick advances the campaign by `batch_size` recipients and returns the
- * fresh counters in one call, so we don't need separate /status fetches.
+ * Backend contract used here:
+ *   GET  /campaigns/{id}              → full campaign dict
+ *   GET  /campaigns/{id}/stats        → deliverability report (snake_case)
+ *   GET  /campaigns/{id}/recipients   → recipient rows (id,email,status,error,sent_at,…)
+ *   POST /campaigns/{id}/start        → begin sending (validates senders + first tick)
+ *   POST /campaigns/{id}/tick         → advance one batch (frontend poll IS the send loop)
+ *   POST /campaigns/{id}/pause|resume|cancel
+ *   POST /campaigns/{id}/duplicate
  *
- * The recipient list refreshes alongside the status. Pause stops the
- * poll; Resume restarts it. Cancel finalizes the campaign.
+ * There is no DELETE endpoint and no open/click tracking per-recipient beyond
+ * the recipient `status` (opened|clicked). "Campaign Replies" was Via-Kashmir
+ * filler in the source and is dropped. See the report at end of session.
  */
 
-import { use, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import {
-  Mail,
-  Pause,
-  Play,
-  X,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  ChevronLeft,
-  Clock,
-} from "lucide-react";
-import { api } from "@/lib/api";
-import { cn, fmtDate } from "@/lib/utils";
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { api, ApiError } from '@/lib/api';
 
-interface CampaignDetail {
-  id: string;
-  name: string;
-  subject: string;
-  preheader: string | null;
-  body_html: string;
-  body_text: string | null;
-  status: string;
-  total_recipients: number;
-  sent_count: number;
-  failed_count: number;
-  skipped_count: number;
-  started_at: string | null;
-  finished_at: string | null;
-  last_tick_at: string | null;
-  batch_size: number;
-  seconds_between_sends: number;
-  warmup_enabled: boolean;
-  sender_account_ids: string[];
-  error: string | null;
-}
+// ─── Types (backend shapes) ────────────────────────────────────────────────
 
-interface Recipient {
+interface RecipientRow {
   id: string;
-  lead_id: string;
+  lead_id: string | null;
   lead_name: string | null;
   email: string;
-  status: string;
+  status: string; // pending | sending | sent | failed | skipped | opened | clicked | bounced
   error: string | null;
   sent_at: string | null;
   sender_account_id: string | null;
 }
 
-interface TickResp {
+interface TrackedLink {
+  tracking_id?: string;
+  original_url?: string;
+  url?: string;
+  clicks?: number;
+}
+
+interface StatsResp {
+  campaign: { name: string; subject: string; status: string; goal: string | null; sent_at: string | null };
+  stats: {
+    total: number;
+    sent: number;
+    opened: number;
+    clicked: number;
+    bounced: number;
+    open_rate: number;
+    click_rate: number;
+    bounce_rate: number;
+    delivery_rate: number;
+  };
+  status_counts: Record<string, number>;
+  performance: 'good' | 'average' | 'critical';
+  what_went_well: string[];
+  what_needs_work: string[];
+  analysis: string[];
+  goal_achieved: number;
+  goal_label: string;
+  benchmarks: { open_target: number; click_target: number };
+  links: TrackedLink[];
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  subject: string;
+  preheader: string | null;
+  body_html: string;
   status: string;
-  totals: {
-    total_recipients: number;
-    sent_count: number;
-    failed_count: number;
-    skipped_count: number;
+  from_name: string | null;
+  from_email: string | null;
+  reply_to: string | null;
+  goal: string | null;
+  tags: string[];
+  merge_columns: string[];
+  sender_account_ids: string[];
+  batch_size: number;
+  seconds_between_sends: number;
+  warmup_enabled: boolean;
+  scheduled_for: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  last_tick_at: string | null;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  skipped_count: number;
+  opened_count: number;
+  clicked_count: number;
+  bounced_count: number;
+  error: string | null;
+  created_at: string;
+}
+
+// ── Normalised UI shapes (kept from the source module) ──
+
+type Perf = 'good' | 'average' | 'critical';
+
+interface UiRecipient {
+  email: string;
+  status: 'pending' | 'sent' | 'opened' | 'clicked' | 'bounced';
+  opened: boolean;
+  clicks: number;
+  bouncedAt?: string;
+}
+
+interface UiLink {
+  trackingId?: string;
+  url: string;
+  clicks: number;
+}
+
+interface UiStats {
+  totalRecipients: number;
+  sent: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  deliveryRate: number;
+  openRate: number;
+  clickRate: number;
+  bounceRate: number;
+  performance: Perf;
+  analysis: string[];
+  whatWentWell: string[];
+  whatNeedsWork: string[];
+  goalAchieved?: number;
+  goalLabel?: string;
+  benchmarks?: { openTarget: number; clickTarget: number };
+  links: UiLink[];
+  recipients: UiRecipient[];
+}
+
+// ─── Design Tokens ──────────────────────────────────────────────────────────
+
+const T = {
+  primary: '#00361a',
+  primaryContainer: '#1a4d2e',
+  surface: '#f8f9fa',
+  surfaceContainerLow: '#f3f4f5',
+  surfaceContainer: '#edeeef',
+  surfaceContainerLowest: '#ffffff',
+  onSurface: '#191c1d',
+  onSurfaceVariant: '#414942',
+  secondary: '#13677b',
+  saffron: '#ffdcc4',
+  ghost: 'rgba(193,201,191,0.15)',
+  shadow: '0 8px 40px rgba(25,28,29,0.04)',
+  gradientCta: 'linear-gradient(135deg, #00361a, #1a4d2e)',
+};
+
+const PAGE_SIZE = 50;
+
+const RECIPIENT_STATUS_CFG: Record<UiRecipient['status'], { bg: string; color: string; label: string }> = {
+  pending: { bg: 'rgba(65,73,66,0.08)', color: '#414942', label: 'Pending' },
+  sent: { bg: 'rgba(19,103,123,0.1)', color: '#13677b', label: 'Sent' },
+  opened: { bg: 'rgba(255,220,196,0.45)', color: '#92400e', label: 'Opened' },
+  clicked: { bg: 'rgba(0,54,26,0.1)', color: '#00361a', label: 'Clicked' },
+  bounced: { bg: 'rgba(220,38,38,0.1)', color: '#dc2626', label: 'Bounced' },
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function fmtDate(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleString('en-US', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true,
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function timeAgo(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days !== 1 ? 's' : ''} ago`;
+}
+
+function normaliseRecipient(r: RecipientRow): UiRecipient {
+  const opened = r.status === 'opened' || r.status === 'clicked';
+  const clicks = r.status === 'clicked' ? 1 : 0;
+  let status: UiRecipient['status'] = 'pending';
+  if (r.status === 'clicked') status = 'clicked';
+  else if (r.status === 'opened') status = 'opened';
+  else if (r.status === 'bounced' || r.status === 'failed') status = 'bounced';
+  else if (r.status === 'sent') status = 'sent';
+  return {
+    email: r.email,
+    status,
+    opened,
+    clicks,
+    bouncedAt: r.status === 'bounced' || r.status === 'failed' ? r.sent_at ?? undefined : undefined,
   };
 }
 
-export default function CampaignDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
+// ─── Toast ─────────────────────────────────────────────────────────────────
+
+function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div style={{
+      position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)',
+      background: type === 'success' ? T.gradientCta : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+      color: '#fff', borderRadius: '12px', padding: '13px 26px',
+      fontSize: '13px', fontWeight: 600, zIndex: 9999,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      display: 'flex', alignItems: 'center', gap: '10px',
+      whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+    }}>
+      <span className="material-symbols-outlined" style={{ fontSize: '17px', fontVariationSettings: "'FILL' 1" }}>
+        {type === 'success' ? 'check_circle' : 'error'}
+      </span>
+      {msg}
+    </div>
+  );
+}
+
+// ─── Confirm Dialog ─────────────────────────────────────────────────────────
+
+function ConfirmDialog({ message, confirmLabel, onConfirm, onCancel }: {
+  message: string; confirmLabel: string; onConfirm: () => void; onCancel: () => void;
 }) {
-  const { id } = use(params);
-  const qc = useQueryClient();
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(25,28,29,0.45)',
+      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      backdropFilter: 'blur(4px)',
+    }}>
+      <div style={{
+        backgroundColor: T.surfaceContainerLowest, borderRadius: '16px', padding: '32px',
+        maxWidth: '420px', width: '100%', boxShadow: '0 24px 80px rgba(25,28,29,0.18)',
+      }}>
+        <h3 style={{ fontSize: '17px', fontWeight: 700, color: T.onSurface, margin: '0 0 10px', fontFamily: 'Manrope, sans-serif' }}>
+          Confirm Action
+        </h3>
+        <p style={{ fontSize: '14px', color: T.onSurfaceVariant, margin: '0 0 28px', lineHeight: 1.65, fontFamily: 'Inter, sans-serif' }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={{
+            padding: '10px 20px', border: 'none', borderRadius: '8px',
+            fontSize: '13px', fontWeight: 600, color: T.onSurfaceVariant,
+            backgroundColor: T.surfaceContainer, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+          }}>Cancel</button>
+          <button onClick={onConfirm} style={{
+            padding: '10px 20px', border: 'none', borderRadius: '8px',
+            fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#dc2626',
+            cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+          }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const { data: campaign } = useQuery<CampaignDetail>({
-    queryKey: ["campaign", id],
-    queryFn: () => api(`/campaigns/${id}`),
-    refetchInterval: (query) => {
-      const d = query.state.data as CampaignDetail | undefined;
-      return d && d.status === "sending" ? 3000 : 15_000;
-    },
+// ─── Mini Bar Chart ─────────────────────────────────────────────────────────
+
+function MiniBarChart({ value }: { value: number }) {
+  const bars = Array.from({ length: 7 }, (_, i) => {
+    const seed = (value * (i + 1) * 31) % 100;
+    return Math.max(15, seed);
   });
+  const max = Math.max(...bars);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '40px' }}>
+      {bars.map((h, i) => (
+        <div key={i} style={{
+          width: '8px',
+          height: `${(h / max) * 100}%`,
+          backgroundColor: i === bars.length - 1 ? T.primary : `rgba(0,54,26,${0.3 + (i / bars.length) * 0.5})`,
+          borderRadius: '3px 3px 0 0',
+          transition: 'height 0.4s ease',
+        }} />
+      ))}
+    </div>
+  );
+}
 
-  const { data: recipients } = useQuery<Recipient[]>({
-    queryKey: ["campaign-recipients", id],
-    queryFn: () => api(`/campaigns/${id}/recipients?limit=200`),
-    refetchInterval: (query) => {
-      const d = (qc.getQueryData(["campaign", id]) as CampaignDetail | undefined);
-      return d && d.status === "sending" ? 5000 : 30_000;
-    },
-  });
+// ─── Campaign Status Badge (perf) ─────────────────────────────────────────────
 
-  // The poll-driven send tick. Runs every 3 s while status === "sending".
-  const tick = useMutation<TickResp, Error, void>({
-    mutationFn: () => api(`/campaigns/${id}/tick`, { method: "POST" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["campaign", id] });
-      qc.invalidateQueries({ queryKey: ["campaign-recipients", id] });
-    },
-  });
+function CampaignStatusBadge({ performance }: { performance?: Perf }) {
+  if (!performance) return null;
+  const cfg = {
+    good: { bg: 'rgba(0,54,26,0.08)', border: 'rgba(0,54,26,0.15)', icon: 'check_circle', color: T.primary, label: 'Good', iconColor: '#16a34a' },
+    average: { bg: 'rgba(255,220,196,0.5)', border: 'rgba(146,64,14,0.2)', icon: 'warning', color: '#92400e', label: 'Average', iconColor: '#d97706' },
+    critical: { bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.2)', icon: 'warning', color: '#dc2626', label: 'Critical Attention', iconColor: '#dc2626' },
+  }[performance];
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      backgroundColor: cfg.bg,
+      border: `1px solid ${cfg.border}`,
+      borderRadius: '10px', padding: '8px 14px',
+    }}>
+      <span className="material-symbols-outlined" style={{ fontSize: '15px', color: cfg.iconColor, fontVariationSettings: "'FILL' 1" }}>
+        {cfg.icon}
+      </span>
+      <div>
+        <div style={{ fontSize: '9px', fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Inter, sans-serif' }}>
+          Campaign Status
+        </div>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: cfg.color, fontFamily: 'Manrope, sans-serif' }}>
+          {cfg.label}
+        </div>
+      </div>
+    </div>
+  );
+}
 
+// ─── Three-dot Menu ───────────────────────────────────────────────────────────
+
+function ActionMenu({
+  campaign, sending, duplicating, onStart, onDuplicate, onCancel, onPause, onResume,
+}: {
+  campaign: Campaign; sending: boolean; duplicating: boolean;
+  onStart: () => void; onDuplicate: () => void; onCancel: () => void;
+  onPause: () => void; onResume: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (campaign?.status !== "sending") return;
-    const i = setInterval(() => {
-      tick.mutate();
-    }, 3000);
-    return () => clearInterval(i);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign?.status]);
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-  const pause = useMutation({
-    mutationFn: () => api(`/campaigns/${id}/pause`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaign", id] }),
-  });
-  const resume = useMutation({
-    mutationFn: () => api(`/campaigns/${id}/resume`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaign", id] }),
-  });
-  const cancel = useMutation({
-    mutationFn: () => api(`/campaigns/${id}/cancel`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaign", id] }),
-  });
+  const canStart = campaign.status === 'draft' || campaign.status === 'scheduled';
+  const items: { label: string; icon: string; color?: string; onClick: () => void; disabled?: boolean }[] = [
+    ...(canStart ? [{
+      label: sending ? 'Starting…' : 'Send Campaign',
+      icon: 'send', color: T.primary,
+      onClick: () => { setOpen(false); onStart(); },
+      disabled: sending,
+    }] : []),
+    ...(campaign.status === 'paused' ? [{
+      label: sending ? 'Resuming…' : 'Resume Campaign',
+      icon: 'play_arrow', color: T.primary,
+      onClick: () => { setOpen(false); onResume(); },
+      disabled: sending,
+    }] : []),
+    ...(campaign.status === 'sending' ? [{
+      label: 'Pause Campaign',
+      icon: 'pause_circle', color: '#c8a84b',
+      onClick: () => { setOpen(false); onPause(); },
+    }] : []),
+    {
+      label: 'Edit Campaign',
+      icon: 'edit',
+      onClick: () => { window.location.href = `/campaigns/new?id=${campaign.id}`; },
+    },
+    {
+      label: duplicating ? 'Duplicating…' : 'Duplicate',
+      icon: 'content_copy',
+      onClick: () => { setOpen(false); onDuplicate(); },
+      disabled: duplicating,
+    },
+    ...(campaign.status === 'sending' || campaign.status === 'paused' ? [{
+      label: 'Cancel Campaign',
+      icon: 'cancel', color: '#dc2626',
+      onClick: () => { setOpen(false); onCancel(); },
+    }] : []),
+  ];
 
-  if (!campaign) {
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '38px', height: '38px', borderRadius: '8px', border: 'none',
+          backgroundColor: open ? T.surfaceContainer : 'transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 0.15s',
+        }}
+        aria-label="Campaign actions"
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '20px', color: T.onSurfaceVariant }}>more_vert</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '44px', right: 0,
+          backgroundColor: T.surfaceContainerLowest,
+          borderRadius: '12px', padding: '6px',
+          boxShadow: '0 12px 40px rgba(25,28,29,0.14)',
+          minWidth: '180px', zIndex: 200,
+        }}>
+          {items.map((item, i) => (
+            <button
+              key={i}
+              onClick={item.onClick}
+              disabled={item.disabled}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 14px', border: 'none', borderRadius: '8px',
+                backgroundColor: 'transparent', cursor: item.disabled ? 'not-allowed' : 'pointer',
+                fontSize: '13px', fontWeight: 600, color: item.color ?? T.onSurface,
+                fontFamily: 'Inter, sans-serif', textAlign: 'left',
+                opacity: item.disabled ? 0.5 : 1,
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => { if (!item.disabled) (e.currentTarget as HTMLButtonElement).style.backgroundColor = T.surfaceContainerLow; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Hero Stat Card ─────────────────────────────────────────────────────────
+
+function HeroStatCard({
+  icon, label, value, trend, trendUp, progressPct,
+}: {
+  icon: string; label: string; value: string; trend?: string; trendUp?: boolean; progressPct: number;
+}) {
+  return (
+    <div style={{
+      backgroundColor: T.surfaceContainerLowest,
+      borderRadius: '12px',
+      padding: '24px 24px 0',
+      boxShadow: T.shadow,
+      display: 'flex', flexDirection: 'column', gap: '12px',
+      overflow: 'hidden', flex: 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '10px',
+            backgroundColor: T.surfaceContainerLow,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: T.primary, fontVariationSettings: "'FILL' 1" }}>
+              {icon}
+            </span>
+          </div>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+            {label}
+          </span>
+        </div>
+        {trend && (
+          <span style={{
+            fontSize: '12px', fontWeight: 700,
+            backgroundColor: trendUp ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)',
+            color: trendUp ? '#16a34a' : '#dc2626',
+            borderRadius: '6px', padding: '3px 8px', fontFamily: 'Inter, sans-serif',
+          }}>
+            {trend}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: '48px', fontWeight: 900, color: T.onSurface, fontFamily: 'Manrope, sans-serif', lineHeight: 1, letterSpacing: '-0.02em' }}>
+        {value}
+      </div>
+      <div style={{
+        height: '3px', backgroundColor: T.surfaceContainer, borderRadius: '0',
+        margin: '0 -24px',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${Math.min(progressPct, 100)}%`,
+          background: T.gradientCta,
+          borderRadius: '0',
+          transition: 'width 0.6s ease',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function CampaignDetailPage() {
+  const params = useParams();
+  const id = (params?.id as string) || '';
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [stats, setStats] = useState<UiStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [sending, setSending] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [selectedLinkUrl, setSelectedLinkUrl] = useState<string | null>(null);
+  const [showAllLinks, setShowAllLinks] = useState(false);
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusRef = useRef<string | null>(null);
+
+  // ── Fetch campaign
+  const fetchCampaign = useCallback(async () => {
+    try {
+      const c = await api<Campaign>(`/campaigns/${id}`);
+      setCampaign(c);
+      statusRef.current = c.status;
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  // ── Fetch stats + recipients (merged into the UiStats shape the UI expects)
+  const fetchStats = useCallback(async (quiet = false) => {
+    if (!quiet) setStatsLoading(true);
+    try {
+      const [s, recips] = await Promise.all([
+        api<StatsResp>(`/campaigns/${id}/stats`),
+        api<RecipientRow[]>(`/campaigns/${id}/recipients?limit=500`),
+      ]);
+      const links: UiLink[] = (s.links ?? []).map(l => ({
+        trackingId: l.tracking_id,
+        url: l.original_url ?? l.url ?? '',
+        clicks: l.clicks ?? 0,
+      }));
+      setStats({
+        totalRecipients: s.stats.total,
+        sent: s.stats.sent,
+        opened: s.stats.opened,
+        clicked: s.stats.clicked,
+        bounced: s.stats.bounced,
+        deliveryRate: s.stats.delivery_rate,
+        openRate: s.stats.open_rate,
+        clickRate: s.stats.click_rate,
+        bounceRate: s.stats.bounce_rate,
+        performance: s.performance,
+        analysis: s.analysis ?? [],
+        whatWentWell: s.what_went_well ?? [],
+        whatNeedsWork: s.what_needs_work ?? [],
+        goalAchieved: s.goal_achieved,
+        goalLabel: s.goal_label,
+        benchmarks: s.benchmarks
+          ? { openTarget: s.benchmarks.open_target, clickTarget: s.benchmarks.click_target }
+          : undefined,
+        links,
+        recipients: (recips ?? []).map(normaliseRecipient),
+      });
+    } catch {
+      // silent — stats may 404 transiently before first tick
+    } finally {
+      if (!quiet) setStatsLoading(false);
+    }
+  }, [id]);
+
+  // ── The poll-driven send tick. While sending, advance one batch per call.
+  const runTick = useCallback(async () => {
+    try {
+      const r = await api<{ status: string }>(`/campaigns/${id}/tick`, { method: 'POST' });
+      // Refresh status + counters cheaply via the full campaign read.
+      await fetchCampaign();
+      await fetchStats(true);
+      if (r.status !== 'sending' && pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    } catch {
+      // silent — keep polling
+    }
+  }, [id, fetchCampaign, fetchStats]);
+
+  // ── Initial load
+  useEffect(() => {
+    fetchCampaign();
+    fetchStats();
+  }, [fetchCampaign, fetchStats]);
+
+  // ── Polling: tick + refresh while sending
+  useEffect(() => {
+    if (campaign?.status === 'sending') {
+      if (!pollRef.current) {
+        pollRef.current = setInterval(() => { runTick(); }, 3000);
+      }
+    } else if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    };
+  }, [campaign?.status, runTick]);
+
+  // ── Start campaign
+  const handleStart = async () => {
+    setSending(true);
+    try {
+      await api(`/campaigns/${id}/start`, { method: 'POST' });
+      setToast({ msg: 'Campaign is sending…', type: 'success' });
+      setCampaign(prev => prev ? { ...prev, status: 'sending' } : prev);
+      await fetchStats(true);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to start';
+      setToast({ msg, type: 'error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── Pause
+  const handlePause = async () => {
+    try {
+      await api(`/campaigns/${id}/pause`, { method: 'POST' });
+      setToast({ msg: 'Campaign paused — stops after the current batch', type: 'success' });
+      setCampaign(prev => prev ? { ...prev, status: 'paused' } : prev);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to pause';
+      setToast({ msg, type: 'error' });
+    }
+  };
+
+  // ── Resume
+  const handleResume = async () => {
+    setSending(true);
+    try {
+      await api(`/campaigns/${id}/resume`, { method: 'POST' });
+      setToast({ msg: 'Campaign resumed', type: 'success' });
+      setCampaign(prev => prev ? { ...prev, status: 'sending' } : prev);
+      await fetchStats(true);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to resume';
+      setToast({ msg, type: 'error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── Cancel
+  const handleCancel = async () => {
+    setShowCancelConfirm(false);
+    try {
+      await api(`/campaigns/${id}/cancel`, { method: 'POST' });
+      setToast({ msg: 'Campaign cancelled', type: 'success' });
+      setCampaign(prev => prev ? { ...prev, status: 'cancelled' } : prev);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to cancel';
+      setToast({ msg, type: 'error' });
+    }
+  };
+
+  // ── Duplicate
+  const handleDuplicate = async () => {
+    setDuplicating(true);
+    try {
+      const r = await api<{ id: string }>(`/campaigns/${id}/duplicate`, { method: 'POST' });
+      setToast({ msg: 'Campaign duplicated', type: 'success' });
+      setTimeout(() => { window.location.href = `/campaigns/${r.id}`; }, 900);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to duplicate';
+      setToast({ msg, type: 'error' });
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  // ── Derived
+  const filteredRecipients = (stats?.recipients ?? []).filter(r =>
+    r.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const totalPages = Math.ceil(filteredRecipients.length / PAGE_SIZE);
+  const pagedRecipients = filteredRecipients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // ── Loading state
+  if (loading) {
     return (
-      <div className="grid h-full place-items-center text-sm text-slate-400">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', backgroundColor: T.surface, flexDirection: 'column', gap: '16px',
+        fontFamily: 'Inter, sans-serif',
+      }}>
+        <div style={{
+          width: '36px', height: '36px', border: `3px solid ${T.primary}`,
+          borderTopColor: 'transparent', borderRadius: '50%',
+          animation: 'spin 0.7s linear infinite',
+        }} />
+        <span style={{ fontSize: '14px', color: T.onSurfaceVariant }}>Loading campaign…</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  const total = Math.max(1, campaign.total_recipients);
-  const finishedRecipients =
-    campaign.sent_count + campaign.failed_count + campaign.skipped_count;
-  const pct = Math.round((finishedRecipients / total) * 100);
-  const isLive = campaign.status === "sending";
-  const isPaused = campaign.status === "paused";
-  const isDone =
-    campaign.status === "completed" || campaign.status === "cancelled";
+  if (!campaign) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', gap: '16px', backgroundColor: T.surface, fontFamily: 'Inter, sans-serif',
+      }}>
+        <span className="material-symbols-outlined" style={{ fontSize: '48px', color: T.surfaceContainer }}>campaign</span>
+        <p style={{ fontSize: '16px', color: T.onSurfaceVariant }}>Campaign not found</p>
+        <Link href="/campaigns" style={{ color: T.primary, fontSize: '14px', fontWeight: 600 }}>
+          Back to campaigns
+        </Link>
+      </div>
+    );
+  }
+
+  const updatedAt = campaign.finished_at || campaign.started_at || campaign.created_at;
+  const openRate = stats?.openRate ?? 0;
+  const clickRate = stats?.clickRate ?? 0;
+
+  const openTrend = stats?.benchmarks
+    ? `${openRate >= stats.benchmarks.openTarget ? '+' : ''}${(openRate - stats.benchmarks.openTarget).toFixed(1)}%`
+    : null;
+  const clickTrend = stats?.benchmarks
+    ? `${clickRate >= stats.benchmarks.clickTarget ? '+' : ''}${(clickRate - stats.benchmarks.clickTarget).toFixed(1)}%`
+    : null;
+
+  const bouncedRecipients = (stats?.recipients ?? []).filter(r => r.status === 'bounced');
+  const maxLinkClicks = stats ? Math.max(...(stats.links.map(l => l.clicks)), 1) : 1;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      {/* Header */}
-      <Link
-        href="/campaigns"
-        className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-700"
-      >
-        <ChevronLeft className="h-3.5 w-3.5" />
-        Back to campaigns
-      </Link>
-      <div className="mb-1 flex items-start justify-between gap-3">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <Mail className="h-5 w-5 text-indigo-600" />
-            <h1 className="text-lg font-semibold">{campaign.name}</h1>
-            <StatusPill status={campaign.status} />
+    <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: T.surface, minHeight: '100vh', paddingBottom: '60px' }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+        @keyframes liveDot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
+        * { box-sizing: border-box; }
+      `}</style>
+
+      {/* ─── Header ──────────────────────────────────────────────────────────── */}
+      <div style={{
+        backgroundColor: T.surfaceContainerLowest,
+        borderBottom: `1px solid ${T.ghost}`,
+        padding: '20px 32px',
+        position: 'sticky', top: 0, zIndex: 100,
+        boxShadow: '0 2px 12px rgba(25,28,29,0.04)',
+      }}>
+        <Link href="/campaigns" style={{
+          display: 'inline-flex', alignItems: 'center', gap: '5px',
+          color: T.onSurfaceVariant, textDecoration: 'none', fontSize: '12px', fontWeight: 600,
+          letterSpacing: '0.02em', marginBottom: '10px',
+          transition: 'color 0.15s',
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>arrow_back</span>
+          Back to Campaigns
+        </Link>
+
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{
+              fontSize: '28px', fontWeight: 900, color: T.onSurface,
+              margin: '0 0 4px', fontFamily: 'Manrope, sans-serif', lineHeight: 1.15,
+              letterSpacing: '-0.02em',
+            }}>
+              {campaign.name}
+            </h1>
+            <p style={{ fontSize: '13px', color: T.onSurfaceVariant, margin: 0, fontFamily: 'Inter, sans-serif' }}>
+              Individual campaign performance &mdash;&nbsp;Last updated {timeAgo(updatedAt)}
+              {campaign.status === 'sending' && (
+                <span style={{ marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{
+                    width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a',
+                    animation: 'liveDot 1.4s ease-in-out infinite', display: 'inline-block',
+                  }} />
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>Live — sending every 3s</span>
+                </span>
+              )}
+            </p>
           </div>
-          <div className="text-sm text-slate-500">
-            <strong>Subject:</strong> {campaign.subject || "(none)"}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CampaignStatusBadge performance={stats?.performance} />
+            <ActionMenu
+              campaign={campaign}
+              sending={sending}
+              duplicating={duplicating}
+              onStart={handleStart}
+              onDuplicate={handleDuplicate}
+              onCancel={() => setShowCancelConfirm(true)}
+              onPause={handlePause}
+              onResume={handleResume}
+            />
           </div>
-        </div>
-        <div className="flex gap-2">
-          {isLive && (
-            <button className="btn-secondary" onClick={() => pause.mutate()}>
-              <Pause className="h-4 w-4" /> Pause
-            </button>
-          )}
-          {isPaused && (
-            <button
-              className="btn bg-indigo-600 text-white hover:bg-indigo-700"
-              onClick={() => resume.mutate()}
-            >
-              <Play className="h-4 w-4" /> Resume
-            </button>
-          )}
-          {(isLive || isPaused) && (
-            <button
-              className="btn-danger"
-              onClick={() => {
-                if (window.confirm("Cancel this campaign? Pending recipients won't be sent.")) {
-                  cancel.mutate();
-                }
-              }}
-            >
-              <X className="h-4 w-4" /> Halt
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Progress card */}
-      <div className="card mb-5 p-5">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold">
-              {finishedRecipients.toLocaleString()} /{" "}
-              {campaign.total_recipients.toLocaleString()} processed
-            </span>
-            <span className="text-slate-400">·</span>
-            <span className="text-slate-500">{pct}%</span>
-          </div>
-          {campaign.last_tick_at && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-              <Clock className="h-3 w-3" />
-              Last tick {fmtDate(campaign.last_tick_at)}
-            </span>
+      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '28px 20px' }}>
+
+        {/* ═══ Campaign Meta Info Bar ══════════════════════════════ */}
+        <div style={{
+          backgroundColor: T.surfaceContainerLowest,
+          borderRadius: '12px', padding: '16px 20px',
+          marginBottom: '20px', boxShadow: T.shadow,
+          display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start',
+        }}>
+          {[
+            { icon: 'person', label: 'From', value: campaign.from_name ? `${campaign.from_name}${campaign.from_email ? ` <${campaign.from_email}>` : ''}` : (campaign.from_email || '—') },
+            { icon: 'reply', label: 'Reply-to', value: campaign.reply_to || campaign.from_email || '—' },
+            { icon: 'flag', label: 'Goal', value: campaign.goal || '—' },
+            {
+              icon: 'schedule', label: campaign.finished_at ? 'Finished at' : campaign.started_at ? 'Started at' : 'Scheduled',
+              value: campaign.finished_at ? fmtDate(campaign.finished_at) : campaign.started_at ? fmtDate(campaign.started_at) : campaign.scheduled_for ? fmtDate(campaign.scheduled_for) : '—',
+            },
+            { icon: 'timer', label: 'Send delay', value: `${campaign.seconds_between_sends}s between sends` },
+            { icon: 'all_inbox', label: 'Batch size', value: `${campaign.batch_size} / tick` },
+            { icon: 'local_fire_department', label: 'Warmup', value: campaign.warmup_enabled ? 'Enabled' : 'Off' },
+          ].map(item => (
+            <div key={item.label} style={{ minWidth: '160px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: T.onSurfaceVariant }}>{item.icon}</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+                  {item.label}
+                </span>
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: T.onSurface, fontFamily: 'Inter, sans-serif' }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+          {campaign.merge_columns && campaign.merge_columns.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: T.onSurfaceVariant }}>data_table</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+                  Personalisation tags
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                {campaign.merge_columns.map(col => (
+                  <span key={col} style={{
+                    padding: '2px 8px', borderRadius: '99px',
+                    backgroundColor: 'rgba(0,54,26,0.07)', color: T.primary,
+                    fontSize: '11px', fontWeight: 700, fontFamily: '"Fira Code", monospace',
+                  }}>{`{${col}}`}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {campaign.tags && campaign.tags.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: T.onSurfaceVariant }}>label</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>Tags</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                {campaign.tags.map(tag => (
+                  <span key={tag} style={{
+                    padding: '2px 8px', borderRadius: '99px',
+                    backgroundColor: T.surfaceContainerLow, color: T.onSurfaceVariant,
+                    fontSize: '11px', fontWeight: 600, fontFamily: 'Inter, sans-serif',
+                  }}>{tag}</span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all duration-500",
-              campaign.status === "failed"
-                ? "bg-red-500"
-                : isDone && campaign.failed_count > 0
-                ? "bg-amber-500"
-                : isDone
-                ? "bg-emerald-500"
-                : "bg-indigo-500"
+
+        {/* ═══ Hero Stats ══════════════════════════════ */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <HeroStatCard
+            icon="visibility"
+            label="Reading Rate"
+            value={stats ? `${openRate.toFixed(1)}%` : '—'}
+            trend={openTrend ?? undefined}
+            trendUp={openTrend ? !openTrend.startsWith('-') : undefined}
+            progressPct={openRate}
+          />
+          <HeroStatCard
+            icon="ads_click"
+            label="Click Rate"
+            value={stats ? `${clickRate.toFixed(1)}%` : '—'}
+            trend={clickTrend ?? undefined}
+            trendUp={clickTrend ? !clickTrend.startsWith('-') : undefined}
+            progressPct={clickRate}
+          />
+        </div>
+
+        {/* ═══ Real-time Delivery + Link Analytics ══════════════════════════════ */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+
+          {/* Real-time Delivery */}
+          <div style={{
+            backgroundColor: T.surfaceContainerLowest,
+            borderRadius: '12px',
+            padding: '24px',
+            boxShadow: T.shadow,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{
+                width: '7px', height: '7px', borderRadius: '50%',
+                backgroundColor: '#16a34a',
+                animation: campaign.status === 'sending' ? 'liveDot 1.4s ease-in-out infinite' : 'none',
+                display: 'inline-block', flexShrink: 0,
+              }} />
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: 0, fontFamily: 'Manrope, sans-serif' }}>
+                Real-time Delivery
+              </h2>
+            </div>
+            <p style={{ fontSize: '12px', color: T.onSurfaceVariant, margin: '0 0 20px', fontFamily: 'Inter, sans-serif' }}>
+              Live feed of transmission progress
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#16a34a', marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                    Delivered
+                  </div>
+                  <div style={{ fontSize: '34px', fontWeight: 900, color: '#16a34a', fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
+                    {campaign.sent_count.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.onSurfaceVariant, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                    Queued
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 900, color: T.onSurfaceVariant, fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
+                    {Math.max(0, campaign.total_recipients - campaign.sent_count - campaign.failed_count - campaign.skipped_count).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.onSurfaceVariant, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                    Failed / Skipped
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: T.onSurface, fontFamily: 'Manrope, sans-serif' }}>
+                    {(campaign.failed_count + campaign.skipped_count).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <MiniBarChart value={campaign.sent_count} />
+            </div>
+          </div>
+
+          {/* Link Analytics */}
+          <div style={{
+            backgroundColor: T.surfaceContainerLowest,
+            borderRadius: '12px', padding: '24px',
+            boxShadow: T.shadow, display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: '0 0 2px', fontFamily: 'Manrope, sans-serif' }}>
+                  Link Analytics
+                </h2>
+                <p style={{ fontSize: '11px', color: T.onSurfaceVariant, margin: 0, fontFamily: 'Inter, sans-serif' }}>
+                  {stats ? `${stats.links.length} tracked link${stats.links.length !== 1 ? 's' : ''}` : 'Loading…'}
+                </p>
+              </div>
+              {selectedLinkUrl && (
+                <button onClick={() => setSelectedLinkUrl(null)} style={{
+                  fontSize: '11px', fontWeight: 600, color: T.primary, background: 'rgba(0,54,26,0.07)',
+                  border: 'none', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                }}>
+                  ← All links
+                </button>
+              )}
+            </div>
+
+            {!stats || stats.links.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '32px', color: T.surfaceContainer }}>link_off</span>
+                <p style={{ fontSize: '13px', color: T.onSurfaceVariant, margin: 0, fontFamily: 'Inter, sans-serif', textAlign: 'center' }}>
+                  No links tracked yet. Links are tracked once the campaign starts sending.
+                </p>
+              </div>
+            ) : selectedLinkUrl ? (
+              (() => {
+                const matched = stats.recipients.filter(r => r.status === 'clicked' || r.clicks > 0);
+                const linkObj = stats.links.find(l => l.url === selectedLinkUrl);
+                return (
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      padding: '10px 12px', borderRadius: '8px',
+                      backgroundColor: 'rgba(0,54,26,0.06)', marginBottom: '14px',
+                    }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: T.primary, letterSpacing: '0.07em', marginBottom: '4px', fontFamily: 'Inter, sans-serif' }}>
+                        Selected link
+                      </div>
+                      <a href={selectedLinkUrl} target="_blank" rel="noreferrer" style={{
+                        fontSize: '12px', color: T.primary, fontFamily: 'Inter, sans-serif',
+                        wordBreak: 'break-all', textDecoration: 'none', fontWeight: 500,
+                      }}>
+                        {selectedLinkUrl}
+                      </a>
+                      <div style={{ fontSize: '20px', fontWeight: 900, color: T.primary, fontFamily: 'Manrope, sans-serif', marginTop: '6px' }}>
+                        {(linkObj?.clicks ?? 0).toLocaleString()} <span style={{ fontSize: '12px', fontWeight: 600 }}>total clicks</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: T.onSurfaceVariant, marginBottom: '8px', fontFamily: 'Inter, sans-serif' }}>
+                      Recipients who clicked ({matched.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                      {matched.length === 0 ? (
+                        <p style={{ fontSize: '12px', color: T.onSurfaceVariant, margin: 0, fontFamily: 'Inter, sans-serif' }}>No recipients have clicked yet.</p>
+                      ) : matched.map((r, i) => (
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '7px 10px', borderRadius: '7px',
+                          backgroundColor: T.surfaceContainerLow,
+                        }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#16a34a', fontVariationSettings: "'FILL' 1" }}>ads_click</span>
+                          <span style={{ fontSize: '12px', color: T.onSurface, fontFamily: 'Inter, sans-serif', flex: 1 }}>{r.email}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0' }}>
+                {(showAllLinks ? stats.links : stats.links.slice(0, 6))
+                  .slice()
+                  .sort((a, b) => (b.clicks ?? 0) - (a.clicks ?? 0))
+                  .map((link, i) => {
+                    const ctr = stats.sent > 0 ? ((link.clicks / stats.sent) * 100).toFixed(1) : '0.0';
+                    const barPct = maxLinkClicks > 0 ? (link.clicks / maxLinkClicks) * 100 : 0;
+                    const domain = (() => { try { return new URL(link.url).hostname.replace('www.', ''); } catch { return link.url; } })();
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => setSelectedLinkUrl(link.url)}
+                        style={{
+                          padding: '10px 8px', borderRadius: '8px', cursor: 'pointer',
+                          borderBottom: i < (showAllLinks ? stats.links.length : Math.min(6, stats.links.length)) - 1
+                            ? `1px solid ${T.surfaceContainer}` : 'none',
+                          transition: 'background 0.12s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = T.surfaceContainerLow}
+                        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                          <div style={{
+                            width: '20px', height: '20px', borderRadius: '5px', flexShrink: 0,
+                            backgroundColor: i === 0 ? 'rgba(0,54,26,0.12)' : T.surfaceContainerLow,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '10px', fontWeight: 700, color: i === 0 ? T.primary : T.onSurfaceVariant,
+                            fontFamily: 'Manrope, sans-serif',
+                          }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '12px', fontWeight: 600, color: T.onSurface,
+                              fontFamily: 'Inter, sans-serif',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }} title={link.url}>
+                              {domain}
+                            </div>
+                            <div style={{
+                              fontSize: '10px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }} title={link.url}>
+                              {link.url.replace(/^https?:\/\//, '').slice(0, 45)}{link.url.length > 48 ? '…' : ''}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '15px', fontWeight: 900, color: T.primary, fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
+                              {(link.clicks ?? 0).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '10px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+                              {ctr}% CTR
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ height: '3px', backgroundColor: T.surfaceContainerLow, borderRadius: '2px' }}>
+                          <div style={{
+                            height: '100%', width: `${barPct}%`,
+                            background: i === 0 ? T.gradientCta : `rgba(0,54,26,${0.3 + (1 - i / stats.links.length) * 0.5})`,
+                            borderRadius: '2px', transition: 'width 0.5s ease',
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                {stats.links.length > 6 && (
+                  <button
+                    onClick={() => setShowAllLinks(v => !v)}
+                    style={{
+                      marginTop: '10px', border: 'none', borderRadius: '8px',
+                      backgroundColor: T.surfaceContainerLow, color: T.primary,
+                      fontSize: '12px', fontWeight: 700, padding: '9px 16px',
+                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'background 0.15s',
+                    }}
+                  >
+                    {showAllLinks ? 'Show less' : `View all ${stats.links.length} links`}
+                  </button>
+                )}
+              </div>
             )}
-            style={{ width: `${pct}%` }}
-          />
+          </div>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-          <Stat
-            label="Sent"
-            value={campaign.sent_count}
-            color="text-emerald-700"
-            icon={CheckCircle2}
-          />
-          <Stat
-            label="Failed"
-            value={campaign.failed_count}
-            color="text-red-700"
-            icon={AlertCircle}
-          />
-          <Stat
-            label="Skipped"
-            value={campaign.skipped_count}
-            color="text-slate-600"
-            icon={X}
-          />
+
+        {/* ═══ Integrity Report ══════════════════════════════ */}
+        <div style={{
+          backgroundColor: T.surfaceContainerLowest,
+          borderRadius: '12px',
+          padding: '24px',
+          boxShadow: T.shadow,
+          marginBottom: '20px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: 0, fontFamily: 'Manrope, sans-serif' }}>
+              Integrity Report
+            </h2>
+            {bouncedRecipients.length > 0 && (
+              <span style={{
+                fontSize: '11px', fontWeight: 700, color: '#fff',
+                backgroundColor: '#dc2626', borderRadius: '6px',
+                padding: '2px 8px', fontFamily: 'Inter, sans-serif',
+              }}>
+                {bouncedRecipients.length} issue{bouncedRecipients.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: '12px',
+              backgroundColor: 'rgba(220,38,38,0.05)',
+              borderRadius: '10px', padding: '14px',
+            }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '8px',
+                backgroundColor: 'rgba(220,38,38,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#dc2626', fontVariationSettings: "'FILL' 1" }}>
+                  error
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                  Bounced / Failed
+                </div>
+                <div style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
+                  {bouncedRecipients.length > 0
+                    ? `${bouncedRecipients.slice(0, 2).map(r => r.email).join(', ')}${bouncedRecipients.length > 2 ? ` +${bouncedRecipients.length - 2} more` : ''} — auto-suppressed on hard failure.`
+                    : 'No bounced or failed addresses detected.'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: '12px',
+              backgroundColor: 'rgba(255,220,196,0.3)',
+              borderRadius: '10px', padding: '14px',
+            }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '8px',
+                backgroundColor: 'rgba(255,220,196,0.6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#92400e', fontVariationSettings: "'FILL' 1" }}>
+                  warning
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                  Deliverability
+                </div>
+                <div style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
+                  Bounce rate {stats ? `${stats.bounceRate.toFixed(1)}%` : '—'}
+                  {stats && stats.bounceRate > 5 ? ' — above safe threshold, review your list.' : ' — within safe parameters.'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        {isLive && (
-          <p className="mt-3 text-[11px] text-indigo-700">
-            Keeping this page open accelerates the send — each browser tick
-            advances {campaign.batch_size} emails.
-          </p>
-        )}
-        {campaign.error && (
-          <div className="mt-3 flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            {campaign.error}
+
+        {/* ═══ Performance Analysis ══════════════════════════════ */}
+        {stats && (stats.whatWentWell.length > 0 || stats.whatNeedsWork.length > 0 || stats.goalAchieved !== undefined) && (
+          <div style={{
+            backgroundColor: T.surfaceContainerLowest,
+            borderRadius: '12px', padding: '24px 28px',
+            boxShadow: T.shadow, marginBottom: '20px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: 0, fontFamily: 'Manrope, sans-serif' }}>
+                Campaign Performance
+              </h2>
+              {stats.performance && (
+                <span style={{
+                  fontSize: '11px', fontWeight: 700,
+                  backgroundColor: stats.performance === 'good' ? 'rgba(0,54,26,0.1)' : stats.performance === 'average' ? 'rgba(255,220,196,0.5)' : 'rgba(220,38,38,0.1)',
+                  color: stats.performance === 'good' ? T.primary : stats.performance === 'average' ? '#92400e' : '#dc2626',
+                  borderRadius: '6px', padding: '3px 10px', letterSpacing: '0.06em',
+                  fontFamily: 'Inter, sans-serif', textTransform: 'uppercase',
+                }}>{stats.performance}</span>
+              )}
+              {stats.goalLabel && (
+                <span style={{ fontSize: '11px', color: T.onSurfaceVariant, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                  Goal: {stats.goalLabel}
+                </span>
+              )}
+            </div>
+
+            {stats.goalAchieved !== undefined && stats.benchmarks && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                <div style={{
+                  textAlign: 'center', padding: '16px 12px', borderRadius: '10px',
+                  backgroundColor: stats.goalAchieved >= 75 ? 'rgba(0,54,26,0.05)' : stats.goalAchieved >= 50 ? 'rgba(255,220,196,0.3)' : 'rgba(220,38,38,0.05)',
+                }}>
+                  <div style={{ fontSize: '28px', fontWeight: 900, color: stats.goalAchieved >= 75 ? T.primary : stats.goalAchieved >= 50 ? '#92400e' : '#dc2626', fontFamily: 'Manrope, sans-serif' }}>
+                    {stats.goalAchieved}%
+                  </div>
+                  <div style={{ fontSize: '11px', color: T.onSurfaceVariant, fontWeight: 600, marginTop: '2px', fontFamily: 'Inter, sans-serif' }}>Goal Achieved</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px 12px', borderRadius: '10px', backgroundColor: T.surfaceContainerLow }}>
+                  <div style={{ fontSize: '11px', color: T.onSurfaceVariant, fontWeight: 600, marginBottom: '4px', fontFamily: 'Inter, sans-serif' }}>Open Target</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: T.primary, fontFamily: 'Manrope, sans-serif' }}>{stats.benchmarks.openTarget}%</div>
+                  <div style={{ fontSize: '11px', marginTop: '2px', color: stats.openRate >= stats.benchmarks.openTarget ? '#16a34a' : '#dc2626', fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                    {stats.openRate >= stats.benchmarks.openTarget ? `Achieved (${stats.openRate}%)` : `Actual: ${stats.openRate}%`}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px 12px', borderRadius: '10px', backgroundColor: T.surfaceContainerLow }}>
+                  <div style={{ fontSize: '11px', color: T.onSurfaceVariant, fontWeight: 600, marginBottom: '4px', fontFamily: 'Inter, sans-serif' }}>Click Target</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: T.primary, fontFamily: 'Manrope, sans-serif' }}>{stats.benchmarks.clickTarget}%</div>
+                  <div style={{ fontSize: '11px', marginTop: '2px', color: stats.clickRate >= stats.benchmarks.clickTarget ? '#16a34a' : '#dc2626', fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                    {stats.clickRate >= stats.benchmarks.clickTarget ? `Achieved (${stats.clickRate}%)` : `Actual: ${stats.clickRate}%`}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {stats.whatWentWell.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'Inter, sans-serif' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>thumb_up</span> What went well
+                </div>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {stats.whatWentWell.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 14px', backgroundColor: 'rgba(0,54,26,0.04)', borderRadius: '8px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#16a34a', flexShrink: 0, marginTop: '1px', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      <span style={{ fontSize: '13px', color: T.onSurface, lineHeight: 1.55, fontFamily: 'Inter, sans-serif' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stats.whatNeedsWork.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'Inter, sans-serif' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>build</span> What needs work
+                </div>
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {stats.whatNeedsWork.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 14px', backgroundColor: 'rgba(220,38,38,0.04)', borderRadius: '8px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#dc2626', flexShrink: 0, marginTop: '1px', fontVariationSettings: "'FILL' 1" }}>warning</span>
+                      <span style={{ fontSize: '13px', color: T.onSurface, lineHeight: 1.55, fontFamily: 'Inter, sans-serif' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* Recipients table */}
-      <div className="card overflow-hidden">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Recipients
-        </div>
-        {!recipients?.length ? (
-          <div className="grid place-items-center p-10 text-sm text-slate-400">
-            No recipients yet.
+        {/* ═══ Recipients Table ══════════════════════════════ */}
+        <div style={{
+          backgroundColor: T.surfaceContainerLowest,
+          borderRadius: '12px', padding: '24px 28px',
+          boxShadow: T.shadow,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: 0, fontFamily: 'Manrope, sans-serif' }}>
+              Recipients
+              {stats && (
+                <span style={{ fontSize: '12px', color: T.onSurfaceVariant, fontWeight: 400, marginLeft: '8px', fontFamily: 'Inter, sans-serif' }}>
+                  ({stats.totalRecipients.toLocaleString()} total{searchQuery ? `, ${filteredRecipients.length} shown` : ''})
+                </span>
+              )}
+            </h2>
+            <div style={{ position: 'relative' }}>
+              <span className="material-symbols-outlined" style={{
+                position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
+                fontSize: '15px', color: T.onSurfaceVariant, pointerEvents: 'none',
+              }}>search</span>
+              <input
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+                placeholder="Search emails…"
+                style={{
+                  paddingLeft: '32px', paddingRight: '12px', paddingTop: '8px', paddingBottom: '8px',
+                  border: 'none', borderRadius: '8px',
+                  backgroundColor: T.surfaceContainerLow,
+                  fontSize: '13px', color: T.onSurface, outline: 'none',
+                  fontFamily: 'Inter, sans-serif', width: '200px',
+                }}
+              />
+            </div>
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-2">Lead</th>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Sent at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recipients.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b border-slate-50 last:border-0"
-                >
-                  <td className="px-4 py-2 font-medium text-slate-800">
-                    {r.lead_name || "—"}
-                  </td>
-                  <td className="px-4 py-2 text-slate-500">{r.email}</td>
-                  <td className="px-4 py-2">
-                    <RecipientStatus status={r.status} error={r.error} />
-                  </td>
-                  <td className="px-4 py-2 text-xs text-slate-400">
-                    {r.sent_at ? fmtDate(r.sent_at) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { cls: string; label: string }> = {
-    draft: { cls: "bg-slate-100 text-slate-600", label: "Draft" },
-    scheduled: { cls: "bg-amber-50 text-amber-700", label: "Scheduled" },
-    sending: { cls: "bg-indigo-50 text-indigo-700", label: "Sending" },
-    paused: { cls: "bg-yellow-50 text-yellow-800", label: "Paused" },
-    completed: { cls: "bg-emerald-50 text-emerald-700", label: "Completed" },
-    cancelled: { cls: "bg-slate-100 text-slate-500", label: "Cancelled" },
-    failed: { cls: "bg-red-50 text-red-700", label: "Failed" },
-  };
-  const m = map[status] || map.draft;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-        m.cls
+          {!stats || stats.recipients.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px', backgroundColor: T.surfaceContainerLow, borderRadius: '10px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '40px', color: T.surfaceContainer, display: 'block', marginBottom: '8px' }}>
+                group
+              </span>
+              <p style={{ fontSize: '13px', color: T.onSurfaceVariant, margin: 0, fontFamily: 'Inter, sans-serif' }}>No recipients data yet</p>
+            </div>
+          ) : (
+            <>
+              {statsLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ width: '14px', height: '14px', border: `2px solid ${T.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  <span style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>Refreshing…</span>
+                </div>
+              )}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+                  <thead>
+                    <tr>
+                      {['Email', 'Status', 'Opened', 'Clicked', 'Sent At'].map(col => (
+                        <th key={col} style={{
+                          textAlign: col === 'Email' ? 'left' : 'center',
+                          padding: '8px 12px 12px',
+                          fontSize: '11px', fontWeight: 700, color: T.onSurfaceVariant,
+                          textTransform: 'uppercase', letterSpacing: '0.08em',
+                          whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+                          borderBottom: `2px solid ${T.surfaceContainerLow}`,
+                        }}>
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedRecipients.map((recipient, i) => {
+                      const sc = RECIPIENT_STATUS_CFG[recipient.status];
+                      return (
+                        <tr key={i}
+                          style={{ transition: 'background 0.1s' }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = T.surfaceContainerLow)}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <td style={{ padding: '11px 12px', fontSize: '13px', color: T.onSurface, fontFamily: 'monospace', borderBottom: `1px solid ${T.ghost}` }}>
+                            {recipient.email}
+                          </td>
+                          <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: `1px solid ${T.ghost}` }}>
+                            <span style={{
+                              fontSize: '11px', fontWeight: 700,
+                              backgroundColor: sc.bg, color: sc.color,
+                              borderRadius: '6px', padding: '3px 9px',
+                              letterSpacing: '0.04em', fontFamily: 'Inter, sans-serif',
+                            }}>
+                              {sc.label}
+                            </span>
+                          </td>
+                          <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: `1px solid ${T.ghost}` }}>
+                            {recipient.opened ? (
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#16a34a', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                            ) : (
+                              <span style={{ fontSize: '13px', color: T.surfaceContainer }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: `1px solid ${T.ghost}` }}>
+                            {recipient.clicks > 0 ? (
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: T.primary, fontVariationSettings: "'FILL' 1" }}>ads_click</span>
+                            ) : (
+                              <span style={{ fontSize: '13px', color: T.surfaceContainer }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '11px 12px', textAlign: 'center', fontSize: '12px', color: T.onSurfaceVariant, borderBottom: `1px solid ${T.ghost}`, fontFamily: 'Inter, sans-serif' }}>
+                            {recipient.bouncedAt ? '—' : '✓'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.surfaceContainerLow}`,
+                  flexWrap: 'wrap', gap: '10px',
+                }}>
+                  <span style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+                    Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filteredRecipients.length)} of {filteredRecipients.length}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      style={{
+                        padding: '7px 14px', border: 'none', borderRadius: '8px',
+                        backgroundColor: T.surfaceContainerLow,
+                        fontSize: '12px', fontWeight: 600,
+                        color: page === 1 ? T.surfaceContainer : T.onSurface,
+                        cursor: page === 1 ? 'not-allowed' : 'pointer',
+                        fontFamily: 'Inter, sans-serif',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_left</span>
+                      Previous
+                    </button>
+                    <span style={{
+                      padding: '7px 14px', borderRadius: '8px',
+                      background: T.gradientCta,
+                      fontSize: '12px', fontWeight: 700, color: '#fff',
+                      fontFamily: 'Inter, sans-serif',
+                    }}>
+                      {page} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      style={{
+                        padding: '7px 14px', border: 'none', borderRadius: '8px',
+                        backgroundColor: T.surfaceContainerLow,
+                        fontSize: '12px', fontWeight: 600,
+                        color: page === totalPages ? T.surfaceContainer : T.onSurface,
+                        cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                        fontFamily: 'Inter, sans-serif',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}
+                    >
+                      Next
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {showCancelConfirm && (
+        <ConfirmDialog
+          message={`Cancel the campaign "${campaign.name}"? Pending recipients won't be sent.`}
+          confirmLabel="Cancel Campaign"
+          onConfirm={handleCancel}
+          onCancel={() => setShowCancelConfirm(false)}
+        />
       )}
-    >
-      {status === "sending" && <Loader2 className="h-3 w-3 animate-spin" />}
-      {m.label}
-    </span>
-  );
-}
 
-function Stat({
-  label,
-  value,
-  color,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  color: string;
-  icon: typeof CheckCircle2;
-}) {
-  return (
-    <div className="rounded-md border border-slate-100 p-2.5">
-      <div className="flex items-center gap-1 text-[11px] uppercase text-slate-500">
-        <Icon className={cn("h-3.5 w-3.5", color)} />
-        {label}
-      </div>
-      <div className={cn("text-lg font-semibold", color)}>
-        {value.toLocaleString()}
-      </div>
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
-  );
-}
-
-function RecipientStatus({ status, error }: { status: string; error: string | null }) {
-  if (status === "sent")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
-        <CheckCircle2 className="h-3.5 w-3.5" /> Sent
-      </span>
-    );
-  if (status === "failed")
-    return (
-      <span
-        className="inline-flex items-center gap-1 text-xs text-red-700"
-        title={error || undefined}
-      >
-        <AlertCircle className="h-3.5 w-3.5" />
-        Failed
-      </span>
-    );
-  if (status === "skipped")
-    return (
-      <span
-        className="inline-flex items-center gap-1 text-xs text-slate-500"
-        title={error || undefined}
-      >
-        <X className="h-3.5 w-3.5" />
-        Skipped
-      </span>
-    );
-  if (status === "sending")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-indigo-700">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-      <Clock className="h-3.5 w-3.5" /> Pending
-    </span>
   );
 }
