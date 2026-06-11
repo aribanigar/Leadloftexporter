@@ -169,15 +169,27 @@ def _upsert_account(
     refresh_token: Optional[str] = None,
     config: Optional[dict] = None,
 ) -> ConnectedAccount:
-    existing = (
-        db.query(ConnectedAccount)
-        .filter(
-            ConnectedAccount.workspace_id == ctx.workspace_id,
-            ConnectedAccount.user_id == ctx.user_id,
-            ConnectedAccount.provider == provider,
-        )
-        .first()
-    )
+    """Upsert a connected account.
+
+    Email-sender providers (smtp, gmail) key on ``external_id`` (the from
+    address) too, so the user can save MULTIPLE senders side-by-side — e.g.
+    contact@hudace.com AND hello@anotherdomain.com — and pick whichever they
+    want at send time. Connecting a sender never overwrites a sibling with a
+    different from-address. The CRM login email and the sender address are
+    completely unrelated.
+
+    Single-account providers (resend, sendgrid, hubspot, …) still upsert by
+    (workspace, user, provider) since they each have ONE API key per account.
+    """
+    multi_per_user = provider in ("smtp", "gmail")
+    base_filter = [
+        ConnectedAccount.workspace_id == ctx.workspace_id,
+        ConnectedAccount.user_id == ctx.user_id,
+        ConnectedAccount.provider == provider,
+    ]
+    if multi_per_user and external_id:
+        base_filter.append(ConnectedAccount.external_id == external_id)
+    existing = db.query(ConnectedAccount).filter(*base_filter).first()
     if existing:
         existing.label = label or existing.label
         existing.external_id = external_id or existing.external_id

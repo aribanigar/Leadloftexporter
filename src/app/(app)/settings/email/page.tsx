@@ -114,7 +114,15 @@ export default function EmailSendersPage() {
 
       {/* Connected senders */}
       <div className="card mb-5 p-4">
-        <h2 className="mb-3 text-sm font-semibold">Connected senders</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Connected senders</h2>
+          {emailAccounts.length > 0 && (
+            <span className="text-[11px] text-slate-400">
+              {emailAccounts.length} active — saving a new SMTP with a
+              different From-address adds another, never overwrites.
+            </span>
+          )}
+        </div>
         {emailAccounts.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
             No email sender connected yet. Pick one below.
@@ -126,10 +134,10 @@ export default function EmailSendersPage() {
                 <ProviderBadge provider={a.provider} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">
-                    {a.label || a.provider}
+                    {a.external_id || a.label || a.provider}
                   </div>
                   <div className="truncate text-xs text-slate-400">
-                    {a.external_id || "—"} ·{" "}
+                    {a.label || a.provider} ·{" "}
                     <span
                       className={
                         a.status === "active" ? "text-emerald-600" : "text-slate-400"
@@ -142,7 +150,7 @@ export default function EmailSendersPage() {
                 <button
                   className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                   onClick={() => {
-                    if (window.confirm(`Disconnect ${a.label || a.provider}?`)) {
+                    if (window.confirm(`Disconnect ${a.external_id || a.label || a.provider}?`)) {
                       disconnect.mutate(a.id);
                     }
                   }}
@@ -245,13 +253,26 @@ function SmtpForm({ onSaved }: FormProps) {
         },
       }),
     onSuccess: () => {
+      // Clear the whole form so the user can immediately add ANOTHER
+      // sender (different from-address) without first clearing the
+      // last one. Multiple senders coexist — see backend _upsert_account.
+      setHost("");
+      setUsername("");
       setPassword("");
+      setFromEmail("");
       onSaved();
     },
   });
 
   return (
     <div>
+      <div className="mb-3 rounded-md border border-indigo-100 bg-indigo-50/50 p-3 text-xs text-indigo-900">
+        <strong>Use any email — totally independent from your LeadCaptura
+        login.</strong> Paste the SMTP credentials of whichever mailbox you
+        want to send from (Hostinger, Zoho, Mailgun, Gmail, your own
+        server …) and recipients will see that address as the sender.
+        You can save multiple senders side-by-side and pick one at send time.
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">SMTP host</label>
@@ -291,13 +312,19 @@ function SmtpForm({ onSaved }: FormProps) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <label className="label mt-3">From address (defaults to username)</label>
+      <label className="label mt-3">
+        From address — what recipients see (defaults to username)
+      </label>
       <input
         className="input"
         placeholder="hello@yourcompany.com"
         value={fromEmail}
         onChange={(e) => setFromEmail(e.target.value)}
       />
+      <p className="mt-1 text-[11px] text-slate-500">
+        This is the &quot;From:&quot; address on every email you send through
+        this sender. It does NOT have to match your LeadCaptura login email.
+      </p>
 
       {save.isError && (
         <p className="mt-3 text-sm text-red-600">
