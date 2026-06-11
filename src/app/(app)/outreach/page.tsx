@@ -43,6 +43,10 @@ import {
   Phone,
   ExternalLink,
   Sparkles,
+  CheckSquare,
+  Square,
+  X as XIcon,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -94,6 +98,23 @@ export default function OutreachPage() {
   // Pending sends keyed by client-generated id so they render instantly
   // and flip to "confirmed" when the backend timeline catches up.
   const [pending, setPending] = useState<ConvMessage[]>([]);
+
+  // ── Bulk-select state. When `selectedIds.size > 0` the right pane switches
+  // from the per-lead conversation view to a Bulk Compose panel that sends
+  // one /inbox/send POST per selected lead, with {first_name}/{full_name}/
+  // {company} merge substitution. Each selection is a Lead.id from the same
+  // list shown on the left, so the count and the actual send targets cannot
+  // disagree.
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // ───── Data ─────────────────────────────────────────────────────────────
   const { data: leadsData } = useQuery<LeadList>({
@@ -350,6 +371,104 @@ export default function OutreachPage() {
   const [smtpModalOpen, setSmtpModalOpen] = useState(false);
   const [waModalOpen, setWaModalOpen] = useState(false);
 
+  // ── Bulk send: loop sequentially through selectedIds and call /inbox/send
+  // per lead. Sequential (not parallel) so SMTP servers and warmup caps
+  // don't get hammered, and so the progress bar advances visibly.
+  type BulkResult = {
+    leadId: string;
+    name: string;
+    email: string;
+    status: "queued" | "sent" | "failed";
+    error?: string;
+  };
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+  const bulkAbortRef = useRef<boolean>(false);
+
+  function renderMergeTokens(template: string, lead: Lead): string {
+    const first =
+      lead.first_name ||
+      (lead.full_name || "").trim().split(/\s+/)[0] ||
+      "there";
+    return template
+      .replace(/\{first_name\}/gi, first)
+      .replace(/\{full_name\}/gi, lead.full_name || first)
+      .replace(/\{company\}/gi, lead.company?.name || "")
+      .replace(/\{title\}/gi, lead.title || "")
+      .replace(/\{email\}/gi, lead.email || "");
+  }
+
+  async function runBulkSend(opts: { subject: string; body: string }) {
+    if (bulkSending) return;
+    const targets = leads.filter(
+      (l) => selectedIds.has(l.id) && (l.email || "").trim() !== ""
+    );
+    if (targets.length === 0) return;
+
+    bulkAbortRef.current = false;
+    setBulkSending(true);
+    setBulkResults(
+      targets.map((l) => ({
+        leadId: l.id,
+        name: l.full_name || l.email || "Lead",
+        email: l.email || "",
+        status: "queued",
+      }))
+    );
+
+    for (let i = 0; i < targets.length; i++) {
+      if (bulkAbortRef.current) break;
+      const lead = targets[i];
+      const subject = renderMergeTokens(opts.subject, lead);
+      const body = renderMergeTokens(opts.body, lead);
+      try {
+        const r = await api<{ ok: boolean; error?: string | null }>(
+          "/inbox/send",
+          {
+            method: "POST",
+            body: {
+              lead_id: lead.id,
+              to: lead.email,
+              subject,
+              body_html: body.replace(/\n/g, "<br/>"),
+              body_text: body,
+            },
+          }
+        );
+        setBulkResults((cur) =>
+          cur.map((b) =>
+            b.leadId === lead.id
+              ? { ...b, status: r.ok ? "sent" : "failed", error: r.error || undefined }
+              : b
+          )
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setBulkResults((cur) =>
+          cur.map((b) =>
+            b.leadId === lead.id ? { ...b, status: "failed", error: msg } : b
+          )
+        );
+      }
+      // Small pacing gap so we don't hammer the SMTP server or trip rate
+      // limits — matches the campaign default of ~1.2 s between sends.
+      if (i < targets.length - 1 && !bulkAbortRef.current) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+    setBulkSending(false);
+    qc.invalidateQueries({ queryKey: ["outreach-leads"] });
+  }
+
+  // When the user toggles bulk mode off, clear selection so we don't surprise
+  // them by re-entering bulk with old picks still active.
+  useEffect(() => {
+    if (!bulkMode) {
+      setSelectedIds(new Set());
+      setBulkResults([]);
+    }
+  }, [bulkMode]);
+
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
       <ConnectSmtpModal
@@ -437,23 +556,84 @@ export default function OutreachPage() {
               {filteredLeads.length}
             </span>
           </div>
+
+          {/* Bulk-select bar — toggles checkboxes on every row and swaps the
+              right pane into Bulk Compose mode. Tracks count + a one-click
+              "Select all with email" since that's the only useful target for
+              email sends anyway. */}
+          <div className="mt-2 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setBulkMode((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium",
+                bulkMode
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              )}
+              title="Pick multiple leads and send the same message to all of them"
+            >
+              <Users className="h-3 w-3" />
+              {bulkMode ? `Bulk · ${selectedIds.size}` : "Bulk"}
+            </button>
+            {bulkMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const withEmail = filteredLeads
+                      .filter((l) => (l.email || "").trim() !== "")
+                      .map((l) => l.id);
+                    setSelectedIds(new Set(withEmail));
+                  }}
+                  className="rounded-md px-2 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50"
+                >
+                  All w/ email
+                </button>
+                {selectedIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100"
+                  >
+                    Clear
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <ul className="flex-1 overflow-y-auto">
           {filteredLeads.map((l) => {
             const active = l.id === activeLeadId;
+            const checked = selectedIds.has(l.id);
             return (
               <li key={l.id}>
                 <button
                   type="button"
-                  onClick={() => setActiveLeadId(l.id)}
+                  onClick={() => {
+                    if (bulkMode) toggleSelect(l.id);
+                    else setActiveLeadId(l.id);
+                  }}
                   className={cn(
                     "flex w-full items-start gap-2.5 border-l-2 px-3 py-2.5 text-left transition-colors",
-                    active
+                    bulkMode && checked
+                      ? "border-indigo-500 bg-indigo-50/80"
+                      : !bulkMode && active
                       ? "border-indigo-500 bg-indigo-50/60"
                       : "border-transparent hover:bg-slate-50"
                   )}
                 >
+                  {bulkMode && (
+                    <span className="mt-1 flex-shrink-0 text-indigo-600">
+                      {checked ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4 text-slate-300" />
+                      )}
+                    </span>
+                  )}
                   <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold uppercase text-slate-500">
                     {initials(l.full_name || l.email)}
                   </span>
@@ -489,9 +669,26 @@ export default function OutreachPage() {
         </ul>
       </aside>
 
-      {/* ───────── RIGHT: conversation pane ───────── */}
+      {/* ───────── RIGHT: bulk compose OR per-lead conversation ───────── */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {!activeLead ? (
+        {bulkMode ? (
+          <BulkComposer
+            count={selectedIds.size}
+            targets={leads.filter(
+              (l) => selectedIds.has(l.id) && (l.email || "").trim() !== ""
+            )}
+            allSelectedCount={selectedIds.size}
+            results={bulkResults}
+            sending={bulkSending}
+            emailConnected={emailConnected}
+            onConnectEmail={() => setSmtpModalOpen(true)}
+            onSend={(subject, body) => runBulkSend({ subject, body })}
+            onCancel={() => {
+              bulkAbortRef.current = true;
+            }}
+            onClose={() => setBulkMode(false)}
+          />
+        ) : !activeLead ? (
           <EmptyState />
         ) : (
           <>
@@ -895,6 +1092,227 @@ function Composer({
           )}
           {isSending ? "Sending…" : `Send via ${isEmail ? "Email" : "WhatsApp"}`}
         </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// BulkComposer — replaces the per-lead conversation pane when bulkMode is on.
+// One Subject + one Body, applied to every selected lead with simple merge
+// substitution. The send loop is sequential (see runBulkSend) so we can show
+// a live per-lead progress list and so SMTP rate limits aren't blown.
+
+interface BulkResultRow {
+  leadId: string;
+  name: string;
+  email: string;
+  status: "queued" | "sent" | "failed";
+  error?: string;
+}
+
+interface BulkComposerProps {
+  count: number;
+  targets: Lead[];
+  allSelectedCount: number;
+  results: BulkResultRow[];
+  sending: boolean;
+  emailConnected: boolean;
+  onConnectEmail: () => void;
+  onSend: (subject: string, body: string) => void;
+  onCancel: () => void;
+  onClose: () => void;
+}
+
+function BulkComposer({
+  count,
+  targets,
+  allSelectedCount,
+  results,
+  sending,
+  emailConnected,
+  onConnectEmail,
+  onSend,
+  onCancel,
+  onClose,
+}: BulkComposerProps) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+
+  const skipped = allSelectedCount - targets.length;
+  const sent = results.filter((r) => r.status === "sent").length;
+  const failed = results.filter((r) => r.status === "failed").length;
+  const totalProgress = results.length;
+  const done = sent + failed;
+
+  const canSend =
+    !sending && emailConnected && targets.length > 0 && subject.trim() && body.trim();
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3.5">
+        <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-indigo-700">
+          <Users className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Bulk email — {count} selected
+            {skipped > 0 && (
+              <span className="ml-2 text-xs font-normal text-amber-600">
+                ({skipped} skipped — no email on file)
+              </span>
+            )}
+          </h2>
+          <div className="mt-0.5 text-xs text-slate-500">
+            One message, sent individually to each lead. Tokens like{" "}
+            <code className="rounded bg-slate-100 px-1">{"{first_name}"}</code>{" "}
+            and <code className="rounded bg-slate-100 px-1">{"{company}"}</code>{" "}
+            are personalised per recipient.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          title="Exit bulk mode"
+        >
+          <XIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      {!emailConnected && (
+        <div className="mx-5 mt-3 flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span className="flex items-start gap-2">
+            <Plug className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+            No email sender connected — connect any SMTP first.
+          </span>
+          <button
+            type="button"
+            onClick={onConnectEmail}
+            className="rounded-md bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700"
+          >
+            Connect now
+          </button>
+        </div>
+      )}
+
+      {/* Composer */}
+      <div className="flex flex-1 flex-col overflow-hidden p-5 pb-3">
+        <input
+          className="input mb-2"
+          placeholder="Subject — supports {first_name}, {company}, {title}…"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          maxLength={250}
+          disabled={sending}
+        />
+        <textarea
+          className="input flex-1 min-h-[200px] resize-none leading-relaxed"
+          placeholder={
+            "Hi {first_name},\n\nQuick idea for {company} — wanted to see if it makes sense to chat.\n\nWorth 10 minutes this week?\n\nThanks,"
+          }
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={8000}
+          disabled={sending}
+        />
+      </div>
+
+      {/* Live progress / per-recipient status — only renders once a send started */}
+      {totalProgress > 0 && (
+        <div className="mx-5 mb-3 max-h-[220px] overflow-y-auto rounded-md border border-slate-200 bg-white">
+          <div className="sticky top-0 flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-600">
+            <span>
+              {done} of {totalProgress} processed
+            </span>
+            {sent > 0 && (
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <CheckCheck className="h-3 w-3" /> {sent} sent
+              </span>
+            )}
+            {failed > 0 && (
+              <span className="inline-flex items-center gap-1 text-rose-600">
+                <AlertCircle className="h-3 w-3" /> {failed} failed
+              </span>
+            )}
+            {sending && (
+              <span className="ml-auto inline-flex items-center gap-1 text-indigo-600">
+                <Loader2 className="h-3 w-3 animate-spin" /> Sending…
+              </span>
+            )}
+          </div>
+          <ul className="divide-y divide-slate-100 text-xs">
+            {results.map((r) => (
+              <li
+                key={r.leadId}
+                className="flex items-center gap-2 px-3 py-1.5"
+              >
+                <span className="w-4 flex-shrink-0 text-center">
+                  {r.status === "sent" ? (
+                    <CheckCheck className="h-3 w-3 text-emerald-600" />
+                  ) : r.status === "failed" ? (
+                    <AlertCircle className="h-3 w-3 text-rose-600" />
+                  ) : (
+                    <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-700">
+                  {r.name}
+                </span>
+                <span className="truncate text-[10px] text-slate-400">
+                  {r.email}
+                </span>
+                {r.error && (
+                  <span
+                    className="truncate text-[10px] text-rose-600"
+                    title={r.error}
+                  >
+                    {r.error}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Footer actions */}
+      <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3">
+        <span className="text-[11px] text-slate-400">
+          Sends one email per lead through your connected SMTP / Resend sender.
+          ~1.2 s pacing between sends.
+        </span>
+        <div className="flex items-center gap-2">
+          {sending ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn-secondary"
+            >
+              Stop
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={!canSend}
+            onClick={() => onSend(subject, body)}
+            className={cn(
+              "btn bg-indigo-600 text-white hover:bg-indigo-700",
+              "disabled:cursor-not-allowed disabled:opacity-50"
+            )}
+          >
+            {sending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {sending
+              ? `Sending ${done}/${totalProgress}…`
+              : `Send to ${targets.length}`}
+          </button>
         </div>
       </div>
     </div>
