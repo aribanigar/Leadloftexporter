@@ -839,6 +839,38 @@ def tick_campaign(
     return _process_tick(db, c, ctx_user_id=ctx.user_id)
 
 
+@router.post("/{campaign_id}/prepare-tick")
+def prepare_tick(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Prepare the next batch for external sending (Next.js nodemailer layer).
+
+    Returns rendered, tracking-injected email jobs WITH SMTP/API credentials
+    so the caller (Vercel serverless) can send them without a separate creds
+    lookup. Recipients are marked ``sending``; call /commit-tick with results
+    to transition them to sent/failed and update campaign counters."""
+    c = _own_campaign(db, ctx, campaign_id)
+    return _prepare_tick_batch(db, c, ctx_user_id=ctx.user_id)
+
+
+@router.post("/{campaign_id}/commit-tick")
+def commit_tick(
+    campaign_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Record send results from an external sender (Next.js nodemailer layer).
+
+    ``body.results`` is a list of
+    ``{recipient_id, message_id, ok, error}`` dicts.
+    Updates CampaignRecipient + EmailMessage rows and campaign counters."""
+    c = _own_campaign(db, ctx, campaign_id)
+    return _commit_tick_results(db, c, body.get("results") or [], ctx_user_id=ctx.user_id)
+
+
 @router.get("/{campaign_id}/status")
 def campaign_status(
     campaign_id: str,
@@ -1244,6 +1276,217 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             failed += 1
 
     campaign.rotation_index = rotation_index
+    _maybe_finalize(db, campaign)
+    db.commit()
+    return _stats(campaign, sent=sent, failed=failed, skipped=skipped)
+
+
+def _prepare_tick_batch(
+    db: Session, campaign: Campaign, ctx_user_id: Optional[str] = None
+) -> dict:
+    """Prepare the next batch without sending. Returns email jobs with SMTP/API
+    credentials for the Next.js tier to dispatch via nodemailer."""
+    settings = get_settings()
+    campaign.last_tick_at = datetime.now(timezone.utc)
+
+    if campaign.status != "sending":
+        db.commit()
+        return {"jobs": [], "campaign_status": campaign.status}
+
+    eligible = _eligible_senders(db, campaign)
+    if not eligible:
+        db.commit()
+        return {"jobs": [], "campaign_status": "sending", "note": "warmup_capped"}
+
+    suppressed = {
+        s.email.lower()
+        for s in db.query(Suppression).filter(
+            Suppression.workspace_id == campaign.workspace_id
+        )
+    }
+
+    batch = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+        )
+        .order_by(CampaignRecipient.created_at.asc())
+        .limit(int(campaign.batch_size or 8))
+        .with_for_update(skip_locked=True)
+        .all()
+    )
+
+    if not batch:
+        _maybe_finalize(db, campaign)
+        db.commit()
+        return {"jobs": [], "campaign_status": campaign.status}
+
+    jobs: list[dict] = []
+    rotation_index = campaign.rotation_index or 0
+
+    for r in batch:
+        if (r.email or "").lower() in suppressed:
+            r.status = "skipped"
+            r.error = "suppressed"
+            campaign.skipped_count = (campaign.skipped_count or 0) + 1
+            continue
+
+        sender = None
+        for i in range(len(eligible)):
+            cand_acct, cand_warm = eligible[(rotation_index + i) % len(eligible)]
+            if cand_warm.sent_today < _warmup_daily_cap(cand_warm):
+                sender = cand_acct
+                rotation_index = (rotation_index + i + 1) % len(eligible)
+                break
+        if not sender:
+            break
+
+        lead = db.get(Lead, r.lead_id) if r.lead_id else None
+        if lead:
+            subject = _render_token(campaign.subject or "", lead)
+            body_html = _render_token(campaign.body_html or "", lead)
+            body_text = (
+                _render_token(campaign.body_text or "", lead)
+                if campaign.body_text else None
+            )
+        else:
+            merge = dict(r.merge_data or {})
+            subject = _render_merge(campaign.subject or "", merge, r.email)
+            body_html = _render_merge(campaign.body_html or "", merge, r.email)
+            body_text = (
+                _render_merge(campaign.body_text or "", merge, r.email)
+                if campaign.body_text else None
+            )
+
+        thread = EmailThread(
+            workspace_id=campaign.workspace_id,
+            lead_id=lead.id if lead else None,
+            subject=subject,
+        )
+        db.add(thread)
+        db.flush()
+        msg = EmailMessage(
+            workspace_id=campaign.workspace_id,
+            thread_id=thread.id,
+            lead_id=lead.id if lead else None,
+            direction="outbound",
+            from_address=sender.external_id or "",
+            to_address=r.email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            status="queued",
+        )
+        db.add(msg)
+        db.flush()
+        r.message_id = msg.id
+        r.sender_account_id = sender.id
+        r.status = "sending"
+
+        links = list(campaign.links or [])
+        tracked_html = _inject_tracking(
+            body_html, settings.public_api_url, campaign.id, r.id, links
+        )
+        msg.body_html = tracked_html
+        campaign.links = links
+        db.flush()
+
+        # Build provider-specific send config (never stored browser-side —
+        # these are returned to the Next.js serverless function only).
+        cfg = sender.config or {}
+        send_config: dict = {"provider": sender.provider}
+        if sender.provider == "smtp":
+            send_config["smtp"] = {
+                "host": cfg.get("host", ""),
+                "port": int(cfg.get("port", 587)),
+                "username": sender.external_id or cfg.get("username", ""),
+                "password": sender.access_token or "",
+                "from_email": sender.external_id or "",
+            }
+        elif sender.provider == "resend":
+            send_config["resend_api_key"] = sender.access_token or ""
+        elif sender.provider == "sendgrid":
+            send_config["sendgrid_api_key"] = sender.access_token or ""
+
+        jobs.append({
+            "recipient_id": r.id,
+            "message_id": msg.id,
+            "to": r.email,
+            "from_name": campaign.from_name or "",
+            "from_email": sender.external_id or "",
+            "subject": subject,
+            "html": tracked_html,
+            "text": body_text or "",
+            "send_config": send_config,
+        })
+
+    campaign.rotation_index = rotation_index
+    db.commit()
+    return {"jobs": jobs, "campaign_status": campaign.status}
+
+
+def _commit_tick_results(
+    db: Session, campaign: Campaign, results: list, ctx_user_id: Optional[str] = None
+) -> dict:
+    """Apply send results from an external sender and update campaign counters."""
+    sent = failed = skipped = 0
+
+    for res in results:
+        rid = res.get("recipient_id")
+        ok = bool(res.get("ok"))
+        error = str(res.get("error") or "")
+
+        r = (
+            db.query(CampaignRecipient)
+            .filter(CampaignRecipient.id == rid)
+            .first()
+        )
+        if not r:
+            continue
+
+        msg = (
+            db.query(EmailMessage).filter(EmailMessage.id == r.message_id).first()
+            if r.message_id else None
+        )
+
+        if ok:
+            r.status = "sent"
+            r.sent_at = datetime.now(timezone.utc)
+            if msg:
+                msg.status = "sent"
+            campaign.sent_count = (campaign.sent_count or 0) + 1
+            sent += 1
+            if r.lead_id:
+                lead = db.get(Lead, r.lead_id)
+                if lead:
+                    db.add(Activity(
+                        workspace_id=campaign.workspace_id,
+                        lead_id=lead.id,
+                        actor_id=ctx_user_id or campaign.user_id,
+                        type="campaign_sent",
+                        payload={
+                            "campaign_id": campaign.id,
+                            "subject": r.message_id,
+                        },
+                    ))
+        else:
+            r.status = "failed"
+            r.error = error[:500]
+            if msg:
+                msg.status = "failed"
+                msg.error = r.error
+            campaign.failed_count = (campaign.failed_count or 0) + 1
+            failed += 1
+            low_err = error.lower()
+            if any(s in low_err for s in ("550", "bounce", "rejected", "invalid recipient")):
+                db.add(Suppression(
+                    workspace_id=campaign.workspace_id,
+                    email=(r.email or "").lower(),
+                    reason="bounce",
+                    source_campaign_id=campaign.id,
+                ))
+
     _maybe_finalize(db, campaign)
     db.commit()
     return _stats(campaign, sent=sent, failed=failed, skipped=skipped)

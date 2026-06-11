@@ -3,12 +3,8 @@
 /**
  * Reusable Connect SMTP modal.
  *
- * Mounts the same SMTP form that lives in /settings/email but in a modal
- * over whatever page the user is currently on (Outreach, Lead Detail, the
- * Messaging composer…) so they never have to navigate away to set up
- * their sender. Hits the same /integrations/smtp/connect endpoint, which
- * verifies the credentials directly first and falls back through the
- * Vercel SMTP relay when Render's outbound-port block trips.
+ * Verifies SMTP credentials from Vercel's network (Next.js /api/smtp-connect)
+ * to bypass Render's outbound-port block, then saves the account to Python.
  *
  * Props:
  *  - open / onClose                modal visibility
@@ -20,7 +16,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { X, Mail, Loader2, Plug, CheckCircle2, AlertCircle } from "lucide-react";
-import { api } from "@/lib/api";
+import { getToken, getWorkspaceId } from "@/lib/api";
 
 interface Props {
   open: boolean;
@@ -40,17 +36,28 @@ export function ConnectSmtpModal({ open, onClose, onConnected }: Props) {
     Error,
     void
   >({
-    mutationFn: () =>
-      api("/integrations/smtp/connect", {
+    mutationFn: async () => {
+      const token = getToken();
+      const wsId = getWorkspaceId();
+      const res = await fetch("/api/smtp-connect", {
         method: "POST",
-        body: {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token || ""}`,
+          "X-Workspace-Id": wsId || "",
+        },
+        body: JSON.stringify({
           host: host.trim(),
           port,
           username: username.trim(),
           password,
           from_email: fromEmail.trim() || username.trim(),
-        },
-      }),
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; id?: string; label?: string; via?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "connect_failed");
+      return data as { id: string; label?: string; via?: string };
+    },
     onSuccess: (r) => {
       setHost("");
       setUsername("");

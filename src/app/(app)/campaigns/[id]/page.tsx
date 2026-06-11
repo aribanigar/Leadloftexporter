@@ -21,7 +21,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, getToken, getWorkspaceId } from '@/lib/api';
 
 // ─── Types (backend shapes) ────────────────────────────────────────────────
 
@@ -566,10 +566,24 @@ export default function CampaignDetailPage() {
     }
   }, [id]);
 
-  // ── The poll-driven send tick. While sending, advance one batch per call.
+  // ── The poll-driven send tick. Calls the Next.js /api/campaigns/{id}/tick
+  // route which sends from Vercel's network (no SMTP port block) then commits
+  // results back to Python. Falls back to the Python tick endpoint for Gmail
+  // and other OAuth senders where nodemailer isn't needed.
   const runTick = useCallback(async () => {
     try {
-      const r = await api<{ status: string }>(`/campaigns/${id}/tick`, { method: 'POST' });
+      const token = getToken();
+      const wsId = getWorkspaceId();
+      const res = await fetch(`/api/campaigns/${id}/tick`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`,
+          'X-Workspace-Id': wsId || '',
+        },
+        body: '{}',
+      });
+      const r = await res.json() as { status?: string };
       // Refresh status + counters cheaply via the full campaign read.
       await fetchCampaign();
       await fetchStats(true);

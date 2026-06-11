@@ -372,47 +372,46 @@ def smtp_connect(
     username = (body.get("username") or "").strip()
     password = body.get("password") or ""
     from_email = (body.get("from_email") or username).strip()
+    skip_verify = bool(body.get("skip_verify", False))
     if not host or not username or not password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "host_username_password_required")
 
-    direct_ok = False
-    direct_err = ""
-    try:
-        asyncio.run(_smtp_verify(host, port, username, password))
-        direct_ok = True
-    except Exception as exc:  # noqa: BLE001
-        direct_err = str(exc)
+    if not skip_verify:
+        direct_ok = False
+        direct_err = ""
+        try:
+            asyncio.run(_smtp_verify(host, port, username, password))
+            direct_ok = True
+        except Exception as exc:  # noqa: BLE001
+            direct_err = str(exc)
 
-    if not direct_ok:
-        is_block = any(
-            s in direct_err.lower()
-            for s in ("timed out", "timeout", "network is unreachable", "no route to host")
-        )
-        if not is_block:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"smtp_connect_failed: {direct_err}")
-        # Render port block — try the Vercel relay with the same credentials.
-        relay_ok, relay_err = _smtp_verify_via_relay(host, port, username, password)
-        if not relay_ok:
-            # The relay returned a real auth/host error — bubble it back so
-            # the user knows whether to fix creds vs. infrastructure.
-            if "auth" in relay_err.lower() or "535" in relay_err:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    f"smtp_auth_failed: {relay_err} — double-check the username + password.",
-                )
-            if "not_configured" in relay_err:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    (
-                        f"smtp_blocked_by_host: connecting to {host}:{port} timed out, and the "
-                        "Vercel SMTP relay isn't configured on this deploy. Use Resend or SendGrid, "
-                        "or set FRONTEND_ORIGINS / SMTP_RELAY_URL on the backend so it can use the relay."
-                    ),
-                )
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"smtp_verify_failed_via_relay: {relay_err}",
+        if not direct_ok:
+            is_block = any(
+                s in direct_err.lower()
+                for s in ("timed out", "timeout", "network is unreachable", "no route to host")
             )
+            if not is_block:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"smtp_connect_failed: {direct_err}")
+            relay_ok, relay_err = _smtp_verify_via_relay(host, port, username, password)
+            if not relay_ok:
+                if "auth" in relay_err.lower() or "535" in relay_err:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        f"smtp_auth_failed: {relay_err} — double-check the username + password.",
+                    )
+                if "not_configured" in relay_err:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        (
+                            f"smtp_blocked_by_host: connecting to {host}:{port} timed out, and the "
+                            "Vercel SMTP relay isn't configured on this deploy. Use Resend or SendGrid, "
+                            "or set FRONTEND_ORIGINS / SMTP_RELAY_URL on the backend so it can use the relay."
+                        ),
+                    )
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"smtp_verify_failed_via_relay: {relay_err}",
+                )
 
     acct = _upsert_account(
         db,
@@ -426,9 +425,7 @@ def smtp_connect(
             "port": port,
             "username": username,
             "from_email": from_email,
-            # Persist the egress path so email_sender.py skips the doomed
-            # direct attempt on every subsequent send.
-            "via": "direct" if direct_ok else "relay",
+            "via": "relay" if not skip_verify else "vercel",
         },
     )
     return {

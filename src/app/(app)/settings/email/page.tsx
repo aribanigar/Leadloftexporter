@@ -12,7 +12,7 @@ import {
   Sparkles,
   AlertCircle,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, getToken, getWorkspaceId } from "@/lib/api";
 
 interface ConnectedAccount {
   id: string;
@@ -216,17 +216,28 @@ function SmtpForm({ onSaved }: FormProps) {
   const [fromEmail, setFromEmail] = useState("");
 
   const save = useMutation({
-    mutationFn: () =>
-      api("/integrations/smtp/connect", {
+    mutationFn: async () => {
+      const token = getToken();
+      const wsId = getWorkspaceId();
+      const res = await fetch("/api/smtp-connect", {
         method: "POST",
-        body: {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token || ""}`,
+          "X-Workspace-Id": wsId || "",
+        },
+        body: JSON.stringify({
           host: host.trim(),
           port,
           username: username.trim(),
           password,
           from_email: fromEmail.trim() || username.trim(),
-        },
-      }),
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error || "connect_failed");
+      return data;
+    },
     onSuccess: () => {
       setHost("");
       setUsername("");
