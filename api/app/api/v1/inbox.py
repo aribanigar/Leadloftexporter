@@ -113,11 +113,32 @@ def send_email(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    """Send a single email synchronously.
+
+    Manual sends from the Outreach / Lead Detail composer MUST dispatch
+    the SMTP/HTTPS call inline — they're driven by a user clicking Send
+    and the UI shows a spinner that won't resolve until we return. The
+    old behaviour was to call queue_email() and rely on the Celery worker
+    to drain queued rows every minute. On Render's free tier no worker
+    runs, so rows sat in "queued" forever and the UI bubbles spun forever.
+
+    Flow:
+      1. queue_email() creates the EmailMessage row + email_queued Activity
+      2. send_email_message() picks a connected account, runs the actual
+         transport (Resend / SendGrid / Gmail / SMTP → Vercel relay
+         fallback), stamps status=sent/sent_at on success or
+         status=failed/error on failure.
+      3. We return the resolved status so the frontend can flip the
+         pending bubble straight to "sent" or "failed".
+    """
+    from app.services.email_sender import send_email_message
+
     lead_id = body.get("lead_id")
     to_address = body.get("to")
     subject = body.get("subject")
     body_html = body.get("body_html") or body.get("body") or ""
-    if not (to_address and body_html):
+    body_text = body.get("body_text") or ""
+    if not (to_address and (body_html or body_text)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "to_and_body_required")
     lead = None
     if lead_id:
@@ -135,8 +156,22 @@ def send_email(
         subject=subject or "",
         body_html=body_html,
     )
+    if body_text:
+        msg.body_text = body_text
+    db.flush()
+
+    # Dispatch immediately. send_email_message mutates msg.status / .sent_at
+    # / .error / .provider_message_id and returns a SendResult.
+    result = send_email_message(db, msg, ctx.workspace, user_id=ctx.user_id)
     db.commit()
-    return {"id": msg.id, "status": msg.status}
+    return {
+        "id": msg.id,
+        "status": msg.status,
+        "ok": result.ok,
+        "error": msg.error,
+        "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
+        "from_address": msg.from_address or None,
+    }
 
 
 @router.post("/bulk-send")

@@ -48,6 +48,8 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Lead, LeadList } from "@/lib/types";
 import { cn, initials, fmtDate } from "@/lib/utils";
+import { ConnectSmtpModal } from "@/components/connect-smtp-modal";
+import { ConnectWhatsAppModal } from "@/components/connect-whatsapp-modal";
 
 type Channel = "email" | "whatsapp";
 
@@ -205,27 +207,52 @@ export default function OutreachPage() {
     out.sort((a, b) =>
       (a.at || "").localeCompare(b.at || "")
     );
-    // merge pending bubbles (these have client ids prefixed "p_")
-    const pendingForLead = pending.filter((p) => p.pending);
-    return [...out, ...pendingForLead];
+    // Merge ALL pending bubbles (both still-pending and just-resolved-by-mutation).
+    // The composer used to disappear the user's text because we dedup'd
+    // pending against the backend timeline by body prefix — if any earlier
+    // send had the same opener, the new bubble vanished instantly. Now we
+    // keep pending bubbles in the conversation until they age out (30 s
+    // after the mutation resolves), so the user always sees their just-
+    // sent message land, with a clear ✓ or ⚠️ status icon.
+    return [...out, ...pending];
   }, [timeline, pending]);
 
-  // Once the backend timeline contains a message matching our pending body,
-  // drop the pending bubble so it doesn't double-render.
+  // Age-out pending bubbles 30 s AFTER they resolve (pending=false). We
+  // never time out a still-pending bubble — that would make the user think
+  // a slow Render-tier backend "lost" their message.
   useEffect(() => {
-    if (!timeline || !pending.length) return;
-    const backendBodies = new Set(
-      timeline
-        .filter((t) => t.kind === "email" || (t.kind === "activity" && t.type === "whatsapp_sent"))
-        .map((t) => ((t.payload?.body_preview || t.preview || "") as string).trim().slice(0, 120))
-    );
-    setPending((cur) =>
-      cur.filter((p) => !backendBodies.has(p.body.trim().slice(0, 120)))
-    );
-  }, [timeline]);  // eslint-disable-line react-hooks/exhaustive-deps
+    if (!pending.length) return;
+    const t = setInterval(() => {
+      const cutoff = Date.now() - 30_000;
+      setPending((cur) =>
+        cur.filter((p) => {
+          if (p.pending) return true;
+          const ageStart = p.at ? Date.parse(p.at) : 0;
+          return ageStart > cutoff;
+        })
+      );
+    }, 5000);
+    return () => clearInterval(t);
+  }, [pending.length]);
 
   // ───── Send mutations ───────────────────────────────────────────────────
-  const sendEmail = useMutation<unknown, Error, { subject: string; body: string }>({
+  // /inbox/send now dispatches the SMTP/HTTPS call synchronously and
+  // returns the resolved status — we use that to flip the pending bubble
+  // straight to "sent" or "failed" without waiting for the next 3 s
+  // timeline poll. The mutation context carries the pending bubble id so
+  // onSuccess/onError can target the right one.
+  type SendEmailResp = {
+    id: string;
+    status: string;
+    ok: boolean;
+    error?: string | null;
+    from_address?: string | null;
+  };
+  const sendEmail = useMutation<
+    SendEmailResp,
+    Error,
+    { subject: string; body: string; pendingId: string }
+  >({
     mutationFn: ({ subject, body }) =>
       api("/inbox/send", {
         method: "POST",
@@ -234,21 +261,63 @@ export default function OutreachPage() {
           to: activeLead?.email,
           subject,
           body_html: body.replace(/\n/g, "<br/>"),
+          body_text: body,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (r, vars) => {
+      // Resolved synchronously — flip the bubble immediately.
+      setPending((cur) =>
+        cur.map((p) =>
+          p.id === vars.pendingId
+            ? {
+                ...p,
+                status: r.ok ? "sent" : "failed",
+                pending: false,
+              }
+            : p
+        )
+      );
       qc.invalidateQueries({ queryKey: ["lead-timeline", activeLeadId] });
+    },
+    onError: (_e, vars) => {
+      setPending((cur) =>
+        cur.map((p) =>
+          p.id === vars.pendingId ? { ...p, status: "failed", pending: false } : p
+        )
+      );
     },
   });
 
-  const sendWhatsApp = useMutation<{ sent: number; failed: number; errors: string[] }, Error, string>({
-    mutationFn: (body) =>
+  const sendWhatsApp = useMutation<
+    { sent: number; failed: number; errors: string[] },
+    Error,
+    { body: string; pendingId: string }
+  >({
+    mutationFn: ({ body }) =>
       api("/whatsapp/send", {
         method: "POST",
         body: { message: body, lead_ids: [activeLeadId] },
       }),
-    onSuccess: () => {
+    onSuccess: (r, vars) => {
+      setPending((cur) =>
+        cur.map((p) =>
+          p.id === vars.pendingId
+            ? {
+                ...p,
+                status: r.failed > 0 ? "failed" : "sent",
+                pending: false,
+              }
+            : p
+        )
+      );
       qc.invalidateQueries({ queryKey: ["lead-timeline", activeLeadId] });
+    },
+    onError: (_e, vars) => {
+      setPending((cur) =>
+        cur.map((p) =>
+          p.id === vars.pendingId ? { ...p, status: "failed", pending: false } : p
+        )
+      );
     },
   });
 
@@ -268,42 +337,77 @@ export default function OutreachPage() {
     setPending((cur) => [...cur, pendingMsg]);
 
     if (channel === "email") {
-      sendEmail.mutate(
-        { subject: args.subject || "", body: args.body.trim() },
-        {
-          onError: () => {
-            setPending((cur) =>
-              cur.map((p) => (p.id === pendingId ? { ...p, status: "failed", pending: false } : p))
-            );
-          },
-        }
-      );
-    } else {
-      sendWhatsApp.mutate(args.body.trim(), {
-        onError: () => {
-          setPending((cur) =>
-            cur.map((p) => (p.id === pendingId ? { ...p, status: "failed", pending: false } : p))
-          );
-        },
-        onSuccess: (r) => {
-          if (r.failed > 0) {
-            setPending((cur) =>
-              cur.map((p) => (p.id === pendingId ? { ...p, status: "failed", pending: false } : p))
-            );
-          }
-        },
+      sendEmail.mutate({
+        subject: args.subject || "",
+        body: args.body.trim(),
+        pendingId,
       });
+    } else {
+      sendWhatsApp.mutate({ body: args.body.trim(), pendingId });
     }
   }
 
+  const [smtpModalOpen, setSmtpModalOpen] = useState(false);
+  const [waModalOpen, setWaModalOpen] = useState(false);
+
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
+      <ConnectSmtpModal
+        open={smtpModalOpen}
+        onClose={() => setSmtpModalOpen(false)}
+        onConnected={() => {
+          qc.invalidateQueries({ queryKey: ["connected-accounts"] });
+        }}
+      />
+      <ConnectWhatsAppModal
+        open={waModalOpen}
+        onClose={() => setWaModalOpen(false)}
+        alreadyConnected={!!waConfig?.connected}
+        display={waConfig?.display}
+        onConnected={() => {
+          qc.invalidateQueries({ queryKey: ["whatsapp-config"] });
+          setTimeout(() => setWaModalOpen(false), 600);
+        }}
+      />
       {/* ───────── LEFT: lead picker ───────── */}
       <aside className="flex w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-indigo-600" />
             <h1 className="text-sm font-semibold">Outreach</h1>
+            {/* Always-visible Connect SMTP button so users can set up an
+                email sender without leaving this page. Quietly shows the
+                Settings link too for the longer flow with Gmail/Resend/etc. */}
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setSmtpModalOpen(true)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium",
+                  emailConnected
+                    ? "text-slate-500 hover:bg-slate-100"
+                    : "bg-indigo-600 text-white hover:bg-indigo-700"
+                )}
+                title="Set up SMTP to send email"
+              >
+                <Mail className="h-3 w-3" />
+                {emailConnected ? "+SMTP" : "SMTP"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setWaModalOpen(true)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium",
+                  waConfig?.connected
+                    ? "text-slate-500 hover:bg-slate-100"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                )}
+                title="Connect WhatsApp"
+              >
+                <MessageCircle className="h-3 w-3" />
+                WhatsApp
+              </button>
+            </div>
           </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -414,6 +518,8 @@ export default function OutreachPage() {
               onSend={dispatchSend}
               emailConnected={emailConnected}
               waConnected={!!waConfig?.connected}
+              onConnectEmail={() => setSmtpModalOpen(true)}
+              onConnectWhatsApp={() => setWaModalOpen(true)}
             />
           </>
         )}
@@ -477,6 +583,22 @@ function LeadHeader({ lead }: { lead: Lead }) {
           )}
         </div>
       </div>
+      {/* WhatsApp Web quick-open — opens the real chat in WhatsApp Web
+          so the rep can have a live, two-way conversation in their
+          actual WhatsApp inbox. No API setup required. */}
+      {lead.phone && (
+        <a
+          href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+          title="Open the live chat in WhatsApp Web — real inbox, real-time"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          WhatsApp Web
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
       <Link
         href={`/leads/${lead.id}`}
         className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
@@ -620,6 +742,8 @@ function Composer({
   onSend,
   emailConnected,
   waConnected,
+  onConnectEmail,
+  onConnectWhatsApp,
 }: {
   lead: Lead;
   channel: Channel;
@@ -628,6 +752,8 @@ function Composer({
   onSend: (args: { subject?: string; body: string }) => void;
   emailConnected: boolean;
   waConnected: boolean;
+  onConnectEmail?: () => void;
+  onConnectWhatsApp?: () => void;
 }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -644,15 +770,37 @@ function Composer({
   const send = () => {
     if (!trimmed || isSending || !canSend) return;
     onSend({ subject: isEmail ? subject || "(no subject)" : undefined, body: trimmed });
-    setBody("");
-    setSubject("");
+    // Don't clear the textarea here — the parent's mutation runs async
+    // and clearing before it resolves made users think their message
+    // disappeared. We clear it once the mutation is no longer in flight.
   };
+  // When the parent's mutation flips from isSending=true to isSending=false
+  // AND we previously dispatched, clear the textarea.
+  const wasSendingRef = useRef(false);
+  useEffect(() => {
+    if (wasSendingRef.current && !isSending) {
+      setBody("");
+      setSubject("");
+    }
+    wasSendingRef.current = isSending;
+  }, [isSending]);
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       send();
     }
   }
+  // wa.me deep-link — opens WhatsApp Web (desktop) or the WhatsApp app
+  // (mobile) with the recipient prefilled, the same number we'd send to
+  // via the Cloud API. Reps use this to open their inbox-style chat with
+  // the lead in WhatsApp Web — best real-time experience until we wire
+  // the inbound webhook + WhatsApp inbox view inline.
+  const waWebHref = useMemo(() => {
+    if (channel !== "whatsapp" || !lead.phone) return null;
+    const digits = lead.phone.replace(/\D/g, "");
+    const txt = trimmed ? `?text=${encodeURIComponent(trimmed)}` : "";
+    return `https://wa.me/${digits}${txt}`;
+  }, [channel, lead.phone, trimmed]);
 
   return (
     <div className="border-t border-slate-200 bg-white px-5 py-3">
@@ -664,23 +812,27 @@ function Composer({
         </div>
       )}
       {missingProvider && !missingContact && (
-        <div className="mb-2 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          <Plug className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-          {isEmail ? (
-            <span>
-              No email sender connected.{" "}
-              <Link href="/settings/email" className="font-medium underline">
-                Connect SMTP / Resend / SendGrid →
-              </Link>
-            </span>
-          ) : (
-            <span>
-              WhatsApp Business API not connected.{" "}
-              <Link href="/settings/whatsapp" className="font-medium underline">
-                Connect WhatsApp →
-              </Link>
-            </span>
-          )}
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span className="flex items-start gap-2">
+            <Plug className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+            {isEmail
+              ? "No email sender connected — connect any SMTP and send instantly."
+              : "WhatsApp Cloud API not connected — or just use the green WhatsApp Web button above."}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              isEmail
+                ? onConnectEmail?.()
+                : onConnectWhatsApp?.()
+            }
+            className={cn(
+              "rounded-md px-2.5 py-1 text-[11px] font-semibold text-white",
+              isEmail ? "bg-indigo-600 hover:bg-indigo-700" : "bg-emerald-600 hover:bg-emerald-700"
+            )}
+          >
+            Connect now
+          </button>
         </div>
       )}
 
@@ -706,13 +858,26 @@ function Composer({
         maxLength={8000}
       />
 
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-[11px] text-slate-400">
           {isEmail
             ? "Cmd / Ctrl + Enter to send. Lands in their inbox via your connected sender."
             : "Cmd / Ctrl + Enter to send. Delivered via WhatsApp Cloud API."}
         </span>
-        <button
+        <div className="flex items-center gap-2">
+          {waWebHref && (
+            <a
+              href={waWebHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary"
+              title="Open WhatsApp Web with this chat pre-filled — your real inbox, real-time"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              WhatsApp Web
+            </a>
+          )}
+          <button
           className={cn(
             "btn",
             isEmail
@@ -730,6 +895,7 @@ function Composer({
           )}
           {isSending ? "Sending…" : `Send via ${isEmail ? "Email" : "WhatsApp"}`}
         </button>
+        </div>
       </div>
     </div>
   );
