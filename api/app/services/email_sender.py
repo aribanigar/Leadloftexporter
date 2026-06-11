@@ -273,6 +273,38 @@ def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: 
         return SendResult(False, error=f"sendgrid_request_failed: {exc}")
 
 
+def send_via_account(
+    account: ConnectedAccount,
+    to_address: str,
+    subject: str,
+    body_text: str,
+    body_html: Optional[str] = None,
+) -> SendResult:
+    """Send a one-off message through a SPECIFIC connected account, routing to
+    the right provider (resend / sendgrid / gmail / smtp+relay) — no
+    EmailMessage row, no daily-limit check, no auto-pick. Used by the
+    "send a test email" button so a user gets real-time, end-to-end proof
+    that the inbox they just connected can actually deliver mail (not merely
+    authenticate). Campaign + composer sends still go through
+    send_email_message; this is the lightweight transient path."""
+    subject = subject or "(no subject)"
+    if account.provider == "resend":
+        return _resend_send(account, to_address, subject, body_text or "", body_html)
+    if account.provider == "sendgrid":
+        return _sendgrid_send(account, to_address, subject, body_text or "", body_html)
+    py = PyEmail()
+    py["From"] = account.external_id or (account.config or {}).get("from_email") or "no-reply@example.com"
+    py["To"] = to_address
+    py["Subject"] = subject
+    py.set_content(body_text or "")
+    if body_html:
+        py.add_alternative(body_html, subtype="html")
+    if account.provider == "gmail":
+        return _gmail_send(account, py)
+    # smtp (+ relay fallback)
+    return asyncio.run(_smtp_send(account, py))
+
+
 def send_email_message(
     db: Session,
     message: EmailMessage,

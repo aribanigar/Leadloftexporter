@@ -137,6 +137,66 @@ def list_accounts(
     ]
 
 
+@router.post("/accounts/{account_id}/test")
+def test_send_account(
+    account_id: str,
+    body: dict | None = None,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Send a real test email through a specific connected sender so the user
+    gets immediate, end-to-end proof the inbox delivers — not just that the
+    credentials authenticate. Defaults the recipient to the sender's own
+    from-address (lands in their own inbox). Works for every email provider
+    (smtp+relay / gmail / resend / sendgrid)."""
+    body = body or {}
+    acct = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.id == account_id,
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+        )
+        .first()
+    )
+    if not acct:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    if acct.provider not in ("smtp", "gmail", "resend", "sendgrid"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_an_email_sender")
+
+    from_addr = acct.external_id or (acct.config or {}).get("from_email") or ""
+    to_address = (body.get("to") or from_addr or "").strip()
+    if not to_address:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_recipient")
+
+    from app.services.email_sender import send_via_account
+
+    label = acct.label or acct.provider
+    result = send_via_account(
+        acct,
+        to_address=to_address,
+        subject="LeadCaptura test email ✓",
+        body_text=(
+            f"This is a test email sent from your connected sender ({from_addr or label}).\n\n"
+            "If you're reading this, the inbox is wired up correctly and can "
+            "deliver campaign + outreach mail end-to-end.\n\n— LeadCaptura"
+        ),
+        body_html=(
+            "<div style=\"font-family:system-ui,Arial,sans-serif;font-size:14px;color:#0f172a\">"
+            f"<p>This is a <strong>test email</strong> from your connected sender "
+            f"(<code>{from_addr or label}</code>).</p>"
+            "<p>If you're reading this, the inbox is wired up correctly and can "
+            "deliver campaign &amp; outreach mail end-to-end. ✓</p>"
+            "<p style=\"color:#64748b\">— LeadCaptura</p></div>"
+        ),
+    )
+    if not result.ok:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"test_send_failed: {result.error or 'unknown_error'}",
+        )
+    return {"ok": True, "to": to_address, "provider": acct.provider}
+
+
 @router.delete("/accounts/{account_id}")
 def delete_account(
     account_id: str,

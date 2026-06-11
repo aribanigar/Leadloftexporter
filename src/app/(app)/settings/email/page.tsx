@@ -10,6 +10,7 @@ import {
   Trash2,
   AlertTriangle,
   Sparkles,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -130,35 +131,15 @@ export default function EmailSendersPage() {
         ) : (
           <ul className="divide-y divide-slate-100">
             {emailAccounts.map((a) => (
-              <li key={a.id} className="flex items-center gap-3 py-2.5">
-                <ProviderBadge provider={a.provider} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">
-                    {a.external_id || a.label || a.provider}
-                  </div>
-                  <div className="truncate text-xs text-slate-400">
-                    {a.label || a.provider} ·{" "}
-                    <span
-                      className={
-                        a.status === "active" ? "text-emerald-600" : "text-slate-400"
-                      }
-                    >
-                      {a.status}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  onClick={() => {
-                    if (window.confirm(`Disconnect ${a.external_id || a.label || a.provider}?`)) {
-                      disconnect.mutate(a.id);
-                    }
-                  }}
-                  title="Disconnect"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
+              <SenderRow
+                key={a.id}
+                account={a}
+                onDisconnect={() => {
+                  if (window.confirm(`Disconnect ${a.external_id || a.label || a.provider}?`)) {
+                    disconnect.mutate(a.id);
+                  }
+                }}
+              />
             ))}
           </ul>
         )}
@@ -208,6 +189,63 @@ export default function EmailSendersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SenderRow({
+  account: a,
+  onDisconnect,
+}: {
+  account: ConnectedAccount;
+  onDisconnect: () => void;
+}) {
+  // Real-time, end-to-end proof: actually send a message through THIS sender
+  // (not just re-verify auth). Defaults to mailing the sender's own address,
+  // so the test email lands right back in the connected inbox.
+  const test = useMutation<{ ok: boolean; to: string }, Error, void>({
+    mutationFn: () => api(`/integrations/accounts/${a.id}/test`, { method: "POST", body: {} }),
+  });
+  return (
+    <li className="flex items-center gap-3 py-2.5">
+      <ProviderBadge provider={a.provider} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">
+          {a.external_id || a.label || a.provider}
+        </div>
+        <div className="truncate text-xs text-slate-400">
+          {a.label || a.provider} ·{" "}
+          <span className={a.status === "active" ? "text-emerald-600" : "text-slate-400"}>
+            {a.status}
+          </span>
+          {test.isSuccess && (
+            <span className="text-emerald-600"> · test sent to {test.data.to} ✓</span>
+          )}
+          {test.isError && (
+            <span className="text-red-500"> · {test.error?.message || "test failed"}</span>
+          )}
+        </div>
+      </div>
+      <button
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        onClick={() => test.mutate()}
+        disabled={test.isPending}
+        title="Send a test email through this inbox"
+      >
+        {test.isPending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Send className="h-3.5 w-3.5" />
+        )}
+        {test.isPending ? "Sending…" : "Send test"}
+      </button>
+      <button
+        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+        onClick={onDisconnect}
+        title="Disconnect"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </li>
   );
 }
 
