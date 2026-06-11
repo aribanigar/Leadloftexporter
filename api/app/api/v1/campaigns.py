@@ -1457,6 +1457,15 @@ def _commit_tick_results(
                 msg.status = "sent"
             campaign.sent_count = (campaign.sent_count or 0) + 1
             sent += 1
+            # Bump warmup counters for the sender that actually sent this email
+            # so the ramp curve advances in real time and `_eligible_senders`
+            # starts skipping it once today's cap is hit.
+            if r.sender_account_id:
+                warmup = _warmup_for_account(
+                    db, campaign.workspace_id, r.sender_account_id
+                )
+                warmup.sent_today = (warmup.sent_today or 0) + 1
+                warmup.total_sent = (warmup.total_sent or 0) + 1
             if r.lead_id:
                 lead = db.get(Lead, r.lead_id)
                 if lead:

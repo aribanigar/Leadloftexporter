@@ -3,6 +3,77 @@ import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
+import {
+  Plus, ArrowLeft, Wand2, XCircle, CheckCircle2, X, Code2, Monitor,
+  Copy, Trash2, GripVertical, FileEdit, ChevronDown, ChevronUp,
+  ListChecks, Maximize2, Minimize2, Users, ShieldCheck, Eye, Save,
+  Send, Smartphone, Columns, Lightbulb, TrendingUp, Upload, AlertCircle,
+  Flag, Newspaper, Tag, RefreshCw, BadgeCheck, Leaf, Megaphone, Settings2,
+  Bold, Italic, Underline, Link as LinkIcon, List, type LucideIcon,
+} from 'lucide-react';
+
+// ─── Icon — maps Material Symbol names → lucide components ────────────────
+// All 42 icon sites in this page were originally rendered with the Material
+// Symbols font (`<span className="material-symbols-outlined">name</span>`),
+// but that font was never loaded, so they shipped as raw text. This component
+// translates the original names to lucide-react (the icon library used
+// everywhere else in the app) so they render correctly.
+const ICON_MAP: Record<string, LucideIcon> = {
+  add: Plus,
+  arrow_back: ArrowLeft,
+  auto_mode: Wand2,
+  cancel: XCircle,
+  check_circle: CheckCircle2,
+  close: X,
+  code: Code2,
+  computer: Monitor,
+  content_copy: Copy,
+  delete: Trash2,
+  drag_indicator: GripVertical,
+  edit_note: FileEdit,
+  error: AlertCircle,
+  expand_more: ChevronDown,
+  expand_less: ChevronUp,
+  fact_check: ListChecks,
+  fullscreen: Maximize2,
+  fullscreen_exit: Minimize2,
+  groups: Users,
+  health_and_safety: ShieldCheck,
+  people: Users,
+  preview: Eye,
+  save: Save,
+  send: Send,
+  smartphone: Smartphone,
+  splitscreen: Columns,
+  tips_and_updates: Lightbulb,
+  trending_up: TrendingUp,
+  upload_file: Upload,
+  visibility: Eye,
+  checklist: ListChecks,
+  flag: Flag,
+  newspaper: Newspaper,
+  local_offer: Tag,
+  refresh: RefreshCw,
+  verified: BadgeCheck,
+  eco: Leaf,
+  campaign: Megaphone,
+  tune: Settings2,
+  format_bold: Bold,
+  format_italic: Italic,
+  format_underline: Underline,
+  link: LinkIcon,
+  format_list_bulleted: List,
+};
+interface IconProps {
+  name: string;
+  size?: number;
+  color?: string;
+  style?: React.CSSProperties;
+}
+function Icon({ name, size = 16, color, style }: IconProps) {
+  const Cmp = ICON_MAP[name] ?? Flag;
+  return <Cmp size={size} color={color} style={{ flexShrink: 0, ...style }} strokeWidth={2} />;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -31,7 +102,8 @@ interface FormState {
   replyTo: string;
   tags: string;
   htmlContent: string;
-  contentMode: 'visual' | 'html' | 'upload';
+  plainText: string;
+  contentMode: 'visual' | 'html' | 'upload' | 'plain';
   manualEmails: string;
   includeAllLeads: boolean;
   followUps: FollowUp[];
@@ -238,9 +310,7 @@ function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error';
       display: 'flex', alignItems: 'center', gap: '10px',
       fontFamily: 'Inter, sans-serif',
     }}>
-      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-        {type === 'success' ? 'check_circle' : 'error'}
-      </span>
+      <Icon name={type === 'success' ? 'check_circle' : 'error'} size={18} />
       {msg}
     </div>
   );
@@ -272,7 +342,7 @@ function PreviewModal({ html, onClose }: { html: string; onClose: () => void }) 
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', color: T.onSurfaceVariant,
           }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+            <Icon name={'close'} size={20} />
           </button>
         </div>
         <iframe
@@ -340,7 +410,7 @@ function PanelSection({ children, noBorder }: { children: React.ReactNode; noBor
 function PanelSectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-      <span className="material-symbols-outlined" style={{ fontSize: '16px', color: T.saffron }}>{icon}</span>
+      <Icon name={icon} size={16} color={T.saffron} />
       <span style={{
         fontSize: '13px', fontWeight: 700, color: T.onSurface,
         fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.01em',
@@ -376,6 +446,7 @@ function NewCampaignPageInner() {
     replyTo: '',
     tags: '',
     htmlContent: '',
+    plainText: '',
     contentMode: 'html',
     manualEmails: prefillEmail,
     includeAllLeads: false,
@@ -466,6 +537,7 @@ function NewCampaignPageInner() {
           replyTo: c.reply_to || '',
           tags: Array.isArray(c.tags) ? c.tags.join(', ') : '',
           htmlContent: c.body_html || '',
+          plainText: (c as CampaignDetail & { body_text?: string }).body_text || '',
           contentMode: 'html',
           manualEmails: (c.recipient_data || []).map(r => r.email).join('\n'),
           includeAllLeads: !!c.include_all_leads,
@@ -654,7 +726,7 @@ function NewCampaignPageInner() {
       name: form.name.trim() || form.subject.trim() || 'Untitled campaign',
       subject: form.subject,
       body_html: bodyHtml,
-      body_text: '',
+      body_text: form.plainText || '',
       from_name: form.fromName || undefined,
       from_email: form.fromEmail || undefined,
       reply_to: form.replyTo || undefined,
@@ -692,7 +764,7 @@ function NewCampaignPageInner() {
       name: form.name.trim() || form.subject.trim() || 'Untitled campaign',
       subject: form.subject,
       body_html: bodyHtml,
-      body_text: '',
+      body_text: form.plainText || '',
       from_name: form.fromName || undefined,
       from_email: form.fromEmail || undefined,
       reply_to: form.replyTo || undefined,
@@ -896,7 +968,7 @@ function NewCampaignPageInner() {
         color: T.onSurfaceVariant,
       }}
     >
-      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{icon}</span>
+      <Icon name={icon} size={14} />
     </button>
   );
 
@@ -934,7 +1006,7 @@ function NewCampaignPageInner() {
           color: T.onSurfaceVariant, textDecoration: 'none', fontSize: '13px',
           fontWeight: 500, flexShrink: 0,
         }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
+          <Icon name={'arrow_back'} size={16} />
           Back
         </Link>
 
@@ -965,6 +1037,50 @@ function NewCampaignPageInner() {
           </span>
         )}
 
+        {/* From-inbox chip — always visible so the user knows exactly which
+            connected inbox(es) this campaign will send through. Bound 1:1 to
+            form.senderIds so there's no chance of a mismatch between the
+            chosen mailbox in the right panel and the live send. */}
+        {!noSenders && (
+          <button
+            onClick={() => {
+              const el = document.getElementById('senders-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            title={form.senderIds.length === 0
+              ? 'No inbox selected — pick one or more on the right'
+              : 'Inboxes that will send this campaign'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '6px 12px',
+              borderRadius: T.radiusFull,
+              border: `1.5px solid ${form.senderIds.length === 0 ? '#dc2626' : T.primary}`,
+              background: form.senderIds.length === 0 ? 'rgba(220,38,38,0.08)' : 'rgba(0,54,26,0.08)',
+              cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              maxWidth: '380px', overflow: 'hidden',
+            }}
+          >
+            <Icon name="send" size={14} color={form.senderIds.length === 0 ? '#dc2626' : T.primary} />
+            <span style={{
+              fontSize: '11px', fontWeight: 800, textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: form.senderIds.length === 0 ? '#dc2626' : T.primary,
+            }}>From</span>
+            <span style={{
+              fontSize: '12px', fontWeight: 600, color: T.onSurface,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {form.senderIds.length === 0
+                ? 'Pick an inbox →'
+                : form.senderIds.length === 1
+                  ? (activeSenders.find(s => s.id === form.senderIds[0])?.from_address
+                      || activeSenders.find(s => s.id === form.senderIds[0])?.label
+                      || 'inbox')
+                  : `${form.senderIds.length} inboxes · rotating`}
+            </span>
+          </button>
+        )}
+
         {/* Live Preview toggle */}
         <button
           onClick={() => setShowSplitPreview(v => !v)}
@@ -979,7 +1095,7 @@ function NewCampaignPageInner() {
             fontFamily: 'Inter, sans-serif',
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>splitscreen</span>
+          <Icon name={'splitscreen'} size={15} />
           Live Preview
         </button>
 
@@ -1006,7 +1122,7 @@ function NewCampaignPageInner() {
               animation: 'spin 0.7s linear infinite', display: 'inline-block',
             }} />
           ) : (
-            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>save</span>
+            <Icon name={'save'} size={15} />
           )}
           Save Draft
         </button>
@@ -1035,7 +1151,7 @@ function NewCampaignPageInner() {
               animation: 'spin 0.7s linear infinite', display: 'inline-block',
             }} />
           ) : (
-            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>send</span>
+            <Icon name={'send'} size={15} />
           )}
           {sending ? 'Launching…' : 'Launch Campaign'}
         </button>
@@ -1078,12 +1194,7 @@ function NewCampaignPageInner() {
               <div>
                 <span style={alpineLabel()}>Campaign Goal</span>
                 <div style={{ position: 'relative' }}>
-                  <span className="material-symbols-outlined" style={{
-                    position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-                    fontSize: '14px', color: T.onSurfaceVariant, pointerEvents: 'none',
-                  }}>
-                    {GOALS.find(g => g.value === form.goal)?.icon || 'flag'}
-                  </span>
+                  <Icon name={GOALS.find(g => g.value === form.goal)?.icon || 'flag'} size={14} color={T.onSurfaceVariant} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   <select
                     value={form.goal}
                     onChange={e => setForm(f => ({ ...f, goal: e.target.value }))}
@@ -1097,10 +1208,7 @@ function NewCampaignPageInner() {
                       <option key={g.value} value={g.value}>{g.label}</option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined" style={{
-                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                    fontSize: '14px', color: T.onSurfaceVariant, pointerEvents: 'none',
-                  }}>expand_more</span>
+                  <Icon name={'expand_more'} size={14} color={T.onSurfaceVariant} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 </div>
               </div>
 
@@ -1212,9 +1320,7 @@ function NewCampaignPageInner() {
                   onChange={e => setForm(f => ({ ...f, includeAllLeads: e.target.checked }))}
                   style={{ width: '15px', height: '15px', accentColor: T.primary, flexShrink: 0 }}
                 />
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: form.includeAllLeads ? T.primary : T.onSurfaceVariant }}>
-                  groups
-                </span>
+                <Icon name={'groups'} size={16} color={form.includeAllLeads ? T.primary : T.onSurfaceVariant} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: T.onSurface }}>Include all CRM leads</div>
                   <div style={{ fontSize: '10px', color: T.onSurfaceVariant }}>Every lead with an email on file</div>
@@ -1236,7 +1342,7 @@ function NewCampaignPageInner() {
                   width: '100%',
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>upload_file</span>
+                <Icon name={'upload_file'} size={16} />
                 CSV Upload (with merge columns)
               </button>
               <input ref={csvInputRef} type="file" accept=".csv" style={{ display: 'none' }}
@@ -1286,9 +1392,7 @@ function NewCampaignPageInner() {
                     marginBottom: validationResult.invalid > 0 ? '6px' : 0,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '14px', color: validationResult.invalid > 0 ? '#dc2626' : '#16a34a' }}>
-                        {validationResult.invalid > 0 ? 'error' : 'check_circle'}
-                      </span>
+                      <Icon name={validationResult.invalid > 0 ? 'error' : 'check_circle'} size={14} color={validationResult.invalid > 0 ? '#dc2626' : '#16a34a'} />
                       <span style={{ fontWeight: 600, color: validationResult.invalid > 0 ? '#dc2626' : '#16a34a' }}>
                         {validationResult.invalid > 0
                           ? `${validationResult.invalid} rejected · ${validationResult.valid} valid`
@@ -1319,9 +1423,7 @@ function NewCampaignPageInner() {
                           padding: '7px 12px',
                           borderBottom: i < arr.length - 1 ? `1px solid ${T.surfaceContainer}` : 'none',
                         }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#dc2626', flexShrink: 0 }}>
-                            cancel
-                          </span>
+                          <Icon name={'cancel'} size={13} color={'#dc2626'} style={{ flexShrink: 0 }} />
                           <span style={{ fontSize: '11px', fontFamily: '"Fira Code", monospace', color: T.onSurface, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.email}
                           </span>
@@ -1386,7 +1488,7 @@ function NewCampaignPageInner() {
                 backgroundColor: 'rgba(0,54,26,0.07)',
                 borderRadius: T.radiusFull,
               }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '14px', color: T.primary }}>people</span>
+                <Icon name={'people'} size={14} color={T.primary} />
                 <span style={{ fontSize: '12px', fontWeight: 700, color: T.primary }}>
                   {form.includeAllLeads
                     ? `All CRM leads${manualCount > 0 ? ` + ${manualCount.toLocaleString()}` : ''}`
@@ -1397,6 +1499,7 @@ function NewCampaignPageInner() {
           </PanelSection>
 
           {/* ── Senders ── */}
+          <div id="senders-section" />
           <PanelSection>
             <PanelSectionTitle icon="alternate_email">Send From</PanelSectionTitle>
 
@@ -1549,9 +1652,7 @@ function NewCampaignPageInner() {
                 onChange={e => setForm(f => ({ ...f, warmupEnabled: e.target.checked }))}
                 style={{ width: '15px', height: '15px', accentColor: T.primary, flexShrink: 0 }}
               />
-              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: form.warmupEnabled ? T.primary : T.onSurfaceVariant }}>
-                trending_up
-              </span>
+              <Icon name={'trending_up'} size={16} color={form.warmupEnabled ? T.primary : T.onSurfaceVariant} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: T.onSurface }}>Warmup enabled</div>
                 <div style={{ fontSize: '10px', color: T.onSurfaceVariant }}>Ramp volume gradually per mailbox</div>
@@ -1576,7 +1677,7 @@ function NewCampaignPageInner() {
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = T.surfaceContainerLow; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = T.surfaceContainerLowest; }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '14px', color: T.primary }}>fact_check</span>
+              <Icon name={'fact_check'} size={14} color={T.primary} />
               Validate Emails
             </button>
           </PanelSection>
@@ -1588,9 +1689,7 @@ function NewCampaignPageInner() {
             padding: '16px 20px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px', color: T.saffron }}>
-                health_and_safety
-              </span>
+              <Icon name={'health_and_safety'} size={14} color={T.saffron} />
               <span style={{
                 fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
                 letterSpacing: '0.07em', color: T.onSurfaceVariant,
@@ -1650,7 +1749,7 @@ function NewCampaignPageInner() {
                   marginBottom: '6px',
                   display: 'flex', alignItems: 'center', gap: '4px',
                 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>tips_and_updates</span>
+                  <Icon name={'tips_and_updates'} size={12} />
                   Top improvements
                 </div>
                 {health.tips.map((tip, i) => (
@@ -1708,7 +1807,7 @@ function NewCampaignPageInner() {
               gap: '12px',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: T.saffron }}>edit_note</span>
+                <Icon name={'edit_note'} size={16} color={T.saffron} />
                 <span style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, fontFamily: 'Manrope, Inter, sans-serif' }}>
                   Email Content
                 </span>
@@ -1724,6 +1823,7 @@ function NewCampaignPageInner() {
               }}>
                 {([
                   { mode: 'html'   as const, label: 'Write HTML' },
+                  { mode: 'plain'  as const, label: 'Plain Text' },
                   { mode: 'upload' as const, label: 'Upload HTML' },
                   { mode: 'visual' as const, label: 'Preview' },
                 ]).map(({ mode, label: lbl }) => {
@@ -1763,9 +1863,7 @@ function NewCampaignPageInner() {
                 }}
                 title="Toggle split preview"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                  {showSplitPreview ? 'fullscreen_exit' : 'fullscreen'}
-                </span>
+                <Icon name={showSplitPreview ? 'fullscreen_exit' : 'fullscreen'} size={18} />
               </button>
             </div>
 
@@ -1812,9 +1910,7 @@ function NewCampaignPageInner() {
                   flexShrink: 0,
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
-                  {healthOpen ? 'expand_less' : 'checklist'}
-                </span>
+                <Icon name={healthOpen ? 'expand_less' : 'checklist'} size={14} />
                 {healthOpen ? 'Hide' : 'Checklist'}
               </button>
             </div>
@@ -1850,12 +1946,7 @@ function NewCampaignPageInner() {
                         borderRadius: '6px',
                         backgroundColor: item.done ? 'rgba(22,163,74,0.05)' : 'rgba(220,38,38,0.04)',
                       }}>
-                        <span className="material-symbols-outlined" style={{
-                          fontSize: '13px', flexShrink: 0, marginTop: '1px',
-                          color: item.done ? '#16a34a' : '#dc2626',
-                        }}>
-                          {item.done ? 'check_circle' : 'cancel'}
-                        </span>
+                        <Icon name={item.done ? 'check_circle' : 'cancel'} size={13} color={item.done ? '#16a34a' : '#dc2626'} style={{ flexShrink: 0, marginTop: '1px' }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '11px', fontWeight: 600, color: item.done ? T.onSurface : T.onSurfaceVariant }}>
@@ -1983,6 +2074,47 @@ function NewCampaignPageInner() {
                   />
                 )}
 
+                {/* Plain Text mode — the email body sent as text/plain. Sent
+                    as the SMTP `text` part; if HTML is also set the recipient's
+                    client will pick the best version. Many spam filters give a
+                    score boost when both parts exist. */}
+                {form.contentMode === 'plain' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <div style={{
+                      padding: '10px 16px',
+                      backgroundColor: T.surfaceContainerLow,
+                      borderBottom: `1px solid ${T.surfaceContainer}`,
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      fontSize: '11px', color: T.onSurfaceVariant,
+                      fontFamily: 'Inter, sans-serif',
+                    }}>
+                      <Icon name="tips_and_updates" size={13} color={T.saffron} />
+                      Merge tokens: <code>{'{first_name}'}</code>, <code>{'{company}'}</code>, <code>{'{email}'}</code>. Sent as <code>text/plain</code> alongside HTML when both are filled — improves inbox placement.
+                    </div>
+                    <textarea
+                      value={form.plainText}
+                      onChange={e => setForm(f => ({ ...f, plainText: e.target.value }))}
+                      placeholder={'Hi {first_name},\n\nQuick idea for {company} — wanted to see if it makes sense to chat.\n\nWorth 10 minutes this week?\n\nThanks,'}
+                      style={{
+                        flex: 1,
+                        display: 'block',
+                        width: '100%',
+                        minHeight: '420px',
+                        padding: '18px 20px',
+                        backgroundColor: '#ffffff',
+                        color: T.onSurface,
+                        border: 'none',
+                        fontFamily: '"SF Mono", Menlo, Consolas, monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.7',
+                        outline: 'none',
+                        resize: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                )}
+
                 {/* Visual Editor mode */}
                 {form.contentMode === 'visual' && (
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -2015,7 +2147,7 @@ function NewCampaignPageInner() {
                             color: T.onSurfaceVariant,
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{btn.icon}</span>
+                          <Icon name={btn.icon} size={15} />
                         </button>
                       ))}
                       <button
@@ -2074,9 +2206,7 @@ function NewCampaignPageInner() {
                         transition: 'all 0.2s',
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '40px', color: isDragOver ? T.primary : T.onSurfaceVariant, marginBottom: '12px', display: 'block' }}>
-                        upload_file
-                      </span>
+                      <Icon name={'upload_file'} size={40} color={isDragOver ? T.primary : T.onSurfaceVariant} style={{ marginBottom: '12px', display: 'block' }} />
                       <p style={{ fontSize: '14px', fontWeight: 600, color: T.onSurface, margin: '0 0 4px', fontFamily: 'Manrope, Inter, sans-serif' }}>
                         Drop your HTML file here
                       </p>
@@ -2095,7 +2225,7 @@ function NewCampaignPageInner() {
                         backgroundColor: 'rgba(0,54,26,0.06)',
                         borderRadius: T.radiusLg, display: 'flex', alignItems: 'center', gap: '8px',
                       }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '16px', color: T.primary }}>check_circle</span>
+                        <Icon name={'check_circle'} size={16} color={T.primary} />
                         <span style={{ fontSize: '13px', color: T.primary, fontWeight: 600 }}>
                           HTML loaded ({form.htmlContent.length.toLocaleString()} characters)
                         </span>
@@ -2113,7 +2243,7 @@ function NewCampaignPageInner() {
                   display: 'flex', alignItems: 'center', gap: '6px',
                   flexShrink: 0,
                 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '13px', color: T.onSurfaceVariant }}>preview</span>
+                  <Icon name={'preview'} size={13} color={T.onSurfaceVariant} />
                   <span style={{ fontSize: '11px', fontWeight: 700, color: T.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Quick Preview
                   </span>
@@ -2127,7 +2257,7 @@ function NewCampaignPageInner() {
                         display: 'flex', alignItems: 'center',
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>computer</span>
+                      <Icon name={'computer'} size={13} />
                     </button>
                     <button
                       onClick={() => setPreviewDevice('mobile')}
@@ -2138,7 +2268,7 @@ function NewCampaignPageInner() {
                         display: 'flex', alignItems: 'center',
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>smartphone</span>
+                      <Icon name={'smartphone'} size={13} />
                     </button>
                   </div>
                 </div>
@@ -2193,7 +2323,7 @@ function NewCampaignPageInner() {
               marginBottom: '16px',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: T.saffron }}>auto_mode</span>
+                <Icon name={'auto_mode'} size={18} color={T.saffron} />
                 <h2 style={{
                   fontSize: '17px', fontWeight: 800, color: T.onSurface, margin: 0,
                   fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.02em',
@@ -2215,7 +2345,7 @@ function NewCampaignPageInner() {
                   boxShadow: '0 2px 8px rgba(0,54,26,0.2)',
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>add</span>
+                <Icon name={'add'} size={15} />
                 Add Sequence Step
               </button>
             </div>
@@ -2276,7 +2406,7 @@ function NewCampaignPageInner() {
                             borderRadius: '6px', padding: '5px 8px',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>content_copy</span>
+                          <Icon name={'content_copy'} size={14} />
                         </button>
                         <button
                           onClick={() => removeFollowUp(idx)}
@@ -2288,7 +2418,7 @@ function NewCampaignPageInner() {
                             borderRadius: '6px', padding: '5px 8px',
                           }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                          <Icon name={'delete'} size={14} />
                         </button>
                       </div>
                     </div>
@@ -2299,7 +2429,7 @@ function NewCampaignPageInner() {
                       borderBottom: `1px solid ${T.surfaceContainer}`,
                       display: 'flex', alignItems: 'center', gap: '10px',
                     }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '15px', color: T.onSurfaceVariant }}>code</span>
+                      <Icon name={'code'} size={15} color={T.onSurfaceVariant} />
                       <span style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: '"Fira Code", monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {fu.htmlContent
                           ? `followup-${idx + 1}.html (${fu.htmlContent.length.toLocaleString()} chars)`
@@ -2319,7 +2449,7 @@ function NewCampaignPageInner() {
                           flexShrink: 0,
                         }}
                       >
-                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span>
+                        <Icon name={'visibility'} size={13} />
                         Preview
                       </button>
                     </div>
@@ -2467,9 +2597,7 @@ function NewCampaignPageInner() {
                                 backgroundColor: T.surfaceContainerLow,
                               }}
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '28px', color: T.onSurfaceVariant, marginBottom: '6px', display: 'block' }}>
-                                upload_file
-                              </span>
+                              <Icon name={'upload_file'} size={28} color={T.onSurfaceVariant} style={{ marginBottom: '6px', display: 'block' }} />
                               <p style={{ fontSize: '12px', fontWeight: 600, color: T.onSurface, margin: '0 0 3px' }}>
                                 Drop HTML file here
                               </p>
@@ -2488,7 +2616,7 @@ function NewCampaignPageInner() {
                                 backgroundColor: 'rgba(0,54,26,0.06)',
                                 borderRadius: T.radiusLg, display: 'flex', alignItems: 'center', gap: '6px',
                               }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: T.primary }}>check_circle</span>
+                                <Icon name={'check_circle'} size={13} color={T.primary} />
                                 <span style={{ fontSize: '11px', color: T.primary, fontWeight: 600 }}>
                                   HTML loaded ({fu.htmlContent.length.toLocaleString()} chars)
                                 </span>
@@ -2548,7 +2676,7 @@ function NewCampaignPageInner() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: T.onSurfaceVariant,
                   }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
+                    <Icon name={'add'} size={14} />
                   </div>
                 </div>
                 <div style={{
@@ -2566,9 +2694,7 @@ function NewCampaignPageInner() {
                   <span style={{ fontSize: '12px', color: T.onSurfaceVariant, fontStyle: 'italic' }}>
                     Add another step to keep the momentum…
                   </span>
-                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: T.onSurfaceVariant }}>
-                    drag_indicator
-                  </span>
+                  <Icon name={'drag_indicator'} size={18} color={T.onSurfaceVariant} />
                 </div>
               </div>
             </div>
@@ -2616,7 +2742,7 @@ function NewCampaignPageInner() {
                     fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>computer</span>
+                  <Icon name={'computer'} size={13} />
                   Desktop
                 </button>
                 <button
@@ -2630,7 +2756,7 @@ function NewCampaignPageInner() {
                     fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>smartphone</span>
+                  <Icon name={'smartphone'} size={13} />
                   Mobile
                 </button>
                 <button
@@ -2640,7 +2766,7 @@ function NewCampaignPageInner() {
                     display: 'flex', alignItems: 'center', color: T.onSurfaceVariant, padding: '4px',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
+                  <Icon name={'close'} size={18} />
                 </button>
               </div>
             </div>
