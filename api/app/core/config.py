@@ -42,7 +42,9 @@ class Settings(BaseSettings):
     # automatically, and `integrations.py:smtp_connect` uses it to verify
     # creds on save. Both URL and secret default to sensible auto-derived
     # values so no extra env vars are required for the default deploy.
-    smtp_relay_url: str = ""
+    # Hardcoded to the Vercel production URL so SMTP relay works zero-config.
+    # Override via SMTP_RELAY_URL env var only if the domain changes.
+    smtp_relay_url: str = "https://leadloftexporter.vercel.app/api/smtp-relay"
     smtp_relay_secret: str = ""
 
     # Public, internet-reachable base URL of THIS backend. Used to build

@@ -84,11 +84,10 @@ export function ConnectSmtpModal({ open, onClose, onConnected }: Props) {
           </button>
         </div>
 
-        <p className="mb-3 rounded-md bg-indigo-50/60 p-3 text-xs text-indigo-900">
-          Paste the SMTP credentials of ANY mailbox you want to send from
-          (Hostinger, Zoho, Mailgun, Gmail, your own server …). Recipients
-          will see that address as the sender. It does not have to match
-          your LeadCaptura login email.
+        <p className="mb-3 text-xs text-slate-500">
+          Use any SMTP mailbox — Hostinger, Zoho, Mailgun, Gmail, your own
+          server. The From address is what recipients see and is completely
+          independent of your LeadCaptura login email.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -157,11 +156,6 @@ export function ConnectSmtpModal({ open, onClose, onConnected }: Props) {
         {save.isSuccess && (
           <p className="mt-3 flex items-center gap-1.5 text-sm text-emerald-700">
             <CheckCircle2 className="h-4 w-4" /> SMTP verified and saved.
-            {save.data?.via === "relay" && (
-              <span className="ml-1 text-xs text-emerald-600">
-                (sending via Vercel relay)
-              </span>
-            )}
           </p>
         )}
 
