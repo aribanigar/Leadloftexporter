@@ -34,6 +34,8 @@ day rollover by comparing `day_anchor` to today's YYYY-MM-DD.
 """
 from __future__ import annotations
 
+import re
+import secrets
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -42,6 +44,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
 from app.models import (
@@ -96,6 +99,67 @@ def _render_token(template: str, lead: Lead) -> str:
     for k, v in repl.items():
         out = out.replace(k, v)
     return out
+
+
+# {token} merge for free-form CSV / pasted recipients that aren't CRM leads.
+_MERGE_RE = re.compile(r"\{(\w+)\}")
+
+
+def _render_merge(template: str, merge: dict, email: str = "") -> str:
+    """Substitute {column} tokens from a per-recipient merge dict. Unknown
+    tokens are left intact (matches the provided module's behaviour). A
+    couple of universal fallbacks (`{email}`) are always available."""
+    if not template:
+        return template
+    data = dict(merge or {})
+    data.setdefault("email", email)
+
+    def repl(m: "re.Match[str]") -> str:
+        key = m.group(1)
+        val = data.get(key)
+        return str(val) if val not in (None, "") else m.group(0)
+
+    return _MERGE_RE.sub(repl, template)
+
+
+def _new_tracking_id() -> str:
+    return secrets.token_hex(8)
+
+
+def _inject_tracking(
+    html: str,
+    base_url: str,
+    campaign_id: str,
+    recipient_id: str,
+    links: list,
+) -> str:
+    """Rewrite outbound <a href> links through the click-tracking redirect
+    and append a 1×1 open-tracking pixel. `links` is the campaign's link
+    registry ([{tracking_id, original_url, clicks}]) and is mutated in place
+    so new URLs get a stable tracking id reused across recipients."""
+    base = (base_url or "").rstrip("/")
+    by_url = {l.get("original_url"): l for l in links if isinstance(l, dict)}
+
+    def repl(m: "re.Match[str]") -> str:
+        url = m.group(1)
+        entry = by_url.get(url)
+        if entry is None:
+            entry = {"tracking_id": _new_tracking_id(), "original_url": url, "clicks": 0}
+            links.append(entry)
+            by_url[url] = entry
+        tid = entry["tracking_id"]
+        return f'href="{base}/api/v1/track/click/{campaign_id}/{tid}?rid={recipient_id}"'
+
+    processed = re.sub(r'href="(https?://[^"]+)"', repl, html or "")
+    pixel = (
+        f'<img src="{base}/api/v1/track/open/{campaign_id}/{recipient_id}" '
+        'width="1" height="1" alt="" style="display:none" />'
+    )
+    if "</body>" in processed:
+        processed = processed.replace("</body>", pixel + "</body>")
+    else:
+        processed += pixel
+    return processed
 
 
 def _warmup_daily_cap(w: SenderWarmup) -> int:
@@ -184,18 +248,84 @@ def _eligible_senders(
 # ──────────────────────────────────────────────────────────────────────────
 
 
+class FollowUpIn(BaseModel):
+    subject: str = ""
+    body_html: str = ""
+    delay_hours: int = 24
+    status: str = "draft"
+
+
+class RecipientRowIn(BaseModel):
+    email: str
+    name: Optional[str] = None
+    merge: dict = Field(default_factory=dict)
+
+
 class CampaignCreateIn(BaseModel):
     name: str = Field(min_length=1, max_length=240)
     subject: str = Field(default="", max_length=500)
     preheader: Optional[str] = Field(default=None, max_length=500)
     body_html: str = ""
     body_text: Optional[str] = None
+    # Sender identity (display) + reply routing.
+    from_name: Optional[str] = None
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
+    # Marketing metadata.
+    goal: Optional[str] = None
+    tags: list[str] = []
+    follow_ups: list[FollowUpIn] = []
+    # Personalisation.
+    merge_columns: list[str] = []
+    # Arbitrary pasted / CSV recipients (NOT tied to CRM leads).
+    recipients: list[RecipientRowIn] = []
+    manual_emails: list[str] = []
+    # CRM lead targeting.
     lead_ids: Optional[list[str]] = None
     stage_id: Optional[str] = None
+    include_all_leads: bool = False
+    # Throttle / senders.
     sender_account_ids: list[str] = []
     batch_size: int = 8
     seconds_between_sends: int = 30
+    daily_limit: Optional[int] = None
     warmup_enabled: bool = True
+
+
+class CampaignUpdateIn(BaseModel):
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    preheader: Optional[str] = None
+    body_html: Optional[str] = None
+    body_text: Optional[str] = None
+    from_name: Optional[str] = None
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
+    goal: Optional[str] = None
+    tags: Optional[list[str]] = None
+    follow_ups: Optional[list[FollowUpIn]] = None
+    sender_account_ids: Optional[list[str]] = None
+    batch_size: Optional[int] = None
+    seconds_between_sends: Optional[int] = None
+    warmup_enabled: Optional[bool] = None
+
+
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+
+
+def _split_emails(raw) -> list[str]:
+    """Defensive split: any string may be comma/newline/semicolon joined.
+    Returns lowercased, regex-validated single addresses only — this is the
+    data-leak guard the provided module relies on so no composite address
+    ever reaches the transport as one `to`."""
+    out: list[str] = []
+    items = raw if isinstance(raw, list) else [str(raw or "")]
+    for item in items:
+        for part in re.split(r"[\n,;]+", str(item)):
+            clean = part.strip().lower()
+            if clean and _EMAIL_RE.match(clean):
+                out.append(clean)
+    return out
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -251,6 +381,20 @@ def create_campaign(
         preheader=(body.preheader or "").strip() or None,
         body_html=body.body_html or "",
         body_text=body.body_text,
+        from_name=(body.from_name or "").strip() or None,
+        from_email=(body.from_email or "").strip() or None,
+        reply_to=(body.reply_to or "").strip() or None,
+        goal=body.goal,
+        tags=body.tags or [],
+        follow_ups=[f.model_dump() for f in body.follow_ups],
+        merge_columns=body.merge_columns or [],
+        recipient_data=[r.model_dump() for r in body.recipients],
+        recipient_sources={
+            "manual_emails": body.manual_emails,
+            "include_all_leads": body.include_all_leads,
+            "lead_ids": body.lead_ids,
+            "stage_id": body.stage_id,
+        },
         recipient_filter={
             "lead_ids": body.lead_ids,
             "stage_id": body.stage_id,
@@ -264,39 +408,67 @@ def create_campaign(
     db.add(c)
     db.flush()
 
-    # Build the recipient set: leads with a valid email, not suppressed.
-    q = db.query(Lead).filter(
-        Lead.workspace_id == ctx.workspace_id, Lead.email.isnot(None)
-    )
-    if body.lead_ids:
-        q = q.filter(Lead.id.in_(body.lead_ids))
-    if body.stage_id:
-        q = q.filter(Lead.stage_id == body.stage_id)
-    leads = q.all()
     suppressed = {
         s.email.lower()
         for s in db.query(Suppression).filter(
             Suppression.workspace_id == ctx.workspace_id
         )
     }
-    added = 0
+
+    # Dedup across every recipient source. First-seen wins so an explicit
+    # merge row beats a bare manual/lead address.
+    seen: set[str] = set()
     skipped_suppressed = 0
-    for lead in leads:
-        email = (lead.email or "").strip().lower()
-        if not email:
-            continue
-        if email in suppressed:
+    added = 0
+
+    def _add(email: str, name: Optional[str], merge: dict, lead_id: Optional[str]):
+        nonlocal added, skipped_suppressed
+        e = (email or "").strip().lower()
+        if not e or not _EMAIL_RE.match(e) or e in seen:
+            return
+        seen.add(e)
+        if e in suppressed:
             skipped_suppressed += 1
-            continue
+            return
         db.add(
             CampaignRecipient(
                 campaign_id=c.id,
-                lead_id=lead.id,
-                email=lead.email,
+                lead_id=lead_id,
+                email=e,
+                name=name,
+                merge_data=merge or {},
                 status="pending",
             )
         )
         added += 1
+
+    # 1) Explicit CSV / pasted rows with merge data.
+    for row in body.recipients:
+        for e in _split_emails(row.email):
+            _add(e, row.name, dict(row.merge or {}), None)
+
+    # 2) Plain manual emails (no merge).
+    for e in _split_emails(body.manual_emails):
+        _add(e, None, {}, None)
+
+    # 3) CRM leads (by id / stage / all).
+    if body.lead_ids or body.stage_id or body.include_all_leads:
+        q = db.query(Lead).filter(
+            Lead.workspace_id == ctx.workspace_id, Lead.email.isnot(None)
+        )
+        if body.lead_ids:
+            q = q.filter(Lead.id.in_(body.lead_ids))
+        if body.stage_id:
+            q = q.filter(Lead.stage_id == body.stage_id)
+        for lead in q.all():
+            merge = {
+                "first_name": (lead.first_name or "").strip(),
+                "last_name": (lead.last_name or "").strip(),
+                "full_name": (lead.full_name or "").strip(),
+                "title": (lead.title or "").strip(),
+            }
+            _add(lead.email, lead.full_name, merge, lead.id)
+
     c.total_recipients = added
     c.skipped_count = skipped_suppressed
     db.commit()
@@ -317,6 +489,10 @@ def get_campaign(
     db: Session = Depends(get_db),
 ):
     c = _own_campaign(db, ctx, campaign_id)
+    return _campaign_dict(c)
+
+
+def _campaign_dict(c: Campaign) -> dict:
     return {
         "id": c.id,
         "name": c.name,
@@ -324,6 +500,16 @@ def get_campaign(
         "preheader": c.preheader,
         "body_html": c.body_html,
         "body_text": c.body_text,
+        "from_name": c.from_name,
+        "from_email": c.from_email,
+        "reply_to": c.reply_to,
+        "goal": c.goal,
+        "tags": c.tags or [],
+        "follow_ups": c.follow_ups or [],
+        "merge_columns": c.merge_columns or [],
+        "recipient_data": c.recipient_data or [],
+        "recipient_sources": c.recipient_sources or {},
+        "links": c.links or [],
         "recipient_filter": c.recipient_filter,
         "sender_account_ids": c.sender_account_ids,
         "rotation_index": c.rotation_index,
@@ -340,8 +526,185 @@ def get_campaign(
         "sent_count": c.sent_count,
         "failed_count": c.failed_count,
         "skipped_count": c.skipped_count,
+        "opened_count": c.opened_count,
+        "clicked_count": c.clicked_count,
+        "bounced_count": c.bounced_count,
+        "unsubscribed_count": c.unsubscribed_count,
         "error": c.error,
         "created_at": c.created_at,
+    }
+
+
+@router.patch("/{campaign_id}")
+def update_campaign(
+    campaign_id: str,
+    body: CampaignUpdateIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Edit a draft/paused campaign's content + throttle. Recipients are not
+    re-resolved here (they're a create-time snapshot)."""
+    c = _own_campaign(db, ctx, campaign_id)
+    data = body.model_dump(exclude_unset=True)
+    if "follow_ups" in data and data["follow_ups"] is not None:
+        data["follow_ups"] = [
+            f if isinstance(f, dict) else f.model_dump() for f in body.follow_ups
+        ]
+    for field in (
+        "name", "subject", "preheader", "body_html", "body_text",
+        "from_name", "from_email", "reply_to", "goal", "tags", "follow_ups",
+        "sender_account_ids", "warmup_enabled",
+    ):
+        if field in data and data[field] is not None:
+            setattr(c, field, data[field])
+    if data.get("batch_size") is not None:
+        c.batch_size = max(1, min(50, data["batch_size"]))
+    if data.get("seconds_between_sends") is not None:
+        c.seconds_between_sends = max(0, min(3600, data["seconds_between_sends"]))
+    db.commit()
+    db.refresh(c)
+    return _campaign_dict(c)
+
+
+@router.post("/{campaign_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_campaign(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Clone a campaign's content + recipients into a fresh draft."""
+    src = _own_campaign(db, ctx, campaign_id)
+    dup = Campaign(
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        name=f"{src.name} (copy)",
+        subject=src.subject,
+        preheader=src.preheader,
+        body_html=src.body_html,
+        body_text=src.body_text,
+        from_name=src.from_name,
+        from_email=src.from_email,
+        reply_to=src.reply_to,
+        goal=src.goal,
+        tags=list(src.tags or []),
+        follow_ups=list(src.follow_ups or []),
+        merge_columns=list(src.merge_columns or []),
+        recipient_data=list(src.recipient_data or []),
+        recipient_sources=dict(src.recipient_sources or {}),
+        recipient_filter=dict(src.recipient_filter or {}),
+        sender_account_ids=list(src.sender_account_ids or []),
+        batch_size=src.batch_size,
+        seconds_between_sends=src.seconds_between_sends,
+        warmup_enabled=src.warmup_enabled,
+        status="draft",
+    )
+    db.add(dup)
+    db.flush()
+    added = 0
+    for r in db.query(CampaignRecipient).filter(
+        CampaignRecipient.campaign_id == src.id
+    ):
+        db.add(
+            CampaignRecipient(
+                campaign_id=dup.id,
+                lead_id=r.lead_id,
+                email=r.email,
+                name=r.name,
+                merge_data=dict(r.merge_data or {}),
+                status="pending",
+            )
+        )
+        added += 1
+    dup.total_recipients = added
+    db.commit()
+    db.refresh(dup)
+    return {"id": dup.id, "name": dup.name, "status": dup.status, "total_recipients": added}
+
+
+_GOAL_BENCHMARKS = {
+    "newsletter": (25, 3, "Newsletter"),
+    "promotional": (20, 5, "Promotional Offer"),
+    "reengagement": (15, 2, "Re-engagement"),
+    "vendor_remind": (30, 4, "Vendor Reminder"),
+    "verification": (35, 8, "Verification Drive"),
+    "listing_drive": (28, 6, "Listing Drive"),
+    "announcement": (30, 3, "Announcement"),
+    "custom": (20, 3, "Custom"),
+}
+
+
+@router.get("/{campaign_id}/stats")
+def campaign_stats(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Post-send deliverability report: rates vs goal benchmark + a plain-
+    English analysis. Drives the Campaign Detail report panel."""
+    c = _own_campaign(db, ctx, campaign_id)
+    rows = (
+        db.query(CampaignRecipient.status, func.count(CampaignRecipient.id))
+        .filter(CampaignRecipient.campaign_id == campaign_id)
+        .group_by(CampaignRecipient.status)
+        .all()
+    )
+    status_counts = {s: n for s, n in rows}
+    total = sum(status_counts.values())
+    pending = status_counts.get("pending", 0) + status_counts.get("sending", 0)
+    sent = total - pending
+    opened = status_counts.get("opened", 0) + status_counts.get("clicked", 0)
+    clicked = status_counts.get("clicked", 0)
+    bounced = status_counts.get("bounced", 0) + status_counts.get("failed", 0)
+
+    def pct(n: int) -> int:
+        return round((n / sent) * 100) if sent > 0 else 0
+
+    open_rate, click_rate, bounce_rate = pct(opened), pct(clicked), pct(bounced)
+    delivery_rate = pct(sent - bounced)
+
+    open_t, click_t, label = _GOAL_BENCHMARKS.get(c.goal or "", (20, 3, "General"))
+    went_well: list[str] = []
+    needs_work: list[str] = []
+    performance = "good"
+    if open_rate >= open_t:
+        went_well.append(f"Open rate {open_rate}% beat the {open_t}% {label} target.")
+    elif open_rate >= open_t * 0.7:
+        performance = "average"
+        needs_work.append(f"Open rate {open_rate}% is close to the {open_t}% target — sharpen the subject line.")
+    else:
+        performance = "critical"
+        needs_work.append(f"Open rate {open_rate}% is below the {open_t}% target — try a more compelling subject line.")
+    if click_rate >= click_t:
+        went_well.append(f"Click rate {click_rate}% met the {click_t}% target.")
+    else:
+        needs_work.append(f"Click rate {click_rate}% is below target — strengthen your CTA.")
+        if performance != "critical":
+            performance = "average"
+    if bounce_rate > 10:
+        performance = "critical"
+        needs_work.append(f"High bounce rate {bounce_rate}% — clean your list.")
+    elif bounce_rate <= 2 and sent > 5:
+        went_well.append(f"Excellent list quality — only {bounce_rate}% bounced.")
+    goal_achieved = (
+        min(99, round((open_rate / open_t) * 50 + (click_rate / click_t) * 50))
+        if sent > 0 else 0
+    )
+
+    return {
+        "campaign": {"name": c.name, "subject": c.subject, "status": c.status, "goal": c.goal, "sent_at": c.started_at},
+        "stats": {
+            "total": total, "sent": sent, "opened": opened, "clicked": clicked, "bounced": bounced,
+            "open_rate": open_rate, "click_rate": click_rate, "bounce_rate": bounce_rate, "delivery_rate": delivery_rate,
+        },
+        "status_counts": status_counts,
+        "performance": performance,
+        "what_went_well": went_well,
+        "what_needs_work": needs_work,
+        "analysis": went_well + needs_work,
+        "goal_achieved": goal_achieved,
+        "goal_label": label,
+        "benchmarks": {"open_target": open_t, "click_target": click_t},
+        "links": c.links or [],
     }
 
 
@@ -700,6 +1063,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
     """
     from app.services.email_sender import send_email_message
 
+    settings = get_settings()
     campaign.last_tick_at = datetime.now(timezone.utc)
     if campaign.status != "sending":
         db.commit()
@@ -762,20 +1126,29 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             break  # all senders capped mid-batch
 
         # Materialise the EmailMessage row, render merge tags, dispatch.
-        lead = db.get(Lead, r.lead_id)
-        if not lead:
-            r.status = "skipped"
-            r.error = "lead_not_found"
-            campaign.skipped_count = (campaign.skipped_count or 0) + 1
-            skipped += 1
-            continue
-        subject = _render_token(campaign.subject or "", lead)
-        body_html = _render_token(campaign.body_html or "", lead)
-        body_text = _render_token(campaign.body_text or "", lead) if campaign.body_text else None
+        # Recipients may be CRM leads OR arbitrary pasted/CSV addresses. When
+        # there's a lead, prefer its fields; otherwise fall back to the
+        # per-recipient merge_data captured at create time.
+        lead = db.get(Lead, r.lead_id) if r.lead_id else None
+        if lead is not None:
+            subject = _render_token(campaign.subject or "", lead)
+            body_html = _render_token(campaign.body_html or "", lead)
+            body_text = (
+                _render_token(campaign.body_text or "", lead)
+                if campaign.body_text else None
+            )
+        else:
+            merge = dict(r.merge_data or {})
+            subject = _render_merge(campaign.subject or "", merge, r.email)
+            body_html = _render_merge(campaign.body_html or "", merge, r.email)
+            body_text = (
+                _render_merge(campaign.body_text or "", merge, r.email)
+                if campaign.body_text else None
+            )
 
         thread = EmailThread(
             workspace_id=campaign.workspace_id,
-            lead_id=lead.id,
+            lead_id=lead.id if lead is not None else None,
             subject=subject,
         )
         db.add(thread)
@@ -783,7 +1156,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         msg = EmailMessage(
             workspace_id=campaign.workspace_id,
             thread_id=thread.id,
-            lead_id=lead.id,
+            lead_id=lead.id if lead is not None else None,
             direction="outbound",
             from_address=sender.external_id or "",
             to_address=r.email,
@@ -797,11 +1170,20 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         r.message_id = msg.id
         r.sender_account_id = sender.id
         r.status = "sending"
+
+        # Inject open/click tracking now that we know the recipient row id.
+        # `campaign.links` is the shared registry — same URL → same tracking
+        # id across recipients. Re-assign so SQLAlchemy flags the JSONB dirty.
+        links = list(campaign.links or [])
+        msg.body_html = _inject_tracking(
+            body_html, settings.public_api_url, campaign.id, r.id, links
+        )
+        campaign.links = links
         db.flush()
 
-        # Dispatch through the existing transport layer — this picks the
-        # right sender stack (Resend, SendGrid, Gmail HTTPS, or SMTP via
-        # the Vercel relay) and stamps msg.status / sent_at / error.
+        # Dispatch through the existing transport layer with the rotated
+        # sender pinned — this picks the right stack (Resend, SendGrid, Gmail
+        # HTTPS, or SMTP via the Vercel relay) and stamps msg.status / error.
         try:
             ws = db.get(Workspace, campaign.workspace_id)
             if ws is None:
@@ -815,6 +1197,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                 msg,
                 ws,
                 user_id=ctx_user_id or campaign.user_id,
+                account=sender,
             )
             if result.ok:
                 r.status = "sent"
@@ -823,19 +1206,20 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                 warmup.total_sent += 1
                 campaign.sent_count = (campaign.sent_count or 0) + 1
                 sent += 1
-                db.add(
-                    Activity(
-                        workspace_id=campaign.workspace_id,
-                        lead_id=lead.id,
-                        actor_id=campaign.user_id,
-                        type="campaign_sent",
-                        payload={
-                            "campaign_id": campaign.id,
-                            "subject": subject,
-                            "from": sender.external_id,
-                        },
+                if lead is not None:
+                    db.add(
+                        Activity(
+                            workspace_id=campaign.workspace_id,
+                            lead_id=lead.id,
+                            actor_id=campaign.user_id,
+                            type="campaign_sent",
+                            payload={
+                                "campaign_id": campaign.id,
+                                "subject": subject,
+                                "from": sender.external_id,
+                            },
+                        )
                     )
-                )
             else:
                 r.status = "failed"
                 r.error = (result.error or "send_failed")[:500]

@@ -17,6 +17,7 @@ from app.api.v1 import (
     whatsapp,
     linkedin_bridge,
     campaigns,
+    tracking,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -37,3 +38,4 @@ api_router.include_router(ai.router)
 api_router.include_router(whatsapp.router)
 api_router.include_router(linkedin_bridge.router)
 api_router.include_router(campaigns.router)
+api_router.include_router(tracking.router)

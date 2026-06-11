@@ -563,6 +563,25 @@ class Campaign(Base, TimestampMixin):
     preheader: Mapped[Optional[str]] = mapped_column(String(500))
     body_html: Mapped[str] = mapped_column(Text, default="")
     body_text: Mapped[Optional[str]] = mapped_column(Text)
+    # Sender identity (display only — the actual SMTP envelope-from is the
+    # connected sender account picked by the rotation).
+    from_name: Mapped[Optional[str]] = mapped_column(String(240))
+    from_email: Mapped[Optional[str]] = mapped_column(String(320))
+    reply_to: Mapped[Optional[str]] = mapped_column(String(320))
+    # Marketing metadata (drives the builder's scoring + the stats benchmarks)
+    goal: Mapped[Optional[str]] = mapped_column(String(40))
+    tags: Mapped[list] = mapped_column(JSONB, default=list)
+    # Drip follow-ups — list of {subject, body_html, delay_hours, status}.
+    follow_ups: Mapped[list] = mapped_column(JSONB, default=list)
+    # Merge / personalisation. merge_columns is the list of available tokens
+    # (e.g. ["name","city"]); recipient_data holds the raw pasted/CSV rows
+    # ([{email, merge:{col:val}}]) before they're materialised into rows.
+    merge_columns: Mapped[list] = mapped_column(JSONB, default=list)
+    recipient_data: Mapped[list] = mapped_column(JSONB, default=list)
+    # How the recipient set was assembled (manual emails / lead filters).
+    recipient_sources: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Click-tracking link registry — [{tracking_id, original_url, clicks}].
+    links: Mapped[list] = mapped_column(JSONB, default=list)
     # Recipients selection (snapshot at campaign-create time)
     recipient_filter: Mapped[dict] = mapped_column(JSONB, default=dict)
     # Sender pool — list of ConnectedAccount.id strings to rotate across.
@@ -594,6 +613,11 @@ class Campaign(Base, TimestampMixin):
     sent_count: Mapped[int] = mapped_column(Integer, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
     skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Engagement counters — incremented by the public tracking endpoints.
+    opened_count: Mapped[int] = mapped_column(Integer, default=0)
+    clicked_count: Mapped[int] = mapped_column(Integer, default=0)
+    bounced_count: Mapped[int] = mapped_column(Integer, default=0)
+    unsubscribed_count: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -616,10 +640,16 @@ class CampaignRecipient(Base, TimestampMixin):
     campaign_id: Mapped[str] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), index=True
     )
-    lead_id: Mapped[str] = mapped_column(
+    # Nullable — campaigns can target arbitrary pasted/CSV emails that are
+    # not tied to any Lead in the CRM. When null, personalisation comes from
+    # `merge_data` instead of the Lead row.
+    lead_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), index=True
     )
     email: Mapped[str] = mapped_column(String(320), nullable=False)
+    name: Mapped[Optional[str]] = mapped_column(String(240))
+    # Per-recipient merge values ({col: val}) for {token} substitution.
+    merge_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     sender_account_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("connected_accounts.id", ondelete="SET NULL")
     )
@@ -627,9 +657,18 @@ class CampaignRecipient(Base, TimestampMixin):
         ForeignKey("email_messages.id", ondelete="SET NULL")
     )
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    # pending | sending | sent | failed | skipped
+    # pending | sending | sent | opened | clicked | failed | skipped
+    #          | bounced | unsubscribed
     error: Mapped[Optional[str]] = mapped_column(Text)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Engagement tracking — written by the public open/click endpoints.
+    open_count: Mapped[int] = mapped_column(Integer, default=0)
+    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    click_count: Mapped[int] = mapped_column(Integer, default=0)
+    clicked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    clicked_links: Mapped[list] = mapped_column(JSONB, default=list)
+    bounce_reason: Mapped[Optional[str]] = mapped_column(Text)
+    bounced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class SenderWarmup(Base, TimestampMixin):

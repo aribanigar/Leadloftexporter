@@ -274,7 +274,11 @@ def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: 
 
 
 def send_email_message(
-    db: Session, message: EmailMessage, workspace: Workspace, user_id: Optional[str] = None
+    db: Session,
+    message: EmailMessage,
+    workspace: Workspace,
+    user_id: Optional[str] = None,
+    account: "Optional[ConnectedAccount]" = None,
 ) -> SendResult:
     if message.status not in {"queued", "failed"}:
         return SendResult(False, error="not_sendable")
@@ -282,16 +286,20 @@ def send_email_message(
     if emails_sent_today(db, workspace.id) >= settings["email_limit_per_day"]:
         return SendResult(False, error="daily_limit_reached")
 
-    if not user_id:
-        from app.models import Lead, Membership
-
-        if message.lead_id:
-            lead = db.get(Lead, message.lead_id)
-            user_id = lead.owner_id if lead else None
+    # An explicit account (campaign sender rotation) skips auto-pick so bulk
+    # sends actually fan out across the connected mailboxes instead of
+    # collapsing onto whichever account _pick_account happens to return.
+    if account is None:
         if not user_id:
-            m = db.query(Membership).filter(Membership.workspace_id == workspace.id).first()
-            user_id = m.user_id if m else ""
-    account = _pick_account(db, workspace.id, user_id or "")
+            from app.models import Lead, Membership
+
+            if message.lead_id:
+                lead = db.get(Lead, message.lead_id)
+                user_id = lead.owner_id if lead else None
+            if not user_id:
+                m = db.query(Membership).filter(Membership.workspace_id == workspace.id).first()
+                user_id = m.user_id if m else ""
+        account = _pick_account(db, workspace.id, user_id or "")
     if not account:
         message.status = "failed"
         message.error = "no_email_account_connected"

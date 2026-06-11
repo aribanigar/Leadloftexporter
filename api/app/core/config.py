@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     smtp_relay_url: str = ""
     smtp_relay_secret: str = ""
 
+    # Public, internet-reachable base URL of THIS backend. Used to build
+    # absolute open-/click-tracking URLs embedded in campaign emails — they
+    # must resolve from the recipient's mail client, so a relative path or
+    # localhost won't do. Defaults to the production Render host.
+    public_api_url: str = "https://leadloftexporter.onrender.com"
+
     @property
     def cors_origins(self) -> List[str]:
         return [o.strip() for o in self.frontend_origins.split(",") if o.strip()]
