@@ -54,7 +54,16 @@ export function ConnectSmtpModal({ open, onClose, onConnected }: Props) {
           from_email: fromEmail.trim() || username.trim(),
         }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string; id?: string; label?: string; via?: string };
+      // Parse defensively — the route serves HTML (404 page) until Vercel
+      // finishes deploying it, which would otherwise surface as a cryptic
+      // "Unexpected token '<'" JSON error.
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; id?: string; label?: string; via?: string } = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("deploying");
+      }
       if (!res.ok || !data.ok) throw new Error(data.error || "connect_failed");
       return data as { id: string; label?: string; via?: string };
     },
@@ -150,6 +159,9 @@ export function ConnectSmtpModal({ open, onClose, onConnected }: Props) {
           <p className="mt-3 flex items-start gap-1.5 text-sm text-red-600">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
             {(() => {
+              if (errMsg === "deploying") {
+                return "Still deploying the new SMTP connector — wait a minute and try again.";
+              }
               if (/smtp_auth_failed/i.test(errMsg)) {
                 return "Username or password rejected by the SMTP server. Double-check the credentials.";
               }

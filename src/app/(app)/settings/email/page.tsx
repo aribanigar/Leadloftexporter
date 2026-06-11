@@ -234,7 +234,16 @@ function SmtpForm({ onSaved }: FormProps) {
           from_email: fromEmail.trim() || username.trim(),
         }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string };
+      // The route returns HTML (its 404 page) until Vercel finishes deploying
+      // it — parse defensively so the user gets a clear message, not a raw
+      // "Unexpected token '<'" JSON error.
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string } = {};
+      try {
+        data = JSON.parse(text) as { ok?: boolean; error?: string };
+      } catch {
+        throw new Error("deploying");
+      }
       if (!res.ok || !data.ok) throw new Error(data.error || "connect_failed");
       return data;
     },
@@ -307,6 +316,7 @@ function SmtpForm({ onSaved }: FormProps) {
           <p className="text-sm text-red-700">
             {(() => {
               const e = save.error?.message || "Connect failed.";
+              if (e === "deploying") return "Still deploying the new SMTP connector — wait a minute and try again.";
               if (/smtp_auth_failed/i.test(e)) return "Username or password rejected. Double-check your SMTP credentials.";
               if (/relay_not_configured/i.test(e)) return "Could not reach the SMTP server. Try Resend or SendGrid instead.";
               return e;
