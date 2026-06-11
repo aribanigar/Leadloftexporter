@@ -1145,6 +1145,7 @@ def lead_timeline(
             "subject": m.subject,
             "preview": (m.body_text or "")[:280],
             "status": m.status,
+            "error": m.error,
             "at": m.sent_at or m.created_at,
         })
     for n in (

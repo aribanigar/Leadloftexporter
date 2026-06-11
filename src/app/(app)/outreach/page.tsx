@@ -68,6 +68,7 @@ interface TimelineItem {
   subject?: string | null;
   preview?: string;
   status?: string;
+  error?: string | null;
   at?: string | null;
 }
 
@@ -78,6 +79,7 @@ interface ConvMessage {
   subject?: string | null;
   body: string;
   status: "queued" | "sent" | "delivered" | "failed" | string;
+  error?: string | null;
   at: string | null;
   pending?: boolean;
 }
@@ -87,6 +89,28 @@ interface ConnectedAccount {
   provider: string;
   label: string | null;
   status: string;
+  // The actual from-address as returned by the integrations endpoint.
+  // Used to detect Resend-on-free-mailbox-domain, which Resend rejects.
+  external_id?: string | null;
+}
+
+// Free mailbox domains Resend refuses to send from without domain verification.
+const FREE_MAILBOX_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "yahoo.com", "yahoo.co.uk", "yahoo.in",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "icloud.com", "me.com", "mac.com",
+  "aol.com", "protonmail.com", "proton.me",
+  "mail.com", "gmx.com", "yandex.com", "zoho.com",
+]);
+
+function isResendDomainBlocked(acct: ConnectedAccount): boolean {
+  if (acct.provider !== "resend") return false;
+  const email = (acct.external_id || acct.label || "").toLowerCase();
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).trim();
+  return FREE_MAILBOX_DOMAINS.has(domain);
 }
 
 export default function OutreachPage() {
@@ -140,6 +164,21 @@ export default function OutreachPage() {
       ),
     [emailAccts]
   );
+
+  // Critical guardrail: detect the "Resend connected but the from-address is
+  // a free mailbox domain" case. Resend silently refuses ALL such sends with
+  // a 403/422 and a vague error string, which used to surface as red bubbles
+  // with no explanation. We now show a prominent banner pointing the user at
+  // the only two fixes (verify a domain in Resend OR connect SMTP).
+  const resendDomainBlock = useMemo(() => {
+    const accts = (emailAccts || []).filter(
+      (a) => ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider) && a.status === "active"
+    );
+    if (accts.length === 0) return null;
+    const allBlocked = accts.every((a) => isResendDomainBlocked(a));
+    if (!allBlocked) return null;
+    return accts[0];
+  }, [emailAccts]);
 
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -202,6 +241,7 @@ export default function OutreachPage() {
           subject: t.subject || null,
           body: t.preview || "",
           status: t.status || "sent",
+          error: t.error || null,
           at: t.at || null,
         });
       } else if (t.kind === "activity" && t.type === "whatsapp_sent") {
@@ -683,6 +723,46 @@ export default function OutreachPage() {
 
       {/* ───────── RIGHT: bulk compose OR per-lead conversation ───────── */}
       <main className="flex flex-1 flex-col overflow-hidden">
+        {/* Resend-domain-block banner. Surfaces ABOVE both bulk and single
+            modes because the failure mode is identical either way: Resend
+            refuses the send before any of our code can do anything about
+            it. Without this banner the user just saw red bubbles with no
+            explanation. */}
+        {resendDomainBlock && (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-3">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+              <div className="flex-1 text-xs leading-relaxed text-amber-900">
+                <div className="mb-0.5 font-semibold">
+                  Resend won&apos;t deliver from{" "}
+                  <code className="rounded bg-amber-100 px-1">{resendDomainBlock.external_id || resendDomainBlock.label}</code>
+                </div>
+                Resend refuses sends from free mailbox domains (gmail.com,
+                outlook.com, etc). Every email you try will come back red
+                until you do one of these:
+                <ul className="mt-1 ml-4 list-disc">
+                  <li>
+                    Verify a domain you own at{" "}
+                    <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">resend.com/domains</a>
+                    {" "}— then reconnect this sender using an address on that domain.
+                  </li>
+                  <li>
+                    Or connect a regular SMTP mailbox (Hostinger, Zoho, your
+                    own server) from{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSmtpModalOpen(true)}
+                      className="underline font-semibold"
+                    >
+                      Connect SMTP
+                    </button>
+                    {" "}— works immediately, no DNS setup.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
         {bulkMode ? (
           <BulkComposer
             count={selectedIds.size}
@@ -870,6 +950,42 @@ function ChannelTabs({
   );
 }
 
+// Translates raw provider errors into one-line plain-English instructions.
+// The most common one we see — Resend rejecting sends from @gmail.com (and
+// other free mailbox domains) because the user hasn't verified a domain in
+// their Resend dashboard — was previously invisible: each failed bubble
+// just had a tiny warning icon. Users had no way to know they needed to
+// either verify a domain or switch to SMTP.
+function humanFailReason(error: string): string {
+  const e = (error || "").toLowerCase();
+  if (
+    e.includes("resend_http_403") ||
+    (e.includes("resend") && (e.includes("domain") || e.includes("not verified")))
+  ) {
+    return "Resend rejected this send — your sending domain isn't verified. Either (1) verify a domain at resend.com/domains, or (2) connect an SMTP mailbox (Hostinger / Zoho / your own server) in Settings → Email Senders.";
+  }
+  if (e.includes("resend_http_429")) {
+    return "Resend rate-limited this send. Wait a minute and try again.";
+  }
+  if (
+    e.includes("resend") &&
+    (e.includes("testing emails") || e.includes("your own email"))
+  ) {
+    return "Resend sandbox mode — you can only send to your own email until you verify a domain. Connect an SMTP sender or verify your domain at resend.com/domains.";
+  }
+  if (e.includes("smtp_auth_failed") || /535|invalid login/i.test(error)) {
+    return "SMTP rejected the username / password. Double-check the credentials in Settings → Email Senders.";
+  }
+  if (e.includes("no_active_sender_connected")) {
+    return "No connected email sender. Add one in Settings → Email Senders.";
+  }
+  if (e.includes("relay_http_404") || e.includes("host_not_allowed")) {
+    return "The Vercel SMTP relay isn't reachable from this backend yet. Wait for the latest deploy or re-check the relay URL.";
+  }
+  // Fall back to the raw error so we never leave the user guessing.
+  return error;
+}
+
 function ConversationStream({
   messages,
   channel,
@@ -924,6 +1040,16 @@ function Bubble({ message }: { message: ConvMessage }) {
           </div>
         )}
         <div className="whitespace-pre-wrap break-words">{message.body || "(empty)"}</div>
+        {/* Why-it-failed line. The earlier UX showed only a tiny warning
+            icon on failed sends, leaving the user guessing. We now surface
+            the actual provider error inline and translate the common
+            Resend "domain not verified" case to a plain-English fix
+            instruction so they don't have to read raw API errors. */}
+        {message.status === "failed" && message.error && (
+          <div className="mt-1.5 rounded bg-red-100 px-2 py-1 text-[11px] text-red-800">
+            {humanFailReason(message.error)}
+          </div>
+        )}
         <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80">
           {message.at ? fmtDate(message.at) : ""}
           {isOut && (
