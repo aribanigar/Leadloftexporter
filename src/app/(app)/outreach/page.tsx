@@ -49,7 +49,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadList } from "@/lib/types";
 import { cn, initials, fmtDate } from "@/lib/utils";
 import { ConnectSmtpModal } from "@/components/connect-smtp-modal";
@@ -416,25 +416,37 @@ export default function OutreachPage() {
       }))
     );
 
+    // Route every send through the Next.js bridge route at /api/outreach/send
+    // (NOT the Python /inbox/send), because the actual SMTP TCP has to leave
+    // from Vercel — Render's free tier blocks outbound SMTP ports and the
+    // direct dispatch was failing red on every recipient. The bridge calls
+    // Python /inbox/prepare-send → nodemailer → Python /inbox/commit-send.
+    const token = getToken();
+    const wsId = getWorkspaceId();
     for (let i = 0; i < targets.length; i++) {
       if (bulkAbortRef.current) break;
       const lead = targets[i];
       const subject = renderMergeTokens(opts.subject, lead);
       const body = renderMergeTokens(opts.body, lead);
       try {
-        const r = await api<{ ok: boolean; error?: string | null }>(
-          "/inbox/send",
-          {
-            method: "POST",
-            body: {
-              lead_id: lead.id,
-              to: lead.email,
-              subject,
-              body_html: body.replace(/\n/g, "<br/>"),
-              body_text: body,
-            },
-          }
-        );
+        const res = await fetch("/api/outreach/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token || ""}`,
+            "X-Workspace-Id": wsId || "",
+          },
+          body: JSON.stringify({
+            lead_id: lead.id,
+            to: lead.email,
+            subject,
+            body_html: body.replace(/\n/g, "<br/>"),
+            body_text: body,
+          }),
+        });
+        const text = await res.text();
+        let r: { ok?: boolean; error?: string | null } = {};
+        try { r = JSON.parse(text); } catch { r = { ok: false, error: "non_json_response" }; }
         setBulkResults((cur) =>
           cur.map((b) =>
             b.leadId === lead.id

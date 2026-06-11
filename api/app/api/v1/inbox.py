@@ -174,6 +174,137 @@ def send_email(
     }
 
 
+@router.post("/prepare-send")
+def prepare_send(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Prepare a single email for external SMTP dispatch (Next.js nodemailer).
+
+    Same role as ``/campaigns/{id}/prepare-tick`` but for one-off manual
+    sends from Outreach / Lead Detail / bulk select. Picks an active SMTP /
+    Resend / SendGrid / Gmail sender, creates the EmailMessage row in
+    ``queued`` status, and returns the rendered job + provider credentials
+    so the Next.js bridge can actually send from Vercel (Render's free tier
+    blocks outbound SMTP ports, so we can't dispatch in-process).
+    """
+    lead_id = body.get("lead_id")
+    to_address = (body.get("to") or "").strip()
+    subject = body.get("subject") or ""
+    body_html = body.get("body_html") or body.get("body") or ""
+    body_text = body.get("body_text") or ""
+    if not to_address or not (body_html or body_text):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "to_and_body_required")
+
+    lead = None
+    if lead_id:
+        lead = (
+            db.query(Lead)
+            .filter(Lead.id == lead_id, Lead.workspace_id == ctx.workspace_id)
+            .first()
+        )
+
+    sender = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+            ConnectedAccount.provider.in_(("smtp", "gmail", "resend", "sendgrid")),
+            ConnectedAccount.status == "active",
+        )
+        .order_by(ConnectedAccount.created_at.asc())
+        .first()
+    )
+    if not sender:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_active_sender_connected")
+
+    msg = queue_email(
+        db,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id,
+        lead=lead,
+        to_address=to_address,
+        subject=subject,
+        body_html=body_html,
+    )
+    if body_text:
+        msg.body_text = body_text
+    msg.from_address = sender.external_id or ""
+    msg.status = "sending"
+    db.commit()
+
+    cfg = sender.config or {}
+    send_config: dict = {"provider": sender.provider}
+    if sender.provider == "smtp":
+        send_config["smtp"] = {
+            "host": cfg.get("host", ""),
+            "port": int(cfg.get("port", 587)),
+            "username": sender.external_id or cfg.get("username", ""),
+            "password": sender.access_token or "",
+            "from_email": sender.external_id or "",
+        }
+    elif sender.provider == "resend":
+        send_config["resend_api_key"] = sender.access_token or ""
+    elif sender.provider == "sendgrid":
+        send_config["sendgrid_api_key"] = sender.access_token or ""
+
+    return {
+        "message_id": msg.id,
+        "to": to_address,
+        "from_email": sender.external_id or "",
+        "from_name": "",
+        "subject": subject,
+        "html": body_html,
+        "text": body_text,
+        "send_config": send_config,
+    }
+
+
+@router.post("/commit-send")
+def commit_send(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Record the result of an external SMTP dispatch (from Next.js bridge).
+
+    Mirrors ``/campaigns/{id}/commit-tick``: flips the EmailMessage row to
+    sent / failed and updates the matching Activity log.
+    """
+    msg_id = body.get("message_id")
+    ok = bool(body.get("ok"))
+    error = str(body.get("error") or "")
+
+    msg = (
+        db.query(EmailMessage)
+        .filter(
+            EmailMessage.id == msg_id,
+            EmailMessage.workspace_id == ctx.workspace_id,
+        )
+        .first()
+    )
+    if not msg:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "message_not_found")
+
+    if ok:
+        msg.status = "sent"
+        msg.sent_at = datetime.now(timezone.utc)
+        msg.error = None
+    else:
+        msg.status = "failed"
+        msg.error = error[:500] if error else "send_failed"
+
+    db.commit()
+    return {
+        "id": msg.id,
+        "ok": ok,
+        "status": msg.status,
+        "error": msg.error,
+        "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
+        "from_address": msg.from_address,
+    }
+
+
 @router.post("/bulk-send")
 def bulk_send_email(
     body: dict,
