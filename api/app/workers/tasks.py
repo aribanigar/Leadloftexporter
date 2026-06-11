@@ -343,3 +343,33 @@ def tick_search_scrapers() -> dict:
             queued += 1
         db.commit()
     return {"queued": queued}
+
+
+@celery_app.task
+def tick_email_campaigns() -> dict:
+    """Advance every active email campaign by one batch.
+
+    Calls into the same _process_tick helper the frontend hits via the
+    /campaigns/{id}/tick endpoint — both paths share the row-locked
+    "claim pending → mark sending → mark sent/failed" loop, so concurrent
+    calls (Celery + browser poll) can't double-send.
+    """
+    from app.api.v1.campaigns import _process_tick
+    from app.models import Campaign
+
+    processed = 0
+    with session_scope() as db:
+        rows = (
+            db.query(Campaign)
+            .filter(Campaign.status == "sending")
+            .order_by(Campaign.last_tick_at.asc().nullsfirst())
+            .limit(50)
+            .all()
+        )
+        for c in rows:
+            try:
+                _process_tick(db, c)
+                processed += 1
+            except Exception as exc:  # noqa: BLE001
+                log.exception("campaign tick failed for %s: %s", c.id, exc)
+    return {"processed": processed}

@@ -524,3 +524,171 @@ class Credit(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(30))  # enrichment|email_verify|ai
     delta: Mapped[int] = mapped_column(Integer)
     reason: Mapped[Optional[str]] = mapped_column(String(120))
+
+
+# ============================================================================
+# EMAIL MARKETING — campaigns, recipients, sender warmup, suppressions
+# ============================================================================
+#
+# Design intent: a campaign is an outbound broadcast that sends INDIVIDUAL
+# emails (no BCC blast) to a list of leads, rotating across one or more
+# connected sender accounts (SMTP / Resend / SendGrid / Gmail) with a
+# per-sender warmup schedule and a global pause/resume control.
+#
+# The send loop is driven by /campaigns/{id}/tick which processes a small
+# batch (~5–10 messages) per call. The endpoint is called by BOTH:
+#   - The frontend's polling loop while the user watches the progress bar
+#     (works on Render free tier where Celery workers don't run).
+#   - The Celery beat schedule when a worker IS running (Starter plan).
+# Both paths are idempotent — the CampaignRecipient.status row is the only
+# source of truth, advancing only "pending" rows.
+
+
+class Campaign(Base, TimestampMixin):
+    __tablename__ = "campaigns"
+    __table_args__ = (
+        Index("ix_campaigns_workspace_status", "workspace_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(240), nullable=False)
+    # Content
+    subject: Mapped[str] = mapped_column(String(500), default="")
+    preheader: Mapped[Optional[str]] = mapped_column(String(500))
+    body_html: Mapped[str] = mapped_column(Text, default="")
+    body_text: Mapped[Optional[str]] = mapped_column(Text)
+    # Recipients selection (snapshot at campaign-create time)
+    recipient_filter: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Sender pool — list of ConnectedAccount.id strings to rotate across.
+    # Empty list = let _pick_account choose per-send.
+    sender_account_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    rotation_index: Mapped[int] = mapped_column(Integer, default=0)
+    # Throttle / warmup
+    batch_size: Mapped[int] = mapped_column(Integer, default=8)
+    seconds_between_sends: Mapped[int] = mapped_column(Integer, default=30)
+    warmup_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Lifecycle
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    # draft | scheduled | sending | paused | completed | cancelled | failed
+    scheduled_for: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    paused_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    last_tick_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    # Counters — denormalised for cheap reads on the dashboard.
+    total_recipients: Mapped[int] = mapped_column(Integer, default=0)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class CampaignRecipient(Base, TimestampMixin):
+    """One row per (campaign × lead). The send loop advances rows in
+    `status="pending"` order — each row is "claimed" by transitioning to
+    `sending`, then to `sent`/`failed`/`skipped`."""
+
+    __tablename__ = "campaign_recipients"
+    __table_args__ = (
+        Index(
+            "ix_campaign_recipients_campaign_status",
+            "campaign_id",
+            "status",
+        ),
+        UniqueConstraint("campaign_id", "lead_id", name="uq_camp_recip_lead"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[str] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    sender_account_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("connected_accounts.id", ondelete="SET NULL")
+    )
+    message_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("email_messages.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    # pending | sending | sent | failed | skipped
+    error: Mapped[Optional[str]] = mapped_column(Text)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class SenderWarmup(Base, TimestampMixin):
+    """Per-(account, day) warmup tracker. The daily cap starts low and
+    ramps up over `ramp_days` (default 30). `sent_today` resets when
+    `day_anchor` rolls over to a new UTC date.
+
+    Cap curve (default): day 1 = 20 emails, doubles roughly every 3 days,
+    capped at `daily_cap_ceiling` (default 2,000). This matches industry
+    warmup playbooks (Mailgun, SendGrid, Postmark).
+    """
+
+    __tablename__ = "sender_warmups"
+    __table_args__ = (
+        UniqueConstraint(
+            "connected_account_id", name="uq_sender_warmup_account"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    connected_account_id: Mapped[str] = mapped_column(
+        ForeignKey("connected_accounts.id", ondelete="CASCADE"),
+        index=True,
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    ramp_days: Mapped[int] = mapped_column(Integer, default=30)
+    daily_cap_ceiling: Mapped[int] = mapped_column(Integer, default=2000)
+    sent_today: Mapped[int] = mapped_column(Integer, default=0)
+    day_anchor: Mapped[Optional[str]] = mapped_column(String(10))  # YYYY-MM-DD
+    total_sent: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Suppression(Base, TimestampMixin):
+    """Email addresses that must never be sent to.
+
+    Populated by: (a) hard bounces, (b) recipient-click unsubscribe links,
+    (c) manual import. The campaign send loop checks this table and marks
+    matching recipients as `skipped` before they touch the SMTP transport.
+    """
+
+    __tablename__ = "suppressions"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "email", name="uq_suppression_email"),
+        Index("ix_suppressions_workspace_email", "workspace_id", "email"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    reason: Mapped[str] = mapped_column(String(40), default="manual")
+    # manual | bounce | unsubscribe | complaint | failed_send
+    source_campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL")
+    )

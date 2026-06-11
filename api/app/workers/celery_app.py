@@ -48,6 +48,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.tick_search_scrapers",
         "schedule": crontab(minute="*/15"),
     },
+    # Advance every "sending" campaign by one batch each minute. The same
+    # /campaigns/{id}/tick endpoint runs from the frontend's poll loop on
+    # the free tier where no worker exists; this just makes campaigns keep
+    # advancing on Starter+ plans even when no browser tab is open.
+    "tick-email-campaigns": {
+        "task": "app.workers.tasks.tick_email_campaigns",
+        "schedule": crontab(minute="*"),
+    },
 }
 
 import app.workers.tasks  # noqa: E402,F401

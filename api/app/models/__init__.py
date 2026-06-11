@@ -27,6 +27,10 @@ from app.models.base import (
     CompanyEmailPattern,
     Integration,
     Credit,
+    Campaign,
+    CampaignRecipient,
+    SenderWarmup,
+    Suppression,
 )
 
 __all__ = [
@@ -58,4 +62,8 @@ __all__ = [
     "CompanyEmailPattern",
     "Integration",
     "Credit",
+    "Campaign",
+    "CampaignRecipient",
+    "SenderWarmup",
+    "Suppression",
 ]
