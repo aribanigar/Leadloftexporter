@@ -6584,11 +6584,62 @@
     return eds[0] || null;
   }
 
+  // Find the message compose dialog by searching for its visible header text
+  // "New message" — class-name and role agnostic, works regardless of how
+  // LinkedIn names its CSS classes.  Returns the container element.
+  function _findDialogByHeaderText() {
+    const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const raw = node.nodeValue || "";
+      const t = raw.trim();
+      if (!t || t.length > 60) continue;
+      let match = false;
+      for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
+      if (!match) continue;
+      // Climb to a substantial ancestor that looks like a dialog/popup.
+      let p = node.parentElement;
+      while (p && p !== document.body) {
+        const r = p.getBoundingClientRect();
+        const cs = getComputedStyle(p);
+        const positioned = cs.position === "fixed" || cs.position === "absolute";
+        if (r.width >= 300 && r.height >= 250 && positioned) return p;
+        if (r.width >= 380 && r.height >= 380) return p;
+        p = p.parentElement;
+      }
+    }
+    return null;
+  }
+
+  // Find the LARGEST visible editable on the page that isn't search/filter/
+  // our own UI. Used as the "find the composer editor without knowing its
+  // class" strategy.
+  function _findLargestComposerEditor() {
+    const all = document.querySelectorAll(
+      "[contenteditable='true'], " +
+      "[contenteditable]:not([contenteditable='false']), " +
+      "[role='textbox'], textarea, input[type='text']"
+    );
+    let best = null, bestArea = 0;
+    for (const el of all) {
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+      if (/search|filter|looking/i.test(lbl + " " + ph)) continue;
+      if (!_existsInLayout(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 100 || r.height < 30) continue;
+      const area = r.width * r.height;
+      if (area > bestArea) { best = el; bestArea = area; }
+    }
+    return best;
+  }
+
   // Find a clickable area showing the "Write a message..." placeholder so
-  // we can click it to activate the editor.  Returns the element under the
-  // user's eye, even if it's not technically the contenteditable.
+  // we can click it to activate the editor.
   function _findMsgPlaceholderClickTarget() {
-    const scope = _findMsgScope() || document;
+    const scope = _findMsgScope() || _findDialogByHeaderText() || document;
     // 1) Anything with aria-placeholder / data-placeholder / placeholder = "Write a message…"
     const phEls = scope.querySelectorAll(
       "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
@@ -7212,12 +7263,19 @@
           try { msgBtn.click(); } catch (e) { console.log("[LeadCaptura] native .click() failed:", e); }
         }
 
-        // Wait up to 10s for ANY of: focused editable, new editable, scope, placeholder.
+        // Wait up to 12s for ANY signal that the dialog opened:
+        //   1) focused editable (strongest)
+        //   2) newly-added editable
+        //   3) the visible "New message" header text appearing on screen
+        //   4) the visible "Write a message" text appearing on screen
+        //   5) known scope class
+        // We don't gate on class names — the "New message" header is real
+        // visible text on screen, which makes detection class-name-agnostic.
         let editor = null;
         let scope = null;
         let phTarget = null;
-        for (let k = 0; k < 50; k++) {
-          // 1) activeElement — strongest signal that the composer is ready.
+        let dialogByText = null;
+        for (let k = 0; k < 60; k++) {
           const ae = document.activeElement;
           if (ae && ae !== document.body && ae !== aeBefore && (
             ae.isContentEditable ||
@@ -7229,7 +7287,6 @@
             console.log("[LeadCaptura] editor = focused element after click:", ae.tagName, ae.className);
             break;
           }
-          // 2) Newly-added editable.
           const now = _allEditables(document);
           for (const el of now) {
             if (!editablesBefore.has(el)) { editor = el; break; }
@@ -7238,7 +7295,11 @@
             console.log("[LeadCaptura] editor = new editable after click:", editor.tagName, editor.className);
             break;
           }
-          // 3) Known scope or placeholder we can click to wake Quill.
+          dialogByText = _findDialogByHeaderText();
+          if (dialogByText) {
+            console.log("[LeadCaptura] dialog found by 'New message' header text:", dialogByText);
+            break;
+          }
           scope = _findMsgScope();
           phTarget = _findMsgPlaceholderClickTarget();
           if (scope || phTarget) break;
@@ -7246,43 +7307,46 @@
         }
         _removeSpotlight();
 
-        if (!editor && !scope && !phTarget) {
-          // Retry forceclick.
+        if (!editor && !scope && !phTarget && !dialogByText) {
           console.log("[LeadCaptura] msg in-place: nothing appeared, retry forceclick");
           _forceClick(msgBtn);
-          for (let k = 0; k < 30; k++) {
+          if (msgBtn.tagName === "A" && msgBtn.href) {
+            try { msgBtn.click(); } catch {}
+          }
+          for (let k = 0; k < 40; k++) {
             const now = _allEditables(document);
             for (const el of now) {
               if (!editablesBefore.has(el)) { editor = el; break; }
             }
             if (editor) break;
+            dialogByText = _findDialogByHeaderText();
             scope = _findMsgScope();
             phTarget = _findMsgPlaceholderClickTarget();
-            if (scope || phTarget) break;
+            if (editor || scope || phTarget || dialogByText) break;
             await sleep(200);
           }
         }
 
-        if (!editor && !scope && !phTarget) {
+        if (!editor && !scope && !phTarget && !dialogByText) {
           failed++;
           _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
           _closeMsgOverlay();
           continue;
         }
 
-        // Give the dialog a beat to finish hydrating.
         await sleep(500 + Math.random() * 350);
 
-        // If we don't have an editor yet, click the placeholder area to wake
-        // the Quill editor up.
         if (!editor) {
-          const clickTarget = phTarget || (scope && _findMsgPlaceholderClickTarget()) || scope;
+          // If we found a dialog by text but no editor yet, click around in
+          // the dialog body to wake Quill.  Try placeholder target first,
+          // then click into the bottom-half of the dialog.
+          let clickTarget = phTarget || (dialogByText && _findMsgPlaceholderClickTarget()) || dialogByText || scope;
           if (clickTarget) {
-            console.log("[LeadCaptura] msg in-place → clicking placeholder/scope:", clickTarget);
+            console.log("[LeadCaptura] msg in-place → clicking dialog/placeholder area:", clickTarget);
             try { await dispatchHumanClick(clickTarget); } catch {}
             await sleep(500);
           }
-          // Now look for the editor — try activeElement first.
+          // Activate element check first.
           const ae = document.activeElement;
           if (ae && ae !== document.body && (
             ae.isContentEditable ||
@@ -7291,9 +7355,11 @@
             ae.getAttribute("role") === "textbox"
           )) {
             editor = ae;
+            console.log("[LeadCaptura] editor = activeElement after dialog click:", ae.tagName);
           }
+          // Newly-added editable.
           if (!editor) {
-            for (let k = 0; k < 20; k++) {
+            for (let k = 0; k < 25; k++) {
               const eds = _allEditables(document);
               for (const el of eds) {
                 if (!editablesBefore.has(el)) { editor = el; break; }
@@ -7302,8 +7368,17 @@
               await sleep(150);
             }
           }
-          // Last resort: just use the placeholder element itself; strategies
-          // E (paste) and F (innerText) can still get text in.
+          // STRONG fallback: largest visible editor on the page that isn't
+          // a search/filter input.  On the connections page the only large
+          // editable area is the composer's textbox — there is no ambiguity.
+          if (!editor) {
+            const largest = _findLargestComposerEditor();
+            if (largest) {
+              editor = largest;
+              console.log("[LeadCaptura] editor = largest visible editable (fallback):", largest.tagName, largest.className);
+            }
+          }
+          // Last resort.
           if (!editor && phTarget) editor = phTarget;
         }
 
