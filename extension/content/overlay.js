@@ -4713,6 +4713,10 @@
   // class names. Mirrors scraper.js _isMutualConnectionContext — keep in
   // lock-step or the two paths disagree.
   function _isMutualConnectionContext(link) {
+    // On the My Connections page every card shows "N mutual connections" as a
+    // stat on the SAME card as the main profile link — that text must never
+    // cause the profile link itself to be rejected.
+    if (location.pathname.startsWith("/mynetwork/invite-connect/connections")) return false;
     try {
       let node = link.parentElement;
       for (let i = 0; i < 2 && node; i++) {
@@ -5045,68 +5049,67 @@
     const path = location.pathname;
     if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
 
-    // Anchor on Message buttons (every row has exactly one, no _isVisible
-    // gate so off-screen rows still get chipped) and walk UP to find each
-    // row. Definition of "row": the LARGEST ancestor that still contains
-    // exactly one unique /in/ profile URL — anything larger spans into a
-    // sibling row's territory.
+    // Start from profile LINKS (not button aria-labels) so this works even
+    // when LinkedIn renders Message buttons without an aria-label attribute.
+    // For each unique /in/ URL: find the smallest ancestor that owns exactly
+    // that one URL, find its Message button by text content, then inject.
     const mainEl = document.querySelector("main") || document.body;
-    const msgBtns = mainEl.querySelectorAll(
-      "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='recruiter' i])"
-    );
-
     const seen = new Set();
     let injected = 0;
 
-    for (const btn of msgBtns) {
-      if (btn.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+    for (const link of mainEl.querySelectorAll("a[href*='/in/']")) {
+      if (link.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
 
+      let url;
+      try { url = globalThis.__lcDom.normalizeProfileUrl(link.href); } catch { continue; }
+      if (!url || /\/in\/me\/?($|\?)/.test(url)) continue;
+      if (seen.has(url)) continue;
+
+      // Walk UP to the largest ancestor that contains exactly this one profile
+      // URL — stop before crossing into sibling rows.
       let row = null;
-      let url = null;
-      let node = btn.parentElement;
+      let msgBtn = null;
+      let node = link.parentElement;
       for (let i = 0; i < 20 && node && node !== mainEl; i++) {
-        const links = node.querySelectorAll("a[href*='/in/']");
-        if (links.length === 0) {
-          node = node.parentElement;
-          continue;
-        }
         const urls = new Set();
-        for (const l of links) {
-          let u;
-          try { u = globalThis.__lcDom.normalizeProfileUrl(l.href); } catch { continue; }
+        for (const l of node.querySelectorAll("a[href*='/in/']")) {
+          let u; try { u = globalThis.__lcDom.normalizeProfileUrl(l.href); } catch { continue; }
           if (!u || /\/in\/me\/?($|\?)/.test(u)) continue;
           urls.add(u);
           if (urls.size > 1) break;
         }
-        if (urls.size > 1) break;       // crossed into siblings — stop
+        if (urls.size > 1) break;    // next sibling row starts here — stop
         if (urls.size === 1) {
           row = node;
-          url = urls.values().next().value;
+          // Grab the Message button within this ancestor (text-content match,
+          // so no dependency on aria-label being present).
+          for (const b of node.querySelectorAll("button:not(.lc-inline-save)")) {
+            if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+            const hay = ((b.getAttribute("aria-label") || "") + " " + (b.textContent || "")).toLowerCase();
+            if (/\bmessage\b/.test(hay) && !/inmail|your team|recruiter/i.test(hay)) {
+              msgBtn = b;
+            }
+          }
         }
         node = node.parentElement;
       }
 
-      if (!row || !url || seen.has(url)) continue;
+      if (!row) continue;
       seen.add(url);
 
       const existing = injectedSaves.get(url);
       if (existing && document.body.contains(existing)) continue;
       if (existing) { injectedSaves.delete(url); chipCardEl.delete(url); }
 
-      const link = row.querySelector("a[href*='/in/']");
-      const name = (link?.getAttribute("aria-label") || link?.textContent || "")
+      const name = (link.getAttribute("aria-label") || link.textContent || "")
         .replace(/\s+/g, " ").trim() || _labelFromUrl(url);
 
       try {
-        injectInlineSave(row, { linkedin_url: url, full_name: name }, btn);
+        injectInlineSave(row, { linkedin_url: url, full_name: name }, msgBtn);
         injected++;
       } catch (e) {
         console.warn("[LeadCaptura/connections] inject failed", e?.message);
       }
-    }
-
-    if (msgBtns.length > 0 && injected === 0) {
-      console.warn("[LeadCaptura/connections] 0 chips injected from", msgBtns.length, "Message buttons");
     }
   }
 
@@ -6309,7 +6312,13 @@
           for (const sel of _MSG_SELS) {
             try {
               for (const b of scope.querySelectorAll(sel)) {
-                if (!_isVisible(b) || b.disabled) continue;
+                // Do NOT gate on _isVisible here — the Message button's
+                // bounding rect can be zero during page hydration (LinkedIn
+                // renders the top-card lazily), and that transient zero would
+                // cause the 15-second poll to time out and fall through to the
+                // "More" dropdown fallback. The aria-label match is specific
+                // enough on its own; _nameOk provides the person-identity guard.
+                if (b.disabled) continue;
                 if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
                 const lbl = b.getAttribute("aria-label") || b.textContent || "";
                 if (!_nameOk(lbl)) {
@@ -6320,7 +6329,8 @@
               }
             } catch {}
           }
-          // Text-content fallback within this scope.
+          // Text-content fallback within this scope — broader selector needs
+          // _isVisible to avoid matching hidden sidebar / "More profiles" buttons.
           for (const el of scope.querySelectorAll("button, a[role='button'], [role='button']")) {
             if (el.classList?.contains("lc-inline-save")) continue;
             if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
