@@ -345,22 +345,59 @@ def list_campaigns(
         .limit(200)
         .all()
     )
-    return [
-        {
-            "id": c.id,
-            "name": c.name,
-            "subject": c.subject,
-            "status": c.status,
-            "total_recipients": c.total_recipients,
-            "sent_count": c.sent_count,
-            "failed_count": c.failed_count,
-            "skipped_count": c.skipped_count,
-            "created_at": c.created_at,
-            "started_at": c.started_at,
-            "finished_at": c.finished_at,
-        }
-        for c in rows
-    ]
+    # Live engagement per campaign in ONE grouped query (same source the
+    # detail-page stats endpoint uses) so the list's open/click rates match
+    # the report exactly — and never come back NaN from a missing field.
+    ids = [c.id for c in rows]
+    agg: dict[str, dict[str, int]] = {}
+    if ids:
+        for cid, st, n in (
+            db.query(
+                CampaignRecipient.campaign_id,
+                CampaignRecipient.status,
+                func.count(CampaignRecipient.id),
+            )
+            .filter(CampaignRecipient.campaign_id.in_(ids))
+            .group_by(CampaignRecipient.campaign_id, CampaignRecipient.status)
+            .all()
+        ):
+            agg.setdefault(cid, {})[st] = n
+
+    out = []
+    for c in rows:
+        sc = agg.get(c.id, {})
+        total = sum(sc.values())
+        pending = sc.get("pending", 0) + sc.get("sending", 0)
+        sent = total - pending
+        opened = sc.get("opened", 0) + sc.get("clicked", 0)
+        clicked = sc.get("clicked", 0)
+        bounced = sc.get("bounced", 0) + sc.get("failed", 0)
+        open_rate = round((opened / sent) * 100) if sent > 0 else 0
+        click_rate = round((clicked / sent) * 100) if sent > 0 else 0
+        bounce_rate = round((bounced / sent) * 100) if sent > 0 else 0
+        out.append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "subject": c.subject,
+                "status": c.status,
+                "total_recipients": c.total_recipients,
+                "sent_count": sent,
+                "failed_count": c.failed_count,
+                "skipped_count": c.skipped_count,
+                # Live engagement — drives the list's OPEN RATE column.
+                "opened_count": opened,
+                "clicked_count": clicked,
+                "bounced_count": bounced,
+                "open_rate": open_rate,
+                "click_rate": click_rate,
+                "bounce_rate": bounce_rate,
+                "created_at": c.created_at,
+                "started_at": c.started_at,
+                "finished_at": c.finished_at,
+            }
+        )
+    return out
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

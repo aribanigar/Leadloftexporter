@@ -5036,26 +5036,15 @@
     };
   }
 
-  // Explicit per-row decoration for the My Network → Connections list
-  // (/mynetwork/invite-connect/connections/). Each row exposes a single
-  // <a href="/in/..."> and a "Message" button; no Connect/Follow buttons
-  // (everyone here is already 1st-degree). The generic action-button-anchored
-  // path was finding the Message button on every row but the chip only
-  // visually rendered on the first row — likely because all rows share
-  // narrow flex containers and absolute children collapsed onto each other.
-  // This dedicated pass walks the SEMANTIC <li>/component row container and
-  // injects exactly one chip per <a href="/in/..."> link.
+  // Dedicated chip injector for /mynetwork/invite-connect/connections.
+  // Starts from profile links (not button aria-labels) so it works even when
+  // LinkedIn renders Message buttons without an aria-label attribute.
   function _decorateConnectionsList() {
     const path = location.pathname;
     if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
 
-    // Start from profile LINKS (not button aria-labels) so this works even
-    // when LinkedIn renders Message buttons without an aria-label attribute.
-    // For each unique /in/ URL: find the smallest ancestor that owns exactly
-    // that one URL, find its Message button by text content, then inject.
     const mainEl = document.querySelector("main") || document.body;
     const seen = new Set();
-    let injected = 0;
 
     for (const link of mainEl.querySelectorAll("a[href*='/in/']")) {
       if (link.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
@@ -5065,8 +5054,7 @@
       if (!url || /\/in\/me\/?($|\?)/.test(url)) continue;
       if (seen.has(url)) continue;
 
-      // Walk UP to the largest ancestor that contains exactly this one profile
-      // URL — stop before crossing into sibling rows.
+      // Walk up to the largest ancestor that contains exactly this one URL.
       let row = null;
       let msgBtn = null;
       let node = link.parentElement;
@@ -5078,11 +5066,10 @@
           urls.add(u);
           if (urls.size > 1) break;
         }
-        if (urls.size > 1) break;    // next sibling row starts here — stop
+        if (urls.size > 1) break;
         if (urls.size === 1) {
           row = node;
-          // Grab the Message button within this ancestor (text-content match,
-          // so no dependency on aria-label being present).
+          // Find Message button by text content — no aria-label dependency.
           for (const b of node.querySelectorAll("button:not(.lc-inline-save)")) {
             if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
             const hay = ((b.getAttribute("aria-label") || "") + " " + (b.textContent || "")).toLowerCase();
@@ -5106,7 +5093,6 @@
 
       try {
         injectInlineSave(row, { linkedin_url: url, full_name: name }, msgBtn);
-        injected++;
       } catch (e) {
         console.warn("[LeadCaptura/connections] inject failed", e?.message);
       }
@@ -5114,14 +5100,8 @@
   }
 
   function decorateSearchCards() {
-    // Dedicated connections-list path — runs on /mynetwork/invite-connect/connections
-    // BEFORE the page-type guard below so we don't bail out of decoration just
-    // because pageType() routes the connections page through search-people.
+    // Dedicated pass for My Connections page first (runs before pageType guard).
     try { _decorateConnectionsList(); } catch {}
-    // On the connections page, ALSO let the generic action-button path run
-    // as a backup. injectInlineSave dedups by URL via injectedSaves, so any
-    // row already chipped by _decorateConnectionsList() will no-op here.
-    // This gives us two independent shots at every row.
 
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
@@ -6240,19 +6220,10 @@
 
   // Send a LinkedIn message on the current profile page.
   // Returns { ok, reason }.
-  //
-  // v1.0.191: every step now emits an on-page `_lcToast` so the user can SEE
-  // where the run bails the moment it bails (the previous version only logged
-  // to console, which the user can't see while watching the page). Also
-  // extends the Message-button polling window from 6s to 15s (LinkedIn's
-  // top-card hydrates lazily on slow connections), adds the "More" dropdown
-  // as a fallback when Message has been moved into the overflow menu, and
-  // guards against re-opening the dialog when one is already on-screen.
   async function _sendProfilePageMessage(messageText) {
     const { sleep, readingPause } = globalThis.__lcHuman;
     const { waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
 
-    _lcToast("📍 Step 1/4 — reading profile…", 1500);
     await sleep(readingPause());
 
     // ── Step 1: click the Message button (unless compose dialog already open) ──
@@ -6266,121 +6237,80 @@
     ];
 
     let editor = document.querySelector(_editorSels.join(","));
-    if (editor) {
-      _lcToast("📨 Step 2/4 — compose box already open, reusing it", 1800);
-    }
 
     if (!editor) {
-      // _findMsgBtn re-reads the profile H1 on every call so the name-guard
-      // works even when the top-card hasn't rendered yet at function-definition
-      // time. Returning null makes the poll loop retry until the H1 is ready.
       const _findMsgBtn = () => {
-        // Read H1 fresh on every poll — it may not be in the DOM yet.
-        const h1 = document.querySelector("main h1") || document.querySelector("h1");
-        const firstName = (h1?.textContent || "").trim().split(/\s+/)[0]?.toLowerCase() || "";
-        // If H1 is not rendered yet, wait for the next poll cycle.
-        if (!firstName) return null;
+        // COLUMN-GEOMETRY strategy — no dependency on the H1 (a hidden/zero-size
+        // <h1> made every earlier version return null → "0 sent"). No dependency
+        // on LinkedIn class names either.
+        //
+        // Fact about the profile layout: the profile owner's CTA row (Message /
+        // Connect / …) renders in the LEFT content column, near the top, at a
+        // small x (~340px). The right-rail "More profiles for you" people
+        // (Jihane, Andrew, …) render in the FAR-RIGHT column at a large x
+        // (~1350px). So: keep only Message buttons in the left ~60% of the
+        // viewport width, then pick the TOP-MOST one — that is always the
+        // profile owner's button, never a sidebar person's.
 
-        // Scope: the top-card container that holds the H1 (and the profile's
-        // own CTA buttons). "More profiles for you" is a SIBLING section, so
-        // staying inside the H1's artdeco-card parent keeps us away from it.
-        const topCard =
-          h1.closest(".pv-top-card-v2-ctas, .pv-top-card, [class*='top-card']") ||
-          h1.parentElement?.closest("section.artdeco-card") ||
-          document.querySelector("main .pv-top-card-v2-ctas") ||
-          document.querySelector("main .pv-top-card") ||
-          null;
+        const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+        const ARIA_SEL =
+          "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
+          "button.message-anywhere-button, [class*='message-anywhere-button'], " +
+          "button[data-control-name*='message' i]";
 
-        // Reject any button whose aria-label names a different person.
-        const _nameOk = (lbl) => {
-          if (!lbl) return true;
-          const m = lbl.toLowerCase().match(/message\s+([a-z][a-z\-' .]*)/);
-          if (!m) return true;
-          return m[1].trim().toLowerCase().includes(firstName);
+        const candidates = [];
+        const seen = new Set();
+
+        const consider = (el) => {
+          if (!el || seen.has(el)) return;
+          seen.add(el);
+          if (el.disabled) return;
+          if (el.classList?.contains("lc-inline-save")) return;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
+          // Defence-in-depth: never the right-rail / "More profiles" column.
+          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const hay = lbl + " " + txt;
+          if (!/\bmessage\b/.test(hay)) return;
+          if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
+          if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) return;       // not visible
+          if (r.left > vw * 0.6) return;                  // right-rail — exclude
+          candidates.push({ el, top: r.top, left: r.left });
         };
 
-        const _MSG_SELS = [
-          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
-          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
-          "button.message-anywhere-button",
-          "[class*='message-anywhere-button']",
-          "button[data-control-name*='message' i]",
-        ];
-
-        const scopes = [topCard, document.querySelector("main")].filter(Boolean);
-        for (const scope of scopes) {
-          for (const sel of _MSG_SELS) {
-            try {
-              for (const b of scope.querySelectorAll(sel)) {
-                // Do NOT gate on _isVisible here — the Message button's
-                // bounding rect can be zero during page hydration (LinkedIn
-                // renders the top-card lazily), and that transient zero would
-                // cause the 15-second poll to time out and fall through to the
-                // "More" dropdown fallback. The aria-label match is specific
-                // enough on its own; _nameOk provides the person-identity guard.
-                if (b.disabled) continue;
-                if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-                const lbl = b.getAttribute("aria-label") || b.textContent || "";
-                if (!_nameOk(lbl)) {
-                  console.log("[LeadCaptura] skip wrong-profile Message btn:", lbl.trim().slice(0, 60));
-                  continue;
-                }
-                return b;
-              }
-            } catch {}
-          }
-          // Text-content fallback within this scope — broader selector needs
-          // _isVisible to avoid matching hidden sidebar / "More profiles" buttons.
-          for (const el of scope.querySelectorAll("button, a[role='button'], [role='button']")) {
-            if (el.classList?.contains("lc-inline-save")) continue;
-            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-            if (!_isVisible(el) || el.disabled) continue;
-            const lblRaw = el.getAttribute("aria-label") || el.textContent || "";
-            const hay = (lblRaw + " " + (el.textContent || "")).toLowerCase();
-            if (!/\bmessage\b/.test(hay)) continue;
-            if (/your team|recruiter|inmail|connect|follow|sales navigator/i.test(hay)) continue;
-            if (!_nameOk(lblRaw)) continue;
-            return el;
-          }
+        for (const el of document.querySelectorAll(ARIA_SEL)) consider(el);
+        // Text-content fallback — a "Message" button with no aria-label.
+        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+          if (seen.has(el)) continue;
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+          if (txt.toLowerCase() === "message") consider(el);
         }
-        return null;
+
+        if (!candidates.length) return null;
+
+        // Top-most (then left-most) in the content column = the owner's CTA.
+        candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        return candidates[0].el;
       };
 
-      _lcToast("🔍 Step 2/4 — finding Message button…", 1800);
-      // Profile pages hydrate over ~3-6s on slow networks. Poll up to 15s.
+      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
       let msgBtn = null;
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 20; i++) {
         msgBtn = _findMsgBtn();
         if (msgBtn) break;
         await sleep(300);
       }
 
-      // Fallback: try the "More" / overflow menu — LinkedIn sometimes moves
-      // Message into the dropdown for 2nd-degree or restricted connections.
       if (!msgBtn) {
-        _lcToast("🔍 Step 2/4 — checking More menu…", 1500);
-        const moreBtn = Array.from(
-          document.querySelectorAll("main button[aria-label*='More' i], main button[aria-label*='actions' i]")
-        ).find((b) => _isVisible(b) && !b.disabled);
-        if (moreBtn) {
-          try { await dispatchHumanClick(moreBtn); } catch {}
-          await sleep(700);
-          // Now look inside the dropdown
-          for (let i = 0; i < 10; i++) {
-            msgBtn = _findMsgBtn();
-            if (msgBtn) break;
-            await sleep(250);
-          }
-        }
-      }
-
-      if (!msgBtn) {
-        _lcToast("⚠️ No Message button on this profile — not connected? Skipping.", 4500);
         console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
+        _lcToast("⚠️ Message button not found on this profile", 3000);
         return { ok: false, reason: "no_message_button" };
       }
+      _lcToast("✉️ Found Message button — opening composer…", 2000);
 
-      _lcToast(`🎯 Step 2/4 — clicking Message: "${(msgBtn.getAttribute("aria-label") || msgBtn.textContent || "").trim().slice(0, 40)}"`, 2200);
       console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
       await sleep(450 + Math.random() * 350);
@@ -6392,28 +6322,25 @@
       // Click with dispatchHumanClick first (realistic pointer sequence — what
       // LinkedIn's bot detection expects to see leading up to a click).
       await dispatchHumanClick(msgBtn);
-      editor = await waitFor(_editorSels, { timeout: 5000 });
+      editor = await waitFor(_editorSels, { timeout: 3500 });
 
       // Fallback: _forceClick (5-strategy including React fiber onClick) when
       // pointer events alone don't trigger LinkedIn's handlers.
       if (!editor) {
-        _lcToast("⏳ Dialog didn't open — retrying with force-click…", 2200);
         console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
         _forceClick(msgBtn);
-        editor = await waitFor(_editorSels, { timeout: 6000 });
+        editor = await waitFor(_editorSels, { timeout: 5000 });
       }
 
       _removeSpotlight();
     }
 
     if (!editor) {
-      _lcToast("❌ Dialog never appeared — LinkedIn may have changed selectors. Stopping.", 5000);
       console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
       return { ok: false, reason: "no_editor" };
     }
 
     // ── Step 2: focus editor and type the message ──
-    _lcToast(`⌨️ Step 3/4 — typing message (${messageText.length} chars)…`, 2200);
     try { editor.click(); } catch {}
     try { editor.focus(); } catch {}
     await sleep(280 + Math.random() * 220);
@@ -6458,12 +6385,10 @@
     }
 
     if (!sendBtn || sendBtn.disabled) {
-      _lcToast("⚠️ Send button still disabled — typing may not have committed. Skipping.", 4500);
       console.log("[LeadCaptura] Message All: Send button not found or disabled");
       return { ok: false, reason: "send_disabled" };
     }
 
-    _lcToast("📨 Step 4/4 — clicking Send…", 2000);
     console.log("[LeadCaptura] Message All: clicking Send");
     _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
     await sleep(400 + Math.random() * 200);
@@ -6478,7 +6403,6 @@
       await sleep(800);
     }
     _removeSpotlight();
-    _lcToast("✓ Sent — moving to next profile", 1800);
     return { ok: true };
   }
 

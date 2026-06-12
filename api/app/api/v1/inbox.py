@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import ConnectedAccount, EmailMessage, EmailThread, Lead
+from app.models import (
+    Campaign,
+    CampaignRecipient,
+    ConnectedAccount,
+    EmailMessage,
+    EmailThread,
+    Lead,
+)
 from app.services.ai_writer import generate_email_for_lead
 from app.services.outreach import (
     emails_sent_today,
@@ -41,15 +48,120 @@ def _render_email(template: str, lead: Lead) -> str:
     return out
 
 
+@router.get("/mailboxes")
+def list_mailboxes(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Inbox sidebar tree: every connected email mailbox, and under each, the
+    campaigns that have sent through it. Powers the Mailbox → Campaigns
+    navigation. Thread counts are live so the badges stay accurate."""
+    accts = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+            ConnectedAccount.provider.in_(("smtp", "gmail", "resend", "sendgrid")),
+        )
+        .order_by(ConnectedAccount.created_at.asc())
+        .all()
+    )
+
+    # Campaigns that routed at least one recipient through each sender account.
+    camp_rows = (
+        db.query(
+            CampaignRecipient.sender_account_id,
+            Campaign.id,
+            Campaign.name,
+            func.count(CampaignRecipient.id),
+        )
+        .join(Campaign, Campaign.id == CampaignRecipient.campaign_id)
+        .filter(
+            Campaign.workspace_id == ctx.workspace_id,
+            CampaignRecipient.sender_account_id.isnot(None),
+        )
+        .group_by(CampaignRecipient.sender_account_id, Campaign.id, Campaign.name)
+        .all()
+    )
+    camps_by_acct: dict[str, list[dict]] = {}
+    for acct_id, cid, cname, n in camp_rows:
+        camps_by_acct.setdefault(acct_id, []).append(
+            {"id": cid, "name": cname, "recipients": n}
+        )
+
+    # Live thread count per mailbox (threads with a message from/to that address).
+    out = []
+    total_threads = (
+        db.query(func.count(EmailThread.id))
+        .filter(EmailThread.workspace_id == ctx.workspace_id)
+        .scalar()
+        or 0
+    )
+    for a in accts:
+        addr = (a.external_id or "").lower()
+        thread_count = 0
+        if addr:
+            thread_count = (
+                db.query(func.count(func.distinct(EmailMessage.thread_id)))
+                .filter(
+                    EmailMessage.workspace_id == ctx.workspace_id,
+                    EmailMessage.thread_id.isnot(None),
+                    func.lower(EmailMessage.from_address) == addr,
+                )
+                .scalar()
+                or 0
+            )
+        out.append(
+            {
+                "id": a.id,
+                "provider": a.provider,
+                "label": a.label,
+                "address": a.external_id,
+                "status": a.status,
+                "thread_count": thread_count,
+                "campaigns": sorted(
+                    camps_by_acct.get(a.id, []), key=lambda c: c["name"].lower()
+                ),
+            }
+        )
+    return {"mailboxes": out, "total_threads": total_threads}
+
+
 @router.get("/threads")
 def list_threads(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
     lead_id: Optional[str] = None,
+    mailbox: Optional[str] = None,
+    campaign_id: Optional[str] = None,
 ):
     q = db.query(EmailThread).filter(EmailThread.workspace_id == ctx.workspace_id)
     if lead_id:
         q = q.filter(EmailThread.lead_id == lead_id)
+    # Filter to threads handled by a specific connected mailbox (by from/to addr).
+    if mailbox:
+        addr = mailbox.strip().lower()
+        msg_thread_ids = (
+            db.query(func.distinct(EmailMessage.thread_id))
+            .filter(
+                EmailMessage.workspace_id == ctx.workspace_id,
+                EmailMessage.thread_id.isnot(None),
+                (func.lower(EmailMessage.from_address) == addr)
+                | (func.lower(EmailMessage.to_address) == addr),
+            )
+            .subquery()
+        )
+        q = q.filter(EmailThread.id.in_(msg_thread_ids))
+    # Filter to threads whose lead is a recipient of a specific campaign.
+    if campaign_id:
+        recip_lead_ids = (
+            db.query(func.distinct(CampaignRecipient.lead_id))
+            .filter(
+                CampaignRecipient.campaign_id == campaign_id,
+                CampaignRecipient.lead_id.isnot(None),
+            )
+            .subquery()
+        )
+        q = q.filter(EmailThread.lead_id.in_(recip_lead_ids))
     rows = q.order_by(EmailThread.last_message_at.desc().nullslast()).limit(200).all()
     return [
         {
