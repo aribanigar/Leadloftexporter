@@ -5,6 +5,13 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 
 // ── Types (match backend GET /campaigns) ───────────────────────────────────────
+interface CampaignSender {
+  id: string;
+  address: string | null;
+  provider: string;
+  label: string | null;
+}
+
 interface Campaign {
   id: string;
   name: string;
@@ -16,10 +23,19 @@ interface Campaign {
   skipped_count: number;
   opened_count: number;
   clicked_count: number;
+  senders?: CampaignSender[];
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
 }
+
+// Provider → brand colour for the mailbox header chip
+const PROVIDER_COLOR: Record<string, string> = {
+  gmail: '#ea4335',
+  smtp: '#0a66c2',
+  resend: '#6b3600',
+  sendgrid: '#1a73e8',
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TABS = ['all', 'completed'] as const;
@@ -224,6 +240,44 @@ export default function EmailCampaignsPage() {
   const visible = tab === 'completed'
     ? campaigns.filter(c => c.status === 'completed')
     : campaigns;
+
+  // ── Group by sender mailbox (the connected email account the campaign
+  //     was/is sent from). A campaign with multiple senders shows once per
+  //     sender so the section row count tells the truth. Campaigns with no
+  //     resolved sender fall into "Unassigned". ──────────────────────────
+  interface CampaignGroup {
+    key: string;
+    address: string;
+    provider: string;
+    label: string | null;
+    campaigns: Campaign[];
+  }
+  const groupMap = new Map<string, CampaignGroup>();
+  for (const c of visible) {
+    const senders = c.senders && c.senders.length > 0 ? c.senders : [null];
+    for (const s of senders) {
+      const key = s?.id || '__unassigned__';
+      const addr = s?.address || s?.label || 'Unassigned';
+      let g = groupMap.get(key);
+      if (!g) {
+        g = {
+          key,
+          address: addr,
+          provider: s?.provider || 'smtp',
+          label: s?.label || null,
+          campaigns: [],
+        };
+        groupMap.set(key, g);
+      }
+      g.campaigns.push(c);
+    }
+  }
+  // Sort: real mailboxes first (alphabetical), unassigned last
+  const groups = Array.from(groupMap.values()).sort((a, b) => {
+    if (a.key === '__unassigned__') return 1;
+    if (b.key === '__unassigned__') return -1;
+    return a.address.localeCompare(b.address);
+  });
 
   // ── Aggregate KPIs ──────────────────────────────────────────────────────────
   const completedCampaigns = campaigns.filter(c => c.status === 'completed');
@@ -454,7 +508,55 @@ export default function EmailCampaignsPage() {
                       </td>
                     </tr>
                   ) : (
-                    visible.map((c, idx) => {
+                    groups.flatMap((g) => [
+                      // ── Mailbox header row — one per connected account ──
+                      <tr key={`hdr-${g.key}`}>
+                        <td colSpan={5} style={{
+                          padding: '14px 16px 8px',
+                          background: T.surfaceLow,
+                          borderTop: `1px solid rgba(65,73,66,0.08)`,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{
+                              display: 'inline-grid',
+                              placeItems: 'center',
+                              width: 22,
+                              height: 22,
+                              borderRadius: T.rFull,
+                              background: PROVIDER_COLOR[g.provider] || T.secondary,
+                              color: '#ffffff',
+                              fontSize: 11,
+                              fontWeight: 700,
+                            }}>
+                              {(g.address || '?').charAt(0).toUpperCase()}
+                            </span>
+                            <span style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: T.onSurface,
+                              fontFamily: 'Manrope, Inter, sans-serif',
+                            }}>
+                              {g.address}
+                            </span>
+                            <span style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: T.onSurfaceVar,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                              padding: '2px 8px',
+                              background: T.surfaceContainer,
+                              borderRadius: T.rFull,
+                            }}>
+                              {g.provider}
+                            </span>
+                            <span style={{ marginLeft: 'auto', fontSize: 12, color: T.onSurfaceVar }}>
+                              {g.campaigns.length} campaign{g.campaigns.length === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>,
+                      ...g.campaigns.map((c, idx) => {
                       const badge = STATUS_BADGE[c.status] || STATUS_BADGE.draft;
                       const openRateNum = c.sent_count ? (c.opened_count / c.sent_count) * 100 : 0;
                       const openRateStr = fmtRateDisplay(c.opened_count, c.sent_count);
@@ -462,7 +564,7 @@ export default function EmailCampaignsPage() {
 
                       return (
                         <tr
-                          key={c.id}
+                          key={`${g.key}-${c.id}`}
                           className="ec-row"
                           style={{
                             borderBottom: `1px solid rgba(65,73,66,0.06)`,
@@ -670,7 +772,8 @@ export default function EmailCampaignsPage() {
                           </td>
                         </tr>
                       );
-                    })
+                    }),
+                    ])
                   )}
                 </tbody>
               </table>

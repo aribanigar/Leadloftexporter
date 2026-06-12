@@ -363,6 +363,38 @@ def list_campaigns(
         ):
             agg.setdefault(cid, {})[st] = n
 
+    # Resolve each campaign's sender mailbox(es) so the UI can group campaigns
+    # by connected account (same model as the Inbox sidebar). We surface:
+    #   - the configured pool (sender_account_ids on the campaign), and
+    #   - the actually-used senders observed in CampaignRecipient rows
+    # The union (configured ∪ used) becomes `senders` — a list of
+    # {id, address, provider, label}.
+    acct_rows = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+            ConnectedAccount.provider.in_(("smtp", "gmail", "resend", "sendgrid")),
+        )
+        .all()
+    )
+    acct_by_id = {a.id: a for a in acct_rows}
+
+    used_by_campaign: dict[str, set[str]] = {}
+    if ids:
+        for cid, aid in (
+            db.query(
+                CampaignRecipient.campaign_id,
+                CampaignRecipient.sender_account_id,
+            )
+            .filter(
+                CampaignRecipient.campaign_id.in_(ids),
+                CampaignRecipient.sender_account_id.isnot(None),
+            )
+            .distinct()
+            .all()
+        ):
+            used_by_campaign.setdefault(cid, set()).add(aid)
+
     out = []
     for c in rows:
         sc = agg.get(c.id, {})
@@ -375,6 +407,26 @@ def list_campaigns(
         open_rate = round((opened / sent) * 100) if sent > 0 else 0
         click_rate = round((clicked / sent) * 100) if sent > 0 else 0
         bounce_rate = round((bounced / sent) * 100) if sent > 0 else 0
+
+        # Sender mailboxes: configured pool ∪ actually-used senders
+        sender_ids: list[str] = []
+        for aid in (c.sender_account_ids or []):
+            if aid and aid not in sender_ids:
+                sender_ids.append(aid)
+        for aid in used_by_campaign.get(c.id, set()):
+            if aid not in sender_ids:
+                sender_ids.append(aid)
+        senders = [
+            {
+                "id": acct_by_id[aid].id,
+                "address": acct_by_id[aid].external_id,
+                "provider": acct_by_id[aid].provider,
+                "label": acct_by_id[aid].label,
+            }
+            for aid in sender_ids
+            if aid in acct_by_id
+        ]
+
         out.append(
             {
                 "id": c.id,
@@ -392,6 +444,9 @@ def list_campaigns(
                 "open_rate": open_rate,
                 "click_rate": click_rate,
                 "bounce_rate": bounce_rate,
+                # Connected mailbox(es) this campaign sends through — used by
+                # the frontend to group the campaigns table by sender.
+                "senders": senders,
                 "created_at": c.created_at,
                 "started_at": c.started_at,
                 "finished_at": c.finished_at,
