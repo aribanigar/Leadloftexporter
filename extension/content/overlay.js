@@ -5129,6 +5129,11 @@
     // BEFORE the page-type guard below so we don't bail out of decoration just
     // because pageType() routes the connections page through search-people.
     try { _decorateConnectionsList(); } catch {}
+    // The connections page is handled exclusively by _decorateConnectionsList().
+    // Do NOT let the action-button path below run on it — it would inject a
+    // second chip on whichever row has a recognised Message button (Shaun Brown
+    // in testing), while leaving all other rows un-chipped.
+    if (location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
 
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
@@ -6279,22 +6284,35 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
+        // Scope to the profile top-card CTA area first. LinkedIn's sidebar
+        // "More profiles for you" section renders its own Message buttons and
+        // they appear earlier in DOM order than the actual profile's button,
+        // so a document-wide querySelectorAll picks the WRONG person's button.
+        // Prefer the top-card CTAs → top-card → any first artdeco-card → main
+        // before falling back to the full document.
+        const topCard =
+          document.querySelector("main .pv-top-card-v2-ctas") ||
+          document.querySelector("main .pv-top-card") ||
+          document.querySelector("main section:first-of-type.artdeco-card") ||
+          document.querySelector("main") ||
+          document.documentElement;
+
         const _MSG_SELS = [
           "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
           "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
-          "main button.message-anywhere-button",
+          "button.message-anywhere-button",
           "[class*='message-anywhere-button']",
           "button[data-control-name*='message' i]",
         ];
         for (const sel of _MSG_SELS) {
           try {
-            for (const b of document.querySelectorAll(sel)) {
+            for (const b of topCard.querySelectorAll(sel)) {
               if (_isVisible(b) && !b.disabled) return b;
             }
           } catch {}
         }
-        // Text-content fallback — broad scan, exclude our own UI.
-        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+        // Text-content fallback — same scoped container, exclude our own UI.
+        for (const el of topCard.querySelectorAll("button, a[role='button'], [role='button']")) {
           if (el.classList?.contains("lc-inline-save")) continue;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
           if (!_isVisible(el) || el.disabled) continue;
