@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Inbox, Mail, ChevronRight, ChevronDown, AtSign, Layers } from "lucide-react";
+import { Inbox, Mail, ChevronRight, ChevronDown, AtSign, Layers, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { fmtRelative } from "@/lib/utils";
 
@@ -73,10 +73,12 @@ export default function InboxPage() {
   const [selection, setSelection] = useState<Selection>({ kind: "all" });
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  // Mailboxes — graceful degradation if the endpoint is not yet deployed (404/error).
   const { data: mbResp } = useQuery<MailboxesResp>({
     queryKey: ["inbox-mailboxes"],
     queryFn: () => api("/inbox/mailboxes"),
     refetchInterval: 20000,
+    retry: false,
   });
 
   // Build the threads query key + path from the current selection.
@@ -91,13 +93,13 @@ export default function InboxPage() {
     return `/inbox/threads${qs ? `?${qs}` : ""}`;
   }, [selection]);
 
-  const { data: threads } = useQuery<Thread[]>({
+  const { data: threads, isLoading: threadsLoading } = useQuery<Thread[]>({
     queryKey: ["inbox-threads", threadsPath],
     queryFn: () => api(threadsPath),
     refetchInterval: 20000,
   });
 
-  const { data: detail } = useQuery<ThreadDetail | null>({
+  const { data: detail, isLoading: detailLoading } = useQuery<ThreadDetail | null>({
     queryKey: ["inbox-thread", active],
     queryFn: () => (active ? api(`/inbox/threads/${active}`) : Promise.resolve(null)),
     enabled: !!active,
@@ -244,12 +246,17 @@ export default function InboxPage() {
           <h2 className="truncate text-sm font-semibold" title={headerLabel}>{headerLabel}</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {threads?.length === 0 && (
+          {threadsLoading && (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+            </div>
+          )}
+          {!threadsLoading && threads?.length === 0 && (
             <div className="p-8 text-center text-sm text-slate-500">
               No conversations here yet. Replies and outbound emails will land here.
             </div>
           )}
-          {threads?.map((t) => (
+          {!threadsLoading && threads?.map((t) => (
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
@@ -266,7 +273,7 @@ export default function InboxPage() {
 
       {/* ── Pane 3: Thread detail ────────────────────────────────────── */}
       <div className="flex flex-1 flex-col">
-        {!detail && (
+        {!active && (
           <div className="grid flex-1 place-items-center text-slate-400">
             <div className="text-center">
               <Mail className="mx-auto h-10 w-10 text-slate-300" />
@@ -274,7 +281,12 @@ export default function InboxPage() {
             </div>
           </div>
         )}
-        {detail && (
+        {active && detailLoading && (
+          <div className="grid flex-1 place-items-center">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          </div>
+        )}
+        {active && !detailLoading && detail && (
           <>
             <div className="border-b border-slate-200 bg-white px-6 py-3">
               <h2 className="text-base font-semibold">{detail.thread.subject || "(no subject)"}</h2>
@@ -289,7 +301,7 @@ export default function InboxPage() {
                 >
                   <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
                     <span>
-                      <span className="font-medium text-slate-700">{m.direction === "outbound" ? m.from_address : m.from_address}</span> →{" "}
+                      <span className="font-medium text-slate-700">{m.from_address}</span> →{" "}
                       {m.direction === "outbound" ? m.to_address : "you"}
                     </span>
                     <span>{fmtRelative(m.sent_at || m.created_at)}</span>
