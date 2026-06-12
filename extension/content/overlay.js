@@ -7343,7 +7343,10 @@
         const url = urls[i];
         const idx = i + 1;
 
-        const card = chipCardEl.get(url);
+        // Wrap each iteration so a thrown error in any helper counts as a
+        // failure and the loop CONTINUES rather than aborting the whole run.
+        try {
+          const card = chipCardEl.get(url);
         if (!card || !document.body.contains(card)) {
           console.log("[LeadCaptura] msg in-place: no card for", url);
           skipped++;
@@ -7567,6 +7570,12 @@
         if (i < urls.length - 1 && !state.messageCancel) {
           const gap = _msgGap();
           await _cancellableMessageSleep(gap);
+        }
+        } catch (err) {
+          console.log(`[LeadCaptura] msg in-place ${idx}/${total} threw:`, err);
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
+          try { _closeMsgOverlay(); } catch {}
         }
       }
     } finally {
