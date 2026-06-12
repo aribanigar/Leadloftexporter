@@ -6324,32 +6324,38 @@
       return w >= 2 && h >= 2;
     };
 
-    // Pass 0a — TRUE VISUAL signal: any Message-labelled button whose
-    // computed background is LinkedIn's primary blue.  This survives class
-    // renames during A/B tests because we read the actual paint.
-    const allMsg = document.querySelectorAll(
-      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
-    );
-    for (const el of allMsg) {
-      if (!_candidateIsValid(el)) continue;
-      if (!_hasBluePrimaryBg(el)) continue;
+    // Helper: does the button or its descendants say "Message"?
+    const _saysMessage = (el) => {
       const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-      if (/\bmessage\b/.test(lbl)) return el;
+      if (/\bmessage\b/.test(lbl)) return true;
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (txt === "message" || /\bmessage\b/.test(txt)) return true;
+      return false;
+    };
+
+    // Pass 0a — TRUE VISUAL signal: any Message-labelled button whose
+    // computed background is LinkedIn's primary blue.  Scans ALL buttons —
+    // not only ones with aria-label — because LinkedIn occasionally ships
+    // the Message button as a plain <button><span>Message</span></button>.
+    const everyBtn = document.querySelectorAll("button, a[role='button'], [role='button']");
+    for (const el of everyBtn) {
+      if (!_candidateIsValid(el)) continue;
+      if (!_saysMessage(el)) continue;
+      if (!_hasBluePrimaryBg(el)) continue;
+      console.log("[LeadCaptura] msg STEP 2 → Pass 0a (blue paint) matched:", el);
+      return el;
     }
 
-    // Pass 0b — CLASS signal: artdeco-button--primary Message button.  Belt
-    // and braces in case computed style hasn't resolved yet (unstyled flash).
+    // Pass 0b — CLASS signal: artdeco-button--primary with "Message" anywhere.
+    // Belt and braces in case computed style hasn't resolved yet.
     const primaries = document.querySelectorAll(
-      "button.artdeco-button--primary[aria-label*='Message' i], " +
-      "a.artdeco-button--primary[aria-label*='Message' i]"
+      "button.artdeco-button--primary, a.artdeco-button--primary"
     );
     for (const el of primaries) {
       if (!_candidateIsValid(el)) continue;
-      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
-        return el;
-      }
+      if (!_saysMessage(el)) continue;
+      console.log("[LeadCaptura] msg STEP 2 → Pass 0b (primary class) matched:", el);
+      return el;
     }
 
     if (!ownerName) return null;
@@ -6381,6 +6387,30 @@
       }
     }
 
+    // Pass 3 — DOM locality: find the Message button living near the H1.
+    // Climb from the H1 to its first ancestor section, then look for the
+    // Message button INSIDE that subtree.  This is by definition the owner's
+    // action row because the H1 is the owner's name.
+    const h1 = document.querySelector("main h1, h1.text-heading-xlarge, h1");
+    if (h1) {
+      let scope = h1;
+      for (let i = 0; i < 8 && scope && scope !== document.body; i++) {
+        scope = scope.parentElement;
+        if (!scope) break;
+        const localBtns = scope.querySelectorAll("button, a[role='button']");
+        for (const el of localBtns) {
+          if (!_candidateIsValid(el)) continue;
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+            console.log("[LeadCaptura] msg STEP 2 → Pass 3 (H1 locality) matched:", el);
+            return el;
+          }
+        }
+      }
+    }
+
+    console.log("[LeadCaptura] msg STEP 2 → ALL passes returned null");
     return null;
   }
 
