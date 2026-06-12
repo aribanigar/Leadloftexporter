@@ -6267,9 +6267,11 @@
           if (el.disabled) return;
           if (el.classList?.contains("lc-inline-save")) return;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
-          // Exclude the right-rail scaffold aside only — do NOT use [class*='aside']
-          // wildcard as it matches profile action containers on some LinkedIn layouts.
-          if (el.closest?.("aside, .scaffold-layout__aside")) return;
+          // "More profiles for you" right-rail is inside a container with "aside"
+          // in its class (e.g. .pv-profile-section__aside-container).  The wildcard
+          // is intentional — do not remove it.  LinkedIn confirmed this protects the
+          // profile owner's CTA from being confused with sidebar people's buttons.
+          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
           const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
           const hay = lbl + " " + txt;
@@ -6282,9 +6284,9 @@
           const w = r.width || el.offsetWidth;
           const h = r.height || el.offsetHeight;
           if (w < 2 || h < 2) return;
-          // Raise cutoff to 80% — centred layouts on wide monitors can put the
-          // profile CTA row beyond the old 60% threshold.
-          if (r.left > vw * 0.8) return;
+          // 60% viewport cutoff: right-rail "More profiles" buttons sit at ~70-75%
+          // on typical screens — keep this threshold below that level.
+          if (r.left > vw * 0.6) return;
           candidates.push({ el, top: r.top, left: r.left });
         };
 
@@ -6325,24 +6327,16 @@
       }
 
       // _findMsgBtn applies viewport/aside filtering on top of the anchor detection.
+      // _btnAnchor just tells us WHEN a message button entered the DOM (timing signal
+      // only) — never use it directly as it may be a right-rail sidebar button.
       let msgBtn = _findMsgBtn();
       if (!msgBtn && _btnAnchor) {
-        // Button appeared but position filter rejected it — back-off retry.
+        // Button appeared in DOM but position filter hasn't accepted it yet —
+        // give the layout a few more frames and retry.
         for (let i = 0; i < 10; i++) {
           await sleep(400);
           msgBtn = _findMsgBtn();
           if (msgBtn) break;
-        }
-        // Absolute last resort: if _findMsgBtn still rejects it, use the raw
-        // anchor if it at least has real dimensions and isn't an LC element.
-        if (!msgBtn && !_btnAnchor.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) {
-          const r = _btnAnchor.getBoundingClientRect();
-          const w = r.width || _btnAnchor.offsetWidth;
-          const h = r.height || _btnAnchor.offsetHeight;
-          if (w >= 2 && h >= 2) {
-            console.log("[LeadCaptura] Message All: using raw anchor as fallback", _btnAnchor.getAttribute("aria-label") || _btnAnchor.textContent?.trim());
-            msgBtn = _btnAnchor;
-          }
         }
       }
 
