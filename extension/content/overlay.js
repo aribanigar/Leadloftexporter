@@ -6680,8 +6680,11 @@
     return dialogs;
   }
 
-  // Wait via MutationObserver for a NEW big positioned compose dialog to
-  // appear (not in the snapshot). Returns the dialog element or null.
+  // Wait via MutationObserver for ANY new big positioned element (not in
+  // snapshot). We don't filter by compose-dialog signals because LinkedIn
+  // lazy-mounts Quill — when the dialog first appears the contenteditable
+  // doesn't exist YET. Returns the smallest new positioned element (the
+  // dialog itself, not the backdrop overlay).
   function _waitForNewDialog(positionedBefore, maxMs = 10000) {
     return new Promise((resolve) => {
       let done = false;
@@ -6695,6 +6698,7 @@
         resolve(dlg);
       };
       const tryFind = () => {
+        const newOnes = [];
         try {
           for (const el of document.querySelectorAll("body *")) {
             if (positionedBefore.has(el)) continue;
@@ -6702,13 +6706,22 @@
               if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
               const cs = getComputedStyle(el);
               if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+              if (cs.display === "none" || cs.visibility === "hidden") continue;
               const r = el.getBoundingClientRect();
               if (r.width < 280 || r.height < 200) continue;
-              if (!_looksLikeComposeDialog(el)) continue;
-              return finish(el);
+              // Skip elements that fill the viewport (likely backdrop overlays).
+              if (r.width >= window.innerWidth * 0.98 && r.height >= window.innerHeight * 0.98) continue;
+              newOnes.push({ el, area: r.width * r.height });
             } catch {}
           }
         } catch {}
+        if (!newOnes.length) return;
+        // Prefer one that looks like a compose dialog. If multiple, pick the
+        // SMALLEST area (the actual dialog, not a wrapper backdrop).
+        const composeMatches = newOnes.filter(x => _looksLikeComposeDialog(x.el));
+        const pool = composeMatches.length ? composeMatches : newOnes;
+        pool.sort((a, b) => a.area - b.area);
+        finish(pool[0].el);
       };
       tryFind();
       if (done) return;
