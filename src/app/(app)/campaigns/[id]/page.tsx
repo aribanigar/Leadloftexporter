@@ -603,6 +603,17 @@ export default function CampaignDetailPage() {
     };
   }, [campaign?.status, runTick]);
 
+  // ── Live engagement refresh. Opens/clicks keep trickling in for hours after
+  // a campaign finishes sending, so the reading rate must stay dynamic even
+  // when the campaign is completed/paused. A quiet 15s poll keeps the numbers
+  // current without the visible spinner. (The 3s send-tick above owns the
+  // refresh while status === 'sending', so we skip it then to avoid double work.)
+  useEffect(() => {
+    if (campaign?.status === 'sending') return;
+    const t = setInterval(() => { fetchStats(true); }, 15000);
+    return () => clearInterval(t);
+  }, [campaign?.status, fetchStats]);
+
   // ── Start campaign
   const handleStart = async () => {
     setSending(true);

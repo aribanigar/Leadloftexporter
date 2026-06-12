@@ -34,6 +34,7 @@ interface FormState {
   contentMode: 'visual' | 'html' | 'upload';
   manualEmails: string;
   includeAllLeads: boolean;
+  stageId: string;         // Pipeline stage filter — pull every lead in this stage
   followUps: FollowUp[];
   sendDelay: number;       // seconds_between_sends
   dailyLimit: number;      // daily_limit (0 = unlimited)
@@ -42,6 +43,14 @@ interface FormState {
   senderIds: string[];     // sender_account_ids
   mergeColumns: string[];
   csvRecipients: CsvRecipient[];
+}
+
+// Pipeline stage from GET /pipeline/stages
+interface Stage {
+  id: string;
+  name: string;
+  color: string;
+  lead_count: number;
 }
 
 // Sender from GET /campaigns/senders/list
@@ -85,6 +94,7 @@ interface CampaignDetail {
   seconds_between_sends: number;
   warmup_enabled: boolean;
   include_all_leads?: boolean;
+  recipient_filter?: { stage_id?: string; lead_ids?: string[] };
 }
 
 // ─── Alpine Editorial Design Tokens ─────────────────────────────────────────
@@ -379,6 +389,7 @@ function NewCampaignPageInner() {
     contentMode: 'html',
     manualEmails: prefillEmail,
     includeAllLeads: false,
+    stageId: '',
     followUps: [],
     sendDelay: 30,
     dailyLimit: 0,
@@ -398,6 +409,7 @@ function NewCampaignPageInner() {
   const [showPreviewFor, setShowPreviewFor] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [senders, setSenders] = useState<Sender[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
   type EmailResult = { email: string; valid: boolean; reason: string; tag: 'valid' | 'invalid_format' };
   const [validationResult, setValidationResult] = useState<{ valid: number; invalid: number; results: EmailResult[] } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -419,9 +431,13 @@ function NewCampaignPageInner() {
     const emails = parseEmails(form.manualEmails).filter(e => e.includes('@'));
     return emails.length;
   })();
-  const recipientCount = form.includeAllLeads ? Math.max(manualCount, 1) : manualCount;
+  const selectedStage = stages.find(s => s.id === form.stageId) || null;
+  const stageCount = selectedStage ? selectedStage.lead_count : 0;
+  const recipientCount = form.includeAllLeads
+    ? Math.max(manualCount + stageCount, 1)
+    : manualCount + stageCount;
 
-  const health = computeScores(form, manualCount);
+  const health = computeScores(form, recipientCount);
 
   const tagPills = form.tags
     .split(',')
@@ -438,9 +454,20 @@ function NewCampaignPageInner() {
     }
   }, []);
 
+  // ── Load pipeline stages (for the "Pick from Pipeline stages" audience option)
+  const fetchStages = useCallback(async () => {
+    try {
+      const list = await api<Stage[]>('/pipeline/stages');
+      setStages(Array.isArray(list) ? list : []);
+    } catch {
+      setStages([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSenders();
-  }, [fetchSenders]);
+    fetchStages();
+  }, [fetchSenders, fetchStages]);
 
   // ── Load existing campaign for editing (when ?id= is in URL)
   useEffect(() => {
@@ -469,6 +496,7 @@ function NewCampaignPageInner() {
           contentMode: 'html',
           manualEmails: (c.recipient_data || []).map(r => r.email).join('\n'),
           includeAllLeads: !!c.include_all_leads,
+          stageId: c.recipient_filter?.stage_id || '',
           followUps: (c.follow_ups || []).map((fu, i) => {
             const { delayValue, delayUnit } = parseDelay(fu.delay_hours ?? 24);
             return {
@@ -664,6 +692,7 @@ function NewCampaignPageInner() {
       recipients,
       manual_emails: manualOnly,
       include_all_leads: form.includeAllLeads,
+      stage_id: form.stageId || undefined,
       sender_account_ids: form.senderIds,
       batch_size: form.batchSize,
       seconds_between_sends: form.sendDelay,
@@ -1220,6 +1249,52 @@ function NewCampaignPageInner() {
                   <div style={{ fontSize: '10px', color: T.onSurfaceVariant }}>Every lead with an email on file</div>
                 </div>
               </label>
+
+              {/* Pick from Pipeline stages — auto-pulls every lead in the chosen
+                  stage that has an email on file. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 14px',
+                borderRadius: T.radiusLg,
+                backgroundColor: form.stageId ? 'rgba(0,54,26,0.08)' : T.surfaceContainerLow,
+                transition: 'background 0.15s',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: form.stageId ? T.primary : T.onSurfaceVariant }}>
+                  filter_list
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: T.onSurface, marginBottom: '4px' }}>
+                    Pick from Pipeline stages
+                  </div>
+                  <select
+                    value={form.stageId}
+                    onChange={e => setForm(f => ({ ...f, stageId: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(65,73,66,0.18)',
+                      background: T.surfaceContainerLowest,
+                      fontSize: '12px',
+                      fontFamily: 'Inter, sans-serif',
+                      color: T.onSurface,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">No stage filter</option>
+                    {stages.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.lead_count} lead{s.lead_count !== 1 ? 's' : ''})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedStage && (
+                    <div style={{ fontSize: '10px', color: T.onSurfaceVariant, marginTop: '4px' }}>
+                      {stageCount} lead{stageCount !== 1 ? 's' : ''} in “{selectedStage.name}” will be added (those with an email).
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* CSV Upload button */}
               <button
