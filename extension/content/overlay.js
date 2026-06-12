@@ -6752,14 +6752,41 @@
     const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
     if (!editor || !text) return false;
 
-    // STEP A — REAL pointer click on the editor.  LinkedIn's new Quill-style
-    // dialog editor needs a pointerdown/pointerup sequence to activate; just
-    // calling .focus() leaves it inert.
+    // If the editor we received is a Quill wrapper (.ql-container or similar
+    // contenteditable=false outer), descend to the actual contenteditable=true
+    // leaf inside.
+    if (!editor.isContentEditable) {
+      const inner = editor.querySelector?.("[contenteditable='true'], [role='textbox']");
+      if (inner && _existsInLayout(inner)) {
+        console.log("[LeadCaptura] type: descended from wrapper to inner editable:", inner);
+        editor = inner;
+      }
+    }
+
+    // STEP A — REAL pointer click on the editor at the centre of its bounds.
+    // LinkedIn's Quill editor activates only after a pointerdown event.
     try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+    await sleep(120);
     try { await dispatchHumanClick(editor); } catch {}
     await sleep(280 + Math.random() * 220);
     try { editor.focus(); } catch {}
-    await sleep(180);
+    await sleep(220);
+    console.log("[LeadCaptura] type: after focus, activeElement =",
+      document.activeElement?.tagName, document.activeElement?.className,
+      "isCE=", document.activeElement?.isContentEditable);
+
+    // Position the selection at the end of the editor's contents — required
+    // for execCommand('insertText') to insert anywhere visible.
+    if (editor.isContentEditable) {
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) { console.log("[LeadCaptura] selection setup failed:", e); }
+    }
 
     // STEP B — typeIntoEditable (existing — execCommand/insertText for
     // contenteditable, native value setter for textarea/input).
