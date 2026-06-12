@@ -5045,62 +5045,68 @@
     const path = location.pathname;
     if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
 
+    // Anchor on Message buttons (every row has exactly one, no _isVisible
+    // gate so off-screen rows still get chipped) and walk UP to find each
+    // row. Definition of "row": the LARGEST ancestor that still contains
+    // exactly one unique /in/ profile URL — anything larger spans into a
+    // sibling row's territory.
     const mainEl = document.querySelector("main") || document.body;
+    const msgBtns = mainEl.querySelectorAll(
+      "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='recruiter' i])"
+    );
+
     const seen = new Set();
+    let injected = 0;
 
-    for (const a of mainEl.querySelectorAll("a[href*='/in/']")) {
-      let url;
-      try { url = globalThis.__lcDom.normalizeProfileUrl(a.href) || ""; } catch { continue; }
-      // Skip the user's own profile link (/in/me, /in/me/)
-      if (!url || /\/in\/me\/?($|\?)/.test(url)) continue;
+    for (const btn of msgBtns) {
+      if (btn.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
 
-      // Primary: closest <li> (LinkedIn always wraps connections in <li>).
-      // Fallback A: closest <article>. Fallback B: walk up to first ancestor
-      // whose class name looks like a card/connection container.
-      const row = a.closest("li") || a.closest("article") || (() => {
-        let node = a.parentElement;
-        for (let i = 0; i < 12 && node && node !== mainEl; i++) {
-          // Stop if this ancestor spans more than one profile
-          let multi = false;
-          for (const l of node.querySelectorAll("a[href*='/in/']")) {
-            let u; try { u = globalThis.__lcDom.normalizeProfileUrl(l.href); } catch { continue; }
-            if (u && u !== url && !/\/in\/me\/?($|\?)/.test(u)) { multi = true; break; }
-          }
-          if (multi) break;
-          if (
-            node.getAttribute?.("role") === "listitem" ||
-            /card|connection/i.test(node.className || "")
-          ) return node;
+      let row = null;
+      let url = null;
+      let node = btn.parentElement;
+      for (let i = 0; i < 20 && node && node !== mainEl; i++) {
+        const links = node.querySelectorAll("a[href*='/in/']");
+        if (links.length === 0) {
           node = node.parentElement;
+          continue;
         }
-        return null;
-      })();
+        const urls = new Set();
+        for (const l of links) {
+          let u;
+          try { u = globalThis.__lcDom.normalizeProfileUrl(l.href); } catch { continue; }
+          if (!u || /\/in\/me\/?($|\?)/.test(u)) continue;
+          urls.add(u);
+          if (urls.size > 1) break;
+        }
+        if (urls.size > 1) break;       // crossed into siblings — stop
+        if (urls.size === 1) {
+          row = node;
+          url = urls.values().next().value;
+        }
+        node = node.parentElement;
+      }
 
-      if (!row || seen.has(url)) continue;
+      if (!row || !url || seen.has(url)) continue;
       seen.add(url);
 
       const existing = injectedSaves.get(url);
       if (existing && document.body.contains(existing)) continue;
       if (existing) { injectedSaves.delete(url); chipCardEl.delete(url); }
 
-      const name = (a.getAttribute("aria-label") || a.textContent || "")
+      const link = row.querySelector("a[href*='/in/']");
+      const name = (link?.getAttribute("aria-label") || link?.textContent || "")
         .replace(/\s+/g, " ").trim() || _labelFromUrl(url);
 
-      // Find Message button INSIDE this specific row (not across all of main).
-      // No _isVisible check here — we trust that if the row is in the DOM,
-      // its buttons are real, even if temporarily off-screen.
-      const msgBtn =
-        row.querySelector(
-          "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i])"
-        ) ||
-        row.querySelector("button[aria-label*='More' i], button[aria-label*='actions' i]") ||
-        null;
-
       try {
-        injectInlineSave(row, { linkedin_url: url, full_name: name }, msgBtn);
+        injectInlineSave(row, { linkedin_url: url, full_name: name }, btn);
+        injected++;
       } catch (e) {
-        console.warn("[LeadCaptura] connections-list decorate failed", e?.message);
+        console.warn("[LeadCaptura/connections] inject failed", e?.message);
       }
+    }
+
+    if (msgBtns.length > 0 && injected === 0) {
+      console.warn("[LeadCaptura/connections] 0 chips injected from", msgBtns.length, "Message buttons");
     }
   }
 
@@ -5109,11 +5115,10 @@
     // BEFORE the page-type guard below so we don't bail out of decoration just
     // because pageType() routes the connections page through search-people.
     try { _decorateConnectionsList(); } catch {}
-    // The connections page is handled exclusively by _decorateConnectionsList().
-    // Do NOT let the action-button path below run on it — it would inject a
-    // second chip on whichever row has a recognised Message button (Shaun Brown
-    // in testing), while leaving all other rows un-chipped.
-    if (location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
+    // On the connections page, ALSO let the generic action-button path run
+    // as a backup. injectInlineSave dedups by URL via injectedSaves, so any
+    // row already chipped by _decorateConnectionsList() will no-op here.
+    // This gives us two independent shots at every row.
 
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
