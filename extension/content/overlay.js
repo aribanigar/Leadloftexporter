@@ -6626,34 +6626,64 @@
     return null;
   }
 
-  // Find ALL currently open "New message" dialogs on the page.
+  // Find ALL currently open "New message" dialogs on the page. Tries multiple
+  // signals because LinkedIn renders the dialog with different markup.
   function _findAllNewMessageDialogs() {
     const dialogs = new Set();
-    const PHRASES = [/^new message$/i];
-    try {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-      let node;
-      while ((node = walker.nextNode())) {
-        const t = (node.nodeValue || "").trim();
-        if (!t || t.length > 30) continue;
-        let match = false;
-        for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
-        if (!match) continue;
-        let p = node.parentElement;
-        while (p && p !== document.body) {
+    // Climb upwards from an element until we find a substantial ancestor that
+    // looks like a dialog container.
+    const climbToContainer = (el) => {
+      let p = el;
+      while (p && p !== document.body) {
+        try {
           const r = p.getBoundingClientRect();
-          if (r.width >= 300 && r.height >= 250) { dialogs.add(p); break; }
-          p = p.parentElement;
+          if (r.width >= 280 && r.height >= 200) return p;
+        } catch {}
+        p = p.parentElement;
+      }
+      return null;
+    };
+    // Signal 1: any element whose textContent STARTS with "New message" /
+    // "Write a message" / "Send a message" / "Compose message".
+    try {
+      const RE = /^\s*(new message|write a message|send a message|compose message)/i;
+      for (const el of document.querySelectorAll("body div, body section, body article")) {
+        const t = (el.textContent || "").trim().slice(0, 120);
+        if (!RE.test(t)) continue;
+        const dlg = climbToContainer(el);
+        if (dlg) dialogs.add(dlg);
+      }
+    } catch {}
+    // Signal 2: aria-label / aria-labelledby pointing to "New message".
+    try {
+      for (const el of document.querySelectorAll(
+        "[aria-label*='New message' i], [aria-label*='Compose' i], " +
+        "[aria-label*='Write a message' i], [aria-label*='Send a message' i]"
+      )) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 280 && r.height >= 200) dialogs.add(el);
+        else {
+          const dlg = climbToContainer(el);
+          if (dlg) dialogs.add(dlg);
         }
       }
     } catch {}
+    // Signal 3: placeholder attribute hinting at message composition.
     try {
-      for (const el of document.querySelectorAll("[aria-label*='New message' i]")) {
-        const r = el.getBoundingClientRect();
-        if (r.width >= 300 && r.height >= 250) dialogs.add(el);
+      for (const el of document.querySelectorAll(
+        "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i]"
+      )) {
+        const dlg = climbToContainer(el);
+        if (dlg) dialogs.add(dlg);
       }
     } catch {}
-    return Array.from(dialogs);
+    const arr = Array.from(dialogs);
+    if (!arr.length) {
+      console.log("[LeadCaptura] _findAllNewMessageDialogs: NONE found; body has 'Write a message':",
+        (document.body.innerText || "").includes("Write a message"),
+        "; body has 'New message':", (document.body.innerText || "").includes("New message"));
+    }
+    return arr;
   }
 
   // Aggressively close every "New message" dialog by clicking the X at the
