@@ -6626,64 +6626,96 @@
     return null;
   }
 
-  // Find ALL currently open "New message" dialogs on the page. Tries multiple
-  // signals because LinkedIn renders the dialog with different markup.
-  function _findAllNewMessageDialogs() {
-    const dialogs = new Set();
-    // Climb upwards from an element until we find a substantial ancestor that
-    // looks like a dialog container.
-    const climbToContainer = (el) => {
-      let p = el;
-      while (p && p !== document.body) {
+  // Returns true if an element looks like a compose dialog — has an editable
+  // inside or a "Write a message" placeholder anywhere within.
+  function _looksLikeComposeDialog(el) {
+    if (!el) return false;
+    try {
+      if (el.querySelector("[contenteditable='true'], [contenteditable]:not([contenteditable='false']), [role='textbox'], textarea")) return true;
+      if (el.querySelector("[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]")) return true;
+      const t = (el.textContent || "");
+      if (/\bwrite a message\b/i.test(t)) return true;
+      if (/^\s*new message\b/i.test(t)) return true;
+    } catch {}
+    return false;
+  }
+
+  // Snapshot ALL big positioned elements currently on the page.
+  function _snapshotBigPositionedElements() {
+    const set = new Set();
+    try {
+      for (const el of document.querySelectorAll("body *")) {
         try {
-          const r = p.getBoundingClientRect();
-          if (r.width >= 280 && r.height >= 200) return p;
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+          const r = el.getBoundingClientRect();
+          if (r.width >= 280 && r.height >= 200) set.add(el);
         } catch {}
-        p = p.parentElement;
-      }
-      return null;
-    };
-    // Signal 1: any element whose textContent STARTS with "New message" /
-    // "Write a message" / "Send a message" / "Compose message".
-    try {
-      const RE = /^\s*(new message|write a message|send a message|compose message)/i;
-      for (const el of document.querySelectorAll("body div, body section, body article")) {
-        const t = (el.textContent || "").trim().slice(0, 120);
-        if (!RE.test(t)) continue;
-        const dlg = climbToContainer(el);
-        if (dlg) dialogs.add(dlg);
       }
     } catch {}
-    // Signal 2: aria-label / aria-labelledby pointing to "New message".
+    return set;
+  }
+
+  // Find ALL currently open compose-like dialogs on the page — big positioned
+  // elements that contain an editable or "Write a message" placeholder.
+  function _findAllNewMessageDialogs() {
+    const dialogs = [];
     try {
-      for (const el of document.querySelectorAll(
-        "[aria-label*='New message' i], [aria-label*='Compose' i], " +
-        "[aria-label*='Write a message' i], [aria-label*='Send a message' i]"
-      )) {
-        const r = el.getBoundingClientRect();
-        if (r.width >= 280 && r.height >= 200) dialogs.add(el);
-        else {
-          const dlg = climbToContainer(el);
-          if (dlg) dialogs.add(dlg);
-        }
+      for (const el of document.querySelectorAll("body *")) {
+        try {
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 280 || r.height < 200) continue;
+          if (!_looksLikeComposeDialog(el)) continue;
+          dialogs.push(el);
+        } catch {}
       }
     } catch {}
-    // Signal 3: placeholder attribute hinting at message composition.
-    try {
-      for (const el of document.querySelectorAll(
-        "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i]"
-      )) {
-        const dlg = climbToContainer(el);
-        if (dlg) dialogs.add(dlg);
-      }
-    } catch {}
-    const arr = Array.from(dialogs);
-    if (!arr.length) {
+    if (!dialogs.length) {
       console.log("[LeadCaptura] _findAllNewMessageDialogs: NONE found; body has 'Write a message':",
-        (document.body.innerText || "").includes("Write a message"),
-        "; body has 'New message':", (document.body.innerText || "").includes("New message"));
+        (document.body.innerText || "").includes("Write a message"));
     }
-    return arr;
+    return dialogs;
+  }
+
+  // Wait via MutationObserver for a NEW big positioned compose dialog to
+  // appear (not in the snapshot). Returns the dialog element or null.
+  function _waitForNewDialog(positionedBefore, maxMs = 10000) {
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+      const finish = (dlg) => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(dlg);
+      };
+      const tryFind = () => {
+        try {
+          for (const el of document.querySelectorAll("body *")) {
+            if (positionedBefore.has(el)) continue;
+            try {
+              if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+              const cs = getComputedStyle(el);
+              if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+              const r = el.getBoundingClientRect();
+              if (r.width < 280 || r.height < 200) continue;
+              if (!_looksLikeComposeDialog(el)) continue;
+              return finish(el);
+            } catch {}
+          }
+        } catch {}
+      };
+      tryFind();
+      if (done) return;
+      observer = new MutationObserver(() => tryFind());
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      timer = setTimeout(() => finish(null), maxMs);
+    });
   }
 
   // Aggressively close every "New message" dialog by clicking the X at the
@@ -6707,32 +6739,6 @@
 
   // Wait via MutationObserver for a NEW dialog (one not in the snapshot)
   // to appear. Returns the dialog element or null on timeout.
-  function _waitForNewDialog(dialogsBefore, maxMs = 10000) {
-    return new Promise((resolve) => {
-      let done = false;
-      let observer = null;
-      let timer = null;
-      const finish = (dlg) => {
-        if (done) return;
-        done = true;
-        if (observer) observer.disconnect();
-        if (timer) clearTimeout(timer);
-        resolve(dlg);
-      };
-      const tryFind = () => {
-        const dialogs = _findAllNewMessageDialogs();
-        for (const dlg of dialogs) {
-          if (!dialogsBefore.has(dlg)) return finish(dlg);
-        }
-      };
-      tryFind();
-      if (done) return;
-      observer = new MutationObserver(() => tryFind());
-      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-      timer = setTimeout(() => finish(null), maxMs);
-    });
-  }
-
   // Find the message editor INSIDE a specific dialog. Returns the textbox or
   // null. Filters out recipient/name/to inputs.
   function _findEditorInDialog(dialog) {
