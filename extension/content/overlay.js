@@ -8358,13 +8358,26 @@
     });
   }
 
+  // Find the message textbox. CRITICAL: requires a <p> child to confirm Quill
+  // has finished mounting — without that child, typing will silently fail.
+  // Empty state: <p><br></p>. Typed state: <p>text</p>. No <p> = not ready.
   function _findEditor() {
-    return (
-      document.querySelector("div.msg-form__contenteditable[contenteditable='true'][role='textbox']") ||
-      document.querySelector("[contenteditable='true'][aria-label='Write a message…']") ||
-      document.querySelector("div.msg-form__contenteditable[contenteditable='true']") ||
-      document.querySelector("div.msg-form__contenteditable")
+    const editors = document.querySelectorAll(
+      "div.msg-form__contenteditable[contenteditable='true']"
     );
+    for (const ed of editors) {
+      if (ed.querySelector("p")) return ed; // Quill mounted + ready
+    }
+    // Activity-based fallback: focused contenteditable inside a msg-form
+    // ancestor, with <p> child.
+    const ae = document.activeElement;
+    if (
+      ae && ae !== document.body && ae.isContentEditable &&
+      ae.closest("[class*='msg-form']") && ae.querySelector("p")
+    ) {
+      return ae;
+    }
+    return null;
   }
 
   function _findSendBtn(enabledOnly = true) {
@@ -8401,22 +8414,30 @@
 
   async function _typeIntoEditor(editor, text) {
     if (!editor || !text) return false;
-    // Focus + position cursor at end
     try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
     _pointerClick(editor);
     await sleep(300);
     try { editor.focus(); } catch (e) {}
     await sleep(200);
+
+    // Position the cursor INSIDE the <p> child. Empty state is <p><br></p>,
+    // so collapsing inside <p> places the cursor where Quill expects it.
+    const pEl = editor.querySelector("p");
     try {
       const sel = window.getSelection();
       const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
+      if (pEl) {
+        range.selectNodeContents(pEl);
+        range.collapse(false);
+      } else {
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
       sel.removeAllRanges();
       sel.addRange(range);
     } catch (e) {}
 
-    // Strategy 1: execCommand
+    // Strategy 1: execCommand — produces <p>text</p> when cursor is in <p>
     try {
       document.execCommand("insertText", false, text);
       await sleep(400);
@@ -8433,9 +8454,14 @@
       if ((editor.textContent || "").trim()) return true;
     } catch (e) {}
 
-    // Strategy 3: innerHTML wrap in <p>
+    // Strategy 3: Directly set the <p> contents and fire input.
     try {
-      editor.innerHTML = "<p>" + text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])) + "</p>";
+      const escaped = text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      if (pEl) {
+        pEl.innerHTML = escaped;
+      } else {
+        editor.innerHTML = "<p>" + escaped + "</p>";
+      }
       editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
       await sleep(400);
       if ((editor.textContent || "").trim()) return true;
@@ -8605,12 +8631,26 @@
     onStatus("Waiting 2s for dialog...");
     await sleep(2000);
 
-    onStatus("Finding textbox (up to 12s)...");
-    const editor = await _waitForObserver(_findEditor, 12000);
+    // Progressive status during the editor wait. Existing threads (where
+    // you've already messaged the person) load the conversation history first
+    // and the textbox can take 15-25s to mount.
+    let phaseTimer = null;
+    let phase = 0;
+    onStatus("Finding textbox...");
+    phaseTimer = setInterval(() => {
+      phase++;
+      if (phase === 1) onStatus("Waiting for Quill editor to mount (existing threads load slowly)...");
+      else if (phase === 2) onStatus("Still waiting for textbox (loading conversation)...");
+      else if (phase === 3) onStatus("Almost there... existing threads can take 25s+");
+    }, 7000);
+    const editor = await _waitForObserver(_findEditor, 30000);
+    clearInterval(phaseTimer);
     if (!editor) {
-      console.log("[Case1] Editor not found. msg-form__contenteditable present:",
-        !!document.querySelector("div.msg-form__contenteditable"));
-      return { ok: false, reason: "Textbox not found" };
+      console.log("[Case1] Editor not found after 30s. msg-form__contenteditable present:",
+        !!document.querySelector("div.msg-form__contenteditable"),
+        "with <p>:",
+        !!document.querySelector("div.msg-form__contenteditable p"));
+      return { ok: false, reason: "Textbox not found (timeout 30s)" };
     }
 
     onStatus("Typing message...");
@@ -8618,7 +8658,7 @@
     if (!typed) return { ok: false, reason: "Could not type into textbox" };
 
     onStatus("Waiting for Send button...");
-    const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
+    const sendBtn = await _waitForObserver(() => _findSendBtn(true), 8000);
     if (!sendBtn) return { ok: false, reason: "Send button disabled" };
 
     onStatus("Clicking Send...");
@@ -8809,8 +8849,9 @@
         await sleep(2000);
 
         // STEP 4: Find editor (MutationObserver — fires on next animation
-        // frame after any DOM change, up to 12s).
-        const editor = await _waitForObserver(_findEditor, 12000);
+        // frame after any DOM change, up to 25s for slow-loading threads).
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] Waiting for textbox to mount...";
+        const editor = await _waitForObserver(_findEditor, 25000);
         if (!editor) {
           failed++;
           statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
