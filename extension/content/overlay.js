@@ -7558,78 +7558,107 @@
 
         await dispatchHumanClick(msgBtn);
 
-        // Helper: find a NEW visible editable (not in snapshot) that isn't
-        // search/recipient. Returns the largest one or null.
-        const _findNewEditable = () => {
-          const now = _snapshotEditables();
-          const newOnes = [];
-          for (const el of now) {
-            if (!editablesBefore.has(el)) newOnes.push(el);
-          }
-          if (!newOnes.length) return null;
-          newOnes.sort((a, b) => {
-            const ra = a.getBoundingClientRect();
-            const rb = b.getBoundingClientRect();
-            return (rb.width * rb.height) - (ra.width * ra.height);
-          });
-          let pick = newOnes[0];
-          if (!pick.isContentEditable) {
-            const inner = pick.querySelector?.("[contenteditable='true'], [role='textbox']");
-            if (inner && _existsInLayout(inner)) pick = inner;
-          }
-          return pick;
-        };
-
-        // Helper: find a visible "Write a message" placeholder element to
-        // click and wake Quill.
-        const _findWriteMessagePlaceholder = () => {
-          for (const el of document.querySelectorAll(
-            "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i], " +
-            "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
-          )) {
-            if (el.closest?.(".lc-overlay-root, .lc-toolbar")) continue;
+        // Helper: find textbox via multiple signals. Returns {el, kind} or null.
+        const _findTextboxOrClickTarget = () => {
+          const isOurUI = (el) => el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar");
+          const notInputForName = (el) => {
             const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-            if (/search|filter|recipient|^to$/i.test(lbl)) continue;
-            if (!_existsInLayout(el)) continue;
-            const r = el.getBoundingClientRect();
-            if (r.width < 100 || r.height < 20) continue;
-            return el;
+            const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+            return !/search|filter|looking|recipient|^to$|to:/i.test(lbl + " " + ph);
+          };
+
+          // Try 1: NEW contenteditable / role=textbox / textarea (Quill is mounted).
+          const now = _snapshotEditables();
+          for (const el of now) {
+            if (editablesBefore.has(el)) continue;
+            return { el, kind: "editor" };
           }
-          // Also look for any leaf element with textContent exactly
-          // "Write a message..." (some Quill builds render it as a child).
-          for (const el of document.querySelectorAll("body div, body span, body p")) {
-            if (el.children.length > 0) continue;
-            const t = (el.textContent || "").trim();
-            if (/^write a message/i.test(t) && t.length < 40) {
-              if (_existsInLayout(el)) return el;
+          // Try 2: explicit Quill class (LinkedIn most likely uses Quill).
+          for (const sel of [
+            ".ql-editor[contenteditable='true']",
+            "[class*='ql-editor']",
+            ".msg-form__contenteditable",
+          ]) {
+            try {
+              for (const el of document.querySelectorAll(sel)) {
+                if (isOurUI(el)) continue;
+                if (!_existsInLayout(el)) continue;
+                return { el, kind: "ql-class" };
+              }
+            } catch {}
+          }
+          // Try 3: cursor:text — the I-beam visible signal. THIS catches the
+          // textbox even when Quill is unmounted and the placeholder is CSS.
+          try {
+            for (const el of document.querySelectorAll("body div, body section, body p, body span")) {
+              if (isOurUI(el)) continue;
+              let cs;
+              try { cs = getComputedStyle(el); } catch { continue; }
+              if (cs.cursor !== "text") continue;
+              if (!_existsInLayout(el)) continue;
+              const r = el.getBoundingClientRect();
+              if (r.width < 200 || r.height < 40) continue;
+              if (!notInputForName(el)) continue;
+              return { el, kind: "cursor-text" };
             }
-          }
+          } catch {}
+          // Try 4: CSS pseudo-element ::before/::after containing message text.
+          try {
+            for (const el of document.querySelectorAll("body div, body span, body p")) {
+              if (isOurUI(el)) continue;
+              for (const pseudo of ["::before", "::after"]) {
+                let cs;
+                try { cs = getComputedStyle(el, pseudo); } catch { continue; }
+                const content = cs.content || "";
+                if (!/write a message|^.message/i.test(content)) continue;
+                if (!_existsInLayout(el)) continue;
+                const r = el.getBoundingClientRect();
+                if (r.width >= 150 && r.height >= 30) {
+                  return { el, kind: "pseudo-content" };
+                }
+              }
+            }
+          } catch {}
+          // Try 5: explicit placeholder attribute.
+          try {
+            for (const el of document.querySelectorAll(
+              "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i], " +
+              "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+            )) {
+              if (isOurUI(el)) continue;
+              if (!_existsInLayout(el)) continue;
+              if (!notInputForName(el)) continue;
+              return { el, kind: "placeholder-attr" };
+            }
+          } catch {}
           return null;
         };
 
-        // Poll for editor OR placeholder for up to 8 seconds.
+        // Poll for editor / textbox target.
         let editor = null;
-        let placeholderEl = null;
-        for (let k = 0; k < 40; k++) {
-          editor = _findNewEditable();
-          if (editor) break;
-          placeholderEl = _findWriteMessagePlaceholder();
-          if (placeholderEl) break;
+        let clickTarget = null;
+        for (let k = 0; k < 50; k++) {
+          const found = _findTextboxOrClickTarget();
+          if (found) {
+            if (found.kind === "editor") { editor = found.el; break; }
+            clickTarget = found.el;
+            console.log("[LeadCaptura] textbox click target via", found.kind, ":", clickTarget);
+            break;
+          }
           await sleep(200);
         }
 
-        // If we found a placeholder but no editor, click the placeholder
-        // (at the centre of its bounding box) to wake Quill, then re-poll.
-        if (!editor && placeholderEl) {
-          console.log("[LeadCaptura] clicking 'Write a message' placeholder to wake Quill:", placeholderEl);
-          try { await dispatchHumanClick(placeholderEl); } catch {}
+        // If we found a non-editor click target, click it to wake Quill.
+        if (!editor && clickTarget) {
+          try { await dispatchHumanClick(clickTarget); } catch {}
           await sleep(500);
-          try { await dispatchHumanClick(placeholderEl); } catch {}
+          try { await dispatchHumanClick(clickTarget); } catch {}
           await sleep(700);
-          for (let k = 0; k < 25; k++) {
-            editor = _findNewEditable();
-            if (editor) break;
-            // Also try activeElement
+          // Re-poll for the now-mounted editor.
+          for (let k = 0; k < 30; k++) {
+            const f = _findTextboxOrClickTarget();
+            if (f && f.kind === "editor") { editor = f.el; break; }
+            // Also try activeElement.
             const ae = document.activeElement;
             if (ae && ae !== document.body && (
               ae.isContentEditable ||
@@ -7645,19 +7674,18 @@
             }
             await sleep(150);
           }
-          // If STILL no editor, use the placeholder element itself.
-          if (!editor) editor = placeholderEl;
+          if (!editor) editor = clickTarget;
         }
 
         _removeSpotlight();
 
         if (!editor) {
           failed++;
-          _lcToast(`✗ ${idx}/${total} — couldn't find textbox`, 2500);
+          _lcToast(`✗ ${idx}/${total} — couldn't find textbox`, 2800);
           continue;
         }
 
-        console.log(`[LeadCaptura] msg ${idx}/${total} → editor found:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
+        console.log(`[LeadCaptura] msg ${idx}/${total} → editor:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
         await sleep(450 + Math.random() * 300);
 
         if (!editor) {
