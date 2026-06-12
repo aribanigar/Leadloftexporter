@@ -7219,19 +7219,58 @@
     return null;
   }
 
-  // Close LinkedIn's message overlay bubble after a successful send so the
-  // next iteration starts from a clean state.
+  // Close LinkedIn's message overlay/dialog after a successful send. Handles
+  // BOTH the legacy bottom-right bubble AND the new design's centred "New
+  // message" dialog (close X at the top-right).
   function _closeMsgOverlay() {
-    const closers = document.querySelectorAll(
+    // 1) Legacy bubble close buttons.
+    const legacy = document.querySelectorAll(
       ".msg-overlay-conversation-bubble button[aria-label*='Close' i], " +
       ".msg-overlay-conversation-bubble button[data-control-name*='close' i], " +
       ".msg-overlay-list-bubble button[aria-label*='Close' i], " +
-      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i], " +
-      ".msg-overlay-bubble-header__controls button[type='button']"
+      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i]"
     );
-    for (const b of closers) {
-      try { b.click(); } catch {}
-    }
+    for (const b of legacy) { try { b.click(); } catch {} }
+
+    // 2) New dialog: scan all "New message" dialogs and click their X.
+    try {
+      const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      let node;
+      const dialogs = new Set();
+      while ((node = walker.nextNode())) {
+        const t = (node.nodeValue || "").trim();
+        if (!t || t.length > 60) continue;
+        let match = false;
+        for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
+        if (!match) continue;
+        let p = node.parentElement;
+        while (p && p !== document.body) {
+          const r = p.getBoundingClientRect();
+          if (r.width >= 300 && r.height >= 250) { dialogs.add(p); break; }
+          p = p.parentElement;
+        }
+      }
+      // Also catch aria-label-based dialogs.
+      for (const el of document.querySelectorAll("[aria-label*='New message' i], [aria-label*='Compose' i]")) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 300 && r.height >= 250) dialogs.add(el);
+      }
+      for (const dlg of dialogs) {
+        // Find close buttons inside.
+        const closes = dlg.querySelectorAll(
+          "button[aria-label*='Close' i], button[aria-label*='Dismiss' i], " +
+          "button[aria-label*='close' i], svg[aria-label*='close' i]"
+        );
+        for (const b of closes) { try { (b.closest("button") || b).click(); } catch {} }
+      }
+    } catch {}
+
+    // 3) Press Escape on the body — closes any modal dialog as last resort.
+    try {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
+    } catch {}
   }
 
   // Extract template variables from a connections-page card.
@@ -7350,17 +7389,47 @@
         console.log(`[LeadCaptura] msg ${idx}/${total} found ${found.kind} via ${found.via}`);
         await sleep(450 + Math.random() * 300);
 
-        // If MutationObserver caught the dialog but not the editor, click
-        // into the dialog body to wake the Quill editor, then find it.
-        let editor = found.kind === "editor" ? found.el : null;
-        if (!editor && found.kind === "dialog") {
-          const phTarget = _findMsgPlaceholderClickTarget() || found.el;
+        // Identify the dialog scope so we only search for the editor INSIDE
+        // the dialog we just opened (not a stale one left over from a
+        // previous iteration).
+        const dialogScope = found.kind === "dialog" ? found.el : (
+          found.el?.closest?.("[role='dialog']") ||
+          // Climb to the nearest big positioned ancestor.
+          (function () {
+            let p = found.el;
+            while (p && p !== document.body) {
+              const r = p.getBoundingClientRect();
+              const cs = getComputedStyle(p);
+              const pos = cs.position === "fixed" || cs.position === "absolute";
+              if (r.width >= 300 && r.height >= 250 && pos) return p;
+              p = p.parentElement;
+            }
+            return null;
+          })()
+        );
+
+        // Find/wake the editor INSIDE the dialog scope.
+        let editor = null;
+        if (found.kind === "editor") {
+          // Use the found editor only if it's inside the dialog scope (or no
+          // scope was identified). Otherwise re-find inside the scope.
+          if (!dialogScope || dialogScope.contains(found.el)) editor = found.el;
+        }
+        if (!editor && dialogScope) {
+          // Click into the dialog body to activate Quill.
+          const phTarget = (function () {
+            const ph = dialogScope.querySelectorAll(
+              "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+            );
+            for (const el of ph) if (_existsInLayout(el)) return el;
+            // Bottom-half click target — message body area.
+            return dialogScope;
+          })();
           console.log("[LeadCaptura] clicking dialog body to activate editor:", phTarget);
           try { await dispatchHumanClick(phTarget); } catch {}
           await sleep(450);
-          // activeElement after click is usually the editor.
           const ae = document.activeElement;
-          if (ae && ae !== document.body && (
+          if (ae && ae !== document.body && dialogScope.contains(ae) && (
             ae.isContentEditable ||
             ae.tagName === "TEXTAREA" ||
             (ae.tagName === "INPUT" && ae.type === "text") ||
@@ -7368,12 +7437,27 @@
           )) {
             editor = ae;
           }
-          // Fall back to the largest visible editor.
-          if (!editor) editor = _findLargestComposerEditor();
-          // Last resort: the placeholder/dialog element itself — typing
-          // strategies E (paste) and F (innerText) can sometimes still work.
+          // Fall back: largest editable INSIDE the dialog only.
+          if (!editor) {
+            const inside = Array.from(dialogScope.querySelectorAll(
+              "[contenteditable='true'], [contenteditable]:not([contenteditable='false']), " +
+              "[role='textbox'], textarea, input[type='text']"
+            )).filter(el => {
+              const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+              const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+              if (/search|filter|looking|recipient|name|to:/i.test(lbl + " " + ph)) return false;
+              return _existsInLayout(el);
+            });
+            inside.sort((a, b) => {
+              const ra = a.getBoundingClientRect();
+              const rb = b.getBoundingClientRect();
+              return (rb.width * rb.height) - (ra.width * ra.height);
+            });
+            if (inside.length) editor = inside[0];
+          }
           if (!editor) editor = phTarget;
         }
+        if (!editor) editor = found.el;
 
         if (!editor) {
           failed++;
