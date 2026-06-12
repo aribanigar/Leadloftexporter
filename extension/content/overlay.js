@@ -6240,36 +6240,101 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
+        // Identify the profile owner from the H1 so we can reject Message buttons
+        // belonging to other people (the right-rail "More profiles for you" panel
+        // renders Message buttons for OTHER users on the same page).
+        const h1 = document.querySelector("main h1") || document.querySelector("h1");
+        const h1Text = (h1?.textContent || "").trim();
+        const firstName = h1Text.split(/\s+/)[0]?.toLowerCase() || "";
+
+        // _nameOk: returns true when the aria-label is generic ("Message") OR
+        // names the profile owner. Returns false when it explicitly names
+        // someone else ("Message Jihane Bou Haidar").
+        const _nameOk = (lbl) => {
+          if (!lbl) return true;
+          const m = lbl.toLowerCase().match(/message\s+([a-z][a-z\-' .]+)/);
+          if (!m) return true;            // "Message" with no name → owner button
+          if (!firstName) return true;    // H1 not ready — accept; poll continues
+          return m[1].trim().toLowerCase().includes(firstName);
+        };
+
+        // Reject any button inside the right-rail / "More profiles for you"
+        // / "People you may know" / mutual-connections panels — those buttons
+        // target OTHER profiles.
+        const _SIDEBAR_REJECTS =
+          "aside, " +
+          "[class*='right-rail'], " +
+          "[class*='profile-card-aside'], " +
+          "[class*='profile-card-mutual'], " +
+          "[class*='profile-card-browsemap'], " +
+          "[class*='browsemap'], " +
+          "[class*='people-also-viewed'], " +
+          "[class*='discover-entity'], " +
+          "[data-view-name*='browsemap'], " +
+          "[data-view-name*='mutual'], " +
+          "[aria-label*='More profiles' i], " +
+          ".scaffold-layout__aside";
+
+        const _isOwnerScope = (el) => {
+          if (!el) return false;
+          if (el.closest?.(_SIDEBAR_REJECTS)) return false;
+          return true;
+        };
+
+        // Scope priority: top-card first (the H1's container with the profile
+        // owner's CTAs), then main but excluding sidebar, then last-resort document.
+        const topCard =
+          h1?.closest(".pv-top-card-v2-ctas, .pv-top-card, [class*='top-card']") ||
+          h1?.parentElement?.closest("section.artdeco-card") ||
+          document.querySelector("main .pv-top-card-v2-ctas") ||
+          document.querySelector("main .pv-top-card") ||
+          null;
+
         const _MSG_SELS = [
-          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
-          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
-          "main button.message-anywhere-button",
+          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
+          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
+          "button.message-anywhere-button",
           "[class*='message-anywhere-button']",
           "button[data-control-name*='message' i]",
         ];
-        for (const sel of _MSG_SELS) {
-          try {
-            for (const b of document.querySelectorAll(sel)) {
-              // Do NOT gate on _isVisible here — the Message button's bounding
-              // rect is transiently zero during LinkedIn's lazy top-card hydration,
-              // which makes the poll time out and fall to the wrong fallback button.
-              // The aria-label selector is specific enough without the visibility gate.
-              if (b.disabled) continue;
-              if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-              return b;
-            }
-          } catch {}
+
+        const scopes = [topCard, document.querySelector("main"), document].filter(Boolean);
+        for (const scope of scopes) {
+          for (const sel of _MSG_SELS) {
+            try {
+              for (const b of scope.querySelectorAll(sel)) {
+                // Do NOT gate on _isVisible here — the Message button's bounding
+                // rect is transiently zero during lazy top-card hydration, which
+                // would make the poll time out and fall to the wrong fallback.
+                if (b.disabled) continue;
+                if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+                if (!_isOwnerScope(b)) continue;
+                const lbl = b.getAttribute("aria-label") || b.textContent || "";
+                if (!_nameOk(lbl)) {
+                  console.log("[LeadCaptura] skip wrong-profile Message btn:", lbl.trim().slice(0, 60));
+                  continue;
+                }
+                return b;
+              }
+            } catch {}
+          }
         }
+
         // Text-content fallback — broad selector needs _isVisible to exclude
-        // hidden sidebar "More profiles for you" buttons.
-        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
-          if (el.classList?.contains("lc-inline-save")) continue;
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-          if (!_isVisible(el) || el.disabled) continue;
-          const lbl = (el.getAttribute("aria-label") || "").trim().toLowerCase();
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const hay = lbl + " " + txt;
-          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) return el;
+        // hidden buttons. Still scoped to owner area and name-guarded.
+        for (const scope of scopes) {
+          for (const el of scope.querySelectorAll("button, a[role='button'], [role='button']")) {
+            if (el.classList?.contains("lc-inline-save")) continue;
+            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+            if (!_isOwnerScope(el)) continue;
+            if (!_isVisible(el) || el.disabled) continue;
+            const lblRaw = el.getAttribute("aria-label") || el.textContent || "";
+            const hay = (lblRaw + " " + (el.textContent || "")).toLowerCase();
+            if (!/\bmessage\b/.test(hay)) continue;
+            if (/your team|recruiter|inmail|connect|follow|sales navigator/i.test(hay)) continue;
+            if (!_nameOk(lblRaw)) continue;
+            return el;
+          }
         }
         return null;
       };
