@@ -257,7 +257,7 @@ export default function EmailCampaignsPage() {
     const senders = c.senders && c.senders.length > 0 ? c.senders : [null];
     for (const s of senders) {
       const key = s?.id || '__unassigned__';
-      const addr = s?.address || s?.label || 'Unassigned';
+      const addr = s?.address || s?.label || 'No mailbox assigned';
       let g = groupMap.get(key);
       if (!g) {
         g = {

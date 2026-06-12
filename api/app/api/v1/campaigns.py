@@ -381,6 +381,7 @@ def list_campaigns(
 
     used_by_campaign: dict[str, set[str]] = {}
     if ids:
+        # 1) Recipients that explicitly recorded which account sent them.
         for cid, aid in (
             db.query(
                 CampaignRecipient.campaign_id,
@@ -394,6 +395,32 @@ def list_campaigns(
             .all()
         ):
             used_by_campaign.setdefault(cid, set()).add(aid)
+        # 2) Fallback for older recipient rows that never stored sender_account_id:
+        # follow the linked EmailMessage.from_address and match it to a
+        # ConnectedAccount.external_id (which is the mailbox address).
+        addr_to_acct = {
+            (a.external_id or "").lower(): a.id
+            for a in acct_rows
+            if a.external_id
+        }
+        if addr_to_acct:
+            from_rows = (
+                db.query(
+                    CampaignRecipient.campaign_id,
+                    func.lower(EmailMessage.from_address),
+                )
+                .join(EmailMessage, EmailMessage.id == CampaignRecipient.message_id)
+                .filter(
+                    CampaignRecipient.campaign_id.in_(ids),
+                    EmailMessage.from_address.isnot(None),
+                )
+                .distinct()
+                .all()
+            )
+            for cid, addr in from_rows:
+                aid = addr_to_acct.get(addr or "")
+                if aid:
+                    used_by_campaign.setdefault(cid, set()).add(aid)
 
     out = []
     for c in rows:
