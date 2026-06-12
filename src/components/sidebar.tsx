@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Sparkles,
   Mail,
+  MessageCircle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -34,6 +35,7 @@ const NAV = [
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/outreach", label: "Outreach", icon: Sparkles },
   { href: "/campaigns", label: "Campaigns", icon: Mail },
+  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/messaging", label: "Messaging", icon: MessageSquare },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ] as const;

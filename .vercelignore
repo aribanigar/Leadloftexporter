@@ -8,6 +8,7 @@
 # "/api/" anchors the exclusion to the repo root only.
 /api/
 /extension/
+/whatsapp/
 docker-compose.yml
 render.yaml
 railway.json

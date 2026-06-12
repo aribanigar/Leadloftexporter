@@ -4,15 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in three independent deployables:
+The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in four independent deployables:
 
 ```
 /api         FastAPI backend (Postgres + Redis + Celery)  → Render
 (root)       Next.js 15 frontend (App Router + TanStack)  → Vercel
 /extension   Chrome MV3 extension (LinkedIn capture)      → unpacked / zipped
+/whatsapp    Node/Baileys WhatsApp sidecar (Express)      → Render (Docker)
 ```
 
-Each can be modified independently. The extension talks to the API; the frontend talks to the API; nothing talks to the extension.
+Each can be modified independently. The extension talks to the API; the frontend talks to the API; nothing talks to the extension. The WhatsApp sidecar is **internal only** — the FastAPI router `whatsapp_web.py` proxies frontend calls to it using `WA_SIDECAR_URL` + `WA_SIDECAR_TOKEN` env vars. Sessions are workspace-scoped by `X-Workspace-Id`.
 
 ## Commands
 

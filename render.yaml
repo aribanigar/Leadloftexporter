@@ -35,6 +35,36 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # WhatsApp sidecar — set these to point at the Node service below.
+      # WA_SIDECAR_URL = https://leadcaptura-whatsapp.onrender.com
+      # WA_SIDECAR_TOKEN must match the value on that service.
+      - key: WA_SIDECAR_URL
+        sync: false
+      - key: WA_SIDECAR_TOKEN
+        sync: false
+
+  # ── WhatsApp sidecar ─────────────────────────────────────────────────────
+  # Node/Baileys service that owns the actual WhatsApp Web connection.
+  # The main API proxies /whatsapp-web/* to this service.
+  # The persistent disk MUST live at /app/.baileys_auth so paired phones
+  # survive container restarts.
+  - type: web
+    name: leadcaptura-whatsapp
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    rootDir: whatsapp
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: wa-sessions
+      mountPath: /app/.baileys_auth
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: "8001"
+      - key: WA_SIDECAR_TOKEN
+        sync: false
 
   - type: worker
     name: leadcaptura-worker
