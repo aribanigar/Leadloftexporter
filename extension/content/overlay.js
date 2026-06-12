@@ -6513,62 +6513,96 @@
     "[contenteditable='true'][data-placeholder*='rite' i]",
     "[contenteditable='true'][data-placeholder*='essage' i]",
   ];
-  // Find the DEEPEST visible contenteditable inside a scope (avoids picking
-  // an outer wrapper when the real editable is a nested div).
-  function _deepestEditable(scope) {
-    if (!scope) return null;
-    const all = scope.querySelectorAll("[contenteditable='true'], textarea, input[type='text']");
-    let best = null;
-    for (const el of all) {
-      if (!_isVisible(el)) continue;
-      // Prefer the one that has NO contenteditable descendant (i.e. is a leaf).
-      if (!el.querySelector("[contenteditable='true']")) {
-        best = el;
-      } else if (!best) {
-        best = el;
+  // Loose "exists in layout" check — width/height > 0, not display:none.
+  // Used for editors that may be 0px before activation.
+  function _existsInLayout(el) {
+    if (!el) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") return false;
+      const r = el.getBoundingClientRect();
+      return r.width >= 1 && r.height >= 1;
+    } catch { return true; }
+  }
+
+  // Find the message dialog/overlay scope — any of the known LinkedIn
+  // surfaces.  We're flexible because LinkedIn ships several variants.
+  function _findMsgScope() {
+    const candidates = [
+      "[role='dialog']",
+      ".msg-form-popup",
+      ".msg-form",
+      ".msg-overlay-conversation-bubble",
+      ".msg-overlay-list-bubble",
+      "[class*='msg-form']",
+      "[class*='compose-overlay']",
+      "[class*='msg-overlay']",
+    ];
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      if (el && _existsInLayout(el)) return el;
+    }
+    return null;
+  }
+
+  // Find ALL editable surfaces inside a scope, deepest first.
+  function _allEditables(scope) {
+    if (!scope) return [];
+    const sels = [
+      "div[contenteditable='true']",
+      "div[contenteditable]:not([contenteditable='false'])",
+      "[role='textbox']",
+      "textarea",
+      "input[type='text']",
+      "[contenteditable]",
+    ];
+    const found = new Set();
+    for (const sel of sels) {
+      for (const el of scope.querySelectorAll(sel)) {
+        if (_existsInLayout(el)) found.add(el);
       }
     }
-    return best;
+    // Sort: leaves first (no contenteditable descendant).
+    return Array.from(found).sort((a, b) => {
+      const aL = a.querySelector("[contenteditable='true']") ? 1 : 0;
+      const bL = b.querySelector("[contenteditable='true']") ? 1 : 0;
+      return aL - bL;
+    });
   }
 
   function _findMsgEditor() {
-    // Pass 1 — known selectors (kept for legacy bubble compatibility).
-    for (const sel of _MSG_EDITOR_SELS) {
-      const els = document.querySelectorAll(sel);
-      for (const el of els) {
-        if (_isVisible(el) && !el.querySelector("[contenteditable='true']")) return el;
-      }
+    const scope = _findMsgScope();
+    if (scope) {
+      const eds = _allEditables(scope);
+      if (eds.length) return eds[0];
     }
-    // Pass 2 — deepest editable inside the dialog (the new design).
-    const dlg = document.querySelector("[role='dialog']");
-    if (dlg) {
-      const deep = _deepestEditable(dlg);
-      if (deep) return deep;
-    }
-    // Pass 3 — climb from "Write a message…" placeholder.
-    const ph = Array.from(document.querySelectorAll(
+    // Fallback: search the whole document.
+    const eds = _allEditables(document);
+    return eds[0] || null;
+  }
+
+  // Find a clickable area showing the "Write a message..." placeholder so
+  // we can click it to activate the editor.  Returns the element under the
+  // user's eye, even if it's not technically the contenteditable.
+  function _findMsgPlaceholderClickTarget() {
+    const scope = _findMsgScope() || document;
+    // 1) Anything with aria-placeholder / data-placeholder / placeholder = "Write a message…"
+    const phEls = scope.querySelectorAll(
       "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
-    ));
-    for (const node of ph) {
-      if (!_isVisible(node)) continue;
-      if (node.matches?.("[contenteditable='true'], textarea, input[type='text']")) return node;
-      const near = node.querySelector?.("[contenteditable='true'], textarea");
-      if (near && _isVisible(near)) return near;
+    );
+    for (const el of phEls) {
+      if (_existsInLayout(el)) return el;
     }
-    // Pass 4 — find any element whose visible text === "Write a message..."
-    // and climb to the closest editable.
-    const all = document.querySelectorAll("[role='dialog'] *, .msg-form *, .msg-overlay-conversation-bubble *");
-    for (const el of all) {
-      const t = (el.textContent || "").trim();
-      if (!t || t.length > 40) continue;
+    // 2) Walk text nodes for "Write a message..."
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const t = (node.nodeValue || "").trim();
+      if (!t) continue;
       if (!/write\s+a\s+message/i.test(t)) continue;
-      const parent = el.closest("[role='dialog'], .msg-form, .msg-overlay-conversation-bubble") || el.parentElement;
-      const near = parent?.querySelector?.("[contenteditable='true'], textarea");
-      if (near && _isVisible(near)) return near;
+      const parent = node.parentElement;
+      if (parent && _existsInLayout(parent)) return parent;
     }
-    // Pass 5 — fallback: any visible contenteditable anywhere.
-    const any = document.querySelector("[contenteditable='true']");
-    if (any && _isVisible(any)) return any;
     return null;
   }
   async function _waitMsgEditor(maxMs) {
@@ -7163,18 +7197,76 @@
         console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
         await dispatchHumanClick(msgBtn);
 
-        // Wait for the message editor in the overlay bubble (or full screen).
-        let editor = await _waitMsgEditor(5000);
-        if (!editor) {
-          console.log("[LeadCaptura] msg in-place: editor never opened, retry forceclick");
+        // Wait for the dialog scope to appear (much more permissive than
+        // waiting for the contenteditable, which may not exist yet).
+        let scope = null;
+        for (let k = 0; k < 30; k++) {
+          scope = _findMsgScope();
+          if (scope) break;
+          await sleep(200);
+        }
+        if (!scope) {
+          console.log("[LeadCaptura] msg in-place: dialog scope never appeared, retry forceclick");
           _forceClick(msgBtn);
-          editor = await _waitMsgEditor(4500);
+          for (let k = 0; k < 20; k++) {
+            scope = _findMsgScope();
+            if (scope) break;
+            await sleep(200);
+          }
         }
         _removeSpotlight();
 
+        if (!scope) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        // Give the dialog a beat to finish hydrating.
+        await sleep(600 + Math.random() * 400);
+
+        // Click the "Write a message..." placeholder area to activate the
+        // editor.  LinkedIn's Quill editor only mounts/activates after a real
+        // pointer event in this area.
+        const phTarget = _findMsgPlaceholderClickTarget();
+        if (phTarget) {
+          console.log("[LeadCaptura] msg in-place → clicking placeholder area:", phTarget);
+          try { await dispatchHumanClick(phTarget); } catch {}
+          await sleep(400);
+        }
+
+        // Now find the editor.  Try the currently focused element first
+        // (clicking the placeholder usually focuses the editor), then fall
+        // back to scanning.
+        let editor = null;
+        const ae = document.activeElement;
+        if (ae && ae !== document.body && (
+          ae.isContentEditable ||
+          ae.tagName === "TEXTAREA" ||
+          (ae.tagName === "INPUT" && ae.type === "text") ||
+          ae.getAttribute("role") === "textbox"
+        )) {
+          editor = ae;
+          console.log("[LeadCaptura] editor = document.activeElement:", ae.tagName, ae.className);
+        }
+        if (!editor) {
+          for (let k = 0; k < 20; k++) {
+            editor = _findMsgEditor();
+            if (editor) break;
+            await sleep(200);
+          }
+        }
+        if (!editor && phTarget) {
+          // Use the placeholder target itself as the editor — _robustTypeMessage
+          // will try multiple strategies including paste/innerText.
+          editor = phTarget;
+          console.log("[LeadCaptura] editor fallback = placeholder target");
+        }
+
         if (!editor) {
           failed++;
-          _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2200);
+          _lcToast(`✗ ${idx}/${total} — couldn't find editor in dialog`, 2500);
           _closeMsgOverlay();
           continue;
         }
