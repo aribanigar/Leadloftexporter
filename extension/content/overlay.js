@@ -8329,6 +8329,35 @@
     return null;
   }
 
+  // MutationObserver-based wait — fires on next animation frame after ANY
+  // DOM change. Much faster + more reliable than fixed polling for elements
+  // that appear after async render.
+  function _waitForObserver(testFn, maxMs = 12000) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (result) => {
+        if (done) return;
+        done = true;
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve(result);
+      };
+      // Initial check.
+      const initial = testFn();
+      if (initial) return finish(initial);
+      const observer = new MutationObserver(() => {
+        const result = testFn();
+        if (result) finish(result);
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
+      const timer = setTimeout(() => finish(null), maxMs);
+    });
+  }
+
   function _findEditor() {
     return (
       document.querySelector("div.msg-form__contenteditable[contenteditable='true'][role='textbox']") ||
@@ -8576,16 +8605,20 @@
     onStatus("Waiting 2s for dialog...");
     await sleep(2000);
 
-    onStatus("Finding textbox...");
-    const editor = await _waitFor(_findEditor, 4000, 200);
-    if (!editor) return { ok: false, reason: "Textbox not found" };
+    onStatus("Finding textbox (up to 12s)...");
+    const editor = await _waitForObserver(_findEditor, 12000);
+    if (!editor) {
+      console.log("[Case1] Editor not found. msg-form__contenteditable present:",
+        !!document.querySelector("div.msg-form__contenteditable"));
+      return { ok: false, reason: "Textbox not found" };
+    }
 
     onStatus("Typing message...");
     const typed = await _typeIntoEditor(editor, messageText);
     if (!typed) return { ok: false, reason: "Could not type into textbox" };
 
     onStatus("Waiting for Send button...");
-    const sendBtn = await _waitFor(() => _findSendBtn(true), 3000, 200);
+    const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
     if (!sendBtn) return { ok: false, reason: "Send button disabled" };
 
     onStatus("Clicking Send...");
@@ -8775,8 +8808,9 @@
         // STEP 3: Wait 2s for dialog (per user spec).
         await sleep(2000);
 
-        // STEP 4: Find editor.
-        const editor = await _waitFor(_findEditor, 4000, 200);
+        // STEP 4: Find editor (MutationObserver — fires on next animation
+        // frame after any DOM change, up to 12s).
+        const editor = await _waitForObserver(_findEditor, 12000);
         if (!editor) {
           failed++;
           statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
@@ -8798,7 +8832,7 @@
         }
 
         // STEP 6: Find Send button (poll until enabled).
-        const sendBtn = await _waitFor(() => _findSendBtn(true), 3000, 200);
+        const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
         if (!sendBtn) {
           failed++;
           statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Send disabled for " + name;
