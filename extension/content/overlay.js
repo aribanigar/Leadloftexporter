@@ -6626,9 +6626,111 @@
     return null;
   }
 
-  // Wait — via MutationObserver — for the message dialog or editor to appear.
-  // Far more reliable than polling: fires on the next animation frame after
-  // ANY DOM mutation, so we never miss the dialog's mount.
+  // Find ALL currently open "New message" dialogs on the page.
+  function _findAllNewMessageDialogs() {
+    const dialogs = new Set();
+    const PHRASES = [/^new message$/i];
+    try {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      let node;
+      while ((node = walker.nextNode())) {
+        const t = (node.nodeValue || "").trim();
+        if (!t || t.length > 30) continue;
+        let match = false;
+        for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
+        if (!match) continue;
+        let p = node.parentElement;
+        while (p && p !== document.body) {
+          const r = p.getBoundingClientRect();
+          if (r.width >= 300 && r.height >= 250) { dialogs.add(p); break; }
+          p = p.parentElement;
+        }
+      }
+    } catch {}
+    try {
+      for (const el of document.querySelectorAll("[aria-label*='New message' i]")) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 300 && r.height >= 250) dialogs.add(el);
+      }
+    } catch {}
+    return Array.from(dialogs);
+  }
+
+  // Aggressively close every "New message" dialog by clicking the X at the
+  // top-right corner of each one (by coordinates — class-name proof).
+  function _closeAllNewMessageDialogs() {
+    const dialogs = _findAllNewMessageDialogs();
+    for (const dlg of dialogs) {
+      try {
+        const r = dlg.getBoundingClientRect();
+        // Top-right corner — X close button is always there.
+        const cx = r.right - 20;
+        const cy = r.top + 20;
+        const closeEl = document.elementFromPoint(cx, cy);
+        if (closeEl) {
+          const btn = closeEl.closest?.("button") || closeEl;
+          btn.click();
+        }
+      } catch {}
+    }
+  }
+
+  // Wait via MutationObserver for a NEW dialog (one not in the snapshot)
+  // to appear. Returns the dialog element or null on timeout.
+  function _waitForNewDialog(dialogsBefore, maxMs = 10000) {
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+      const finish = (dlg) => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(dlg);
+      };
+      const tryFind = () => {
+        const dialogs = _findAllNewMessageDialogs();
+        for (const dlg of dialogs) {
+          if (!dialogsBefore.has(dlg)) return finish(dlg);
+        }
+      };
+      tryFind();
+      if (done) return;
+      observer = new MutationObserver(() => tryFind());
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      timer = setTimeout(() => finish(null), maxMs);
+    });
+  }
+
+  // Find the message editor INSIDE a specific dialog. Returns the textbox or
+  // null. Filters out recipient/name/to inputs.
+  function _findEditorInDialog(dialog) {
+    if (!dialog) return null;
+    const candidates = Array.from(dialog.querySelectorAll(
+      "[contenteditable='true'], [contenteditable]:not([contenteditable='false']), " +
+      "[role='textbox'], textarea, input[type='text']"
+    )).filter(el => {
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+      if (/search|filter|looking|recipient|name|to:|^to$/i.test(lbl + " " + ph)) return false;
+      return _existsInLayout(el);
+    });
+    if (!candidates.length) return null;
+    // Pick the LARGEST area editable (message box is biggest in dialog).
+    candidates.sort((a, b) => {
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      return (rb.width * rb.height) - (ra.width * ra.height);
+    });
+    // If the candidate is a wrapper (contenteditable=false), descend.
+    let best = candidates[0];
+    if (!best.isContentEditable) {
+      const inner = best.querySelector("[contenteditable='true'], [role='textbox']");
+      if (inner && _existsInLayout(inner)) best = inner;
+    }
+    return best;
+  }
   function _waitForComposerMutation(editablesBefore, aeBefore, maxMs = 10000) {
     return new Promise((resolve) => {
       let done = false;
@@ -7386,128 +7488,77 @@
 
         console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
 
-        const editablesBefore = new Set(_allEditables(document));
-        const aeBefore = document.activeElement;
+        // Close any stale "New message" dialogs before starting.
+        _closeAllNewMessageDialogs();
+        await sleep(400);
 
-        // ONE click — dispatchHumanClick first (real pointer events; React
-        // onClick fires on this). If that fails to open anything, retry with
-        // native .click(). Doing BOTH opens two dialogs, which is what
-        // happened in the previous build.
+        // Snapshot dialogs BEFORE clicking — anything new after is the
+        // dialog we just opened.
+        const dialogsBefore = new Set(_findAllNewMessageDialogs());
+
+        // ONE click — dispatchHumanClick first. If that fails to open
+        // anything, fall back to native .click() then _forceClick.
         await dispatchHumanClick(msgBtn);
 
-        let found = await _waitForComposerMutation(editablesBefore, aeBefore, 6000);
-        if (!found && msgBtn.tagName === "A" && msgBtn.href) {
+        let dialogScope = await _waitForNewDialog(dialogsBefore, 6000);
+        if (!dialogScope && msgBtn.tagName === "A" && msgBtn.href) {
           console.log("[LeadCaptura] retry with native .click() for anchor");
           try { msgBtn.click(); } catch {}
-          found = await _waitForComposerMutation(editablesBefore, aeBefore, 6000);
+          dialogScope = await _waitForNewDialog(dialogsBefore, 6000);
         }
-        if (!found) {
+        if (!dialogScope) {
           console.log("[LeadCaptura] retry with _forceClick");
           _forceClick(msgBtn);
-          found = await _waitForComposerMutation(editablesBefore, aeBefore, 5000);
+          dialogScope = await _waitForNewDialog(dialogsBefore, 5000);
         }
 
         _removeSpotlight();
 
-        if (!found) {
+        if (!dialogScope) {
           failed++;
           _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
-          _closeMsgOverlay();
+          _closeAllNewMessageDialogs();
           continue;
         }
 
-        console.log(`[LeadCaptura] msg ${idx}/${total} found ${found.kind} via ${found.via}`);
+        console.log(`[LeadCaptura] msg ${idx}/${total} → new dialog detected:`, dialogScope);
         await sleep(450 + Math.random() * 300);
 
-        // Identify the dialog scope so we only search for the editor INSIDE
-        // the dialog we just opened (not a stale one left over from a
-        // previous iteration).
-        const dialogScope = found.kind === "dialog" ? found.el : (
-          found.el?.closest?.("[role='dialog']") ||
-          // Climb to the nearest big positioned ancestor.
-          (function () {
-            let p = found.el;
-            while (p && p !== document.body) {
-              const r = p.getBoundingClientRect();
-              const cs = getComputedStyle(p);
-              const pos = cs.position === "fixed" || cs.position === "absolute";
-              if (r.width >= 300 && r.height >= 250 && pos) return p;
-              p = p.parentElement;
-            }
-            return null;
-          })()
-        );
+        // Find the editor INSIDE this specific dialog.
+        let editor = _findEditorInDialog(dialogScope);
 
-        // Find/wake the editor INSIDE the dialog scope.
-        let editor = null;
-        if (found.kind === "editor") {
-          if (!dialogScope || dialogScope.contains(found.el)) editor = found.el;
-        }
-        if (!editor && dialogScope) {
-          // Click at PIXEL COORDINATES in the bottom 65% of the dialog (where
-          // the message textbox visually sits). Clicking the dialog element's
-          // centre lands on the profile preview, NOT the textbox — that's why
-          // Quill was never activating. document.elementFromPoint() returns
-          // whatever element is painted at the textbox area regardless of
-          // how it's classed.
+        // If no editor yet, click at the textbox coords to wake Quill, then
+        // re-find.
+        if (!editor) {
+          // Click at PIXEL COORDINATES in the bottom 70% of the dialog
+          // (where the message textbox visually sits) to wake Quill.
           const dRect = dialogScope.getBoundingClientRect();
           const cx = dRect.left + dRect.width / 2;
           const cy = dRect.top + dRect.height * 0.7;
           let textboxEl = document.elementFromPoint(cx, cy);
-          // If we landed on a child, climb out of text-node leaves.
           if (textboxEl?.nodeType === Node.TEXT_NODE) textboxEl = textboxEl.parentElement;
           console.log("[LeadCaptura] textbox click target at", Math.round(cx), Math.round(cy), "→", textboxEl?.tagName, textboxEl?.className);
           if (textboxEl) {
-            // Click TWICE at the textbox coords — Quill sometimes ignores the
-            // first click and only mounts on the second.
             try { await dispatchHumanClick(textboxEl); } catch {}
-            await sleep(350);
+            await sleep(400);
             try { await dispatchHumanClick(textboxEl); } catch {}
-            await sleep(550);
-          } else {
-            // Last resort: click the placeholder finder result, then dialog.
-            const fb = (function () {
-              const ph = dialogScope.querySelectorAll(
-                "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
-              );
-              for (const el of ph) if (_existsInLayout(el)) return el;
-              return dialogScope;
-            })();
-            try { await dispatchHumanClick(fb); } catch {}
-            await sleep(550);
+            await sleep(600);
           }
-          const ae = document.activeElement;
-          if (ae && ae !== document.body && dialogScope.contains(ae) && (
-            ae.isContentEditable ||
-            ae.tagName === "TEXTAREA" ||
-            (ae.tagName === "INPUT" && ae.type === "text") ||
-            ae.getAttribute("role") === "textbox"
-          )) {
-            editor = ae;
-          }
-          // Fall back: largest editable INSIDE the dialog only.
+          // Re-find editor INSIDE this dialog after the wake-up click.
+          editor = _findEditorInDialog(dialogScope);
+          // Final fallback: activeElement if it's inside the dialog.
           if (!editor) {
-            const inside = Array.from(dialogScope.querySelectorAll(
-              "[contenteditable='true'], [contenteditable]:not([contenteditable='false']), " +
-              "[role='textbox'], textarea, input[type='text']"
-            )).filter(el => {
-              const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-              const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
-              if (/search|filter|looking|recipient|name|to:/i.test(lbl + " " + ph)) return false;
-              return _existsInLayout(el);
-            });
-            inside.sort((a, b) => {
-              const ra = a.getBoundingClientRect();
-              const rb = b.getBoundingClientRect();
-              return (rb.width * rb.height) - (ra.width * ra.height);
-            });
-            if (inside.length) editor = inside[0];
+            const ae = document.activeElement;
+            if (ae && ae !== document.body && dialogScope.contains(ae) && (
+              ae.isContentEditable ||
+              ae.tagName === "TEXTAREA" ||
+              (ae.tagName === "INPUT" && ae.type === "text") ||
+              ae.getAttribute("role") === "textbox"
+            )) {
+              editor = ae;
+            }
           }
-          // Last resort: use the click target / dialog itself; the typing
-          // strategies (paste, innerText) can sometimes still get text in.
-          if (!editor) editor = textboxEl || dialogScope;
         }
-        if (!editor) editor = found.el;
 
         if (!editor) {
           failed++;
