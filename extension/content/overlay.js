@@ -4713,6 +4713,10 @@
   // class names. Mirrors scraper.js _isMutualConnectionContext — keep in
   // lock-step or the two paths disagree.
   function _isMutualConnectionContext(link) {
+    // On the My Connections page every card shows "N mutual connections" as a
+    // stat on the SAME card as the main profile link — that text must never
+    // cause the profile link itself to be rejected.
+    if (location.pathname.startsWith("/mynetwork/invite-connect/connections")) return false;
     try {
       let node = link.parentElement;
       for (let i = 0; i < 2 && node; i++) {
@@ -5032,7 +5036,73 @@
     };
   }
 
+  // Dedicated chip injector for /mynetwork/invite-connect/connections.
+  // Starts from profile links (not button aria-labels) so it works even when
+  // LinkedIn renders Message buttons without an aria-label attribute.
+  function _decorateConnectionsList() {
+    const path = location.pathname;
+    if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
+
+    const mainEl = document.querySelector("main") || document.body;
+    const seen = new Set();
+
+    for (const link of mainEl.querySelectorAll("a[href*='/in/']")) {
+      if (link.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+
+      let url;
+      try { url = globalThis.__lcDom.normalizeProfileUrl(link.href); } catch { continue; }
+      if (!url || /\/in\/me\/?($|\?)/.test(url)) continue;
+      if (seen.has(url)) continue;
+
+      // Walk up to the largest ancestor that contains exactly this one URL.
+      let row = null;
+      let msgBtn = null;
+      let node = link.parentElement;
+      for (let i = 0; i < 20 && node && node !== mainEl; i++) {
+        const urls = new Set();
+        for (const l of node.querySelectorAll("a[href*='/in/']")) {
+          let u; try { u = globalThis.__lcDom.normalizeProfileUrl(l.href); } catch { continue; }
+          if (!u || /\/in\/me\/?($|\?)/.test(u)) continue;
+          urls.add(u);
+          if (urls.size > 1) break;
+        }
+        if (urls.size > 1) break;
+        if (urls.size === 1) {
+          row = node;
+          // Find Message button by text content — no aria-label dependency.
+          for (const b of node.querySelectorAll("button:not(.lc-inline-save)")) {
+            if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+            const hay = ((b.getAttribute("aria-label") || "") + " " + (b.textContent || "")).toLowerCase();
+            if (/\bmessage\b/.test(hay) && !/inmail|your team|recruiter/i.test(hay)) {
+              msgBtn = b;
+            }
+          }
+        }
+        node = node.parentElement;
+      }
+
+      if (!row) continue;
+      seen.add(url);
+
+      const existing = injectedSaves.get(url);
+      if (existing && document.body.contains(existing)) continue;
+      if (existing) { injectedSaves.delete(url); chipCardEl.delete(url); }
+
+      const name = (link.getAttribute("aria-label") || link.textContent || "")
+        .replace(/\s+/g, " ").trim() || _labelFromUrl(url);
+
+      try {
+        injectInlineSave(row, { linkedin_url: url, full_name: name }, msgBtn);
+      } catch (e) {
+        console.warn("[LeadCaptura/connections] inject failed", e?.message);
+      }
+    }
+  }
+
   function decorateSearchCards() {
+    // Dedicated pass for My Connections page first (runs before pageType guard).
+    try { _decorateConnectionsList(); } catch {}
+
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
 
@@ -6180,11 +6250,18 @@
         for (const sel of _MSG_SELS) {
           try {
             for (const b of document.querySelectorAll(sel)) {
-              if (_isVisible(b) && !b.disabled) return b;
+              // Do NOT gate on _isVisible here — the Message button's bounding
+              // rect is transiently zero during LinkedIn's lazy top-card hydration,
+              // which makes the poll time out and fall to the wrong fallback button.
+              // The aria-label selector is specific enough without the visibility gate.
+              if (b.disabled) continue;
+              if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+              return b;
             }
           } catch {}
         }
-        // Text-content fallback — broad scan, exclude our own UI.
+        // Text-content fallback — broad selector needs _isVisible to exclude
+        // hidden sidebar "More profiles for you" buttons.
         for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
           if (el.classList?.contains("lc-inline-save")) continue;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
