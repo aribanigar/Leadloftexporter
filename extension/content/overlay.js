@@ -6493,19 +6493,52 @@
   }
 
   // Find the active compose editor on this page.  LinkedIn renders it in
-  // either a fly-out overlay bubble (default) or a centred dialog.
+  // either a fly-out overlay bubble (legacy), a centred "New message" dialog
+  // (new design), or a full-page composer at /messaging/compose.
   const _MSG_EDITOR_SELS = [
+    // New "New message" dialog (the one your screenshot showed):
+    "[role='dialog'] div[role='textbox'][contenteditable='true']",
+    "[role='dialog'] [contenteditable='true']",
+    "[role='dialog'] textarea",
+    // Legacy fly-out bubble:
     "div.msg-form__contenteditable[contenteditable='true']",
-    "div[role='textbox'][contenteditable='true']",
+    ".msg-form__msg-content-container [contenteditable='true']",
     ".msg-form__compose-box [contenteditable='true']",
     ".msg-overlay-conversation-bubble [contenteditable='true']",
     ".msg-overlay-list-bubble [contenteditable='true']",
+    ".msg-form [contenteditable='true']",
+    // Generic last-resort signals:
+    "div[role='textbox'][contenteditable='true']",
+    "[contenteditable='true'][aria-label*='message' i]",
     "[contenteditable='true'][data-placeholder*='rite' i]",
+    "[contenteditable='true'][data-placeholder*='essage' i]",
   ];
   function _findMsgEditor() {
+    // Pass 1 — known selectors.
     for (const sel of _MSG_EDITOR_SELS) {
-      const el = document.querySelector(sel);
-      if (el && _isVisible(el)) return el;
+      const els = document.querySelectorAll(sel);
+      for (const el of els) {
+        if (_isVisible(el)) return el;
+      }
+    }
+    // Pass 2 — climb from the "Write a message…" placeholder text to find
+    // the editor. LinkedIn renders the placeholder as a sibling/parent.
+    const ph = Array.from(document.querySelectorAll(
+      "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+    ));
+    for (const node of ph) {
+      if (!_isVisible(node)) continue;
+      // The node itself may BE the editor (contenteditable div).
+      if (node.matches?.("[contenteditable='true'], textarea, input[type='text']")) return node;
+      // Otherwise look near it.
+      const near = node.querySelector?.("[contenteditable='true'], textarea");
+      if (near && _isVisible(near)) return near;
+    }
+    // Pass 3 — last resort: any visible contenteditable in a dialog.
+    const dlg = document.querySelector("[role='dialog']");
+    if (dlg) {
+      const any = dlg.querySelector("[contenteditable='true'], textarea");
+      if (any && _isVisible(any)) return any;
     }
     return null;
   }
@@ -6527,14 +6560,18 @@
     const scopes = [];
     if (editor) {
       let n = editor;
-      for (let i = 0; i < 6 && n && n !== document.body; i++, n = n.parentElement) {
+      for (let i = 0; i < 8 && n && n !== document.body; i++, n = n.parentElement) {
         scopes.push(n);
       }
     }
+    // Widen scopes to include the New message dialog, the legacy overlay,
+    // and the full-page composer route.
     scopes.push(
+      document.querySelector("[role='dialog']"),
       document.querySelector(".msg-form__container"),
       document.querySelector(".msg-overlay-conversation-bubble"),
       document.querySelector(".msg-overlay-list-bubble"),
+      document.querySelector(".msg-form"),
       document
     );
     for (const scope of scopes) {
@@ -6544,14 +6581,22 @@
         "button[type='submit'].msg-form__send-button",
         "button[aria-label='Send']:not([disabled])",
         "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
+        "button[aria-label*='Send message' i]:not([disabled])",
+        "button.artdeco-button--primary[type='submit']:not([disabled])",
       ]) {
         const b = scope.querySelector?.(sel);
         if (b && _isVisible(b)) return b;
       }
+      // Text/aria-label = "Send" or "Send message".
       for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
         const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
         const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-        if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
+        if (!_isVisible(btn)) continue;
+        if (t === "send" || a === "send") return btn;
+        if (a === "send message" || t === "send message") return btn;
+        // The New message dialog's Send is often the primary button at the
+        // bottom-right with text "Send" — match more loosely.
+        if (/^send\b/.test(t) && btn.classList.contains("artdeco-button--primary")) return btn;
       }
     }
     return null;
@@ -6992,12 +7037,34 @@
         await typeIntoEditable(editor, finalMsg);
         await sleep(450 + Math.random() * 300);
 
-        const typed = (editor.textContent || "").trim();
+        const _editorText = (e) => (e.value || e.textContent || e.innerText || "").trim();
+        const typed = _editorText(editor);
+        console.log(`[LeadCaptura] msg in-place ${idx}/${total} editor text after type: "${typed.slice(0, 60)}"`);
         if (!typed) {
-          failed++;
-          _lcToast(`✗ ${idx}/${total} — couldn't type`, 2200);
-          _closeMsgOverlay();
-          continue;
+          // Last-ditch: try setting value directly (some React-controlled
+          // textareas don't accept execCommand/key events but DO listen to
+          // an input event with the right value setter).
+          try {
+            if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
+              const proto = window.HTMLTextAreaElement.prototype;
+              const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+              setter.call(editor, finalMsg);
+              editor.dispatchEvent(new Event("input", { bubbles: true }));
+            } else if (editor.isContentEditable) {
+              editor.innerHTML = finalMsg.split("\n").map(l =>
+                "<p>" + l.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])) + "</p>"
+              ).join("");
+              editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
+            }
+          } catch (e) { console.log("[LeadCaptura] fallback type failed:", e); }
+          await sleep(500);
+          const typed2 = _editorText(editor);
+          if (!typed2) {
+            failed++;
+            _lcToast(`✗ ${idx}/${total} — couldn't type`, 2500);
+            _closeMsgOverlay();
+            continue;
+          }
         }
 
         // Find + click Send.
@@ -7020,12 +7087,12 @@
 
         // Verify by editor clearing.
         await sleep(900);
-        let stillText = (editor.textContent || "").trim().length > 0;
+        let stillText = (editor.value ?? editor.textContent ?? "").trim().length > 0;
         if (stillText) {
           const retry = _findMsgSendBtn(editor);
           if (retry) _forceClick(retry);
           await sleep(900);
-          stillText = (editor.textContent || "").trim().length > 0;
+          stillText = (editor.value ?? editor.textContent ?? "").trim().length > 0;
         }
         _removeSpotlight();
 
