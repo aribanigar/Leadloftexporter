@@ -8757,40 +8757,69 @@
     const isOurUI = (el) =>
       el.closest("#lc-case1-fab, #lc-case2-fab, #lc-case1-composer, #lc-case2-composer, .lc-overlay-root, .lc-toolbar");
 
-    // Try 1: aria-label starts with "Send a message to" (the standard format).
-    let buttons = Array.from(
-      document.querySelectorAll("button[aria-label^='Send a message to' i]")
-    ).filter((b) => !isOurUI(b));
+    // PRIMARY: iterate <li class="mn-connection-card"> and find the Message
+    // button inside each. This is the EXACT structure shown in the user's
+    // DOM screenshots: each <li> contains one Message button.
+    const liItems = document.querySelectorAll("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+    console.log("[Case2] li.mn-connection-card items found:", liItems.length);
+    let buttons = [];
+    for (const li of liItems) {
+      // Try several button selectors INSIDE this li:
+      const candidates = [
+        li.querySelector("button[aria-label^='Send a message to' i]"),
+        li.querySelector(".entry-point button"),
+        li.querySelector(".mn-connection-card__action-container button"),
+        li.querySelector("button[aria-label*='message' i]"),
+        // Find any button whose visible text is exactly "Message"
+        Array.from(li.querySelectorAll("button")).find((b) => {
+          const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          return t === "message";
+        }),
+      ];
+      for (const c of candidates) {
+        if (c && !isOurUI(c) && !buttons.includes(c)) {
+          buttons.push(c);
+          break;
+        }
+      }
+    }
     if (buttons.length) {
-      console.log("[Case2] Found via 'Send a message to' aria-label:", buttons.length);
+      console.log("[Case2] PRIMARY (li.mn-connection-card) found:", buttons.length,
+        "first aria-label:", buttons[0]?.getAttribute("aria-label"));
       return buttons;
     }
 
-    // Try 2: aria-label contains "message" + connection-card scope.
+    // FALLBACK 1: document-wide aria-label match.
+    buttons = Array.from(
+      document.querySelectorAll("button[aria-label^='Send a message to' i]")
+    ).filter((b) => !isOurUI(b));
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 1 (doc-wide aria-label) found:", buttons.length);
+      return buttons;
+    }
+
+    // FALLBACK 2: aria-label contains "message" + any connection-card-like ancestor.
     const cardScopes = Array.from(
       document.querySelectorAll(
         ".mn-connection-card, [class*='connection-card'], .entry-point, [class*='entry-point']"
       )
     );
-    if (cardScopes.length) {
-      for (const card of cardScopes) {
-        for (const btn of card.querySelectorAll("button")) {
-          if (isOurUI(btn)) continue;
-          const txt = (btn.textContent || "").trim().toLowerCase();
-          const lbl = (btn.getAttribute("aria-label") || "").toLowerCase();
-          if (txt === "message" || /\bmessage\b/.test(lbl)) {
-            buttons.push(btn);
-          }
+    for (const card of cardScopes) {
+      for (const btn of card.querySelectorAll("button")) {
+        if (isOurUI(btn)) continue;
+        const txt = (btn.textContent || "").trim().toLowerCase();
+        const lbl = (btn.getAttribute("aria-label") || "").toLowerCase();
+        if (txt === "message" || /\bmessage\b/.test(lbl)) {
+          if (!buttons.includes(btn)) buttons.push(btn);
         }
       }
-      if (buttons.length) {
-        console.log("[Case2] Found via connection-card scope:", buttons.length);
-        return buttons;
-      }
+    }
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 2 (card scope) found:", buttons.length);
+      return buttons;
     }
 
-    // Try 3: any visible button with text exactly "Message" outside our UI,
-    // excluding the top-nav and Messaging panel.
+    // FALLBACK 3: any visible button with text exactly "Message".
     const allBtns = document.querySelectorAll("button");
     for (const btn of allBtns) {
       if (isOurUI(btn)) continue;
@@ -8798,10 +8827,10 @@
       const txt = (btn.textContent || "").trim().toLowerCase();
       if (txt === "message") {
         const r = btn.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) buttons.push(btn);
+        if (r.width > 0 && r.height > 0 && !buttons.includes(btn)) buttons.push(btn);
       }
     }
-    console.log("[Case2] Found via text='Message' fallback:", buttons.length);
+    console.log("[Case2] FALLBACK 3 (text='Message') found:", buttons.length);
     return buttons;
   }
 
