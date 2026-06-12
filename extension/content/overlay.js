@@ -6240,20 +6240,44 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
-        // KEY INSIGHT: LinkedIn's layout puts the right-rail "More profiles for
-        // you" panel inside <aside class="scaffold-layout__aside">, which is a
-        // SIBLING of <main>, not a descendant. Scoping to <main> (and the
-        // top-card inside it) automatically excludes every sidebar button —
-        // no class-name rejection patterns needed.
+        // LinkedIn profile page layout (confirmed from live DOM):
+        //
+        //  <main>
+        //    <div class="scaffold-layout__inner">
+        //      <div class="scaffold-layout__main">   ← profile owner content
+        //        <section> <h1>Abdelmoughit</h1>
+        //          <button aria-label="Message Abdelmoughit">   ← WANT THIS
+        //        </section>
+        //        <section> ...experience, about... </section>
+        //      </div>
+        //      <div class="scaffold-layout__aside">  ← right-rail: OTHER people
+        //        <button aria-label="Message Jihane Bou Haidar">  ← MUST SKIP
+        //      </div>
+        //    </div>
+        //  </main>
+        //
+        // Both columns are INSIDE <main>, so scoping to <main> is not enough.
+        // Scope to .scaffold-layout__main (profile owner column) and, tighter,
+        // to the top-card section that holds the profile H1 + CTA buttons.
+
         const mainEl = document.querySelector("main");
         if (!mainEl) return null;
 
-        const h1 = mainEl.querySelector("h1") || document.querySelector("h1");
+        // Prefer the non-aside content column; fall back to mainEl minus the aside.
+        const contentCol =
+          mainEl.querySelector(".scaffold-layout__main") ||
+          mainEl.querySelector(".core-rail") ||
+          mainEl.querySelector("[class*='scaffold-layout__main']") ||
+          null;
+
+        const h1 = (contentCol || mainEl).querySelector("h1") || document.querySelector("h1");
+
+        // Tightest possible scope: the section/card that contains the H1.
+        // This is the profile owner's top-card with their own CTA buttons.
         const topCard =
-          h1?.closest(".pv-top-card-v2-ctas, .pv-top-card, [class*='top-card']") ||
-          h1?.parentElement?.closest("section.artdeco-card") ||
-          mainEl.querySelector(".pv-top-card-v2-ctas") ||
-          mainEl.querySelector(".pv-top-card") ||
+          h1?.closest("section") ||
+          h1?.parentElement?.closest("section") ||
+          h1?.closest("[class*='top-card'], [class*='pv-top']") ||
           null;
 
         const _MSG_SELS = [
@@ -6264,25 +6288,29 @@
           "button[data-control-name*='message' i]",
         ];
 
-        // Search top-card first (tightest scope), then full <main>.
-        // Never search document-wide — that reaches <aside> sidebar buttons.
-        const scopes = [topCard, mainEl].filter(Boolean);
+        // Search tightest-to-widest. When we reach contentCol / mainEl, explicitly
+        // skip any button that lives inside .scaffold-layout__aside.
+        const scopes = [topCard, contentCol, mainEl].filter(Boolean);
         for (const scope of scopes) {
           for (const sel of _MSG_SELS) {
             try {
               for (const b of scope.querySelectorAll(sel)) {
                 if (b.disabled) continue;
                 if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+                // Skip right-rail / "More profiles for you" buttons.
+                if (b.closest?.(".scaffold-layout__aside")) continue;
                 return b;
               }
             } catch {}
           }
         }
 
-        // Text-content fallback — still scoped to <main> only.
-        for (const el of mainEl.querySelectorAll("button, a[role='button'], [role='button']")) {
+        // Text-content fallback scoped to the content column.
+        const textScope = contentCol || mainEl;
+        for (const el of textScope.querySelectorAll("button, a[role='button'], [role='button']")) {
           if (el.classList?.contains("lc-inline-save")) continue;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+          if (el.closest?.(".scaffold-layout__aside")) continue;
           if (!_isVisible(el) || el.disabled) continue;
           const hay = ((el.getAttribute("aria-label") || "") + " " + (el.textContent || "")).toLowerCase();
           if (!/\bmessage\b/.test(hay)) continue;
