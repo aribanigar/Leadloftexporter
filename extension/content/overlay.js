@@ -8678,9 +8678,67 @@
     ta.focus();
   }
 
+  // Find all Message buttons on the connection list — robust to aria-label
+  // variations and lazy rendering. Returns DOM-ordered array.
+  function _findCase2MessageButtons() {
+    const isOurUI = (el) =>
+      el.closest("#lc-case1-fab, #lc-case2-fab, #lc-case1-composer, #lc-case2-composer, .lc-overlay-root, .lc-toolbar");
+
+    // Try 1: aria-label starts with "Send a message to" (the standard format).
+    let buttons = Array.from(
+      document.querySelectorAll("button[aria-label^='Send a message to' i]")
+    ).filter((b) => !isOurUI(b));
+    if (buttons.length) {
+      console.log("[Case2] Found via 'Send a message to' aria-label:", buttons.length);
+      return buttons;
+    }
+
+    // Try 2: aria-label contains "message" + connection-card scope.
+    const cardScopes = Array.from(
+      document.querySelectorAll(
+        ".mn-connection-card, [class*='connection-card'], .entry-point, [class*='entry-point']"
+      )
+    );
+    if (cardScopes.length) {
+      for (const card of cardScopes) {
+        for (const btn of card.querySelectorAll("button")) {
+          if (isOurUI(btn)) continue;
+          const txt = (btn.textContent || "").trim().toLowerCase();
+          const lbl = (btn.getAttribute("aria-label") || "").toLowerCase();
+          if (txt === "message" || /\bmessage\b/.test(lbl)) {
+            buttons.push(btn);
+          }
+        }
+      }
+      if (buttons.length) {
+        console.log("[Case2] Found via connection-card scope:", buttons.length);
+        return buttons;
+      }
+    }
+
+    // Try 3: any visible button with text exactly "Message" outside our UI,
+    // excluding the top-nav and Messaging panel.
+    const allBtns = document.querySelectorAll("button");
+    for (const btn of allBtns) {
+      if (isOurUI(btn)) continue;
+      if (btn.closest("nav, header, [role='navigation'], .msg-overlay-list-bubble, .global-nav")) continue;
+      const txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt === "message") {
+        const r = btn.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) buttons.push(btn);
+      }
+    }
+    console.log("[Case2] Found via text='Message' fallback:", buttons.length);
+    return buttons;
+  }
+
   async function _case2Run(messageText, statusEl, progressEl) {
-    // Snapshot Message buttons on the page (top-most first by DOM order).
-    const buttons = Array.from(document.querySelectorAll("button[aria-label^='Send a message to']"));
+    statusEl.textContent = "Looking for Message buttons...";
+    // Scroll a bit to trigger lazy render, then collect.
+    try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
+    await sleep(400);
+
+    const buttons = _findCase2MessageButtons();
     const total = buttons.length;
     if (!total) {
       statusEl.textContent = "❌ No Message buttons found on the page";
