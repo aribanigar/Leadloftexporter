@@ -6293,6 +6293,24 @@
   // LinkedIn templates every Message button this way, so the owner's button
   // matches and right-rail people's buttons (Message Swet Prakash, Message
   // SUGANDHA WAHAL …) cannot collide.
+  // True visual check: is this button painted with LinkedIn's primary blue
+  // background?  LinkedIn's brand blue is ~rgb(10, 102, 194) / #0a66c2 with
+  // some variance across themes.  We accept any solid colour where blue
+  // dominates (B > 150) and red/green are clearly lower (R + 40 < B).
+  function _hasBluePrimaryBg(el) {
+    if (!el) return false;
+    try {
+      const cs = window.getComputedStyle(el);
+      const bg = cs.backgroundColor || "";
+      const m = bg.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (!m) return false;
+      const r = +m[1], g = +m[2], b = +m[3], a = m[4] !== undefined ? +m[4] : 1;
+      if (a < 0.5) return false;
+      // Blue dominance: blue clearly above red and red below ~80 (LinkedIn blue).
+      return b >= 150 && r < 80 && b > r + 40 && b > g + 20;
+    } catch { return false; }
+  }
+
   function _findOwnerMessageBtnByName(ownerName) {
     const _candidateIsValid = (el) => {
       if (!el) return false;
@@ -6306,19 +6324,27 @@
       return w >= 2 && h >= 2;
     };
 
-    // Pass 0 — the killer signal: LinkedIn paints the profile owner's Message
-    // button as the blue PRIMARY artdeco button.  Sidebar "Message" buttons on
-    // "More profiles for you" cards are SECONDARY (white bg, blue border).  So
-    // the primary-styled Message button on the page is almost always the owner's.
+    // Pass 0a — TRUE VISUAL signal: any Message-labelled button whose
+    // computed background is LinkedIn's primary blue.  This survives class
+    // renames during A/B tests because we read the actual paint.
+    const allMsg = document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+    );
+    for (const el of allMsg) {
+      if (!_candidateIsValid(el)) continue;
+      if (!_hasBluePrimaryBg(el)) continue;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      if (/\bmessage\b/.test(lbl)) return el;
+    }
+
+    // Pass 0b — CLASS signal: artdeco-button--primary Message button.  Belt
+    // and braces in case computed style hasn't resolved yet (unstyled flash).
     const primaries = document.querySelectorAll(
       "button.artdeco-button--primary[aria-label*='Message' i], " +
-      "a.artdeco-button--primary[aria-label*='Message' i], " +
-      "button.artdeco-button--primary[aria-label*='message' i], " +
-      "a.artdeco-button--primary[aria-label*='message' i]"
+      "a.artdeco-button--primary[aria-label*='Message' i]"
     );
     for (const el of primaries) {
       if (!_candidateIsValid(el)) continue;
-      // Tighter: make sure the visible text or aria-label actually says Message.
       const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
       const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
       if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
@@ -6396,9 +6422,13 @@
       if (txt.toLowerCase() === "message") consider(el);
     }
     if (!candidates.length) return null;
-    // Strong tie-breaker: prefer artdeco-button--primary (blue) — that's the
-    // styling LinkedIn applies to the profile owner's own Message button.
+    // Strongest tie-breaker: actual painted blue background (LinkedIn primary
+    // blue ≈ #0a66c2).  Then the artdeco-button--primary class.  Then
+    // top-leftmost position.
     candidates.sort((a, b) => {
+      const aBlue = _hasBluePrimaryBg(a.el) ? 0 : 1;
+      const bBlue = _hasBluePrimaryBg(b.el) ? 0 : 1;
+      if (aBlue !== bBlue) return aBlue - bBlue;
       const aP = a.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
       const bP = b.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
       if (aP !== bP) return aP - bP;
