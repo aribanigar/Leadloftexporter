@@ -6549,12 +6549,11 @@
   function _allEditables(scope) {
     if (!scope) return [];
     const sels = [
-      "div[contenteditable='true']",
-      "div[contenteditable]:not([contenteditable='false'])",
+      "[contenteditable='true']",
+      "[contenteditable]:not([contenteditable='false'])",
       "[role='textbox']",
       "textarea",
       "input[type='text']",
-      "[contenteditable]",
     ];
     const found = new Set();
     for (const sel of sels) {
@@ -6562,10 +6561,14 @@
         if (_existsInLayout(el)) found.add(el);
       }
     }
+    // Filter to only those NOT inside our own UI.
+    const filtered = Array.from(found).filter(el =>
+      !el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")
+    );
     // Sort: leaves first (no contenteditable descendant).
-    return Array.from(found).sort((a, b) => {
-      const aL = a.querySelector("[contenteditable='true']") ? 1 : 0;
-      const bL = b.querySelector("[contenteditable='true']") ? 1 : 0;
+    return filtered.sort((a, b) => {
+      const aL = a.querySelector("[contenteditable='true'], [role='textbox'], textarea") ? 1 : 0;
+      const bL = b.querySelector("[contenteditable='true'], [role='textbox'], textarea") ? 1 : 0;
       return aL - bL;
     });
   }
@@ -7195,28 +7198,51 @@
         await sleep(650 + Math.random() * 300);
 
         console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
+
+        // Snapshot existing editables BEFORE the click — anything new that
+        // appears afterwards is the freshly-opened composer's editor.
+        const editablesBefore = new Set(_allEditables(document));
+
         await dispatchHumanClick(msgBtn);
 
-        // Wait for the dialog scope to appear (much more permissive than
-        // waiting for the contenteditable, which may not exist yet).
+        // Wait up to 10s for a NEW editable to appear anywhere on the page,
+        // OR any of the known dialog scopes, OR a placeholder-bearing element.
+        let editor = null;
         let scope = null;
-        for (let k = 0; k < 30; k++) {
-          scope = _findMsgScope();
-          if (scope) break;
-          await sleep(200);
-        }
-        if (!scope) {
-          console.log("[LeadCaptura] msg in-place: dialog scope never appeared, retry forceclick");
-          _forceClick(msgBtn);
-          for (let k = 0; k < 20; k++) {
-            scope = _findMsgScope();
-            if (scope) break;
-            await sleep(200);
+        let phTarget = null;
+        for (let k = 0; k < 50; k++) {
+          // Look for a freshly added editable.
+          const now = _allEditables(document);
+          for (const el of now) {
+            if (!editablesBefore.has(el)) { editor = el; break; }
           }
+          if (editor) break;
+          // Or a known scope / placeholder we can click.
+          scope = _findMsgScope();
+          phTarget = _findMsgPlaceholderClickTarget();
+          if (scope || phTarget) break;
+          await sleep(200);
         }
         _removeSpotlight();
 
-        if (!scope) {
+        if (!editor && !scope && !phTarget) {
+          // Retry forceclick.
+          console.log("[LeadCaptura] msg in-place: nothing appeared, retry forceclick");
+          _forceClick(msgBtn);
+          for (let k = 0; k < 30; k++) {
+            const now = _allEditables(document);
+            for (const el of now) {
+              if (!editablesBefore.has(el)) { editor = el; break; }
+            }
+            if (editor) break;
+            scope = _findMsgScope();
+            phTarget = _findMsgPlaceholderClickTarget();
+            if (scope || phTarget) break;
+            await sleep(200);
+          }
+        }
+
+        if (!editor && !scope && !phTarget) {
           failed++;
           _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
           _closeMsgOverlay();
@@ -7224,49 +7250,45 @@
         }
 
         // Give the dialog a beat to finish hydrating.
-        await sleep(600 + Math.random() * 400);
+        await sleep(500 + Math.random() * 350);
 
-        // Click the "Write a message..." placeholder area to activate the
-        // editor.  LinkedIn's Quill editor only mounts/activates after a real
-        // pointer event in this area.
-        const phTarget = _findMsgPlaceholderClickTarget();
-        if (phTarget) {
-          console.log("[LeadCaptura] msg in-place → clicking placeholder area:", phTarget);
-          try { await dispatchHumanClick(phTarget); } catch {}
-          await sleep(400);
-        }
-
-        // Now find the editor.  Try the currently focused element first
-        // (clicking the placeholder usually focuses the editor), then fall
-        // back to scanning.
-        let editor = null;
-        const ae = document.activeElement;
-        if (ae && ae !== document.body && (
-          ae.isContentEditable ||
-          ae.tagName === "TEXTAREA" ||
-          (ae.tagName === "INPUT" && ae.type === "text") ||
-          ae.getAttribute("role") === "textbox"
-        )) {
-          editor = ae;
-          console.log("[LeadCaptura] editor = document.activeElement:", ae.tagName, ae.className);
-        }
+        // If we don't have an editor yet, click the placeholder area to wake
+        // the Quill editor up.
         if (!editor) {
-          for (let k = 0; k < 20; k++) {
-            editor = _findMsgEditor();
-            if (editor) break;
-            await sleep(200);
+          const clickTarget = phTarget || (scope && _findMsgPlaceholderClickTarget()) || scope;
+          if (clickTarget) {
+            console.log("[LeadCaptura] msg in-place → clicking placeholder/scope:", clickTarget);
+            try { await dispatchHumanClick(clickTarget); } catch {}
+            await sleep(500);
           }
-        }
-        if (!editor && phTarget) {
-          // Use the placeholder target itself as the editor — _robustTypeMessage
-          // will try multiple strategies including paste/innerText.
-          editor = phTarget;
-          console.log("[LeadCaptura] editor fallback = placeholder target");
+          // Now look for the editor — try activeElement first.
+          const ae = document.activeElement;
+          if (ae && ae !== document.body && (
+            ae.isContentEditable ||
+            ae.tagName === "TEXTAREA" ||
+            (ae.tagName === "INPUT" && ae.type === "text") ||
+            ae.getAttribute("role") === "textbox"
+          )) {
+            editor = ae;
+          }
+          if (!editor) {
+            for (let k = 0; k < 20; k++) {
+              const eds = _allEditables(document);
+              for (const el of eds) {
+                if (!editablesBefore.has(el)) { editor = el; break; }
+              }
+              if (editor) break;
+              await sleep(150);
+            }
+          }
+          // Last resort: just use the placeholder element itself; strategies
+          // E (paste) and F (innerText) can still get text in.
+          if (!editor && phTarget) editor = phTarget;
         }
 
         if (!editor) {
           failed++;
-          _lcToast(`✗ ${idx}/${total} — couldn't find editor in dialog`, 2500);
+          _lcToast(`✗ ${idx}/${total} — couldn't find editor`, 2500);
           _closeMsgOverlay();
           continue;
         }
