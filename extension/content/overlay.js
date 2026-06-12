@@ -8742,6 +8742,9 @@
   const CASE2_SENT_KEY = "lcCase2SentUrls";
   const CASE2_CB_CLASS = "lc-case2-cb";
   const CASE2_LI_DECORATED = "lc-case2-li-decorated";
+  // Rolling window: anyone messaged more than 2h ago becomes messageable
+  // again. Storage shape: { "/in/<handle>": timestampMs, ... }.
+  const CASE2_SENT_TTL_MS = 2 * 60 * 60 * 1000;
 
   function _normalizeProfileUrl(href) {
     if (!href) return null;
@@ -8796,39 +8799,69 @@
     catch (e) { return false; }
   }
 
-  async function _loadSentSet() {
+  // Load raw {url:timestamp} map from storage (1s timeout-safe).
+  function _loadSentMapRaw() {
     return new Promise((resolve) => {
-      // Bail fast if context is dead — flooded console with
-      // chrome-extension://invalid means the storage.get callback never fires.
-      if (!_runtimeAlive()) { resolve(new Set()); return; }
+      if (!_runtimeAlive()) { resolve({}); return; }
       let done = false;
-      const finish = (val) => { if (done) return; done = true; resolve(val); };
-      // Hard 1s timeout — never let the decorator hang.
-      const t = setTimeout(() => finish(new Set()), 1000);
+      const finish = (v) => { if (done) return; done = true; resolve(v); };
+      const t = setTimeout(() => finish({}), 1000);
       try {
         chrome.storage.local.get(CASE2_SENT_KEY, (result) => {
           clearTimeout(t);
-          if (chrome.runtime.lastError) { finish(new Set()); return; }
-          finish(new Set(result[CASE2_SENT_KEY] || []));
+          if (chrome.runtime.lastError) { finish({}); return; }
+          const raw = result[CASE2_SENT_KEY];
+          // Backward compat: legacy array → discard (treat as expired).
+          if (Array.isArray(raw)) { finish({}); return; }
+          finish(raw && typeof raw === "object" ? raw : {});
         });
-      } catch (e) { clearTimeout(t); finish(new Set()); }
+      } catch (e) { clearTimeout(t); finish({}); }
     });
+  }
+
+  // Filter to URLs sent within the last 2 hours; auto-prune expired ones.
+  async function _loadSentSet() {
+    const map = await _loadSentMapRaw();
+    const now = Date.now();
+    const set = new Set();
+    const pruned = {};
+    let didPrune = false;
+    for (const [url, ts] of Object.entries(map)) {
+      if (typeof ts === "number" && (now - ts) < CASE2_SENT_TTL_MS) {
+        set.add(url);
+        pruned[url] = ts;
+      } else {
+        didPrune = true; // expired entry — will drop on next write
+      }
+    }
+    // Best-effort prune so storage stays tidy (no await needed).
+    if (didPrune && _runtimeAlive()) {
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: pruned }); } catch (e) {}
+    }
+    return set;
   }
 
   async function _markSent(url) {
     if (!url) return;
     if (!_runtimeAlive()) return;
     try {
-      const set = await _loadSentSet();
-      set.add(url);
-      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: Array.from(set) }); } catch (e) {}
+      const map = await _loadSentMapRaw();
+      const now = Date.now();
+      // Drop any expired entries while we're here.
+      for (const [k, ts] of Object.entries(map)) {
+        if (typeof ts !== "number" || (now - ts) >= CASE2_SENT_TTL_MS) {
+          delete map[k];
+        }
+      }
+      map[url] = now;
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: map }); } catch (e) {}
     } catch (e) {}
   }
 
   async function _clearSentHistory() {
     if (!_runtimeAlive()) return;
     try {
-      chrome.storage.local.set({ [CASE2_SENT_KEY]: [] });
+      chrome.storage.local.set({ [CASE2_SENT_KEY]: {} });
     } catch (e) {}
   }
 
@@ -8950,7 +8983,7 @@
 
     wrap.innerHTML =
       '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Already-messaged profiles are auto-skipped. Random 15-30s gap.</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 2 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
       '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
       '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
       '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
@@ -8980,7 +9013,7 @@
         const totalCards = _findConnectionCards().length;
         statsEl.textContent =
           "📊 " + totalCards + " visible · " +
-          sent.size + " already messaged · " +
+          sent.size + " messaged in last 2h · " +
           selected.size + " selected via checkbox";
       } catch (e) {}
     };
@@ -8988,7 +9021,7 @@
     const statsTimer = setInterval(refreshStats, 1500);
 
     resetBtn.onclick = async () => {
-      if (!confirm("Clear remembered 'already-messaged' history? Cards will become selectable again.")) return;
+      if (!confirm("Clear the 2-hour sent-history? All cards (including ones messaged in the last 2h) will become selectable again.")) return;
       await _clearSentHistory();
       _decorateCase2Cards();
       refreshStats();
@@ -9167,7 +9200,7 @@
     const total = buttons.length;
     if (!total) {
       statusEl.textContent =
-        "✓ Nothing to send — " + skippedAlreadySent + " already messaged" +
+        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 2h" +
         (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
       return;
     }
