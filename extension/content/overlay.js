@@ -8791,27 +8791,42 @@
     return cards;
   }
 
+  function _runtimeAlive() {
+    try { return !!(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id); }
+    catch (e) { return false; }
+  }
+
   async function _loadSentSet() {
     return new Promise((resolve) => {
+      // Bail fast if context is dead — flooded console with
+      // chrome-extension://invalid means the storage.get callback never fires.
+      if (!_runtimeAlive()) { resolve(new Set()); return; }
+      let done = false;
+      const finish = (val) => { if (done) return; done = true; resolve(val); };
+      // Hard 1s timeout — never let the decorator hang.
+      const t = setTimeout(() => finish(new Set()), 1000);
       try {
         chrome.storage.local.get(CASE2_SENT_KEY, (result) => {
-          if (chrome.runtime.lastError) { resolve(new Set()); return; }
-          resolve(new Set(result[CASE2_SENT_KEY] || []));
+          clearTimeout(t);
+          if (chrome.runtime.lastError) { finish(new Set()); return; }
+          finish(new Set(result[CASE2_SENT_KEY] || []));
         });
-      } catch (e) { resolve(new Set()); }
+      } catch (e) { clearTimeout(t); finish(new Set()); }
     });
   }
 
   async function _markSent(url) {
     if (!url) return;
+    if (!_runtimeAlive()) return;
     try {
       const set = await _loadSentSet();
       set.add(url);
-      chrome.storage.local.set({ [CASE2_SENT_KEY]: Array.from(set) });
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: Array.from(set) }); } catch (e) {}
     } catch (e) {}
   }
 
   async function _clearSentHistory() {
+    if (!_runtimeAlive()) return;
     try {
       chrome.storage.local.set({ [CASE2_SENT_KEY]: [] });
     } catch (e) {}
@@ -8823,6 +8838,11 @@
     if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
     const sent = await _loadSentSet();
     const lis = _findConnectionCards();
+    if (lis.length === 0) {
+      console.log("[Case2] decorator: 0 cards found — nothing to mount");
+      return;
+    }
+    let mounted = 0;
     for (const li of lis) {
       const url = _getProfileUrlFromLi(li);
       if (!url) continue;
@@ -8879,7 +8899,9 @@
       });
       li.appendChild(wrap);
       li.classList.add(CASE2_LI_DECORATED);
+      mounted++;
     }
+    console.log("[Case2] decorator: " + lis.length + " cards, " + mounted + " checkboxes mounted, " + sent.size + " already-sent");
   }
 
   function _selectedUrlsFromCheckboxes() {
