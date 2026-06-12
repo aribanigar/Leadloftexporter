@@ -8738,6 +8738,141 @@
   const CASE2_COMPOSER_ID = "lc-case2-composer";
   const _case2State = { running: false, cancelled: false };
 
+  // ───────── Sent-history & checkbox-selection persistence (Case #2) ─────────
+  const CASE2_SENT_KEY = "lcCase2SentUrls";
+  const CASE2_CB_CLASS = "lc-case2-cb";
+  const CASE2_LI_DECORATED = "lc-case2-li-decorated";
+
+  function _normalizeProfileUrl(href) {
+    if (!href) return null;
+    const m = href.match(/\/in\/([^/?#]+)/);
+    return m ? "/in/" + m[1] : null;
+  }
+
+  function _getProfileUrlFromLi(li) {
+    if (!li) return null;
+    const link = li.querySelector("a[href*='/in/']");
+    if (!link) return null;
+    return _normalizeProfileUrl(link.getAttribute("href"));
+  }
+
+  async function _loadSentSet() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(CASE2_SENT_KEY, (result) => {
+          if (chrome.runtime.lastError) { resolve(new Set()); return; }
+          resolve(new Set(result[CASE2_SENT_KEY] || []));
+        });
+      } catch (e) { resolve(new Set()); }
+    });
+  }
+
+  async function _markSent(url) {
+    if (!url) return;
+    try {
+      const set = await _loadSentSet();
+      set.add(url);
+      chrome.storage.local.set({ [CASE2_SENT_KEY]: Array.from(set) });
+    } catch (e) {}
+  }
+
+  async function _clearSentHistory() {
+    try {
+      chrome.storage.local.set({ [CASE2_SENT_KEY]: [] });
+    } catch (e) {}
+  }
+
+  // Mount a checkbox top-right of each <li.mn-connection-card>. Tracks the
+  // profile URL on the input. Disabled + greyed if already-sent.
+  async function _decorateCase2Cards() {
+    if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
+    const sent = await _loadSentSet();
+    const lis = document.querySelectorAll(
+      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
+    );
+    for (const li of lis) {
+      const url = _getProfileUrlFromLi(li);
+      if (!url) continue;
+      // Remove old checkbox if already there (re-decorate to refresh sent state).
+      const existing = li.querySelector("." + CASE2_CB_CLASS);
+      if (existing) {
+        const wasChecked = existing.checked;
+        existing.remove();
+        li.classList.remove(CASE2_LI_DECORATED);
+      }
+      // Mount fresh.
+      if (getComputedStyle(li).position === "static") {
+        try { li.style.position = "relative"; } catch (e) {}
+      }
+      const wrap = document.createElement("label");
+      wrap.className = CASE2_CB_CLASS + "-wrap";
+      Object.assign(wrap.style, {
+        position: "absolute",
+        top: "8px",
+        left: "8px",
+        zIndex: "20",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        padding: "4px 8px",
+        background: sent.has(url) ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.95)",
+        border: sent.has(url) ? "1px solid #22c55e" : "1px solid #cbd5e1",
+        borderRadius: "999px",
+        cursor: sent.has(url) ? "not-allowed" : "pointer",
+        fontSize: "10px",
+        fontWeight: "600",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        color: sent.has(url) ? "#15803d" : "#0a66c2",
+        userSelect: "none",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      });
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = CASE2_CB_CLASS;
+      cb.dataset.url = url;
+      cb.style.cssText = "width:13px;height:13px;cursor:inherit;margin:0;accent-color:#0a66c2;";
+      if (sent.has(url)) {
+        cb.disabled = true;
+        cb.checked = false;
+      }
+      const lbl = document.createElement("span");
+      lbl.textContent = sent.has(url) ? "✓ Messaged" : "Select";
+      wrap.appendChild(cb);
+      wrap.appendChild(lbl);
+      cb.addEventListener("change", () => {
+        lbl.textContent = cb.checked ? "Selected" : "Select";
+        wrap.style.background = cb.checked ? "rgba(10,102,194,0.12)" : "rgba(255,255,255,0.95)";
+        wrap.style.border = cb.checked ? "1px solid #0a66c2" : "1px solid #cbd5e1";
+      });
+      li.appendChild(wrap);
+      li.classList.add(CASE2_LI_DECORATED);
+    }
+  }
+
+  function _selectedUrlsFromCheckboxes() {
+    const set = new Set();
+    for (const cb of document.querySelectorAll("input." + CASE2_CB_CLASS + ":checked")) {
+      if (cb.dataset.url) set.add(cb.dataset.url);
+    }
+    return set;
+  }
+
+  // Watcher: decorate cards as user scrolls and LinkedIn paginates in new <li>.
+  let _case2DecorateTimer = null;
+  function _startCase2Decorator() {
+    if (_case2DecorateTimer) return;
+    _case2DecorateTimer = setInterval(() => {
+      if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
+      try { _decorateCase2Cards(); } catch (e) {}
+    }, 1500);
+  }
+  function _stopCase2Decorator() {
+    if (_case2DecorateTimer) {
+      clearInterval(_case2DecorateTimer);
+      _case2DecorateTimer = null;
+    }
+  }
+
   function _showCase2Composer() {
     document.getElementById(CASE2_COMPOSER_ID)?.remove();
 
@@ -8759,13 +8894,15 @@
     });
 
     wrap.innerHTML =
-      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:10px;">Message All Visible Connections</div>' +
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Sends to every visible profile in the list. Random 15-30s pause between sends.</div>' +
-      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:110px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
-      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:8px;min-height:16px;"></div>' +
+      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Already-messaged profiles are auto-skipped. Random 15-30s gap.</div>' +
+      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
+      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">' +
       '<div data-role="progress" style="font-size:12px;color:#64748b;"></div>' +
-      '<div style="display:flex;gap:8px;">' +
+      '<div style="display:flex;gap:6px;">' +
+      '<button data-role="reset" type="button" style="padding:6px 12px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;cursor:pointer;font-size:12px;color:#b91c1c;font-family:inherit;" title="Clear remembered \'already-messaged\' history">Reset History</button>' +
       '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
       '<button data-role="start" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Start</button>' +
       "</div></div>";
@@ -8773,10 +8910,36 @@
     document.documentElement.appendChild(wrap);
 
     const ta = wrap.querySelector("[data-role='ta']");
+    const statsEl = wrap.querySelector("[data-role='stats']");
     const statusEl = wrap.querySelector("[data-role='status']");
     const progressEl = wrap.querySelector("[data-role='progress']");
     const cancelBtn = wrap.querySelector("[data-role='cancel']");
     const startBtn = wrap.querySelector("[data-role='start']");
+    const resetBtn = wrap.querySelector("[data-role='reset']");
+
+    // Refresh stats periodically.
+    const refreshStats = async () => {
+      try {
+        const sent = await _loadSentSet();
+        const selected = _selectedUrlsFromCheckboxes();
+        const totalCards = document.querySelectorAll(
+          "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
+        ).length;
+        statsEl.textContent =
+          "📊 " + totalCards + " visible · " +
+          sent.size + " already messaged · " +
+          selected.size + " selected via checkbox";
+      } catch (e) {}
+    };
+    refreshStats();
+    const statsTimer = setInterval(refreshStats, 1500);
+
+    resetBtn.onclick = async () => {
+      if (!confirm("Clear remembered 'already-messaged' history? Cards will become selectable again.")) return;
+      await _clearSentHistory();
+      _decorateCase2Cards();
+      refreshStats();
+    };
 
     cancelBtn.onclick = () => {
       if (_case2State.running) {
@@ -8784,6 +8947,7 @@
         cancelBtn.textContent = "Stopping after current...";
         cancelBtn.disabled = true;
       } else {
+        clearInterval(statsTimer);
         wrap.remove();
       }
     };
@@ -8919,15 +9083,48 @@
 
   async function _case2Run(messageText, statusEl, progressEl) {
     statusEl.textContent = "Looking for Message buttons...";
-    // Scroll a bit to trigger lazy render, then collect.
     try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
     await sleep(400);
 
-    const buttons = _findCase2MessageButtons();
-    const total = buttons.length;
-    if (!total) {
+    const allButtons = _findCase2MessageButtons();
+    if (!allButtons.length) {
       statusEl.textContent = "❌ No Message buttons found on the page";
       return;
+    }
+
+    // Load sent set + selected set.
+    const sentSet = await _loadSentSet();
+    const selectedSet = _selectedUrlsFromCheckboxes();
+    const hasSelection = selectedSet.size > 0;
+
+    // Build {btn, url, name, li} list and filter.
+    const allCands = allButtons.map((btn) => {
+      const li = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+      const url = _getProfileUrlFromLi(li);
+      return { btn, url, li };
+    });
+    let skippedAlreadySent = 0;
+    let skippedNotSelected = 0;
+    const buttons = [];
+    for (const c of allCands) {
+      if (!c.url) { buttons.push(c.btn); continue; } // no URL → can't dedupe, still try
+      if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
+      if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
+      buttons.push(c.btn);
+    }
+
+    const total = buttons.length;
+    if (!total) {
+      statusEl.textContent =
+        "✓ Nothing to send — " + skippedAlreadySent + " already messaged" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
+      return;
+    }
+    if (skippedAlreadySent || skippedNotSelected) {
+      statusEl.textContent =
+        "Starting (" + total + " to send · " + skippedAlreadySent + " skipped as already-messaged" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "") + ")";
+      await sleep(800);
     }
     let sent = 0, failed = 0;
     progressEl.textContent = "0 sent · 0 failed · 0/" + total;
@@ -9035,6 +9232,30 @@
         sent++;
         statusEl.textContent = "[" + (i + 1) + "/" + total + "] ✅ Sent to " + name;
 
+        // Persist: mark this profile URL as messaged so future runs skip it.
+        try {
+          const liForBtn = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+          const url = _getProfileUrlFromLi(liForBtn);
+          if (url) {
+            await _markSent(url);
+            // Visually update the card's chip to "Messaged" state.
+            const cb = liForBtn?.querySelector("input." + CASE2_CB_CLASS);
+            if (cb) {
+              cb.disabled = true;
+              cb.checked = false;
+              const wrap = cb.closest("label");
+              if (wrap) {
+                wrap.style.background = "rgba(34,197,94,0.12)";
+                wrap.style.border = "1px solid #22c55e";
+                wrap.style.color = "#15803d";
+                wrap.style.cursor = "not-allowed";
+                const lbl = wrap.querySelector("span");
+                if (lbl) lbl.textContent = "✓ Messaged";
+              }
+            }
+          }
+        } catch (e) {}
+
         // STEP 8: Close dialog with X.
         _closeMsgDialog();
         await sleep(800);
@@ -9079,8 +9300,11 @@
 
     if (onConnections) {
       _mountFab(CASE2_FAB_ID, "✉️ Message All", _showCase2Composer);
+      _startCase2Decorator();
+      _decorateCase2Cards();
     } else {
       _unmountFab(CASE2_FAB_ID);
+      _stopCase2Decorator();
       // Don't close composer if a run is active.
       if (!_case2State.running) {
         document.getElementById(CASE2_COMPOSER_ID)?.remove();
