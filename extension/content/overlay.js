@@ -6240,60 +6240,82 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
-        // Strategy: walk UP from the profile H1 and return the first Message
-        // button found in any ancestor.
+        // GEOMETRIC strategy — find the Message button physically closest to
+        // the profile H1 on the rendered page.
         //
-        // Why this works: the profile owner's CTA buttons (Message, Connect…)
-        // always share a CLOSE ancestor with the H1 — typically the same
-        // top-card section a few levels up. Sidebar people like Jihane live in
-        // a completely separate branch of the DOM tree that is only reachable
-        // by climbing much higher (past the profile section, past the content
-        // column, all the way to the layout root). By stopping as soon as we
-        // find ANY Message button, we always get Abdelmoughit's, never Jihane's.
-        //
-        // This requires zero knowledge of LinkedIn's CSS class names.
+        // The profile owner's Message button is ALWAYS displayed right below
+        // their name (within ~200px). The right-rail "More profiles for you"
+        // buttons (Andrew, Jihane, etc.) are 400-800px away from the H1, on
+        // the opposite side of the page. Picking the geometrically nearest
+        // candidate is impossible to misidentify regardless of LinkedIn's
+        // DOM structure or class names.
 
         const h1 = document.querySelector("main h1") || document.querySelector("h1");
-        if (!h1) return null;   // H1 not rendered yet — poll retries
+        if (!h1) return null;
 
-        const _MSG_SEL = [
-          "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='Sales Navigator' i])",
-          "a[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='Sales Navigator' i])",
-          "button.message-anywhere-button",
-          "[class*='message-anywhere-button']",
-          "button[data-control-name*='message' i]",
-        ].join(", ");
+        const h1Rect = h1.getBoundingClientRect();
+        if (h1Rect.width < 2 || h1Rect.height < 2) return null;  // not laid out yet
+        const h1CenterX = h1Rect.left + h1Rect.width / 2;
+        const h1CenterY = h1Rect.top + h1Rect.height / 2;
 
-        // Walk up from the H1. At each level, search ALL descendants of that
-        // ancestor. The first match we encounter is the owner's button.
-        let node = h1.parentElement;
-        for (let i = 0; i < 15 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
-          try {
-            for (const b of node.querySelectorAll(_MSG_SEL)) {
-              if (b.disabled) continue;
-              if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-              return b;
-            }
-          } catch {}
-          node = node.parentElement;
+        // Collect ALL Message button candidates anywhere on the page.
+        const ARIA_SEL = "button[aria-label*='Message' i], a[aria-label*='Message' i], button.message-anywhere-button, [class*='message-anywhere-button'], button[data-control-name*='message' i]";
+
+        const candidates = [];
+        const seen = new Set();
+
+        const consider = (el) => {
+          if (!el || seen.has(el)) return;
+          seen.add(el);
+          if (el.disabled) return;
+          if (el.classList?.contains("lc-inline-save")) return;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          const hay = lbl + " " + txt;
+          if (!/\bmessage\b/.test(hay)) return;
+          if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
+          // Don't confuse Connect/Follow buttons that contain the word "message".
+          if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) return;   // not visible
+          candidates.push({ el, rect: r });
+        };
+
+        for (const el of document.querySelectorAll(ARIA_SEL)) consider(el);
+        // Text-content fallback — buttons with just "Message" text and no aria-label.
+        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+          if (seen.has(el)) continue;
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+          if (txt.toLowerCase() === "message") consider(el);
         }
 
-        // Text-content fallback: same walk-up but match by text for buttons
-        // without a recognised aria-label.
-        node = h1.parentElement;
-        for (let i = 0; i < 15 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
-          for (const el of node.querySelectorAll("button, a[role='button'], [role='button']")) {
-            if (el.classList?.contains("lc-inline-save")) continue;
-            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-            if (!_isVisible(el) || el.disabled) continue;
-            const hay = ((el.getAttribute("aria-label") || "") + " " + (el.textContent || "")).toLowerCase();
-            if (/\bmessage\b/.test(hay) && !/inmail|your team|recruiter|connect|follow|sales navigator/i.test(hay)) {
-              return el;
-            }
+        if (!candidates.length) return null;
+
+        // Pick the candidate whose center is closest to the H1's center.
+        // Weight vertical distance heavier than horizontal so a button directly
+        // below the name beats one to the right at the same Y.
+        let best = null;
+        let bestScore = Infinity;
+        for (const c of candidates) {
+          const cx = c.rect.left + c.rect.width / 2;
+          const cy = c.rect.top + c.rect.height / 2;
+          const dx = Math.abs(cx - h1CenterX);
+          const dy = Math.abs(cy - h1CenterY);
+          // Penalise buttons ABOVE the H1 — owner's buttons are always BELOW.
+          const aboveH1 = cy < h1Rect.top ? 1000 : 0;
+          const score = dy * 2 + dx + aboveH1;
+          if (score < bestScore) {
+            bestScore = score;
+            best = c.el;
           }
-          node = node.parentElement;
         }
-        return null;
+
+        // Sanity check: the chosen button should be within ~600px of the H1.
+        // If everything is farther than that, the page hasn't finished laying
+        // out — return null and let the poll retry.
+        if (best && bestScore > 1200) return null;
+        return best;
       };
 
       // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
