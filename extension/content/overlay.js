@@ -6267,8 +6267,9 @@
           if (el.disabled) return;
           if (el.classList?.contains("lc-inline-save")) return;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
-          // Defence-in-depth: never the right-rail / "More profiles" column.
-          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
+          // Exclude the right-rail scaffold aside only — do NOT use [class*='aside']
+          // wildcard as it matches profile action containers on some LinkedIn layouts.
+          if (el.closest?.("aside, .scaffold-layout__aside")) return;
           const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
           const hay = lbl + " " + txt;
@@ -6276,8 +6277,14 @@
           if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
           if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
           const r = el.getBoundingClientRect();
-          if (r.width < 2 || r.height < 2) return;       // not visible
-          if (r.left > vw * 0.6) return;                  // right-rail — exclude
+          // Use offsetWidth/offsetHeight as fallback when getBoundingClientRect
+          // returns zero before the first paint cycle completes.
+          const w = r.width || el.offsetWidth;
+          const h = r.height || el.offsetHeight;
+          if (w < 2 || h < 2) return;
+          // Raise cutoff to 80% — centred layouts on wide monitors can put the
+          // profile CTA row beyond the old 60% threshold.
+          if (r.left > vw * 0.8) return;
           candidates.push({ el, top: r.top, left: r.left });
         };
 
@@ -6296,12 +6303,47 @@
         return candidates[0].el;
       };
 
-      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
-      let msgBtn = null;
-      for (let i = 0; i < 20; i++) {
-        msgBtn = _findMsgBtn();
-        if (msgBtn) break;
-        await sleep(300);
+      // Use MutationObserver (via waitFor) to detect the moment a Message button
+      // enters the DOM — far more responsive than a fixed poll interval.
+      // LinkedIn profiles hydrate via async JS; the button can appear anywhere
+      // from 1 s to 10 s after document_idle. waitFor fires immediately on insert.
+      const _MSG_SELS = [
+        "button[aria-label*='Message' i]",
+        "a[aria-label*='Message' i]",
+        "button.message-anywhere-button",
+        "[class*='message-anywhere-button']",
+        "button[data-control-name*='message' i]",
+      ];
+      // Scroll to top first — profile CTA buttons are above the fold.
+      try { window.scrollTo({ top: 0, behavior: "instant" }); } catch {}
+      const _btnAnchor = await waitFor(_MSG_SELS, { timeout: 14000 });
+      if (_btnAnchor) {
+        // Give the browser one paint cycle so getBoundingClientRect is valid.
+        await sleep(250);
+      } else {
+        console.log("[LeadCaptura] Message All: waitFor timed out — no Message button appeared", location.pathname);
+      }
+
+      // _findMsgBtn applies viewport/aside filtering on top of the anchor detection.
+      let msgBtn = _findMsgBtn();
+      if (!msgBtn && _btnAnchor) {
+        // Button appeared but position filter rejected it — back-off retry.
+        for (let i = 0; i < 10; i++) {
+          await sleep(400);
+          msgBtn = _findMsgBtn();
+          if (msgBtn) break;
+        }
+        // Absolute last resort: if _findMsgBtn still rejects it, use the raw
+        // anchor if it at least has real dimensions and isn't an LC element.
+        if (!msgBtn && !_btnAnchor.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) {
+          const r = _btnAnchor.getBoundingClientRect();
+          const w = r.width || _btnAnchor.offsetWidth;
+          const h = r.height || _btnAnchor.offsetHeight;
+          if (w >= 2 && h >= 2) {
+            console.log("[LeadCaptura] Message All: using raw anchor as fallback", _btnAnchor.getAttribute("aria-label") || _btnAnchor.textContent?.trim());
+            msgBtn = _btnAnchor;
+          }
+        }
       }
 
       if (!msgBtn) {
@@ -6315,7 +6357,7 @@
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
       await sleep(450 + Math.random() * 350);
 
-      // Spotlight the Message button briefly so the user can see what's happening.
+      // Spotlight the Message button so the user can see it being actioned.
       _showButtonSpotlight(msgBtn, "⚡ Opening Message", "auto-clicking now", 900);
       await sleep(600 + Math.random() * 250);
 
