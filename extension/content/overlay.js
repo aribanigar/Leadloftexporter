@@ -8336,11 +8336,12 @@
     return new Promise((resolve) => {
       let done = false;
       const observers = [];
+      let timer = null;
       const finish = (result) => {
         if (done) return;
         done = true;
         for (const obs of observers) obs.disconnect();
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         resolve(result);
       };
       // Initial check.
@@ -8373,7 +8374,7 @@
       });
       obs3.observe(document.documentElement, { childList: true, subtree: true });
       observers.push(obs3);
-      const timer = setTimeout(() => finish(null), maxMs);
+      timer = setTimeout(() => finish(null), maxMs);
     });
   }
 
