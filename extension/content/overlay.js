@@ -7438,23 +7438,41 @@
         // Find/wake the editor INSIDE the dialog scope.
         let editor = null;
         if (found.kind === "editor") {
-          // Use the found editor only if it's inside the dialog scope (or no
-          // scope was identified). Otherwise re-find inside the scope.
           if (!dialogScope || dialogScope.contains(found.el)) editor = found.el;
         }
         if (!editor && dialogScope) {
-          // Click into the dialog body to activate Quill.
-          const phTarget = (function () {
-            const ph = dialogScope.querySelectorAll(
-              "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
-            );
-            for (const el of ph) if (_existsInLayout(el)) return el;
-            // Bottom-half click target — message body area.
-            return dialogScope;
-          })();
-          console.log("[LeadCaptura] clicking dialog body to activate editor:", phTarget);
-          try { await dispatchHumanClick(phTarget); } catch {}
-          await sleep(450);
+          // Click at PIXEL COORDINATES in the bottom 65% of the dialog (where
+          // the message textbox visually sits). Clicking the dialog element's
+          // centre lands on the profile preview, NOT the textbox — that's why
+          // Quill was never activating. document.elementFromPoint() returns
+          // whatever element is painted at the textbox area regardless of
+          // how it's classed.
+          const dRect = dialogScope.getBoundingClientRect();
+          const cx = dRect.left + dRect.width / 2;
+          const cy = dRect.top + dRect.height * 0.7;
+          let textboxEl = document.elementFromPoint(cx, cy);
+          // If we landed on a child, climb out of text-node leaves.
+          if (textboxEl?.nodeType === Node.TEXT_NODE) textboxEl = textboxEl.parentElement;
+          console.log("[LeadCaptura] textbox click target at", Math.round(cx), Math.round(cy), "→", textboxEl?.tagName, textboxEl?.className);
+          if (textboxEl) {
+            // Click TWICE at the textbox coords — Quill sometimes ignores the
+            // first click and only mounts on the second.
+            try { await dispatchHumanClick(textboxEl); } catch {}
+            await sleep(350);
+            try { await dispatchHumanClick(textboxEl); } catch {}
+            await sleep(550);
+          } else {
+            // Last resort: click the placeholder finder result, then dialog.
+            const fb = (function () {
+              const ph = dialogScope.querySelectorAll(
+                "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+              );
+              for (const el of ph) if (_existsInLayout(el)) return el;
+              return dialogScope;
+            })();
+            try { await dispatchHumanClick(fb); } catch {}
+            await sleep(550);
+          }
           const ae = document.activeElement;
           if (ae && ae !== document.body && dialogScope.contains(ae) && (
             ae.isContentEditable ||
