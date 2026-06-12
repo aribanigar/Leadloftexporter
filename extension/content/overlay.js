@@ -7584,7 +7584,7 @@
       try { renderToolbar(); } catch {}
       flashStatus(
         `Message All done: ${sent} sent, ${skipped} skipped, ${failed} failed ✓`,
-        sent > 0 ? "ok" : "warn"
+        "ok"
       );
       _lcToast(`✓ Message All done — ${sent} sent · ${skipped} skipped · ${failed} failed`, 8000);
     }
