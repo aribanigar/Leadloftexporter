@@ -6218,227 +6218,339 @@
       : 95000 + Math.random() * 45000;                   // 95-140s (7%)
   }
 
-  // Send a LinkedIn message on the current profile page.
-  // Returns { ok, reason }.
+  // ════════════════════════════════════════════════════════════════════
+  // PROFILE-PAGE MESSAGE SENDER  (rebuilt v1.0.200)
+  //
+  // Sends a personalised LinkedIn message on a /in/<handle> profile page.
+  // The previous version had three independent failure modes that all
+  // produced "0 sent" with different root causes:
+  //   1. timing — message button not yet in DOM when we looked
+  //   2. wrong target — picked up a right-rail "More profiles" person's button
+  //   3. silent click — clicked the button but composer never opened
+  //
+  // The new design is built around ONE strong positive signal that
+  // LinkedIn provides for free: the profile owner's Message button has an
+  // aria-label literally equal to "Message <Owner's Full Name>".  So if we
+  // (a) wait for the owner's <h1> name to render, then (b) match the button
+  // by aria-label against that name, we get the right button or no button —
+  // never the wrong button.  Geometry + aside filtering is kept as a
+  // fallback for the rare layout where the templated aria-label is missing.
+  //
+  // Every step toasts to the user so they can see exactly where a failure
+  // happens.  Every step logs to console with a STEP-N prefix so a stuck
+  // run is traceable.
+  // ════════════════════════════════════════════════════════════════════
+
+  // Read the profile owner's full name from the page.  We try the H1 first
+  // (the canonical source on /in/ pages) then fall back to the document
+  // title (`Owner Name | LinkedIn`) which is set even before H1 hydration.
+  function _getProfileOwnerName() {
+    // H1 with non-empty text — LinkedIn's profile page always has one.
+    const h1s = document.querySelectorAll("main h1, h1.text-heading-xlarge, h1");
+    for (const h of h1s) {
+      const t = (h.textContent || "").replace(/\s+/g, " ").trim();
+      if (t && t.length < 120 && !/linkedin/i.test(t)) return t;
+    }
+    // Fallback: document title is "<Name> | <Title> | LinkedIn"
+    const ttl = (document.title || "").split("|")[0].trim();
+    if (ttl && ttl.length < 120 && !/^linkedin/i.test(ttl)) return ttl;
+    return "";
+  }
+
+  // Wait until BOTH the owner name and at least one candidate message button
+  // are present in the DOM.  Returns the owner name (or "" on timeout).
+  async function _waitProfileReady(maxMs = 14000) {
+    const { sleep } = globalThis.__lcHuman;
+    const t0 = Date.now();
+    let name = "";
+    while (Date.now() - t0 < maxMs) {
+      name = _getProfileOwnerName();
+      const anyMsgBtn = document.querySelector(
+        "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+      );
+      if (name && anyMsgBtn) return name;
+      await sleep(250);
+    }
+    return name;
+  }
+
+  // Strong-signal finder: returns the button whose aria-label is literally
+  // "Message <owner full name>" (case-insensitive, whitespace-flexible).
+  // LinkedIn templates every Message button this way, so the owner's button
+  // matches and right-rail people's buttons (Message Swet Prakash, Message
+  // SUGANDHA WAHAL …) cannot collide.
+  function _findOwnerMessageBtnByName(ownerName) {
+    if (!ownerName) return null;
+    // Build a tolerant regex: collapse whitespace and escape regex chars.
+    const escaped = ownerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                             .replace(/\s+/g, "\\s+");
+    const re = new RegExp("^\\s*Message\\s+" + escaped + "\\s*$", "i");
+
+    const candidates = document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+    );
+    for (const el of candidates) {
+      if (el.disabled) continue;
+      if (el.classList?.contains("lc-inline-save")) continue;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+      const lbl = (el.getAttribute("aria-label") || "").trim();
+      if (!re.test(lbl)) continue;
+      // Defence-in-depth: even with a name match, skip if it's in an aside —
+      // LinkedIn never templates the owner's own button into the sidebar, so
+      // a name match there would be a layout we don't recognise.
+      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) continue;
+      const r = el.getBoundingClientRect();
+      const w = r.width || el.offsetWidth;
+      const h = r.height || el.offsetHeight;
+      if (w < 2 || h < 2) continue;
+      return el;
+    }
+    return null;
+  }
+
+  // Geometry fallback when the name-based finder fails (rare — happens on
+  // localised UIs where the aria-label isn't "Message <Name>").  Keeps the
+  // strict aside-exclusion and 60% viewport cutoff from v1.0.199.
+  function _findMessageBtnByGeometry() {
+    const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+    const candidates = [];
+    const seen = new Set();
+    const consider = (el) => {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      if (el.disabled) return;
+      if (el.classList?.contains("lc-inline-save")) return;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
+      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const hay = lbl + " " + txt;
+      if (!/\bmessage\b/.test(hay)) return;
+      if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
+      if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
+      const r = el.getBoundingClientRect();
+      const w = r.width || el.offsetWidth;
+      const h = r.height || el.offsetHeight;
+      if (w < 2 || h < 2) return;
+      if (r.left > vw * 0.6) return;
+      candidates.push({ el, top: r.top, left: r.left });
+    };
+    for (const el of document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
+      "button.message-anywhere-button, [class*='message-anywhere-button'], " +
+      "button[data-control-name*='message' i]"
+    )) consider(el);
+    for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+      if (seen.has(el)) continue;
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.toLowerCase() === "message") consider(el);
+    }
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+    return candidates[0].el;
+  }
+
+  // Find the active compose editor on this page.  LinkedIn renders it in
+  // either a fly-out overlay bubble (default) or a centred dialog.
+  const _MSG_EDITOR_SELS = [
+    "div.msg-form__contenteditable[contenteditable='true']",
+    "div[role='textbox'][contenteditable='true']",
+    ".msg-form__compose-box [contenteditable='true']",
+    ".msg-overlay-conversation-bubble [contenteditable='true']",
+    ".msg-overlay-list-bubble [contenteditable='true']",
+    "[contenteditable='true'][data-placeholder*='rite' i]",
+  ];
+  function _findMsgEditor() {
+    for (const sel of _MSG_EDITOR_SELS) {
+      const el = document.querySelector(sel);
+      if (el && _isVisible(el)) return el;
+    }
+    return null;
+  }
+  async function _waitMsgEditor(maxMs) {
+    const { sleep } = globalThis.__lcHuman;
+    const t0 = Date.now();
+    while (Date.now() - t0 < maxMs) {
+      const el = _findMsgEditor();
+      if (el) return el;
+      await sleep(150);
+    }
+    return null;
+  }
+
+  // Find the Send button inside whichever compose surface is open.  We
+  // search the smallest scope first (the bubble nearest the editor) and
+  // expand outward.
+  function _findMsgSendBtn(editor) {
+    const scopes = [];
+    if (editor) {
+      let n = editor;
+      for (let i = 0; i < 6 && n && n !== document.body; i++, n = n.parentElement) {
+        scopes.push(n);
+      }
+    }
+    scopes.push(
+      document.querySelector(".msg-form__container"),
+      document.querySelector(".msg-overlay-conversation-bubble"),
+      document.querySelector(".msg-overlay-list-bubble"),
+      document
+    );
+    for (const scope of scopes) {
+      if (!scope) continue;
+      for (const sel of [
+        "button.msg-form__send-button:not([disabled])",
+        "button[type='submit'].msg-form__send-button",
+        "button[aria-label='Send']:not([disabled])",
+        "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
+      ]) {
+        const b = scope.querySelector?.(sel);
+        if (b && _isVisible(b)) return b;
+      }
+      for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
+        const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+        if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
+      }
+    }
+    return null;
+  }
+
+  // The full send pipeline — returns { ok, reason }.
   async function _sendProfilePageMessage(messageText) {
     const { sleep, readingPause } = globalThis.__lcHuman;
-    const { waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
 
-    await sleep(readingPause());
-
-    // ── Step 1: click the Message button (unless compose dialog already open) ──
-    const _editorSels = [
-      "div.msg-form__contenteditable[contenteditable='true']",
-      "div[role='textbox'][contenteditable='true']",
-      ".msg-form__compose-box [contenteditable='true']",
-      ".msg-overlay-conversation-bubble [contenteditable='true']",
-      ".msg-overlay-list-bubble [contenteditable='true']",
-      "[contenteditable='true'][data-placeholder*='rite' i]",
-    ];
-
-    let editor = document.querySelector(_editorSels.join(","));
+    // If a composer is already open (re-entry from a half-finished run), use it.
+    let editor = _findMsgEditor();
 
     if (!editor) {
-      const _findMsgBtn = () => {
-        // COLUMN-GEOMETRY strategy — no dependency on the H1 (a hidden/zero-size
-        // <h1> made every earlier version return null → "0 sent"). No dependency
-        // on LinkedIn class names either.
-        //
-        // Fact about the profile layout: the profile owner's CTA row (Message /
-        // Connect / …) renders in the LEFT content column, near the top, at a
-        // small x (~340px). The right-rail "More profiles for you" people
-        // (Jihane, Andrew, …) render in the FAR-RIGHT column at a large x
-        // (~1350px). So: keep only Message buttons in the left ~60% of the
-        // viewport width, then pick the TOP-MOST one — that is always the
-        // profile owner's button, never a sidebar person's.
-
-        const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
-        const ARIA_SEL =
-          "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
-          "button.message-anywhere-button, [class*='message-anywhere-button'], " +
-          "button[data-control-name*='message' i]";
-
-        const candidates = [];
-        const seen = new Set();
-
-        const consider = (el) => {
-          if (!el || seen.has(el)) return;
-          seen.add(el);
-          if (el.disabled) return;
-          if (el.classList?.contains("lc-inline-save")) return;
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
-          // "More profiles for you" right-rail is inside a container with "aside"
-          // in its class (e.g. .pv-profile-section__aside-container).  The wildcard
-          // is intentional — do not remove it.  LinkedIn confirmed this protects the
-          // profile owner's CTA from being confused with sidebar people's buttons.
-          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
-          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const hay = lbl + " " + txt;
-          if (!/\bmessage\b/.test(hay)) return;
-          if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
-          if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
-          const r = el.getBoundingClientRect();
-          // Use offsetWidth/offsetHeight as fallback when getBoundingClientRect
-          // returns zero before the first paint cycle completes.
-          const w = r.width || el.offsetWidth;
-          const h = r.height || el.offsetHeight;
-          if (w < 2 || h < 2) return;
-          // 60% viewport cutoff: right-rail "More profiles" buttons sit at ~70-75%
-          // on typical screens — keep this threshold below that level.
-          if (r.left > vw * 0.6) return;
-          candidates.push({ el, top: r.top, left: r.left });
-        };
-
-        for (const el of document.querySelectorAll(ARIA_SEL)) consider(el);
-        // Text-content fallback — a "Message" button with no aria-label.
-        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
-          if (seen.has(el)) continue;
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
-          if (txt.toLowerCase() === "message") consider(el);
-        }
-
-        if (!candidates.length) return null;
-
-        // Top-most (then left-most) in the content column = the owner's CTA.
-        candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
-        return candidates[0].el;
-      };
-
-      // Use MutationObserver (via waitFor) to detect the moment a Message button
-      // enters the DOM — far more responsive than a fixed poll interval.
-      // LinkedIn profiles hydrate via async JS; the button can appear anywhere
-      // from 1 s to 10 s after document_idle. waitFor fires immediately on insert.
-      const _MSG_SELS = [
-        "button[aria-label*='Message' i]",
-        "a[aria-label*='Message' i]",
-        "button.message-anywhere-button",
-        "[class*='message-anywhere-button']",
-        "button[data-control-name*='message' i]",
-      ];
-      // Scroll to top first — profile CTA buttons are above the fold.
+      // STEP 1 — wait for the profile to be ready (name + a message button).
+      console.log("[LeadCaptura] msg STEP 1 → waiting for profile to render");
       try { window.scrollTo({ top: 0, behavior: "instant" }); } catch {}
-      const _btnAnchor = await waitFor(_MSG_SELS, { timeout: 14000 });
-      if (_btnAnchor) {
-        // Give the browser one paint cycle so getBoundingClientRect is valid.
-        await sleep(250);
-      } else {
-        console.log("[LeadCaptura] Message All: waitFor timed out — no Message button appeared", location.pathname);
+      const ownerName = await _waitProfileReady(14000);
+      if (!ownerName) {
+        console.log("[LeadCaptura] msg STEP 1 ✗ profile name never rendered");
+        _lcToast("⚠️ Profile didn't load in time", 2800);
+        return { ok: false, reason: "profile_not_ready" };
       }
+      console.log("[LeadCaptura] msg STEP 1 ✓ owner =", ownerName);
+      _lcToast(`👤 Profile loaded — ${ownerName}`, 1500);
 
-      // _findMsgBtn applies viewport/aside filtering on top of the anchor detection.
-      // _btnAnchor just tells us WHEN a message button entered the DOM (timing signal
-      // only) — never use it directly as it may be a right-rail sidebar button.
-      let msgBtn = _findMsgBtn();
-      if (!msgBtn && _btnAnchor) {
-        // Button appeared in DOM but position filter hasn't accepted it yet —
-        // give the layout a few more frames and retry.
-        for (let i = 0; i < 10; i++) {
-          await sleep(400);
-          msgBtn = _findMsgBtn();
-          if (msgBtn) break;
+      // STEP 2 — find the owner's Message button by templated aria-label.
+      console.log("[LeadCaptura] msg STEP 2 → finding Message button");
+      let msgBtn = _findOwnerMessageBtnByName(ownerName);
+      let foundVia = "name";
+      if (!msgBtn) {
+        // Give one more re-paint cycle in case aria-label is filled async,
+        // then geometry-fallback.
+        await sleep(700);
+        msgBtn = _findOwnerMessageBtnByName(ownerName);
+        if (!msgBtn) {
+          msgBtn = _findMessageBtnByGeometry();
+          foundVia = "geometry";
         }
       }
-
       if (!msgBtn) {
-        console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
-        _lcToast("⚠️ Message button not found on this profile", 3000);
+        console.log("[LeadCaptura] msg STEP 2 ✗ no Message button found for", ownerName);
+        _lcToast(`⚠️ No Message button for ${ownerName} (not connected?)`, 2800);
         return { ok: false, reason: "no_message_button" };
       }
-      _lcToast("✉️ Found Message button — opening composer…", 2000);
+      const lbl = msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim();
+      console.log(`[LeadCaptura] msg STEP 2 ✓ found via ${foundVia}: "${lbl}"`);
 
-      console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
+      // STEP 3 — spotlight the button and click.
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await sleep(450 + Math.random() * 350);
+      await sleep(350 + Math.random() * 250);
+      _showButtonSpotlight(msgBtn, `⚡ Messaging ${ownerName}`, "auto-clicking", 1100);
+      _lcToast(`✉️ Opening composer for ${ownerName}…`, 2000);
+      await sleep(700 + Math.random() * 250);
 
-      // Spotlight the Message button so the user can see it being actioned.
-      _showButtonSpotlight(msgBtn, "⚡ Opening Message", "auto-clicking now", 900);
-      await sleep(600 + Math.random() * 250);
-
-      // Click with dispatchHumanClick first (realistic pointer sequence — what
-      // LinkedIn's bot detection expects to see leading up to a click).
+      console.log("[LeadCaptura] msg STEP 3 → click");
       await dispatchHumanClick(msgBtn);
-      editor = await waitFor(_editorSels, { timeout: 3500 });
+      editor = await _waitMsgEditor(4500);
 
-      // Fallback: _forceClick (5-strategy including React fiber onClick) when
-      // pointer events alone don't trigger LinkedIn's handlers.
+      // Click retry 1: _forceClick (multi-strategy native click).
       if (!editor) {
-        console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
+        console.log("[LeadCaptura] msg STEP 3 ↺ retry via _forceClick");
         _forceClick(msgBtn);
-        editor = await waitFor(_editorSels, { timeout: 5000 });
+        editor = await _waitMsgEditor(4500);
       }
-
+      // Click retry 2: click the inner <span>/<svg> — some Ember handlers
+      // bind to children rather than the button itself.
+      if (!editor) {
+        const inner = msgBtn.querySelector("span, svg, .artdeco-button__text");
+        if (inner) {
+          console.log("[LeadCaptura] msg STEP 3 ↺↺ retry via inner-child click");
+          _forceClick(inner);
+          editor = await _waitMsgEditor(4500);
+        }
+      }
       _removeSpotlight();
     }
 
     if (!editor) {
-      console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
+      console.log("[LeadCaptura] msg STEP 3 ✗ composer never opened after 3 clicks");
+      _lcToast("⚠️ Composer didn't open — skipping", 2500);
       return { ok: false, reason: "no_editor" };
     }
+    console.log("[LeadCaptura] msg STEP 3 ✓ composer open");
 
-    // ── Step 2: focus editor and type the message ──
+    // STEP 4 — focus + type.
+    console.log("[LeadCaptura] msg STEP 4 → typing", messageText.length, "chars");
     try { editor.click(); } catch {}
     try { editor.focus(); } catch {}
     await sleep(280 + Math.random() * 220);
-
     await typeIntoEditable(editor, messageText);
-    await sleep(400 + Math.random() * 400);
+    await sleep(450 + Math.random() * 350);
 
-    // ── Step 3: find and click the Send button ──
-    // Search inside the overlay bubble first, then fall back to document-wide.
-    const _findSendBtn = () => {
-      const scopes = [
-        document.querySelector(".msg-overlay-conversation-bubble"),
-        document.querySelector(".msg-overlay-list-bubble"),
-        document.querySelector(".msg-form__container"),
-        document,
-      ];
-      for (const scope of scopes) {
-        if (!scope) continue;
-        for (const sel of [
-          "button.msg-form__send-button:not([disabled])",
-          "button[aria-label='Send']:not([disabled])",
-          "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
-        ]) {
-          const b = scope.querySelector?.(sel);
-          if (b && _isVisible(b)) return b;
-        }
-        for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
-          const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-          if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
-        }
-      }
-      return null;
-    };
-    // Poll for the Send button to become enabled (LinkedIn enables it ~50-200ms
-    // after the last input event fires).
+    // Verify text actually landed in the editor.
+    const typed = (editor.textContent || "").trim();
+    if (!typed) {
+      console.log("[LeadCaptura] msg STEP 4 ✗ editor empty after typing");
+      _lcToast("⚠️ Couldn't type into composer", 2500);
+      return { ok: false, reason: "typing_failed" };
+    }
+    console.log("[LeadCaptura] msg STEP 4 ✓ typed");
+
+    // STEP 5 — find + click Send (poll up to 2.4s for enabled state).
+    console.log("[LeadCaptura] msg STEP 5 → finding Send button");
     let sendBtn = null;
     for (let i = 0; i < 12; i++) {
-      sendBtn = _findSendBtn();
+      sendBtn = _findMsgSendBtn(editor);
       if (sendBtn && !sendBtn.disabled) break;
       await sleep(200);
     }
-
     if (!sendBtn || sendBtn.disabled) {
-      console.log("[LeadCaptura] Message All: Send button not found or disabled");
+      console.log("[LeadCaptura] msg STEP 5 ✗ Send button not ready");
+      _lcToast("⚠️ Send button disabled", 2500);
       return { ok: false, reason: "send_disabled" };
     }
+    console.log("[LeadCaptura] msg STEP 5 ✓ Send ready");
 
-    console.log("[LeadCaptura] Message All: clicking Send");
-    _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
+    _showButtonSpotlight(sendBtn, "📨 Sending", "delivering message", 900);
     await sleep(400 + Math.random() * 200);
     await dispatchHumanClick(sendBtn);
-    // Verify the editor cleared (= send actually went through). If not, retry once.
+
+    // STEP 6 — verify send by editor clearing.  Retry once with _forceClick
+    // if not cleared within 1s.
     await sleep(900);
-    const stillHasText = (editor.textContent || "").trim().length > 0;
+    let stillHasText = (editor.textContent || "").trim().length > 0;
     if (stillHasText) {
-      console.log("[LeadCaptura] Message All: editor not cleared — retrying Send via _forceClick");
-      const retryBtn = _findSendBtn();
+      console.log("[LeadCaptura] msg STEP 6 ↺ editor still has text — retry via _forceClick");
+      const retryBtn = _findMsgSendBtn(editor);
       if (retryBtn) _forceClick(retryBtn);
-      await sleep(800);
+      await sleep(900);
+      stillHasText = (editor.textContent || "").trim().length > 0;
     }
     _removeSpotlight();
+
+    if (stillHasText) {
+      console.log("[LeadCaptura] msg STEP 6 ✗ message did not send");
+      _lcToast("⚠️ Send didn't go through", 2500);
+      return { ok: false, reason: "send_unverified" };
+    }
+    console.log("[LeadCaptura] msg STEP 6 ✓ sent");
+    _lcToast("✅ Message sent", 1800);
     return { ok: true };
   }
 
