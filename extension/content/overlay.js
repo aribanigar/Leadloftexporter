@@ -8958,10 +8958,18 @@
         }
         try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
         await sleep(500);
-        // For anchors, both pointer events (React handler) AND native .click()
-        // (SPA router for href) are needed. For buttons, .click() suffices.
-        _pointerClick(btn);
-        try { btn.click(); } catch (e) {}
+        // Snapshot existing textboxes BEFORE click — we need to identify the
+        // NEW one that mounts for this specific recipient, not a stale/cached
+        // editor in the shadow DOM.
+        const editorsBefore = new Set(_queryAllAcrossShadows(
+          "div.msg-form__contenteditable[contenteditable='true']"
+        ));
+        // Single click only. Buttons fire onClick from .click(); anchors
+        // also fire SPA navigation via href + onClick.
+        try { btn.click(); } catch (e) {
+          // Anchor-only fallback if .click() doesn't fire for some reason.
+          _pointerClick(btn);
+        }
 
         // STEP 2: Wait for click confirmation: data-artdeco-is-focused="true"
         let confirmed = false;
@@ -8973,10 +8981,21 @@
         // STEP 3: Wait 2s for dialog (per user spec).
         await sleep(2000);
 
-        // STEP 4: Find editor (MutationObserver — fires on next animation
-        // frame after any DOM change, up to 25s for slow-loading threads).
+        // STEP 4: Find the NEW editor (one that wasn't in editorsBefore).
+        // This avoids the false-positive where my code finds a cached/preload
+        // editor in shadow DOM that isn't connected to the visible dialog.
         statusEl.textContent = "[" + (i + 1) + "/" + total + "] Waiting for textbox to mount...";
-        const editor = await _waitForObserver(_findEditor, 25000);
+        const findNewEditor = () => {
+          const editors = _queryAllAcrossShadows(
+            "div.msg-form__contenteditable[contenteditable='true']"
+          );
+          for (const ed of editors) {
+            if (editorsBefore.has(ed)) continue; // skip stale
+            if (ed.querySelector("p")) return ed;
+          }
+          return null;
+        };
+        const editor = await _waitForObserver(findNewEditor, 25000);
         if (!editor) {
           failed++;
           statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
