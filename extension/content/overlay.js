@@ -8756,6 +8756,41 @@
     return _normalizeProfileUrl(link.getAttribute("href"));
   }
 
+  // Find connection cards on the page. Tries traditional class selectors
+  // first, then falls back to STRUCTURAL match (any <li> containing both a
+  // /in/<handle> link and a Message control). The structural match works
+  // regardless of how LinkedIn renames its CSS classes.
+  function _findConnectionCards() {
+    // Traditional.
+    let cards = Array.from(document.querySelectorAll(
+      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
+    ));
+    if (cards.length) return cards;
+    // Structural fallback.
+    const allLis = document.querySelectorAll("li");
+    for (const li of allLis) {
+      const profileLink = li.querySelector("a[href*='/in/']");
+      if (!profileLink) continue;
+      let msgCtrl =
+        li.querySelector("a[href*='/messaging/compose/']") ||
+        li.querySelector("button[aria-label^='Send a message' i]");
+      if (!msgCtrl) {
+        // Look for any button/anchor with text "Message".
+        for (const el of li.querySelectorAll("button, a, [role='button']")) {
+          const t = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          if (t === "message" || /\bmessage\b/.test(t)) {
+            msgCtrl = el;
+            break;
+          }
+        }
+      }
+      if (msgCtrl && !cards.includes(li)) cards.push(li);
+    }
+    // De-dup to outermost <li> (some pages have nested li-like structures).
+    cards = cards.filter((li, i) => !cards.some((other, j) => j !== i && other.contains(li)));
+    return cards;
+  }
+
   async function _loadSentSet() {
     return new Promise((resolve) => {
       try {
@@ -8782,14 +8817,12 @@
     } catch (e) {}
   }
 
-  // Mount a checkbox top-right of each <li.mn-connection-card>. Tracks the
+  // Mount a checkbox top-right of each connection card. Tracks the
   // profile URL on the input. Disabled + greyed if already-sent.
   async function _decorateCase2Cards() {
     if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
     const sent = await _loadSentSet();
-    const lis = document.querySelectorAll(
-      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
-    );
+    const lis = _findConnectionCards();
     for (const li of lis) {
       const url = _getProfileUrlFromLi(li);
       if (!url) continue;
@@ -8922,9 +8955,7 @@
       try {
         const sent = await _loadSentSet();
         const selected = _selectedUrlsFromCheckboxes();
-        const totalCards = document.querySelectorAll(
-          "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
-        ).length;
+        const totalCards = _findConnectionCards().length;
         statsEl.textContent =
           "📊 " + totalCards + " visible · " +
           sent.size + " already messaged · " +
@@ -8988,10 +9019,8 @@
     // control inside each. Uses the SAME trait as the legacy
     // _findMessageBtnInCard: anchor first (new design ships
     // <a href="/messaging/compose/...">), button as legacy fallback.
-    const liItems = document.querySelectorAll(
-      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
-    );
-    console.log("[Case2] li.mn-connection-card items found:", liItems.length);
+    const liItems = _findConnectionCards();
+    console.log("[Case2] connection cards found (structural):", liItems.length);
     let buttons = [];
 
     const findInsideCard = (li) => {
@@ -9099,7 +9128,7 @@
 
     // Build {btn, url, name, li} list and filter.
     const allCands = allButtons.map((btn) => {
-      const li = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+      const li = btn.closest("li");
       const url = _getProfileUrlFromLi(li);
       return { btn, url, li };
     });
@@ -9139,7 +9168,7 @@
         name = ariaLbl.replace(/^Send a message to\s+/i, "").trim();
       }
       if (!name) {
-        const li = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+        const li = btn.closest("li");
         const nameEl = li?.querySelector(".mn-connection-card__name, [class*='name'], .artdeco-entity-lockup__title, h3");
         if (nameEl) name = (nameEl.textContent || "").trim();
       }
@@ -9234,7 +9263,7 @@
 
         // Persist: mark this profile URL as messaged so future runs skip it.
         try {
-          const liForBtn = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+          const liForBtn = btn.closest("li");
           const url = _getProfileUrlFromLi(liForBtn);
           if (url) {
             await _markSent(url);
