@@ -6265,7 +6265,19 @@
     const { sleep } = globalThis.__lcHuman;
     const t0 = Date.now();
     let name = "";
+    // Prefer waiting until the BLUE primary Message button has actually painted —
+    // that's the owner's button and it sometimes lags the rest of the profile.
     while (Date.now() - t0 < maxMs) {
+      name = _getProfileOwnerName();
+      const primary = document.querySelector(
+        "button.artdeco-button--primary[aria-label*='Message' i], " +
+        "a.artdeco-button--primary[aria-label*='Message' i]"
+      );
+      if (name && primary) return name;
+      await sleep(250);
+    }
+    // Final fallback: accept any message-labelled button so we still try.
+    while (Date.now() - t0 < maxMs + 2000) {
       name = _getProfileOwnerName();
       const anyMsgBtn = document.querySelector(
         "button[aria-label*='Message' i], a[aria-label*='Message' i]"
@@ -6282,9 +6294,8 @@
   // matches and right-rail people's buttons (Message Swet Prakash, Message
   // SUGANDHA WAHAL …) cannot collide.
   function _findOwnerMessageBtnByName(ownerName) {
-    if (!ownerName) return null;
-
     const _candidateIsValid = (el) => {
+      if (!el) return false;
       if (el.disabled) return false;
       if (el.classList?.contains("lc-inline-save")) return false;
       if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return false;
@@ -6294,6 +6305,28 @@
       const h = r.height || el.offsetHeight;
       return w >= 2 && h >= 2;
     };
+
+    // Pass 0 — the killer signal: LinkedIn paints the profile owner's Message
+    // button as the blue PRIMARY artdeco button.  Sidebar "Message" buttons on
+    // "More profiles for you" cards are SECONDARY (white bg, blue border).  So
+    // the primary-styled Message button on the page is almost always the owner's.
+    const primaries = document.querySelectorAll(
+      "button.artdeco-button--primary[aria-label*='Message' i], " +
+      "a.artdeco-button--primary[aria-label*='Message' i], " +
+      "button.artdeco-button--primary[aria-label*='message' i], " +
+      "a.artdeco-button--primary[aria-label*='message' i]"
+    );
+    for (const el of primaries) {
+      if (!_candidateIsValid(el)) continue;
+      // Tighter: make sure the visible text or aria-label actually says Message.
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+        return el;
+      }
+    }
+
+    if (!ownerName) return null;
 
     const candidates = Array.from(document.querySelectorAll(
       "button[aria-label*='Message' i], a[aria-label*='Message' i]"
@@ -6363,7 +6396,14 @@
       if (txt.toLowerCase() === "message") consider(el);
     }
     if (!candidates.length) return null;
-    candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+    // Strong tie-breaker: prefer artdeco-button--primary (blue) — that's the
+    // styling LinkedIn applies to the profile owner's own Message button.
+    candidates.sort((a, b) => {
+      const aP = a.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
+      const bP = b.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
+      if (aP !== bP) return aP - bP;
+      return (a.top - b.top) || (a.left - b.left);
+    });
     return candidates[0].el;
   }
 
