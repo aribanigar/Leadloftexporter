@@ -8330,46 +8330,108 @@
   }
 
   // MutationObserver-based wait — fires on next animation frame after ANY
-  // DOM change. Much faster + more reliable than fixed polling for elements
-  // that appear after async render.
+  // DOM change. Also observes inside #interop-outlet's shadow root (where
+  // LinkedIn now mounts the message dialog).
   function _waitForObserver(testFn, maxMs = 12000) {
     return new Promise((resolve) => {
       let done = false;
+      const observers = [];
       const finish = (result) => {
         if (done) return;
         done = true;
-        observer.disconnect();
+        for (const obs of observers) obs.disconnect();
         clearTimeout(timer);
         resolve(result);
       };
       // Initial check.
       const initial = testFn();
       if (initial) return finish(initial);
-      const observer = new MutationObserver(() => {
+      const onMutation = () => {
         const result = testFn();
         if (result) finish(result);
+      };
+      // Observe main document body.
+      const obs1 = new MutationObserver(onMutation);
+      obs1.observe(document.body, { childList: true, subtree: true, attributes: true });
+      observers.push(obs1);
+      // Observe inside #interop-outlet's shadow root if present.
+      const outlet = document.querySelector("#interop-outlet");
+      if (outlet && outlet.shadowRoot) {
+        const obs2 = new MutationObserver(onMutation);
+        obs2.observe(outlet.shadowRoot, { childList: true, subtree: true, attributes: true });
+        observers.push(obs2);
+      }
+      // Also: re-attach to shadow root if #interop-outlet appears later.
+      const obs3 = new MutationObserver(() => {
+        const outletLater = document.querySelector("#interop-outlet");
+        if (outletLater && outletLater.shadowRoot && observers.length < 4) {
+          const newObs = new MutationObserver(onMutation);
+          newObs.observe(outletLater.shadowRoot, { childList: true, subtree: true, attributes: true });
+          observers.push(newObs);
+        }
+        onMutation();
       });
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-      });
+      obs3.observe(document.documentElement, { childList: true, subtree: true });
+      observers.push(obs3);
       const timer = setTimeout(() => finish(null), maxMs);
     });
   }
 
+  // Helper: search inside a scope (document OR shadowRoot) for a matching
+  // element. Used by everything that needs to look inside #interop-outlet's
+  // shadow root, which is where LinkedIn now mounts the message dialog.
+  function _queryAcrossShadows(selector) {
+    // 1) Main document.
+    let el = document.querySelector(selector);
+    if (el) return el;
+    // 2) The known LinkedIn messaging shadow host.
+    const outlet = document.querySelector("#interop-outlet");
+    if (outlet && outlet.shadowRoot) {
+      el = outlet.shadowRoot.querySelector(selector);
+      if (el) return el;
+    }
+    // 3) Any other shadow roots on the page (defensive).
+    for (const host of document.querySelectorAll("*")) {
+      if (host.shadowRoot) {
+        try {
+          const found = host.shadowRoot.querySelector(selector);
+          if (found) return found;
+        } catch (e) {}
+      }
+    }
+    return null;
+  }
+
+  function _queryAllAcrossShadows(selector) {
+    const out = [];
+    document.querySelectorAll(selector).forEach((el) => out.push(el));
+    const outlet = document.querySelector("#interop-outlet");
+    if (outlet && outlet.shadowRoot) {
+      outlet.shadowRoot.querySelectorAll(selector).forEach((el) => out.push(el));
+    }
+    // Defensive: walk all shadow hosts.
+    for (const host of document.querySelectorAll("*")) {
+      if (host.shadowRoot) {
+        try {
+          host.shadowRoot.querySelectorAll(selector).forEach((el) => out.push(el));
+        } catch (e) {}
+      }
+    }
+    return out;
+  }
+
   // Find the message textbox. CRITICAL: requires a <p> child to confirm Quill
   // has finished mounting — without that child, typing will silently fail.
-  // Empty state: <p><br></p>. Typed state: <p>text</p>. No <p> = not ready.
+  // Also searches inside #interop-outlet's shadowRoot (LinkedIn's new design
+  // mounts the dialog inside a shadow DOM).
   function _findEditor() {
-    const editors = document.querySelectorAll(
+    const editors = _queryAllAcrossShadows(
       "div.msg-form__contenteditable[contenteditable='true']"
     );
     for (const ed of editors) {
       if (ed.querySelector("p")) return ed; // Quill mounted + ready
     }
-    // Activity-based fallback: focused contenteditable inside a msg-form
-    // ancestor, with <p> child.
+    // Activity-based fallback: focused contenteditable.
     const ae = document.activeElement;
     if (
       ae && ae !== document.body && ae.isContentEditable &&
@@ -8382,9 +8444,9 @@
 
   function _findSendBtn(enabledOnly = true) {
     if (enabledOnly) {
-      return document.querySelector("button.msg-form__send-button:not([disabled])");
+      return _queryAcrossShadows("button.msg-form__send-button:not([disabled])");
     }
-    return document.querySelector("button.msg-form__send-button");
+    return _queryAcrossShadows("button.msg-form__send-button");
   }
 
   function _closeMsgDialog() {
@@ -8399,7 +8461,7 @@
       "[role='dialog'] button[aria-label*='Dismiss' i]",
     ];
     for (const sel of closeSelectors) {
-      const btn = document.querySelector(sel);
+      const btn = _queryAcrossShadows(sel);
       if (btn) {
         try { btn.click(); return true; } catch (e) {}
       }
