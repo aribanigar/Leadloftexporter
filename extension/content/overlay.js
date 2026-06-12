@@ -6513,33 +6513,62 @@
     "[contenteditable='true'][data-placeholder*='rite' i]",
     "[contenteditable='true'][data-placeholder*='essage' i]",
   ];
+  // Find the DEEPEST visible contenteditable inside a scope (avoids picking
+  // an outer wrapper when the real editable is a nested div).
+  function _deepestEditable(scope) {
+    if (!scope) return null;
+    const all = scope.querySelectorAll("[contenteditable='true'], textarea, input[type='text']");
+    let best = null;
+    for (const el of all) {
+      if (!_isVisible(el)) continue;
+      // Prefer the one that has NO contenteditable descendant (i.e. is a leaf).
+      if (!el.querySelector("[contenteditable='true']")) {
+        best = el;
+      } else if (!best) {
+        best = el;
+      }
+    }
+    return best;
+  }
+
   function _findMsgEditor() {
-    // Pass 1 — known selectors.
+    // Pass 1 — known selectors (kept for legacy bubble compatibility).
     for (const sel of _MSG_EDITOR_SELS) {
       const els = document.querySelectorAll(sel);
       for (const el of els) {
-        if (_isVisible(el)) return el;
+        if (_isVisible(el) && !el.querySelector("[contenteditable='true']")) return el;
       }
     }
-    // Pass 2 — climb from the "Write a message…" placeholder text to find
-    // the editor. LinkedIn renders the placeholder as a sibling/parent.
+    // Pass 2 — deepest editable inside the dialog (the new design).
+    const dlg = document.querySelector("[role='dialog']");
+    if (dlg) {
+      const deep = _deepestEditable(dlg);
+      if (deep) return deep;
+    }
+    // Pass 3 — climb from "Write a message…" placeholder.
     const ph = Array.from(document.querySelectorAll(
       "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
     ));
     for (const node of ph) {
       if (!_isVisible(node)) continue;
-      // The node itself may BE the editor (contenteditable div).
       if (node.matches?.("[contenteditable='true'], textarea, input[type='text']")) return node;
-      // Otherwise look near it.
       const near = node.querySelector?.("[contenteditable='true'], textarea");
       if (near && _isVisible(near)) return near;
     }
-    // Pass 3 — last resort: any visible contenteditable in a dialog.
-    const dlg = document.querySelector("[role='dialog']");
-    if (dlg) {
-      const any = dlg.querySelector("[contenteditable='true'], textarea");
-      if (any && _isVisible(any)) return any;
+    // Pass 4 — find any element whose visible text === "Write a message..."
+    // and climb to the closest editable.
+    const all = document.querySelectorAll("[role='dialog'] *, .msg-form *, .msg-overlay-conversation-bubble *");
+    for (const el of all) {
+      const t = (el.textContent || "").trim();
+      if (!t || t.length > 40) continue;
+      if (!/write\s+a\s+message/i.test(t)) continue;
+      const parent = el.closest("[role='dialog'], .msg-form, .msg-overlay-conversation-bubble") || el.parentElement;
+      const near = parent?.querySelector?.("[contenteditable='true'], textarea");
+      if (near && _isVisible(near)) return near;
     }
+    // Pass 5 — fallback: any visible contenteditable anywhere.
+    const any = document.querySelector("[contenteditable='true']");
+    if (any && _isVisible(any)) return any;
     return null;
   }
   async function _waitMsgEditor(maxMs) {
@@ -6551,6 +6580,126 @@
       await sleep(150);
     }
     return null;
+  }
+
+  // Pull the current text out of any editor variant (textarea, input,
+  // contenteditable div).  Returns "" if nothing typed.
+  function _editorText(e) {
+    if (!e) return "";
+    if (typeof e.value === "string" && e.value) return e.value.trim();
+    return ((e.textContent || e.innerText || "")).trim();
+  }
+
+  // Robust multi-strategy typing into the active message editor.  Returns
+  // true if SOMETHING ended up in the editor, false if every strategy failed.
+  async function _robustTypeMessage(editor, text) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+    if (!editor || !text) return false;
+
+    // STEP A — REAL pointer click on the editor.  LinkedIn's new Quill-style
+    // dialog editor needs a pointerdown/pointerup sequence to activate; just
+    // calling .focus() leaves it inert.
+    try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+    try { await dispatchHumanClick(editor); } catch {}
+    await sleep(280 + Math.random() * 220);
+    try { editor.focus(); } catch {}
+    await sleep(180);
+
+    // STEP B — typeIntoEditable (existing — execCommand/insertText for
+    // contenteditable, native value setter for textarea/input).
+    try { await typeIntoEditable(editor, text); } catch (e) { console.log("[LeadCaptura] strategy B failed:", e); }
+    await sleep(300);
+    if (_editorText(editor)) {
+      console.log("[LeadCaptura] type strategy B (typeIntoEditable) succeeded");
+      return true;
+    }
+
+    // STEP C — Selection API + execCommand for contenteditable.  Some Quill
+    // editors only accept input when the selection is inside the editor.
+    if (editor.isContentEditable) {
+      try {
+        editor.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand("insertText", false, text);
+        await sleep(300);
+        if (_editorText(editor)) {
+          console.log("[LeadCaptura] type strategy C (Selection+insertText) succeeded");
+          return true;
+        }
+      } catch (e) { console.log("[LeadCaptura] strategy C failed:", e); }
+    }
+
+    // STEP D — beforeinput/input event simulation.  Char-by-char with full
+    // InputEvent. Quill and Lexical both listen to these.
+    try {
+      editor.focus();
+      await sleep(120);
+      for (const ch of text) {
+        const init = { data: ch, inputType: "insertText", bubbles: true, cancelable: true };
+        editor.dispatchEvent(new InputEvent("beforeinput", init));
+        if (editor.isContentEditable) {
+          document.execCommand("insertText", false, ch);
+        } else if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
+          const proto = editor.tagName === "TEXTAREA"
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+          const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+          setter.call(editor, (editor.value || "") + ch);
+        }
+        editor.dispatchEvent(new InputEvent("input", init));
+        await sleep(25 + Math.random() * 20);
+      }
+      await sleep(250);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy D (InputEvent loop) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy D failed:", e); }
+
+    // STEP E — synthesised paste.
+    try {
+      editor.focus();
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      dt.setData("text/html", text.replace(/\n/g, "<br>"));
+      const evt = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+      editor.dispatchEvent(evt);
+      await sleep(400);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy E (paste) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy E failed:", e); }
+
+    // STEP F — brute force: write directly to innerText / value, then fire input.
+    try {
+      if (editor.isContentEditable) {
+        editor.innerText = text;
+        editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
+      } else if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
+        const proto = editor.tagName === "TEXTAREA"
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+        setter.call(editor, text);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+        editor.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      await sleep(400);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy F (innerText/value) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy F failed:", e); }
+
+    console.log("[LeadCaptura] ALL typing strategies failed for editor:", editor);
+    return false;
   }
 
   // Find the Send button inside whichever compose surface is open.  We
@@ -7030,41 +7179,16 @@
           continue;
         }
 
-        // Type the message.
-        try { editor.click(); } catch {}
-        try { editor.focus(); } catch {}
-        await sleep(300 + Math.random() * 200);
-        await typeIntoEditable(editor, finalMsg);
-        await sleep(450 + Math.random() * 300);
-
-        const _editorText = (e) => (e.value || e.textContent || e.innerText || "").trim();
-        const typed = _editorText(editor);
-        console.log(`[LeadCaptura] msg in-place ${idx}/${total} editor text after type: "${typed.slice(0, 60)}"`);
-        if (!typed) {
-          // Last-ditch: try setting value directly (some React-controlled
-          // textareas don't accept execCommand/key events but DO listen to
-          // an input event with the right value setter).
-          try {
-            if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
-              const proto = window.HTMLTextAreaElement.prototype;
-              const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
-              setter.call(editor, finalMsg);
-              editor.dispatchEvent(new Event("input", { bubbles: true }));
-            } else if (editor.isContentEditable) {
-              editor.innerHTML = finalMsg.split("\n").map(l =>
-                "<p>" + l.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])) + "</p>"
-              ).join("");
-              editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
-            }
-          } catch (e) { console.log("[LeadCaptura] fallback type failed:", e); }
-          await sleep(500);
-          const typed2 = _editorText(editor);
-          if (!typed2) {
-            failed++;
-            _lcToast(`✗ ${idx}/${total} — couldn't type`, 2500);
-            _closeMsgOverlay();
-            continue;
-          }
+        // Type the message — multi-strategy.  LinkedIn's "New message"
+        // dialog uses a Quill-style editor that requires a real pointer
+        // click before it accepts input; focus() alone is silently ignored.
+        console.log(`[LeadCaptura] msg in-place ${idx}/${total} editor:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
+        const ok = await _robustTypeMessage(editor, finalMsg);
+        if (!ok) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't type the message`, 2800);
+          _closeMsgOverlay();
+          continue;
         }
 
         // Find + click Send.
