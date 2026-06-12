@@ -8284,3 +8284,551 @@
     removeMessageSpotlight,
   };
 })();
+
+// ════════════════════════════════════════════════════════════════════
+// CASE #1 + CASE #2 — User-taught messaging flows (v1.0.226)
+// SELF-CONTAINED IIFE. Does NOT touch any existing code.
+// - Case #1: Floating "Send Message" pill on /in/<handle> pages.
+// - Case #2: Floating "Message All" pill on /mynetwork/invite-connect/connections/ pages.
+// Both use the EXACT DOM selectors the user provided:
+//   Textbox: div.msg-form__contenteditable[contenteditable='true'][role='textbox']
+//   Send:    button.msg-form__send-button
+//   Card Msg button: button[aria-label^="Send a message to"]
+//   Click confirm:   data-artdeco-is-focused="true"
+// ════════════════════════════════════════════════════════════════════
+(function () {
+  "use strict";
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // —— Helpers ——————————————————————————————————————————————————————
+
+  function _pointerClick(el) {
+    if (!el) return;
+    try {
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 };
+      el.dispatchEvent(new PointerEvent("pointerover", opts));
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+    } catch (e) {}
+  }
+
+  async function _waitFor(testFn, maxMs = 5000, intervalMs = 150) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      const result = testFn();
+      if (result) return result;
+      await sleep(intervalMs);
+    }
+    return null;
+  }
+
+  function _findEditor() {
+    return (
+      document.querySelector("div.msg-form__contenteditable[contenteditable='true'][role='textbox']") ||
+      document.querySelector("[contenteditable='true'][aria-label='Write a message…']") ||
+      document.querySelector("div.msg-form__contenteditable[contenteditable='true']") ||
+      document.querySelector("div.msg-form__contenteditable")
+    );
+  }
+
+  function _findSendBtn(enabledOnly = true) {
+    if (enabledOnly) {
+      return document.querySelector("button.msg-form__send-button:not([disabled])");
+    }
+    return document.querySelector("button.msg-form__send-button");
+  }
+
+  function _closeMsgDialog() {
+    const closeSelectors = [
+      "button[aria-label*='Close your conversation' i]",
+      "section.msg-overlay-conversation-bubble button[aria-label*='Close' i]",
+      ".msg-overlay-conversation-bubble button[aria-label*='Close' i]",
+      "header.msg-overlay-bubble-header button[aria-label*='Close' i]",
+      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i]",
+      "[class*='msg-overlay'] button[aria-label*='Close' i]",
+      "[role='dialog'] button[aria-label*='Close' i]",
+      "[role='dialog'] button[aria-label*='Dismiss' i]",
+    ];
+    for (const sel of closeSelectors) {
+      const btn = document.querySelector(sel);
+      if (btn) {
+        try { btn.click(); return true; } catch (e) {}
+      }
+    }
+    // Fallback: Escape
+    try {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+    } catch (e) {}
+    return false;
+  }
+
+  async function _typeIntoEditor(editor, text) {
+    if (!editor || !text) return false;
+    // Focus + position cursor at end
+    try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+    _pointerClick(editor);
+    await sleep(300);
+    try { editor.focus(); } catch (e) {}
+    await sleep(200);
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
+
+    // Strategy 1: execCommand
+    try {
+      document.execCommand("insertText", false, text);
+      await sleep(400);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    // Strategy 2: paste event
+    try {
+      editor.focus();
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+      await sleep(500);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    // Strategy 3: innerHTML wrap in <p>
+    try {
+      editor.innerHTML = "<p>" + text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])) + "</p>";
+      editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
+      await sleep(400);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    return false;
+  }
+
+  // —— Floating Action Buttons ——————————————————————————————————————
+
+  const FAB_BASE_STYLE = {
+    position: "fixed",
+    bottom: "120px",
+    right: "24px",
+    zIndex: "2147483640",
+    background: "linear-gradient(135deg, #0a66c2, #004182)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "999px",
+    padding: "12px 22px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+    boxShadow: "0 4px 16px rgba(10, 102, 194, 0.4)",
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    transition: "transform 0.15s ease, box-shadow 0.15s ease",
+  };
+
+  function _mountFab(id, label, onClick) {
+    if (document.getElementById(id)) return;
+    const btn = document.createElement("button");
+    btn.id = id;
+    btn.type = "button";
+    btn.textContent = label;
+    Object.assign(btn.style, FAB_BASE_STYLE);
+    btn.addEventListener("mouseenter", () => {
+      btn.style.transform = "translateY(-2px)";
+      btn.style.boxShadow = "0 8px 24px rgba(10, 102, 194, 0.6)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.transform = "translateY(0)";
+      btn.style.boxShadow = "0 4px 16px rgba(10, 102, 194, 0.4)";
+    });
+    btn.addEventListener("click", onClick);
+    document.body.appendChild(btn);
+  }
+
+  function _unmountFab(id) {
+    document.getElementById(id)?.remove();
+  }
+
+  function _showToast(msg, ms = 2500) {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    Object.assign(t.style, {
+      position: "fixed",
+      bottom: "60px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(15, 23, 42, 0.95)",
+      color: "#fff",
+      padding: "10px 18px",
+      borderRadius: "999px",
+      fontSize: "13px",
+      fontWeight: "500",
+      zIndex: "2147483647",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+    });
+    document.documentElement.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // CASE #1 — Individual Profile "Send Message"
+  // ════════════════════════════════════════════════════════════════════
+  const CASE1_FAB_ID = "lc-case1-fab";
+  const CASE1_COMPOSER_ID = "lc-case1-composer";
+
+  function _showCase1Composer() {
+    document.getElementById(CASE1_COMPOSER_ID)?.remove();
+
+    const wrap = document.createElement("div");
+    wrap.id = CASE1_COMPOSER_ID;
+    Object.assign(wrap.style, {
+      position: "fixed",
+      bottom: "180px",
+      right: "24px",
+      width: "380px",
+      maxWidth: "calc(100vw - 40px)",
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "14px",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+      padding: "16px 18px",
+      zIndex: "2147483641",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+    });
+
+    wrap.innerHTML =
+      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:10px;">Send Message to this Profile</div>' +
+      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:120px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:8px;min-height:16px;"></div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">' +
+      '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
+      '<button data-role="send" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Send Message</button>' +
+      "</div>";
+
+    document.documentElement.appendChild(wrap);
+
+    const ta = wrap.querySelector("[data-role='ta']");
+    const statusEl = wrap.querySelector("[data-role='status']");
+    const cancelBtn = wrap.querySelector("[data-role='cancel']");
+    const sendBtn = wrap.querySelector("[data-role='send']");
+
+    cancelBtn.onclick = () => wrap.remove();
+    sendBtn.onclick = async () => {
+      const msg = ta.value.trim();
+      if (!msg) { ta.focus(); return; }
+      sendBtn.disabled = true;
+      cancelBtn.disabled = true;
+      ta.disabled = true;
+      try {
+        const result = await _case1Run(msg, (s) => { statusEl.textContent = s; });
+        if (result.ok) {
+          statusEl.textContent = "✅ Sent successfully";
+          setTimeout(() => wrap.remove(), 2000);
+        } else {
+          statusEl.textContent = "❌ " + result.reason;
+          sendBtn.disabled = false;
+          cancelBtn.disabled = false;
+          ta.disabled = false;
+        }
+      } catch (e) {
+        statusEl.textContent = "❌ " + (e.message || e);
+        sendBtn.disabled = false;
+        cancelBtn.disabled = false;
+        ta.disabled = false;
+      }
+    };
+    ta.focus();
+  }
+
+  async function _case1Run(messageText, onStatus) {
+    onStatus("Finding Message button on this profile...");
+    // Profile Message button: prefer the messaging compose anchor, exclude sidebar/aside.
+    let msgBtn = null;
+    const all = document.querySelectorAll("a[href*='/messaging/compose/'], button[aria-label^='Message'], a[aria-label^='Message']");
+    for (const el of all) {
+      if (el.closest("aside, [class*='aside']")) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      msgBtn = el;
+      break;
+    }
+    if (!msgBtn) return { ok: false, reason: "Message button not found on profile" };
+
+    onStatus("Clicking Message button...");
+    try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+    await sleep(400);
+    if (msgBtn.tagName === "A") {
+      try { msgBtn.click(); } catch (e) {}
+    } else {
+      _pointerClick(msgBtn);
+    }
+
+    onStatus("Waiting 2s for dialog...");
+    await sleep(2000);
+
+    onStatus("Finding textbox...");
+    const editor = await _waitFor(_findEditor, 4000, 200);
+    if (!editor) return { ok: false, reason: "Textbox not found" };
+
+    onStatus("Typing message...");
+    const typed = await _typeIntoEditor(editor, messageText);
+    if (!typed) return { ok: false, reason: "Could not type into textbox" };
+
+    onStatus("Waiting for Send button...");
+    const sendBtn = await _waitFor(() => _findSendBtn(true), 3000, 200);
+    if (!sendBtn) return { ok: false, reason: "Send button disabled" };
+
+    onStatus("Clicking Send...");
+    _pointerClick(sendBtn);
+    await sleep(1500);
+
+    return { ok: true };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // CASE #2 — Connection List "Message All"
+  // ════════════════════════════════════════════════════════════════════
+  const CASE2_FAB_ID = "lc-case2-fab";
+  const CASE2_COMPOSER_ID = "lc-case2-composer";
+  const _case2State = { running: false, cancelled: false };
+
+  function _showCase2Composer() {
+    document.getElementById(CASE2_COMPOSER_ID)?.remove();
+
+    const wrap = document.createElement("div");
+    wrap.id = CASE2_COMPOSER_ID;
+    Object.assign(wrap.style, {
+      position: "fixed",
+      bottom: "180px",
+      right: "24px",
+      width: "440px",
+      maxWidth: "calc(100vw - 40px)",
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "14px",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+      padding: "16px 18px",
+      zIndex: "2147483641",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+    });
+
+    wrap.innerHTML =
+      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:10px;">Message All Visible Connections</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Sends to every visible profile in the list. Random 15-30s pause between sends.</div>' +
+      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:110px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:8px;min-height:16px;"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">' +
+      '<div data-role="progress" style="font-size:12px;color:#64748b;"></div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
+      '<button data-role="start" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Start</button>' +
+      "</div></div>";
+
+    document.documentElement.appendChild(wrap);
+
+    const ta = wrap.querySelector("[data-role='ta']");
+    const statusEl = wrap.querySelector("[data-role='status']");
+    const progressEl = wrap.querySelector("[data-role='progress']");
+    const cancelBtn = wrap.querySelector("[data-role='cancel']");
+    const startBtn = wrap.querySelector("[data-role='start']");
+
+    cancelBtn.onclick = () => {
+      if (_case2State.running) {
+        _case2State.cancelled = true;
+        cancelBtn.textContent = "Stopping after current...";
+        cancelBtn.disabled = true;
+      } else {
+        wrap.remove();
+      }
+    };
+
+    startBtn.onclick = async () => {
+      const msg = ta.value.trim();
+      if (!msg) { ta.focus(); return; }
+      startBtn.disabled = true;
+      ta.disabled = true;
+      cancelBtn.textContent = "Stop";
+      _case2State.running = true;
+      _case2State.cancelled = false;
+      try {
+        await _case2Run(msg, statusEl, progressEl);
+      } catch (e) {
+        statusEl.textContent = "❌ " + (e.message || e);
+      } finally {
+        _case2State.running = false;
+        _case2State.cancelled = false;
+        startBtn.disabled = false;
+        ta.disabled = false;
+        cancelBtn.textContent = "Close";
+        cancelBtn.disabled = false;
+        cancelBtn.onclick = () => wrap.remove();
+      }
+    };
+
+    ta.focus();
+  }
+
+  async function _case2Run(messageText, statusEl, progressEl) {
+    // Snapshot Message buttons on the page (top-most first by DOM order).
+    const buttons = Array.from(document.querySelectorAll("button[aria-label^='Send a message to']"));
+    const total = buttons.length;
+    if (!total) {
+      statusEl.textContent = "❌ No Message buttons found on the page";
+      return;
+    }
+    let sent = 0, failed = 0;
+    progressEl.textContent = "0 sent · 0 failed · 0/" + total;
+
+    for (let i = 0; i < buttons.length; i++) {
+      if (_case2State.cancelled) break;
+      const btn = buttons[i];
+      const ariaLbl = btn.getAttribute("aria-label") || "";
+      const name = ariaLbl.replace(/^Send a message to\s+/i, "").trim() || "Unknown";
+      statusEl.textContent = "[" + (i + 1) + "/" + total + "] Messaging " + name + "...";
+
+      try {
+        // STEP 1: Scroll button into view + click.
+        if (!document.body.contains(btn)) {
+          failed++;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+        try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+        await sleep(500);
+        btn.click();
+
+        // STEP 2: Wait for click confirmation: data-artdeco-is-focused="true"
+        let confirmed = false;
+        for (let k = 0; k < 30; k++) {
+          if (btn.getAttribute("data-artdeco-is-focused") === "true") { confirmed = true; break; }
+          await sleep(100);
+        }
+
+        // STEP 3: Wait 2s for dialog (per user spec).
+        await sleep(2000);
+
+        // STEP 4: Find editor.
+        const editor = await _waitFor(_findEditor, 4000, 200);
+        if (!editor) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 5: Type message.
+        const typed = await _typeIntoEditor(editor, messageText);
+        if (!typed) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Could not type for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 6: Find Send button (poll until enabled).
+        const sendBtn = await _waitFor(() => _findSendBtn(true), 3000, 200);
+        if (!sendBtn) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Send disabled for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 7: Click Send.
+        _pointerClick(sendBtn);
+        await sleep(1500);
+
+        // Success.
+        sent++;
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ✅ Sent to " + name;
+
+        // STEP 8: Close dialog with X.
+        _closeMsgDialog();
+        await sleep(800);
+
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+
+        // STEP 9: Random 15-30s gap between messages (skip if last or cancelled).
+        if (i < buttons.length - 1 && !_case2State.cancelled) {
+          const waitMs = 15000 + Math.floor(Math.random() * 15000);
+          const waitS = Math.round(waitMs / 1000);
+          for (let s = waitS; s > 0; s--) {
+            if (_case2State.cancelled) break;
+            statusEl.textContent = "Waiting " + s + "s before next...";
+            await sleep(1000);
+          }
+        }
+      } catch (e) {
+        failed++;
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Error: " + (e.message || e);
+        try { _closeMsgDialog(); } catch (err) {}
+        await sleep(1000);
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+      }
+    }
+
+    statusEl.textContent = "Done. " + sent + " sent, " + failed + " failed.";
+  }
+
+  // —— Self-mounting watcher ——————————————————————————————————————
+
+  function _syncFabs() {
+    const path = location.pathname;
+    const onProfile = path.startsWith("/in/");
+    const onConnections = path.startsWith("/mynetwork/invite-connect/connections");
+
+    if (onProfile) {
+      _mountFab(CASE1_FAB_ID, "✉️ Send Message", _showCase1Composer);
+    } else {
+      _unmountFab(CASE1_FAB_ID);
+      document.getElementById(CASE1_COMPOSER_ID)?.remove();
+    }
+
+    if (onConnections) {
+      _mountFab(CASE2_FAB_ID, "✉️ Message All", _showCase2Composer);
+    } else {
+      _unmountFab(CASE2_FAB_ID);
+      // Don't close composer if a run is active.
+      if (!_case2State.running) {
+        document.getElementById(CASE2_COMPOSER_ID)?.remove();
+      }
+    }
+  }
+
+  // Initial mount once body is ready.
+  function _initWhenReady() {
+    if (document.body) {
+      _syncFabs();
+      // Watch URL changes (SPA navigation).
+      let lastPath = location.pathname;
+      setInterval(() => {
+        if (location.pathname !== lastPath) {
+          lastPath = location.pathname;
+          _syncFabs();
+        } else {
+          // Also re-mount if the FAB got ripped out by LinkedIn's React re-render.
+          _syncFabs();
+        }
+      }, 1500);
+    } else {
+      setTimeout(_initWhenReady, 300);
+    }
+  }
+  _initWhenReady();
+})();
