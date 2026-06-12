@@ -1276,7 +1276,7 @@
                     if (state.connectActive) state.connectCancel = true;
                     if (state.applyActive) state.applyCancel = true;
                     if (state.messageActive) {
-                      state.messageActive = false;
+                      state.messageCancel = true;
                       _clearMsgRun().catch(() => {});
                     }
                     flashStatus("Stopping…", "warn");
@@ -6835,22 +6835,237 @@
     ta.focus();
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // IN-PLACE MESSAGE ALL  (v1.0.206 — no profile navigation)
+  //
+  // Click the inline Message button on each card right on the connections /
+  // search page.  LinkedIn's new design renders the Message control as an
+  // <a href="/messaging/compose/?profileUrn=..."> anchor with hash-obfuscated
+  // CSS classes — NOT a button.artdeco-button--primary.  The href is the
+  // single most reliable signal.
+  // ════════════════════════════════════════════════════════════════════
+
+  // Find the Message anchor/button inside a card subtree.  Handles BOTH
+  // the new anchor-based design and the legacy button-based one.
+  function _findMessageBtnInCard(cardEl) {
+    if (!cardEl) return null;
+    // Strongest signal: new design ships an <a href="/messaging/compose/...">.
+    const composeLink = cardEl.querySelector(
+      "a[href*='/messaging/compose/'], a[href*='messaging/thread/new'], a[href*='messaging/compose']"
+    );
+    if (composeLink) return composeLink;
+    // Legacy: button with text/aria-label "Message".
+    const candidates = cardEl.querySelectorAll(
+      "button, a, [role='button']"
+    );
+    for (const el of candidates) {
+      if (el.disabled) continue;
+      if (el.classList?.contains("lc-inline-save")) continue;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  // Close LinkedIn's message overlay bubble after a successful send so the
+  // next iteration starts from a clean state.
+  function _closeMsgOverlay() {
+    const closers = document.querySelectorAll(
+      ".msg-overlay-conversation-bubble button[aria-label*='Close' i], " +
+      ".msg-overlay-conversation-bubble button[data-control-name*='close' i], " +
+      ".msg-overlay-list-bubble button[aria-label*='Close' i], " +
+      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i], " +
+      ".msg-overlay-bubble-header__controls button[type='button']"
+    );
+    for (const b of closers) {
+      try { b.click(); } catch {}
+    }
+  }
+
+  // Extract template variables from a connections-page card.
+  function _scrapeCardProfile(cardEl) {
+    const profile = {};
+    try {
+      const link = cardEl.querySelector("a[href*='/in/']");
+      const nameText = (link?.textContent || link?.getAttribute("aria-label") || "").trim();
+      const cleanName = nameText.replace(/\s+/g, " ").trim();
+      if (cleanName) {
+        profile.full_name = cleanName;
+        const parts = cleanName.split(/\s+/);
+        profile.first_name = parts[0];
+        profile.last_name = parts.slice(1).join(" ");
+      }
+      const subline = cardEl.querySelector(".artdeco-entity-lockup__subtitle, .entity-result__primary-subtitle, [class*='subtitle'], [class*='headline']");
+      if (subline) profile.title = subline.textContent.replace(/\s+/g, " ").trim();
+    } catch {}
+    return profile;
+  }
+
   async function _startMessageAll(message, useAI = false) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
     if (!urls.length) { flashStatus("No profiles to message", "warn"); return; }
-    urls = urls.map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
 
-    const run = {
-      active: true, message, useAI, urls, index: 0, searchUrl: location.href,
-      sent: 0, failed: 0, skipped: 0, startedAt: Date.now(),
-    };
-    await _saveMsgRun(run);
-    flashStatus(`Message All started — ${urls.length} profile${urls.length === 1 ? "" : "s"}`, "ok");
-    _lcToast(`⚡ Message All — opening profile 1/${urls.length}`, 2800);
-    await new Promise((r) => setTimeout(r, 1500));
-    location.href = urls[0];
+    state.messageActive = true;
+    state.messageCancel = false;
+    try { renderToolbar(); } catch {}
+
+    let sent = 0, skipped = 0, failed = 0;
+    const total = urls.length;
+    flashStatus(`Message All started — ${total} profile${total === 1 ? "" : "s"}`, "ok");
+    _lcToast(`⚡ Message All — ${total} card${total === 1 ? "" : "s"}`, 2500);
+
+    try {
+      for (let i = 0; i < urls.length; i++) {
+        if (state.messageCancel) break;
+        const url = urls[i];
+        const idx = i + 1;
+
+        const card = chipCardEl.get(url);
+        if (!card || !document.body.contains(card)) {
+          console.log("[LeadCaptura] msg in-place: no card for", url);
+          skipped++;
+          _lcToast(`⏭ ${idx}/${total} — card not visible`, 1500);
+          continue;
+        }
+
+        // Close any leftover overlay before starting.
+        _closeMsgOverlay();
+        await sleep(300);
+
+        // Make the card visible.
+        try { card.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+        await sleep(500 + Math.random() * 350);
+
+        const msgBtn = _findMessageBtnInCard(card);
+        if (!msgBtn) {
+          console.log("[LeadCaptura] msg in-place: no Message btn on card", url, card);
+          skipped++;
+          _lcToast(`⏭ ${idx}/${total} — no Message button`, 1500);
+          continue;
+        }
+
+        const profile = _scrapeCardProfile(card);
+        let finalMsg;
+        if (useAI) {
+          finalMsg = await _aiPersonalizeMessage(message, profile).catch(() => null);
+          if (!finalMsg) finalMsg = _renderMsgTemplate(message, profile);
+        } else {
+          finalMsg = _renderMsgTemplate(message, profile);
+        }
+
+        const firstName = profile.first_name || "this connection";
+        _showButtonSpotlight(msgBtn, `✉️ Messaging ${firstName} (${idx}/${total})`, "auto-clicking", 1000);
+        _lcToast(`✉️ Opening composer for ${firstName}…`, 1800);
+        await sleep(650 + Math.random() * 300);
+
+        console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
+        await dispatchHumanClick(msgBtn);
+
+        // Wait for the message editor in the overlay bubble (or full screen).
+        let editor = await _waitMsgEditor(5000);
+        if (!editor) {
+          console.log("[LeadCaptura] msg in-place: editor never opened, retry forceclick");
+          _forceClick(msgBtn);
+          editor = await _waitMsgEditor(4500);
+        }
+        _removeSpotlight();
+
+        if (!editor) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2200);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        // Type the message.
+        try { editor.click(); } catch {}
+        try { editor.focus(); } catch {}
+        await sleep(300 + Math.random() * 200);
+        await typeIntoEditable(editor, finalMsg);
+        await sleep(450 + Math.random() * 300);
+
+        const typed = (editor.textContent || "").trim();
+        if (!typed) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't type`, 2200);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        // Find + click Send.
+        let sendBtn = null;
+        for (let k = 0; k < 14; k++) {
+          sendBtn = _findMsgSendBtn(editor);
+          if (sendBtn && !sendBtn.disabled) break;
+          await sleep(200);
+        }
+        if (!sendBtn || sendBtn.disabled) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — Send disabled`, 2200);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        _showButtonSpotlight(sendBtn, `📨 Sending to ${firstName}`, "delivering", 900);
+        await sleep(380 + Math.random() * 200);
+        await dispatchHumanClick(sendBtn);
+
+        // Verify by editor clearing.
+        await sleep(900);
+        let stillText = (editor.textContent || "").trim().length > 0;
+        if (stillText) {
+          const retry = _findMsgSendBtn(editor);
+          if (retry) _forceClick(retry);
+          await sleep(900);
+          stillText = (editor.textContent || "").trim().length > 0;
+        }
+        _removeSpotlight();
+
+        if (stillText) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — send didn't go through`, 2200);
+        } else {
+          sent++;
+          try { _markContacted(url); _applyContactedVisual(url); } catch {}
+          _lcToast(`✅ ${idx}/${total} sent to ${firstName}`, 1800);
+        }
+
+        _closeMsgOverlay();
+
+        // Human-paced gap before the next card.
+        if (i < urls.length - 1 && !state.messageCancel) {
+          const gap = _msgGap();
+          await _cancellableMessageSleep(gap);
+        }
+      }
+    } finally {
+      state.messageActive = false;
+      state.messageCancel = false;
+      try { renderToolbar(); } catch {}
+      flashStatus(
+        `Message All done: ${sent} sent, ${skipped} skipped, ${failed} failed ✓`,
+        sent > 0 ? "ok" : "warn"
+      );
+      _lcToast(`✓ Message All done — ${sent} sent · ${skipped} skipped · ${failed} failed`, 8000);
+    }
+  }
+
+  // Cancellable sleep that respects state.messageCancel (Stop button).
+  async function _cancellableMessageSleep(ms) {
+    const { sleep } = globalThis.__lcHuman;
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (state.messageCancel) return;
+      await sleep(Math.min(150, end - Date.now()));
+    }
   }
 
   // Called on every page boot from main.js. If a Message Run is active and
