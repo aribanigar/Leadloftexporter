@@ -6240,26 +6240,23 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
-        // GEOMETRIC strategy — find the Message button physically closest to
-        // the profile H1 on the rendered page.
+        // COLUMN-GEOMETRY strategy — no dependency on the H1 (a hidden/zero-size
+        // <h1> made every earlier version return null → "0 sent"). No dependency
+        // on LinkedIn class names either.
         //
-        // The profile owner's Message button is ALWAYS displayed right below
-        // their name (within ~200px). The right-rail "More profiles for you"
-        // buttons (Andrew, Jihane, etc.) are 400-800px away from the H1, on
-        // the opposite side of the page. Picking the geometrically nearest
-        // candidate is impossible to misidentify regardless of LinkedIn's
-        // DOM structure or class names.
+        // Fact about the profile layout: the profile owner's CTA row (Message /
+        // Connect / …) renders in the LEFT content column, near the top, at a
+        // small x (~340px). The right-rail "More profiles for you" people
+        // (Jihane, Andrew, …) render in the FAR-RIGHT column at a large x
+        // (~1350px). So: keep only Message buttons in the left ~60% of the
+        // viewport width, then pick the TOP-MOST one — that is always the
+        // profile owner's button, never a sidebar person's.
 
-        const h1 = document.querySelector("main h1") || document.querySelector("h1");
-        if (!h1) return null;
-
-        const h1Rect = h1.getBoundingClientRect();
-        if (h1Rect.width < 2 || h1Rect.height < 2) return null;  // not laid out yet
-        const h1CenterX = h1Rect.left + h1Rect.width / 2;
-        const h1CenterY = h1Rect.top + h1Rect.height / 2;
-
-        // Collect ALL Message button candidates anywhere on the page.
-        const ARIA_SEL = "button[aria-label*='Message' i], a[aria-label*='Message' i], button.message-anywhere-button, [class*='message-anywhere-button'], button[data-control-name*='message' i]";
+        const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+        const ARIA_SEL =
+          "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
+          "button.message-anywhere-button, [class*='message-anywhere-button'], " +
+          "button[data-control-name*='message' i]";
 
         const candidates = [];
         const seen = new Set();
@@ -6270,20 +6267,22 @@
           if (el.disabled) return;
           if (el.classList?.contains("lc-inline-save")) return;
           if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
+          // Defence-in-depth: never the right-rail / "More profiles" column.
+          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
           const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
           const hay = lbl + " " + txt;
           if (!/\bmessage\b/.test(hay)) return;
           if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
-          // Don't confuse Connect/Follow buttons that contain the word "message".
           if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
           const r = el.getBoundingClientRect();
-          if (r.width < 2 || r.height < 2) return;   // not visible
-          candidates.push({ el, rect: r });
+          if (r.width < 2 || r.height < 2) return;       // not visible
+          if (r.left > vw * 0.6) return;                  // right-rail — exclude
+          candidates.push({ el, top: r.top, left: r.left });
         };
 
         for (const el of document.querySelectorAll(ARIA_SEL)) consider(el);
-        // Text-content fallback — buttons with just "Message" text and no aria-label.
+        // Text-content fallback — a "Message" button with no aria-label.
         for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
           if (seen.has(el)) continue;
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
@@ -6292,30 +6291,9 @@
 
         if (!candidates.length) return null;
 
-        // Pick the candidate whose center is closest to the H1's center.
-        // Weight vertical distance heavier than horizontal so a button directly
-        // below the name beats one to the right at the same Y.
-        let best = null;
-        let bestScore = Infinity;
-        for (const c of candidates) {
-          const cx = c.rect.left + c.rect.width / 2;
-          const cy = c.rect.top + c.rect.height / 2;
-          const dx = Math.abs(cx - h1CenterX);
-          const dy = Math.abs(cy - h1CenterY);
-          // Penalise buttons ABOVE the H1 — owner's buttons are always BELOW.
-          const aboveH1 = cy < h1Rect.top ? 1000 : 0;
-          const score = dy * 2 + dx + aboveH1;
-          if (score < bestScore) {
-            bestScore = score;
-            best = c.el;
-          }
-        }
-
-        // Sanity check: the chosen button should be within ~600px of the H1.
-        // If everything is farther than that, the page hasn't finished laying
-        // out — return null and let the poll retry.
-        if (best && bestScore > 1200) return null;
-        return best;
+        // Top-most (then left-most) in the content column = the owner's CTA.
+        candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+        return candidates[0].el;
       };
 
       // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
@@ -6328,8 +6306,10 @@
 
       if (!msgBtn) {
         console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
+        _lcToast("⚠️ Message button not found on this profile", 3000);
         return { ok: false, reason: "no_message_button" };
       }
+      _lcToast("✉️ Found Message button — opening composer…", 2000);
 
       console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
