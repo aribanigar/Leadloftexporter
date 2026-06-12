@@ -7503,7 +7503,9 @@
             });
             if (inside.length) editor = inside[0];
           }
-          if (!editor) editor = phTarget;
+          // Last resort: use the click target / dialog itself; the typing
+          // strategies (paste, innerText) can sometimes still get text in.
+          if (!editor) editor = textboxEl || dialogScope;
         }
         if (!editor) editor = found.el;
 
