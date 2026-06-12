@@ -6240,82 +6240,58 @@
 
     if (!editor) {
       const _findMsgBtn = () => {
-        // LinkedIn profile page layout (confirmed from live DOM):
+        // Strategy: walk UP from the profile H1 and return the first Message
+        // button found in any ancestor.
         //
-        //  <main>
-        //    <div class="scaffold-layout__inner">
-        //      <div class="scaffold-layout__main">   ← profile owner content
-        //        <section> <h1>Abdelmoughit</h1>
-        //          <button aria-label="Message Abdelmoughit">   ← WANT THIS
-        //        </section>
-        //        <section> ...experience, about... </section>
-        //      </div>
-        //      <div class="scaffold-layout__aside">  ← right-rail: OTHER people
-        //        <button aria-label="Message Jihane Bou Haidar">  ← MUST SKIP
-        //      </div>
-        //    </div>
-        //  </main>
+        // Why this works: the profile owner's CTA buttons (Message, Connect…)
+        // always share a CLOSE ancestor with the H1 — typically the same
+        // top-card section a few levels up. Sidebar people like Jihane live in
+        // a completely separate branch of the DOM tree that is only reachable
+        // by climbing much higher (past the profile section, past the content
+        // column, all the way to the layout root). By stopping as soon as we
+        // find ANY Message button, we always get Abdelmoughit's, never Jihane's.
         //
-        // Both columns are INSIDE <main>, so scoping to <main> is not enough.
-        // Scope to .scaffold-layout__main (profile owner column) and, tighter,
-        // to the top-card section that holds the profile H1 + CTA buttons.
+        // This requires zero knowledge of LinkedIn's CSS class names.
 
-        const mainEl = document.querySelector("main");
-        if (!mainEl) return null;
+        const h1 = document.querySelector("main h1") || document.querySelector("h1");
+        if (!h1) return null;   // H1 not rendered yet — poll retries
 
-        // Prefer the non-aside content column; fall back to mainEl minus the aside.
-        const contentCol =
-          mainEl.querySelector(".scaffold-layout__main") ||
-          mainEl.querySelector(".core-rail") ||
-          mainEl.querySelector("[class*='scaffold-layout__main']") ||
-          null;
-
-        const h1 = (contentCol || mainEl).querySelector("h1") || document.querySelector("h1");
-
-        // Tightest possible scope: the section/card that contains the H1.
-        // This is the profile owner's top-card with their own CTA buttons.
-        const topCard =
-          h1?.closest("section") ||
-          h1?.parentElement?.closest("section") ||
-          h1?.closest("[class*='top-card'], [class*='pv-top']") ||
-          null;
-
-        const _MSG_SELS = [
-          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
-          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
+        const _MSG_SEL = [
+          "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='Sales Navigator' i])",
+          "a[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i]):not([aria-label*='Sales Navigator' i])",
           "button.message-anywhere-button",
           "[class*='message-anywhere-button']",
           "button[data-control-name*='message' i]",
-        ];
+        ].join(", ");
 
-        // Search tightest-to-widest. When we reach contentCol / mainEl, explicitly
-        // skip any button that lives inside .scaffold-layout__aside.
-        const scopes = [topCard, contentCol, mainEl].filter(Boolean);
-        for (const scope of scopes) {
-          for (const sel of _MSG_SELS) {
-            try {
-              for (const b of scope.querySelectorAll(sel)) {
-                if (b.disabled) continue;
-                if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-                // Skip right-rail / "More profiles for you" buttons.
-                if (b.closest?.(".scaffold-layout__aside")) continue;
-                return b;
-              }
-            } catch {}
-          }
+        // Walk up from the H1. At each level, search ALL descendants of that
+        // ancestor. The first match we encounter is the owner's button.
+        let node = h1.parentElement;
+        for (let i = 0; i < 15 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+          try {
+            for (const b of node.querySelectorAll(_MSG_SEL)) {
+              if (b.disabled) continue;
+              if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+              return b;
+            }
+          } catch {}
+          node = node.parentElement;
         }
 
-        // Text-content fallback scoped to the content column.
-        const textScope = contentCol || mainEl;
-        for (const el of textScope.querySelectorAll("button, a[role='button'], [role='button']")) {
-          if (el.classList?.contains("lc-inline-save")) continue;
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-          if (el.closest?.(".scaffold-layout__aside")) continue;
-          if (!_isVisible(el) || el.disabled) continue;
-          const hay = ((el.getAttribute("aria-label") || "") + " " + (el.textContent || "")).toLowerCase();
-          if (!/\bmessage\b/.test(hay)) continue;
-          if (/your team|recruiter|inmail|connect|follow|sales navigator/i.test(hay)) continue;
-          return el;
+        // Text-content fallback: same walk-up but match by text for buttons
+        // without a recognised aria-label.
+        node = h1.parentElement;
+        for (let i = 0; i < 15 && node && node.tagName !== "BODY" && node.tagName !== "HTML"; i++) {
+          for (const el of node.querySelectorAll("button, a[role='button'], [role='button']")) {
+            if (el.classList?.contains("lc-inline-save")) continue;
+            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+            if (!_isVisible(el) || el.disabled) continue;
+            const hay = ((el.getAttribute("aria-label") || "") + " " + (el.textContent || "")).toLowerCase();
+            if (/\bmessage\b/.test(hay) && !/inmail|your team|recruiter|connect|follow|sales navigator/i.test(hay)) {
+              return el;
+            }
+          }
+          node = node.parentElement;
         }
         return null;
       };
