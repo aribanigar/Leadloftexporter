@@ -5032,7 +5032,104 @@
     };
   }
 
+  // Explicit per-row decoration for the My Network → Connections list
+  // (/mynetwork/invite-connect/connections/). Each row exposes a single
+  // <a href="/in/..."> and a "Message" button; no Connect/Follow buttons
+  // (everyone here is already 1st-degree). The generic action-button-anchored
+  // path was finding the Message button on every row but the chip only
+  // visually rendered on the first row — likely because all rows share
+  // narrow flex containers and absolute children collapsed onto each other.
+  // This dedicated pass walks the SEMANTIC <li>/component row container and
+  // injects exactly one chip per <a href="/in/..."> link.
+  function _decorateConnectionsList() {
+    const path = location.pathname;
+    if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
+
+    const rows = document.querySelectorAll(
+      "li.mn-connection-card, " +
+      "[class*='mn-connection-card'], " +
+      "[componentkey*='connection' i], " +
+      "li[class*='_connection-card-item' i]"
+    );
+
+    // If LinkedIn restructured and the above selectors miss, fall back to:
+    // every <a href*='/in/'> link in the main column, climb to its smallest
+    // ancestor that contains exactly one such link.
+    const targets = rows.length
+      ? Array.from(rows)
+      : Array.from(document.querySelectorAll("main a[href*='/in/']"))
+          .map((a) => {
+            let node = a.parentElement;
+            for (let i = 0; i < 12 && node && node.tagName !== "MAIN"; i++) {
+              const owners = new Set();
+              for (const l of node.querySelectorAll("a[href*='/in/']")) {
+                try {
+                  const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
+                  if (u) owners.add(u);
+                } catch {}
+                if (owners.size > 1) break;
+              }
+              if (owners.size > 1) break;
+              if (
+                owners.size === 1 &&
+                (node.tagName === "LI" ||
+                  node.tagName === "ARTICLE" ||
+                  node.getAttribute?.("role") === "listitem" ||
+                  /card|row|connection/i.test(node.className || ""))
+              ) {
+                return node;
+              }
+              node = node.parentElement;
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+    const seen = new Set();
+    for (const card of targets) {
+      const link = card.querySelector("a[href*='/in/']");
+      if (!link) continue;
+      let url = "";
+      try { url = globalThis.__lcDom.normalizeProfileUrl(link.href) || ""; } catch {}
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+
+      const existing = injectedSaves.get(url);
+      if (existing && document.body.contains(existing)) continue;
+      if (existing) {
+        injectedSaves.delete(url);
+        chipCardEl.delete(url);
+      }
+
+      // Find the Message button or "..." button to anchor next to.
+      let anchorBtn = card.querySelector(
+        "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i])"
+      );
+      if (!anchorBtn) {
+        anchorBtn = card.querySelector(
+          "button[aria-label*='More' i], button[aria-label*='actions' i]"
+        );
+      }
+
+      const name =
+        (link.getAttribute("aria-label") || link.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim() || _labelFromUrl(url);
+      const profile = { linkedin_url: url, full_name: name };
+      try {
+        injectInlineSave(card, profile, anchorBtn);
+      } catch (e) {
+        console.warn("[LeadCaptura] connections-list decorate failed", e?.message);
+      }
+    }
+  }
+
   function decorateSearchCards() {
+    // Dedicated connections-list path — runs on /mynetwork/invite-connect/connections
+    // BEFORE the page-type guard below so we don't bail out of decoration just
+    // because pageType() routes the connections page through search-people.
+    try { _decorateConnectionsList(); } catch {}
+
     const type = Scraper.pageType();
     if (!type.includes("search") && !type.includes("sales")) return;
 
@@ -6150,10 +6247,19 @@
 
   // Send a LinkedIn message on the current profile page.
   // Returns { ok, reason }.
+  //
+  // v1.0.191: every step now emits an on-page `_lcToast` so the user can SEE
+  // where the run bails the moment it bails (the previous version only logged
+  // to console, which the user can't see while watching the page). Also
+  // extends the Message-button polling window from 6s to 15s (LinkedIn's
+  // top-card hydrates lazily on slow connections), adds the "More" dropdown
+  // as a fallback when Message has been moved into the overflow menu, and
+  // guards against re-opening the dialog when one is already on-screen.
   async function _sendProfilePageMessage(messageText) {
     const { sleep, readingPause } = globalThis.__lcHuman;
     const { waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
 
+    _lcToast("📍 Step 1/4 — reading profile…", 1500);
     await sleep(readingPause());
 
     // ── Step 1: click the Message button (unless compose dialog already open) ──
@@ -6167,6 +6273,9 @@
     ];
 
     let editor = document.querySelector(_editorSels.join(","));
+    if (editor) {
+      _lcToast("📨 Step 2/4 — compose box already open, reusing it", 1800);
+    }
 
     if (!editor) {
       const _findMsgBtn = () => {
@@ -6197,19 +6306,41 @@
         return null;
       };
 
-      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
+      _lcToast("🔍 Step 2/4 — finding Message button…", 1800);
+      // Profile pages hydrate over ~3-6s on slow networks. Poll up to 15s.
       let msgBtn = null;
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 50; i++) {
         msgBtn = _findMsgBtn();
         if (msgBtn) break;
         await sleep(300);
       }
 
+      // Fallback: try the "More" / overflow menu — LinkedIn sometimes moves
+      // Message into the dropdown for 2nd-degree or restricted connections.
       if (!msgBtn) {
+        _lcToast("🔍 Step 2/4 — checking More menu…", 1500);
+        const moreBtn = Array.from(
+          document.querySelectorAll("main button[aria-label*='More' i], main button[aria-label*='actions' i]")
+        ).find((b) => _isVisible(b) && !b.disabled);
+        if (moreBtn) {
+          try { await dispatchHumanClick(moreBtn); } catch {}
+          await sleep(700);
+          // Now look inside the dropdown
+          for (let i = 0; i < 10; i++) {
+            msgBtn = _findMsgBtn();
+            if (msgBtn) break;
+            await sleep(250);
+          }
+        }
+      }
+
+      if (!msgBtn) {
+        _lcToast("⚠️ No Message button on this profile — not connected? Skipping.", 4500);
         console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
         return { ok: false, reason: "no_message_button" };
       }
 
+      _lcToast(`🎯 Step 2/4 — clicking Message: "${(msgBtn.getAttribute("aria-label") || msgBtn.textContent || "").trim().slice(0, 40)}"`, 2200);
       console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
       await sleep(450 + Math.random() * 350);
@@ -6221,25 +6352,28 @@
       // Click with dispatchHumanClick first (realistic pointer sequence — what
       // LinkedIn's bot detection expects to see leading up to a click).
       await dispatchHumanClick(msgBtn);
-      editor = await waitFor(_editorSels, { timeout: 3500 });
+      editor = await waitFor(_editorSels, { timeout: 5000 });
 
       // Fallback: _forceClick (5-strategy including React fiber onClick) when
       // pointer events alone don't trigger LinkedIn's handlers.
       if (!editor) {
+        _lcToast("⏳ Dialog didn't open — retrying with force-click…", 2200);
         console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
         _forceClick(msgBtn);
-        editor = await waitFor(_editorSels, { timeout: 5000 });
+        editor = await waitFor(_editorSels, { timeout: 6000 });
       }
 
       _removeSpotlight();
     }
 
     if (!editor) {
+      _lcToast("❌ Dialog never appeared — LinkedIn may have changed selectors. Stopping.", 5000);
       console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
       return { ok: false, reason: "no_editor" };
     }
 
     // ── Step 2: focus editor and type the message ──
+    _lcToast(`⌨️ Step 3/4 — typing message (${messageText.length} chars)…`, 2200);
     try { editor.click(); } catch {}
     try { editor.focus(); } catch {}
     await sleep(280 + Math.random() * 220);
@@ -6284,10 +6418,12 @@
     }
 
     if (!sendBtn || sendBtn.disabled) {
+      _lcToast("⚠️ Send button still disabled — typing may not have committed. Skipping.", 4500);
       console.log("[LeadCaptura] Message All: Send button not found or disabled");
       return { ok: false, reason: "send_disabled" };
     }
 
+    _lcToast("📨 Step 4/4 — clicking Send…", 2000);
     console.log("[LeadCaptura] Message All: clicking Send");
     _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
     await sleep(400 + Math.random() * 200);
@@ -6302,6 +6438,7 @@
       await sleep(800);
     }
     _removeSpotlight();
+    _lcToast("✓ Sent — moving to next profile", 1800);
     return { ok: true };
   }
 
