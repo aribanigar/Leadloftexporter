@@ -6248,12 +6248,14 @@
     // H1 with non-empty text — LinkedIn's profile page always has one.
     const h1s = document.querySelectorAll("main h1, h1.text-heading-xlarge, h1");
     for (const h of h1s) {
-      const t = (h.textContent || "").replace(/\s+/g, " ").trim();
-      if (t && t.length < 120 && !/linkedin/i.test(t)) return t;
+      let t = (h.textContent || "").replace(/\s+/g, " ").trim();
+      // Strip LinkedIn degree badge appended by a nested span: "Vimal Kumar · 1st" → "Vimal Kumar"
+      t = t.replace(/\s*[·•]\s*\d+(st|nd|rd|th)\b.*/i, "").trim();
+      if (t && t.length > 1 && t.length < 120 && !/linkedin/i.test(t)) return t;
     }
     // Fallback: document title is "<Name> | <Title> | LinkedIn"
     const ttl = (document.title || "").split("|")[0].trim();
-    if (ttl && ttl.length < 120 && !/^linkedin/i.test(ttl)) return ttl;
+    if (ttl && ttl.length > 1 && ttl.length < 120 && !/^linkedin/i.test(ttl)) return ttl;
     return "";
   }
 
@@ -6281,30 +6283,45 @@
   // SUGANDHA WAHAL …) cannot collide.
   function _findOwnerMessageBtnByName(ownerName) {
     if (!ownerName) return null;
-    // Build a tolerant regex: collapse whitespace and escape regex chars.
-    const escaped = ownerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-                             .replace(/\s+/g, "\\s+");
-    const re = new RegExp("^\\s*Message\\s+" + escaped + "\\s*$", "i");
 
-    const candidates = document.querySelectorAll(
-      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
-    );
-    for (const el of candidates) {
-      if (el.disabled) continue;
-      if (el.classList?.contains("lc-inline-save")) continue;
-      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-      const lbl = (el.getAttribute("aria-label") || "").trim();
-      if (!re.test(lbl)) continue;
-      // Defence-in-depth: even with a name match, skip if it's in an aside —
-      // LinkedIn never templates the owner's own button into the sidebar, so
-      // a name match there would be a layout we don't recognise.
-      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) continue;
+    const _candidateIsValid = (el) => {
+      if (el.disabled) return false;
+      if (el.classList?.contains("lc-inline-save")) return false;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return false;
+      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return false;
       const r = el.getBoundingClientRect();
       const w = r.width || el.offsetWidth;
       const h = r.height || el.offsetHeight;
-      if (w < 2 || h < 2) continue;
-      return el;
+      return w >= 2 && h >= 2;
+    };
+
+    const candidates = Array.from(document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+    ));
+
+    // Pass 1: exact full-name match — "Message <ownerName>" (whitespace-flexible).
+    const escapedFull = ownerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                                 .replace(/\s+/g, "\\s+");
+    const reFull = new RegExp("^\\s*Message\\s+" + escapedFull + "\\s*$", "i");
+    for (const el of candidates) {
+      const lbl = (el.getAttribute("aria-label") || "").trim();
+      if (reFull.test(lbl) && _candidateIsValid(el)) return el;
     }
+
+    // Pass 2: first-two-words fallback — handles middle-name differences or
+    // localisation where the button omits the last name.
+    const words = ownerName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      const escapedShort = words.slice(0, 2)
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("\\s+");
+      const reShort = new RegExp("^\\s*Message\\s+" + escapedShort + "\\b", "i");
+      for (const el of candidates) {
+        const lbl = (el.getAttribute("aria-label") || "").trim();
+        if (reShort.test(lbl) && _candidateIsValid(el)) return el;
+      }
+    }
+
     return null;
   }
 
@@ -6332,7 +6349,7 @@
       const w = r.width || el.offsetWidth;
       const h = r.height || el.offsetHeight;
       if (w < 2 || h < 2) return;
-      if (r.left > vw * 0.6) return;
+      if (r.left > vw * 0.7) return;
       candidates.push({ el, top: r.top, left: r.left });
     };
     for (const el of document.querySelectorAll(
