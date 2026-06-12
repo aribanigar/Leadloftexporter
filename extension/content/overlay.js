@@ -8758,38 +8758,50 @@
       el.closest("#lc-case1-fab, #lc-case2-fab, #lc-case1-composer, #lc-case2-composer, .lc-overlay-root, .lc-toolbar");
 
     // PRIMARY: iterate <li class="mn-connection-card"> and find the Message
-    // button inside each. This is the EXACT structure shown in the user's
-    // DOM screenshots: each <li> contains one Message button.
-    const liItems = document.querySelectorAll("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+    // control inside each. Uses the SAME trait as the legacy
+    // _findMessageBtnInCard: anchor first (new design ships
+    // <a href="/messaging/compose/...">), button as legacy fallback.
+    const liItems = document.querySelectorAll(
+      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
+    );
     console.log("[Case2] li.mn-connection-card items found:", liItems.length);
     let buttons = [];
-    for (const li of liItems) {
-      // Try several button selectors INSIDE this li:
-      const candidates = [
-        li.querySelector("button[aria-label^='Send a message to' i]"),
-        li.querySelector(".entry-point button"),
-        li.querySelector(".mn-connection-card__action-container button"),
-        li.querySelector("button[aria-label*='message' i]"),
-        // Find any button whose visible text is exactly "Message"
-        Array.from(li.querySelectorAll("button")).find((b) => {
-          const t = (b.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          return t === "message";
-        }),
-      ];
-      for (const c of candidates) {
-        if (c && !isOurUI(c) && !buttons.includes(c)) {
-          buttons.push(c);
-          break;
+
+    const findInsideCard = (li) => {
+      // 1) Strongest signal: anchor that goes to messaging/compose.
+      const composeLink = li.querySelector(
+        "a[href*='/messaging/compose/'], a[href*='messaging/thread/new'], a[href*='messaging/compose']"
+      );
+      if (composeLink && !isOurUI(composeLink)) return composeLink;
+      // 2) button[aria-label^='Send a message to']
+      const ariaBtn = li.querySelector("button[aria-label^='Send a message to' i]");
+      if (ariaBtn && !isOurUI(ariaBtn)) return ariaBtn;
+      // 3) Any button/anchor/role=button inside the card with "message" in label/text.
+      const candidates = li.querySelectorAll("button, a, [role='button']");
+      for (const el of candidates) {
+        if (el.disabled) continue;
+        if (isOurUI(el)) continue;
+        if (el.classList?.contains("lc-inline-save")) continue;
+        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+        const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+          return el;
         }
       }
+      return null;
+    };
+
+    for (const li of liItems) {
+      const found = findInsideCard(li);
+      if (found && !buttons.includes(found)) buttons.push(found);
     }
     if (buttons.length) {
       console.log("[Case2] PRIMARY (li.mn-connection-card) found:", buttons.length,
-        "first aria-label:", buttons[0]?.getAttribute("aria-label"));
+        "first:", buttons[0]?.tagName, buttons[0]?.getAttribute("aria-label") || buttons[0]?.getAttribute("href"));
       return buttons;
     }
 
-    // FALLBACK 1: document-wide aria-label match.
+    // FALLBACK 1: document-wide aria-label.
     buttons = Array.from(
       document.querySelectorAll("button[aria-label^='Send a message to' i]")
     ).filter((b) => !isOurUI(b));
@@ -8798,14 +8810,23 @@
       return buttons;
     }
 
-    // FALLBACK 2: aria-label contains "message" + any connection-card-like ancestor.
+    // FALLBACK 2: document-wide messaging compose anchors.
+    buttons = Array.from(
+      document.querySelectorAll("a[href*='/messaging/compose/']")
+    ).filter((b) => !isOurUI(b));
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 2 (doc-wide compose anchor) found:", buttons.length);
+      return buttons;
+    }
+
+    // FALLBACK 3: card-scope text=Message.
     const cardScopes = Array.from(
       document.querySelectorAll(
         ".mn-connection-card, [class*='connection-card'], .entry-point, [class*='entry-point']"
       )
     );
     for (const card of cardScopes) {
-      for (const btn of card.querySelectorAll("button")) {
+      for (const btn of card.querySelectorAll("button, a, [role='button']")) {
         if (isOurUI(btn)) continue;
         const txt = (btn.textContent || "").trim().toLowerCase();
         const lbl = (btn.getAttribute("aria-label") || "").toLowerCase();
@@ -8815,13 +8836,12 @@
       }
     }
     if (buttons.length) {
-      console.log("[Case2] FALLBACK 2 (card scope) found:", buttons.length);
+      console.log("[Case2] FALLBACK 3 (card scope) found:", buttons.length);
       return buttons;
     }
 
-    // FALLBACK 3: any visible button with text exactly "Message".
-    const allBtns = document.querySelectorAll("button");
-    for (const btn of allBtns) {
+    // FALLBACK 4: doc-wide visible Message element.
+    for (const btn of document.querySelectorAll("button, a, [role='button']")) {
       if (isOurUI(btn)) continue;
       if (btn.closest("nav, header, [role='navigation'], .msg-overlay-list-bubble, .global-nav")) continue;
       const txt = (btn.textContent || "").trim().toLowerCase();
@@ -8830,7 +8850,7 @@
         if (r.width > 0 && r.height > 0 && !buttons.includes(btn)) buttons.push(btn);
       }
     }
-    console.log("[Case2] FALLBACK 3 (text='Message') found:", buttons.length);
+    console.log("[Case2] FALLBACK 4 (doc-wide text='Message') found:", buttons.length);
     return buttons;
   }
 
@@ -8852,8 +8872,18 @@
     for (let i = 0; i < buttons.length; i++) {
       if (_case2State.cancelled) break;
       const btn = buttons[i];
+      // Name: aria-label first, then climb to <li> and grab the profile name.
+      let name = "";
       const ariaLbl = btn.getAttribute("aria-label") || "";
-      const name = ariaLbl.replace(/^Send a message to\s+/i, "").trim() || "Unknown";
+      if (/^Send a message to\s+/i.test(ariaLbl)) {
+        name = ariaLbl.replace(/^Send a message to\s+/i, "").trim();
+      }
+      if (!name) {
+        const li = btn.closest("li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']");
+        const nameEl = li?.querySelector(".mn-connection-card__name, [class*='name'], .artdeco-entity-lockup__title, h3");
+        if (nameEl) name = (nameEl.textContent || "").trim();
+      }
+      if (!name) name = "Unknown";
       statusEl.textContent = "[" + (i + 1) + "/" + total + "] Messaging " + name + "...";
 
       try {
@@ -8865,7 +8895,10 @@
         }
         try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
         await sleep(500);
-        btn.click();
+        // For anchors, both pointer events (React handler) AND native .click()
+        // (SPA router for href) are needed. For buttons, .click() suffices.
+        _pointerClick(btn);
+        try { btn.click(); } catch (e) {}
 
         // STEP 2: Wait for click confirmation: data-artdeco-is-focused="true"
         let confirmed = false;
