@@ -6387,30 +6387,55 @@
       }
     }
 
-    // Pass 3 — DOM locality: find the Message button living near the H1.
-    // Climb from the H1 to its first ancestor section, then look for the
-    // Message button INSIDE that subtree.  This is by definition the owner's
-    // action row because the H1 is the owner's name.
+    // Pass 3 — DOM locality from the H1.  H1 locality alone guarantees this
+    // is the owner's card, so we use a RELAXED validator (no aside filter —
+    // LinkedIn's profile card uses class names like `pv-text-details__aside`
+    // and the wildcard `[class*='aside']` was killing this pass).
+    const _localityValid = (el) => {
+      if (!el || el.disabled) return false;
+      if (el.classList?.contains("lc-inline-save")) return false;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return false;
+      const r = el.getBoundingClientRect();
+      return (r.width || el.offsetWidth) >= 2 && (r.height || el.offsetHeight) >= 2;
+    };
     const h1 = document.querySelector("main h1, h1.text-heading-xlarge, h1");
     if (h1) {
       let scope = h1;
-      for (let i = 0; i < 8 && scope && scope !== document.body; i++) {
+      for (let i = 0; i < 10 && scope && scope !== document.body; i++) {
         scope = scope.parentElement;
         if (!scope) break;
-        const localBtns = scope.querySelectorAll("button, a[role='button']");
+        const localBtns = scope.querySelectorAll("button, a[role='button'], a.artdeco-button");
+        // Prefer blue-painted ones, then primary class, then anything.
+        const matches = [];
         for (const el of localBtns) {
-          if (!_candidateIsValid(el)) continue;
+          if (!_localityValid(el)) continue;
           const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
-            console.log("[LeadCaptura] msg STEP 2 → Pass 3 (H1 locality) matched:", el);
-            return el;
-          }
+          if (!(/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt))) continue;
+          const score =
+            (_hasBluePrimaryBg(el) ? 0 : 10) +
+            (el.classList?.contains("artdeco-button--primary") ? 0 : 1);
+          matches.push({ el, score });
+        }
+        if (matches.length) {
+          matches.sort((a, b) => a.score - b.score);
+          console.log("[LeadCaptura] msg STEP 2 → Pass 3 (H1 locality) matched:", matches[0].el, "score:", matches[0].score);
+          return matches[0].el;
         }
       }
     }
 
-    console.log("[LeadCaptura] msg STEP 2 → ALL passes returned null");
+    // Diagnostic dump so we can see what's actually in the page when nothing matches.
+    try {
+      const allMsgEls = Array.from(document.querySelectorAll("button, a[role='button'], a"))
+        .filter((el) => {
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").trim().toLowerCase();
+          return /\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt);
+        });
+      console.log("[LeadCaptura] msg STEP 2 → ALL passes failed. H1 =", h1?.textContent?.trim(),
+                  "Message-like elements:", allMsgEls.length, allMsgEls);
+    } catch {}
     return null;
   }
 
@@ -6568,8 +6593,36 @@
         }
       }
       if (!msgBtn) {
+        // Last-ditch fallback: any visible button with text/aria-label "Message"
+        // in the top half of the page, scored by blue-paint + primary-class.
+        const vh = window.innerHeight || 800;
+        const everything = Array.from(document.querySelectorAll("button, a[role='button'], a.artdeco-button"));
+        const desperate = [];
+        for (const el of everything) {
+          if (el.disabled) continue;
+          if (el.classList?.contains("lc-inline-save")) continue;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) continue;
+          if (r.top > vh * 1.2) continue;
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          if (!/\bmessage\b/.test(lbl) && txt !== "message" && !/\bmessage\b/.test(txt)) continue;
+          const score = (_hasBluePrimaryBg(el) ? 0 : 100)
+                      + (el.classList?.contains("artdeco-button--primary") ? 0 : 10)
+                      + r.top * 0.01;
+          desperate.push({ el, score });
+        }
+        if (desperate.length) {
+          desperate.sort((a, b) => a.score - b.score);
+          msgBtn = desperate[0].el;
+          foundVia = "desperate";
+          console.log("[LeadCaptura] msg STEP 2 → DESPERATE fallback picked:", msgBtn, "from", desperate.length, "candidates");
+        }
+      }
+      if (!msgBtn) {
         console.log("[LeadCaptura] msg STEP 2 ✗ no Message button found for", ownerName);
-        _lcToast(`⚠️ No Message button for ${ownerName} (not connected?)`, 2800);
+        _lcToast(`⚠️ No Message button for ${ownerName} (not connected?)`, 6000);
         return { ok: false, reason: "no_message_button" };
       }
       const lbl = msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim();
