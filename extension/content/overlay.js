@@ -7541,73 +7541,124 @@
         _closeAllNewMessageDialogs();
         await sleep(400);
 
-        // Snapshot dialogs BEFORE clicking — anything new after is the
-        // dialog we just opened.
-        const dialogsBefore = new Set(_findAllNewMessageDialogs());
+        // Snapshot existing visible editables — anything new after the click
+        // is the textbox we want to type in. Don't try to find the dialog.
+        const _snapshotEditables = () => {
+          const set = new Set();
+          for (const el of document.querySelectorAll("[contenteditable='true'], [role='textbox'], textarea")) {
+            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+            const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+            const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+            if (/search|filter|looking|recipient|^to$|to:/i.test(lbl + " " + ph)) continue;
+            if (_existsInLayout(el)) set.add(el);
+          }
+          return set;
+        };
+        const editablesBefore = _snapshotEditables();
 
-        // ONE click — dispatchHumanClick first. If that fails to open
-        // anything, fall back to native .click() then _forceClick.
         await dispatchHumanClick(msgBtn);
 
-        let dialogScope = await _waitForNewDialog(dialogsBefore, 6000);
-        if (!dialogScope && msgBtn.tagName === "A" && msgBtn.href) {
-          console.log("[LeadCaptura] retry with native .click() for anchor");
-          try { msgBtn.click(); } catch {}
-          dialogScope = await _waitForNewDialog(dialogsBefore, 6000);
-        }
-        if (!dialogScope) {
-          console.log("[LeadCaptura] retry with _forceClick");
-          _forceClick(msgBtn);
-          dialogScope = await _waitForNewDialog(dialogsBefore, 5000);
-        }
-
-        _removeSpotlight();
-
-        if (!dialogScope) {
-          failed++;
-          _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
-          _closeAllNewMessageDialogs();
-          continue;
-        }
-
-        console.log(`[LeadCaptura] msg ${idx}/${total} → new dialog detected:`, dialogScope);
-        await sleep(450 + Math.random() * 300);
-
-        // Find the editor INSIDE this specific dialog.
-        let editor = _findEditorInDialog(dialogScope);
-
-        // If no editor yet, click at the textbox coords to wake Quill, then
-        // re-find.
-        if (!editor) {
-          // Click at PIXEL COORDINATES in the bottom 70% of the dialog
-          // (where the message textbox visually sits) to wake Quill.
-          const dRect = dialogScope.getBoundingClientRect();
-          const cx = dRect.left + dRect.width / 2;
-          const cy = dRect.top + dRect.height * 0.7;
-          let textboxEl = document.elementFromPoint(cx, cy);
-          if (textboxEl?.nodeType === Node.TEXT_NODE) textboxEl = textboxEl.parentElement;
-          console.log("[LeadCaptura] textbox click target at", Math.round(cx), Math.round(cy), "→", textboxEl?.tagName, textboxEl?.className);
-          if (textboxEl) {
-            try { await dispatchHumanClick(textboxEl); } catch {}
-            await sleep(400);
-            try { await dispatchHumanClick(textboxEl); } catch {}
-            await sleep(600);
+        // Helper: find a NEW visible editable (not in snapshot) that isn't
+        // search/recipient. Returns the largest one or null.
+        const _findNewEditable = () => {
+          const now = _snapshotEditables();
+          const newOnes = [];
+          for (const el of now) {
+            if (!editablesBefore.has(el)) newOnes.push(el);
           }
-          // Re-find editor INSIDE this dialog after the wake-up click.
-          editor = _findEditorInDialog(dialogScope);
-          // Final fallback: activeElement if it's inside the dialog.
-          if (!editor) {
+          if (!newOnes.length) return null;
+          newOnes.sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return (rb.width * rb.height) - (ra.width * ra.height);
+          });
+          let pick = newOnes[0];
+          if (!pick.isContentEditable) {
+            const inner = pick.querySelector?.("[contenteditable='true'], [role='textbox']");
+            if (inner && _existsInLayout(inner)) pick = inner;
+          }
+          return pick;
+        };
+
+        // Helper: find a visible "Write a message" placeholder element to
+        // click and wake Quill.
+        const _findWriteMessagePlaceholder = () => {
+          for (const el of document.querySelectorAll(
+            "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i], " +
+            "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+          )) {
+            if (el.closest?.(".lc-overlay-root, .lc-toolbar")) continue;
+            const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+            if (/search|filter|recipient|^to$/i.test(lbl)) continue;
+            if (!_existsInLayout(el)) continue;
+            const r = el.getBoundingClientRect();
+            if (r.width < 100 || r.height < 20) continue;
+            return el;
+          }
+          // Also look for any leaf element with textContent exactly
+          // "Write a message..." (some Quill builds render it as a child).
+          for (const el of document.querySelectorAll("body div, body span, body p")) {
+            if (el.children.length > 0) continue;
+            const t = (el.textContent || "").trim();
+            if (/^write a message/i.test(t) && t.length < 40) {
+              if (_existsInLayout(el)) return el;
+            }
+          }
+          return null;
+        };
+
+        // Poll for editor OR placeholder for up to 8 seconds.
+        let editor = null;
+        let placeholderEl = null;
+        for (let k = 0; k < 40; k++) {
+          editor = _findNewEditable();
+          if (editor) break;
+          placeholderEl = _findWriteMessagePlaceholder();
+          if (placeholderEl) break;
+          await sleep(200);
+        }
+
+        // If we found a placeholder but no editor, click the placeholder
+        // (at the centre of its bounding box) to wake Quill, then re-poll.
+        if (!editor && placeholderEl) {
+          console.log("[LeadCaptura] clicking 'Write a message' placeholder to wake Quill:", placeholderEl);
+          try { await dispatchHumanClick(placeholderEl); } catch {}
+          await sleep(500);
+          try { await dispatchHumanClick(placeholderEl); } catch {}
+          await sleep(700);
+          for (let k = 0; k < 25; k++) {
+            editor = _findNewEditable();
+            if (editor) break;
+            // Also try activeElement
             const ae = document.activeElement;
-            if (ae && ae !== document.body && dialogScope.contains(ae) && (
+            if (ae && ae !== document.body && (
               ae.isContentEditable ||
               ae.tagName === "TEXTAREA" ||
               (ae.tagName === "INPUT" && ae.type === "text") ||
               ae.getAttribute("role") === "textbox"
             )) {
-              editor = ae;
+              const lbl = (ae.getAttribute("aria-label") || "").toLowerCase();
+              if (!/search|filter|recipient|^to$/i.test(lbl)) {
+                editor = ae;
+                break;
+              }
             }
+            await sleep(150);
           }
+          // If STILL no editor, use the placeholder element itself.
+          if (!editor) editor = placeholderEl;
         }
+
+        _removeSpotlight();
+
+        if (!editor) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't find textbox`, 2500);
+          continue;
+        }
+
+        console.log(`[LeadCaptura] msg ${idx}/${total} → editor found:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
+        await sleep(450 + Math.random() * 300);
 
         if (!editor) {
           failed++;
