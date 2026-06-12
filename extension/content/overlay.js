@@ -6584,21 +6584,19 @@
     return eds[0] || null;
   }
 
-  // Find the message compose dialog by searching for its visible header text
-  // "New message" — class-name and role agnostic, works regardless of how
-  // LinkedIn names its CSS classes.  Returns the container element.
+  // Find the message compose dialog by searching for visible header text
+  // OR aria-label attributes. Class-name and role agnostic.
   function _findDialogByHeaderText() {
-    const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
+    const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i, /^compose message/i];
+    // 1) Text nodes.
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
     let node;
     while ((node = walker.nextNode())) {
-      const raw = node.nodeValue || "";
-      const t = raw.trim();
+      const t = (node.nodeValue || "").trim();
       if (!t || t.length > 60) continue;
       let match = false;
       for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
       if (!match) continue;
-      // Climb to a substantial ancestor that looks like a dialog/popup.
       let p = node.parentElement;
       while (p && p !== document.body) {
         const r = p.getBoundingClientRect();
@@ -6609,7 +6607,76 @@
         p = p.parentElement;
       }
     }
+    // 2) Attributes (aria-label, title) containing the phrases.
+    const attrCandidates = document.querySelectorAll(
+      "[aria-label*='New message' i], [aria-label*='Compose' i], " +
+      "[aria-label*='Write a message' i], [aria-label*='Send a message' i], " +
+      "[title*='New message' i], [title*='Compose' i]"
+    );
+    for (const el of attrCandidates) {
+      const r = el.getBoundingClientRect();
+      if (r.width >= 300 && r.height >= 250) return el;
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        const pr = p.getBoundingClientRect();
+        if (pr.width >= 300 && pr.height >= 250) return p;
+        p = p.parentElement;
+      }
+    }
     return null;
+  }
+
+  // Wait — via MutationObserver — for the message dialog or editor to appear.
+  // Far more reliable than polling: fires on the next animation frame after
+  // ANY DOM mutation, so we never miss the dialog's mount.
+  function _waitForComposerMutation(editablesBefore, aeBefore, maxMs = 10000) {
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+      const finish = (result) => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(result);
+      };
+      const tryFind = () => {
+        // 1) Focused element became editable.
+        const ae = document.activeElement;
+        if (ae && ae !== document.body && ae !== aeBefore && (
+          ae.isContentEditable ||
+          ae.tagName === "TEXTAREA" ||
+          (ae.tagName === "INPUT" && ae.type === "text") ||
+          ae.getAttribute?.("role") === "textbox"
+        )) {
+          return finish({ kind: "editor", el: ae, via: "activeElement" });
+        }
+        // 2) New editable.
+        const now = _allEditables(document);
+        for (const el of now) {
+          if (!editablesBefore.has(el)) {
+            return finish({ kind: "editor", el, via: "newEditable" });
+          }
+        }
+        // 3) Largest visible editor (catch existing-but-now-visible composers).
+        const largest = _findLargestComposerEditor();
+        if (largest) {
+          return finish({ kind: "editor", el: largest, via: "largestEditor" });
+        }
+        // 4) Dialog by header text / aria label.
+        const dlg = _findDialogByHeaderText();
+        if (dlg) {
+          return finish({ kind: "dialog", el: dlg, via: "dialogText" });
+        }
+      };
+      // Initial check (in case it already happened).
+      tryFind();
+      if (done) return;
+      observer = new MutationObserver(() => { tryFind(); });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      timer = setTimeout(() => finish(null), maxMs);
+    });
   }
 
   // Find the LARGEST visible editable on the page that isn't search/filter/
@@ -7250,103 +7317,48 @@
 
         console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
 
-        // Snapshot existing editables BEFORE the click so we can detect a
-        // newly-opened composer even if a previous bubble is still in the DOM.
         const editablesBefore = new Set(_allEditables(document));
         const aeBefore = document.activeElement;
 
-        // Two-step click: dispatchHumanClick (real pointer events for any
-        // React/onPointerDown handlers + bot-detection), THEN native .click()
-        // for anchors so LinkedIn's SPA router actually fires.
+        // ONE click — dispatchHumanClick first (real pointer events; React
+        // onClick fires on this). If that fails to open anything, retry with
+        // native .click(). Doing BOTH opens two dialogs, which is what
+        // happened in the previous build.
         await dispatchHumanClick(msgBtn);
-        if (msgBtn.tagName === "A" && msgBtn.href) {
-          try { msgBtn.click(); } catch (e) { console.log("[LeadCaptura] native .click() failed:", e); }
+
+        let found = await _waitForComposerMutation(editablesBefore, aeBefore, 6000);
+        if (!found && msgBtn.tagName === "A" && msgBtn.href) {
+          console.log("[LeadCaptura] retry with native .click() for anchor");
+          try { msgBtn.click(); } catch {}
+          found = await _waitForComposerMutation(editablesBefore, aeBefore, 6000);
+        }
+        if (!found) {
+          console.log("[LeadCaptura] retry with _forceClick");
+          _forceClick(msgBtn);
+          found = await _waitForComposerMutation(editablesBefore, aeBefore, 5000);
         }
 
-        // Wait up to 12s for ANY signal that the dialog opened:
-        //   1) focused editable (strongest)
-        //   2) newly-added editable
-        //   3) the visible "New message" header text appearing on screen
-        //   4) the visible "Write a message" text appearing on screen
-        //   5) known scope class
-        // We don't gate on class names — the "New message" header is real
-        // visible text on screen, which makes detection class-name-agnostic.
-        let editor = null;
-        let scope = null;
-        let phTarget = null;
-        let dialogByText = null;
-        for (let k = 0; k < 60; k++) {
-          const ae = document.activeElement;
-          if (ae && ae !== document.body && ae !== aeBefore && (
-            ae.isContentEditable ||
-            ae.tagName === "TEXTAREA" ||
-            (ae.tagName === "INPUT" && ae.type === "text") ||
-            ae.getAttribute("role") === "textbox"
-          )) {
-            editor = ae;
-            console.log("[LeadCaptura] editor = focused element after click:", ae.tagName, ae.className);
-            break;
-          }
-          const now = _allEditables(document);
-          for (const el of now) {
-            if (!editablesBefore.has(el)) { editor = el; break; }
-          }
-          if (editor) {
-            console.log("[LeadCaptura] editor = new editable after click:", editor.tagName, editor.className);
-            break;
-          }
-          dialogByText = _findDialogByHeaderText();
-          if (dialogByText) {
-            console.log("[LeadCaptura] dialog found by 'New message' header text:", dialogByText);
-            break;
-          }
-          scope = _findMsgScope();
-          phTarget = _findMsgPlaceholderClickTarget();
-          if (scope || phTarget) break;
-          await sleep(200);
-        }
         _removeSpotlight();
 
-        if (!editor && !scope && !phTarget && !dialogByText) {
-          console.log("[LeadCaptura] msg in-place: nothing appeared, retry forceclick");
-          _forceClick(msgBtn);
-          if (msgBtn.tagName === "A" && msgBtn.href) {
-            try { msgBtn.click(); } catch {}
-          }
-          for (let k = 0; k < 40; k++) {
-            const now = _allEditables(document);
-            for (const el of now) {
-              if (!editablesBefore.has(el)) { editor = el; break; }
-            }
-            if (editor) break;
-            dialogByText = _findDialogByHeaderText();
-            scope = _findMsgScope();
-            phTarget = _findMsgPlaceholderClickTarget();
-            if (editor || scope || phTarget || dialogByText) break;
-            await sleep(200);
-          }
-        }
-
-        if (!editor && !scope && !phTarget && !dialogByText) {
+        if (!found) {
           failed++;
           _lcToast(`✗ ${idx}/${total} — composer didn't open`, 2500);
           _closeMsgOverlay();
           continue;
         }
 
-        await sleep(500 + Math.random() * 350);
+        console.log(`[LeadCaptura] msg ${idx}/${total} found ${found.kind} via ${found.via}`);
+        await sleep(450 + Math.random() * 300);
 
-        if (!editor) {
-          // If we found a dialog by text but no editor yet, click around in
-          // the dialog body to wake Quill.  Try placeholder target first,
-          // then click into the bottom-half of the dialog.
-          let clickTarget = phTarget || (dialogByText && _findMsgPlaceholderClickTarget()) || dialogByText || scope;
-          if (clickTarget) {
-            console.log("[LeadCaptura] msg in-place → clicking dialog/placeholder area:", clickTarget);
-            try { await dispatchHumanClick(clickTarget); } catch {}
-            await sleep(500);
-          }
-          // Activate element check first.
+        // If MutationObserver caught the dialog but not the editor, click
+        // into the dialog body to wake the Quill editor, then find it.
+        let editor = found.kind === "editor" ? found.el : null;
+        if (!editor && found.kind === "dialog") {
+          const phTarget = _findMsgPlaceholderClickTarget() || found.el;
+          console.log("[LeadCaptura] clicking dialog body to activate editor:", phTarget);
+          try { await dispatchHumanClick(phTarget); } catch {}
+          await sleep(450);
+          // activeElement after click is usually the editor.
           const ae = document.activeElement;
           if (ae && ae !== document.body && (
             ae.isContentEditable ||
@@ -7355,36 +7367,17 @@
             ae.getAttribute("role") === "textbox"
           )) {
             editor = ae;
-            console.log("[LeadCaptura] editor = activeElement after dialog click:", ae.tagName);
           }
-          // Newly-added editable.
-          if (!editor) {
-            for (let k = 0; k < 25; k++) {
-              const eds = _allEditables(document);
-              for (const el of eds) {
-                if (!editablesBefore.has(el)) { editor = el; break; }
-              }
-              if (editor) break;
-              await sleep(150);
-            }
-          }
-          // STRONG fallback: largest visible editor on the page that isn't
-          // a search/filter input.  On the connections page the only large
-          // editable area is the composer's textbox — there is no ambiguity.
-          if (!editor) {
-            const largest = _findLargestComposerEditor();
-            if (largest) {
-              editor = largest;
-              console.log("[LeadCaptura] editor = largest visible editable (fallback):", largest.tagName, largest.className);
-            }
-          }
-          // Last resort.
-          if (!editor && phTarget) editor = phTarget;
+          // Fall back to the largest visible editor.
+          if (!editor) editor = _findLargestComposerEditor();
+          // Last resort: the placeholder/dialog element itself — typing
+          // strategies E (paste) and F (innerText) can sometimes still work.
+          if (!editor) editor = phTarget;
         }
 
         if (!editor) {
           failed++;
-          _lcToast(`✗ ${idx}/${total} — couldn't find editor`, 2500);
+          _lcToast(`✗ ${idx}/${total} — couldn't find editor in dialog`, 2500);
           _closeMsgOverlay();
           continue;
         }
