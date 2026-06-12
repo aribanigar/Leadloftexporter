@@ -5045,50 +5045,38 @@
     const path = location.pathname;
     if (!path.startsWith("/mynetwork/invite-connect/connections")) return;
 
-    const rows = document.querySelectorAll(
-      "li.mn-connection-card, " +
-      "[class*='mn-connection-card'], " +
-      "[componentkey*='connection' i], " +
-      "li[class*='_connection-card-item' i]"
+    // Every connection row has exactly ONE Message button. Anchor on those
+    // (scoped to <main> so the right-rail messaging panel and promoted ad are
+    // excluded) and climb to the smallest ancestor that contains the button +
+    // a /in/ link — that ancestor IS the row, regardless of which class names
+    // LinkedIn is currently shipping. This guarantees one chip per row.
+    const mainScope = document.querySelector("main") || document.body;
+    const msgBtns = mainScope.querySelectorAll(
+      "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])"
     );
 
-    // If LinkedIn restructured and the above selectors miss, fall back to:
-    // every <a href*='/in/'> link in the main column, climb to its smallest
-    // ancestor that contains exactly one such link.
-    const targets = rows.length
-      ? Array.from(rows)
-      : Array.from(document.querySelectorAll("main a[href*='/in/']"))
-          .map((a) => {
-            let node = a.parentElement;
-            for (let i = 0; i < 12 && node && node.tagName !== "MAIN"; i++) {
-              const owners = new Set();
-              for (const l of node.querySelectorAll("a[href*='/in/']")) {
-                try {
-                  const u = globalThis.__lcDom.normalizeProfileUrl(l.href);
-                  if (u) owners.add(u);
-                } catch {}
-                if (owners.size > 1) break;
-              }
-              if (owners.size > 1) break;
-              if (
-                owners.size === 1 &&
-                (node.tagName === "LI" ||
-                  node.tagName === "ARTICLE" ||
-                  node.getAttribute?.("role") === "listitem" ||
-                  /card|row|connection/i.test(node.className || ""))
-              ) {
-                return node;
-              }
-              node = node.parentElement;
-            }
-            return null;
-          })
-          .filter(Boolean);
-
     const seen = new Set();
-    for (const card of targets) {
-      const link = card.querySelector("a[href*='/in/']");
+    for (const btn of msgBtns) {
+      if (!_isVisible(btn) || btn.disabled) continue;
+      if (btn.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+      // Defensive: skip if this is the page's compose-dialog Send button or
+      // similar non-row context (no /in/ link anywhere in the ancestor chain).
+
+      // Climb to nearest ancestor that contains both this button AND a /in/ link.
+      let row = null;
+      let node = btn.parentElement;
+      for (let i = 0; i < 12 && node && node.tagName !== "MAIN"; i++) {
+        if (node.querySelector("a[href*='/in/']")) {
+          row = node;
+          break;
+        }
+        node = node.parentElement;
+      }
+      if (!row) continue;
+
+      const link = row.querySelector("a[href*='/in/']");
       if (!link) continue;
+
       let url = "";
       try { url = globalThis.__lcDom.normalizeProfileUrl(link.href) || ""; } catch {}
       if (!url || seen.has(url)) continue;
@@ -5101,23 +5089,13 @@
         chipCardEl.delete(url);
       }
 
-      // Find the Message button or "..." button to anchor next to.
-      let anchorBtn = card.querySelector(
-        "button[aria-label*='Message' i]:not([aria-label*='InMail' i]):not([aria-label*='your team' i])"
-      );
-      if (!anchorBtn) {
-        anchorBtn = card.querySelector(
-          "button[aria-label*='More' i], button[aria-label*='actions' i]"
-        );
-      }
-
       const name =
         (link.getAttribute("aria-label") || link.textContent || "")
           .replace(/\s+/g, " ")
           .trim() || _labelFromUrl(url);
       const profile = { linkedin_url: url, full_name: name };
       try {
-        injectInlineSave(card, profile, anchorBtn);
+        injectInlineSave(row, profile, btn);
       } catch (e) {
         console.warn("[LeadCaptura] connections-list decorate failed", e?.message);
       }
@@ -6283,43 +6261,85 @@
     }
 
     if (!editor) {
+      // ── Anchor on the profile's H1 ──
+      // The profile's name H1 is always inside the top card. Climb from it to
+      // its container <section> and search Message there. LinkedIn's right
+      // rail "More profiles for you" lives outside this section, so its
+      // Message buttons can't be reached.
+      //
+      // Defence-in-depth: even within scope, reject a Message button whose
+      // aria-label clearly names a DIFFERENT person than the profile H1.
+      const profileH1 =
+        document.querySelector("main h1") ||
+        document.querySelector("h1.text-heading-xlarge") ||
+        document.querySelector("h1");
+      const profileName = (profileH1?.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const firstNameLower = profileName.split(/\s+/)[0]?.toLowerCase() || "";
+
+      const topCard =
+        (profileH1 &&
+          profileH1.closest(
+            "section.artdeco-card, .pv-top-card-v2-ctas, .pv-top-card, [class*='top-card'], section"
+          )) ||
+        document.querySelector("main .pv-top-card-v2-ctas") ||
+        document.querySelector("main .pv-top-card") ||
+        document.querySelector("main section.artdeco-card") ||
+        null;
+
+      const _nameMatchesProfile = (btnLabel) => {
+        if (!firstNameLower) return true; // no profile name → can't check
+        if (!btnLabel) return true;
+        const lbl = btnLabel.toLowerCase();
+        // Try to extract the name from "Message <name>" / "Message <name> in a new tab"
+        const m = lbl.match(/message\s+([a-z][a-z\-' .]*)/i);
+        if (!m) return true; // no name in label → accept
+        const labelName = m[1].trim();
+        // Accept if the profile's first name appears anywhere in the button's name part.
+        return labelName.includes(firstNameLower);
+      };
+
       const _findMsgBtn = () => {
-        // Scope to the profile top-card CTA area first. LinkedIn's sidebar
-        // "More profiles for you" section renders its own Message buttons and
-        // they appear earlier in DOM order than the actual profile's button,
-        // so a document-wide querySelectorAll picks the WRONG person's button.
-        // Prefer the top-card CTAs → top-card → any first artdeco-card → main
-        // before falling back to the full document.
-        const topCard =
-          document.querySelector("main .pv-top-card-v2-ctas") ||
-          document.querySelector("main .pv-top-card") ||
-          document.querySelector("main section:first-of-type.artdeco-card") ||
-          document.querySelector("main") ||
-          document.documentElement;
+        const scopes = [topCard, document.querySelector("main")].filter(Boolean);
 
         const _MSG_SELS = [
-          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i])",
-          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i])",
+          "button[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='recruiter' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
+          "a[aria-label*='Message' i]:not([aria-label*='your team' i]):not([aria-label*='InMail' i]):not([aria-label*='Sales Navigator' i])",
           "button.message-anywhere-button",
           "[class*='message-anywhere-button']",
           "button[data-control-name*='message' i]",
         ];
-        for (const sel of _MSG_SELS) {
-          try {
-            for (const b of topCard.querySelectorAll(sel)) {
-              if (_isVisible(b) && !b.disabled) return b;
-            }
-          } catch {}
-        }
-        // Text-content fallback — same scoped container, exclude our own UI.
-        for (const el of topCard.querySelectorAll("button, a[role='button'], [role='button']")) {
-          if (el.classList?.contains("lc-inline-save")) continue;
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
-          if (!_isVisible(el) || el.disabled) continue;
-          const lbl = (el.getAttribute("aria-label") || "").trim().toLowerCase();
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const hay = lbl + " " + txt;
-          if (/\bmessage\b/.test(hay) && !/your team|recruiter|inmail|connect|follow/i.test(hay)) return el;
+
+        for (const scope of scopes) {
+          for (const sel of _MSG_SELS) {
+            try {
+              for (const b of scope.querySelectorAll(sel)) {
+                if (!_isVisible(b) || b.disabled) continue;
+                if (b.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+                const lbl = b.getAttribute("aria-label") || b.textContent || "";
+                if (!_nameMatchesProfile(lbl)) {
+                  console.log("[LeadCaptura] skip non-profile Message btn:", lbl.trim().slice(0, 60));
+                  continue;
+                }
+                return b;
+              }
+            } catch {}
+          }
+          // Text-content fallback within this scope.
+          for (const el of scope.querySelectorAll("button, a[role='button'], [role='button']")) {
+            if (el.classList?.contains("lc-inline-save")) continue;
+            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+            if (!_isVisible(el) || el.disabled) continue;
+            const lblRaw = el.getAttribute("aria-label") || el.textContent || "";
+            const lbl = lblRaw.trim().toLowerCase();
+            const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+            const hay = lbl + " " + txt;
+            if (!/\bmessage\b/.test(hay)) continue;
+            if (/your team|recruiter|inmail|connect|follow|sales navigator/i.test(hay)) continue;
+            if (!_nameMatchesProfile(lblRaw)) continue;
+            return el;
+          }
         }
         return null;
       };
