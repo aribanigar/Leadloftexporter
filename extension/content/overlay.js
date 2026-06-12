@@ -7199,25 +7199,46 @@
 
         console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
 
-        // Snapshot existing editables BEFORE the click — anything new that
-        // appears afterwards is the freshly-opened composer's editor.
+        // Snapshot existing editables BEFORE the click so we can detect a
+        // newly-opened composer even if a previous bubble is still in the DOM.
         const editablesBefore = new Set(_allEditables(document));
+        const aeBefore = document.activeElement;
 
+        // Two-step click: dispatchHumanClick (real pointer events for any
+        // React/onPointerDown handlers + bot-detection), THEN native .click()
+        // for anchors so LinkedIn's SPA router actually fires.
         await dispatchHumanClick(msgBtn);
+        if (msgBtn.tagName === "A" && msgBtn.href) {
+          try { msgBtn.click(); } catch (e) { console.log("[LeadCaptura] native .click() failed:", e); }
+        }
 
-        // Wait up to 10s for a NEW editable to appear anywhere on the page,
-        // OR any of the known dialog scopes, OR a placeholder-bearing element.
+        // Wait up to 10s for ANY of: focused editable, new editable, scope, placeholder.
         let editor = null;
         let scope = null;
         let phTarget = null;
         for (let k = 0; k < 50; k++) {
-          // Look for a freshly added editable.
+          // 1) activeElement — strongest signal that the composer is ready.
+          const ae = document.activeElement;
+          if (ae && ae !== document.body && ae !== aeBefore && (
+            ae.isContentEditable ||
+            ae.tagName === "TEXTAREA" ||
+            (ae.tagName === "INPUT" && ae.type === "text") ||
+            ae.getAttribute("role") === "textbox"
+          )) {
+            editor = ae;
+            console.log("[LeadCaptura] editor = focused element after click:", ae.tagName, ae.className);
+            break;
+          }
+          // 2) Newly-added editable.
           const now = _allEditables(document);
           for (const el of now) {
             if (!editablesBefore.has(el)) { editor = el; break; }
           }
-          if (editor) break;
-          // Or a known scope / placeholder we can click.
+          if (editor) {
+            console.log("[LeadCaptura] editor = new editable after click:", editor.tagName, editor.className);
+            break;
+          }
+          // 3) Known scope or placeholder we can click to wake Quill.
           scope = _findMsgScope();
           phTarget = _findMsgPlaceholderClickTarget();
           if (scope || phTarget) break;
