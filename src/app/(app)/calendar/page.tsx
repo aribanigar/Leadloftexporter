@@ -196,7 +196,7 @@ function Disconnected({ onConnect, connecting }: { onConnect: () => void; connec
     <div className="card max-w-2xl p-6">
       <h2 className="mb-1 font-semibold">Connect your calendar</h2>
       <p className="mb-4 text-sm text-slate-600">
-        Sync Google Calendar so LeadCaptura can read your busy times and write reminders &amp; your AI daily agenda
+        Sync Google Calendar so LeadCaptura can read your busy times and write reminders &amp; your daily agenda
         straight onto your calendar — who to talk to and about what, every morning.
       </p>
       <button
@@ -335,7 +335,7 @@ function Connected({
 
         {/* Daily agenda */}
         <div className="card p-5">
-          <h3 className="mb-3 font-semibold">AI daily agenda</h3>
+          <h3 className="mb-3 font-semibold">Daily agenda</h3>
           <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"

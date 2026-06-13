@@ -19,7 +19,6 @@ writing a Google Calendar event for ``channel="calendar"`` or sending mail for
 """
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -29,14 +28,11 @@ try:  # stdlib on 3.9+, but guard anyway
 except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
-from anthropic import Anthropic
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.models import (
     Activity,
     ConnectedAccount,
-    EmailMessage,
     Lead,
     Note,
     Reminder,
@@ -46,17 +42,6 @@ from app.models import (
 from app.services import google_calendar as gcal
 
 log = logging.getLogger(__name__)
-_settings = get_settings()
-_client: Optional[Anthropic] = None
-
-
-def _anthropic() -> Optional[Anthropic]:
-    global _client
-    if not _settings.anthropic_api_key:
-        return None
-    if _client is None:
-        _client = Anthropic(api_key=_settings.anthropic_api_key)
-    return _client
 
 
 # --------------------------------------------------------------------------- #
@@ -416,61 +401,58 @@ def _gather_signals(db: Session, workspace_id: str, user_id: str, tz) -> dict:
     }
 
 
-def _signals_to_context(db: Session, signals: dict) -> tuple[str, int]:
-    """Render the signals to a compact text block + count of items."""
-    lines: list[str] = []
+def build_agenda_text(db: Session, signals: dict) -> tuple[str, int]:
+    """Compose the agenda body — a clean, prioritized plain-text plan of who to
+    talk to and about what. Deterministic, no AI. Returns (text, item_count).
+
+    Ordering is the priority order: replies awaiting a response first, then
+    tasks due today, then pipeline moves, then fresh notes.
+    """
+    sections: list[str] = []
     count = 0
 
-    for t in signals["due_tasks"]:
-        lead = db.get(Lead, t.lead_id) if t.lead_id else None
-        lines.append(f"- TASK DUE: {t.title} — {_lead_label(lead)} (due {t.due_at:%H:%M})")
-        count += 1
-    for lead in signals["replied"]:
-        lines.append(f"- REPLIED: {_lead_label(lead)} replied {lead.last_inbound_at:%b %d %H:%M} — needs a response")
-        count += 1
-    for a in signals["stage_moves"]:
-        lead = db.get(Lead, a.lead_id) if a.lead_id else None
-        lines.append(f"- STAGE MOVED: {_lead_label(lead)}")
-        count += 1
-    for n in signals["recent_notes"]:
-        lead = db.get(Lead, n.lead_id) if n.lead_id else None
-        lines.append(f"- NOTE: {_lead_label(lead)} — {n.body[:160]}")
-        count += 1
+    replied = signals["replied"]
+    if replied:
+        lines = [
+            f"• {_lead_label(lead)} — replied {lead.last_inbound_at:%b %d %H:%M}, respond"
+            for lead in replied
+        ]
+        sections.append("Reply to:\n" + "\n".join(lines))
+        count += len(replied)
 
-    return ("\n".join(lines) if lines else "(no open items today)"), count
+    due_tasks = signals["due_tasks"]
+    if due_tasks:
+        lines = []
+        for t in due_tasks:
+            lead = db.get(Lead, t.lead_id) if t.lead_id else None
+            who = f" — {_lead_label(lead)}" if lead else ""
+            lines.append(f"• {t.title}{who} (due {t.due_at:%H:%M})")
+        sections.append("Tasks due:\n" + "\n".join(lines))
+        count += len(due_tasks)
 
+    stage_moves = signals["stage_moves"]
+    if stage_moves:
+        lines = []
+        for a in stage_moves:
+            lead = db.get(Lead, a.lead_id) if a.lead_id else None
+            lines.append(f"• {_lead_label(lead)} — plan the next touch")
+        sections.append("Moved stage:\n" + "\n".join(lines))
+        count += len(stage_moves)
 
-def build_agenda_text(db: Session, signals: dict) -> tuple[str, int]:
-    """Compose the agenda body. Uses Claude when configured, else a clean
-    deterministic list. Returns (markdown_text, item_count)."""
-    context, count = _signals_to_context(db, signals)
+    recent_notes = signals["recent_notes"]
+    if recent_notes:
+        lines = []
+        for n in recent_notes:
+            lead = db.get(Lead, n.lead_id) if n.lead_id else None
+            lines.append(f"• {_lead_label(lead)} — {n.body[:140]}")
+        sections.append("Follow up on notes:\n" + "\n".join(lines))
+        count += len(recent_notes)
+
     if count == 0:
-        return ("You have no open conversations or due tasks today. Clear runway. 🎯", 0)
+        return ("You have no open conversations or due tasks today. Clear runway.", 0)
 
-    client = _anthropic()
-    if not client:
-        # Deterministic fallback — already useful without an API key.
-        header = f"Your day — {count} item{'s' if count != 1 else ''} to handle:\n"
-        return (header + context, count)
-
-    try:
-        resp = client.messages.create(
-            model=_settings.anthropic_fast_model,
-            max_tokens=700,
-            system=(
-                "You are an executive assistant for a salesperson. Turn the raw CRM "
-                "signals into a crisp daily agenda. Group by priority. For each item say "
-                "WHO to talk to and WHAT about, in one short line. Lead with the most "
-                "time-sensitive (replies awaiting response, tasks due soon). Be concrete, "
-                "no fluff, no preamble. Output plain text with short bullet lines, max ~12 bullets."
-            ),
-            messages=[{"role": "user", "content": f"Today's signals:\n{context}\n\nWrite the agenda."}],
-        )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
-        return (text or context, count)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("agenda AI generation failed, using fallback: %s", exc)
-        return (f"Your day — {count} items:\n{context}", count)
+    header = f"Your day — {count} item{'s' if count != 1 else ''} to handle:\n"
+    return (header + "\n\n".join(sections), count)
 
 
 def generate_daily_agenda(
