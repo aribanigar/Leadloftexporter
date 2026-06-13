@@ -1324,8 +1324,22 @@ function NewCampaignPageInner() {
           fontSize: '20px', fontWeight: 800, color: T.onSurface, margin: 0,
           fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.02em',
           flex: 1,
+          display: 'flex', alignItems: 'center', gap: '10px',
         }}>
-          {editId ? 'Edit Campaign' : 'Campaign Builder'}
+          <span style={{
+            width: '28px', height: '28px', borderRadius: '9px',
+            background: 'linear-gradient(135deg, #4f46e5 0%, #a855f7 60%, #ec4899 100%)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(99,102,241,0.32)',
+          }}>
+            <Wand2 size={14} color="#fff" strokeWidth={2.4} />
+          </span>
+          <span style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            {editId ? 'Edit Campaign' : 'Campaign Builder'}
+          </span>
         </h1>
 
         {loadingEdit && (
@@ -2150,7 +2164,16 @@ function NewCampaignPageInner() {
             borderRadius: T.radiusXl,
             overflow: 'hidden',
             flexShrink: 0,
+            border: '1px solid rgba(99,102,241,0.10)',
+            boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 28px -8px rgba(99,102,241,0.10), 0 0 0 1px rgba(255,255,255,0.6) inset',
+            position: 'relative',
           }}>
+            {/* Gradient accent strip — royal indigo→purple→pink hairline */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
+              background: 'linear-gradient(90deg, #4f46e5 0%, #a855f7 50%, #ec4899 100%)',
+              opacity: 0.85,
+            }} />
 
             {/* Tab bar + header row */}
             <div style={{
@@ -2159,9 +2182,19 @@ function NewCampaignPageInner() {
               borderBottom: `1px solid ${T.surfaceContainer}`,
               gap: '12px',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Icon name={'edit_note'} size={16} color={T.saffron} />
-                <span style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, fontFamily: 'Manrope, Inter, sans-serif' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  width: '26px', height: '26px', borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12))',
+                  border: '1px solid rgba(99,102,241,0.20)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <FileEdit size={13} color="#6366f1" strokeWidth={2.4} />
+                </span>
+                <span style={{
+                  fontSize: '14px', fontWeight: 800, color: T.onSurface,
+                  fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.01em',
+                }}>
                   Email Content
                 </span>
               </div>
@@ -2182,23 +2215,33 @@ function NewCampaignPageInner() {
                   { mode: 'visual' as const, label: 'Preview' },
                 ]).map(({ mode, label: lbl }) => {
                   const active = form.contentMode === mode;
+                  const isAmp = mode === 'amp';
                   return (
                     <button
                       key={mode}
                       onClick={() => setForm(f => ({ ...f, contentMode: mode }))}
                       style={{
                         padding: '6px 14px',
-                        borderRadius: '6px',
+                        borderRadius: '7px',
                         border: 'none',
-                        backgroundColor: active ? T.surfaceContainerLowest : 'transparent',
-                        color: active ? T.primary : T.onSurfaceVariant,
+                        background: active
+                          ? (isAmp
+                              ? 'linear-gradient(135deg, #6366f1, #a855f7)'
+                              : T.surfaceContainerLowest)
+                          : 'transparent',
+                        color: active
+                          ? (isAmp ? '#fff' : T.primary)
+                          : (isAmp ? '#7c3aed' : T.onSurfaceVariant),
                         fontSize: '12px',
-                        fontWeight: active ? 700 : 500,
+                        fontWeight: active ? 700 : (isAmp ? 700 : 500),
                         cursor: 'pointer',
                         fontFamily: 'Inter, sans-serif',
                         transition: 'all 0.15s',
-                        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        borderBottom: active ? `2px solid ${T.primary}` : '2px solid transparent',
+                        boxShadow: active
+                          ? (isAmp
+                              ? '0 3px 10px rgba(99,102,241,0.32)'
+                              : '0 1px 3px rgba(0,0,0,0.08)')
+                          : 'none',
                       }}
                     >
                       {lbl}
@@ -2663,7 +2706,10 @@ function NewCampaignPageInner() {
               </div>
 
               {/* Right: Quick Preview thumbnail */}
-              <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: T.surfaceContainerLow }}>
+              <div style={{
+                display: 'flex', flexDirection: 'column',
+                background: 'linear-gradient(180deg, rgba(99,102,241,0.04), rgba(168,85,247,0.04))',
+              }}>
                 <div style={{
                   padding: '10px 14px',
                   borderBottom: `1px solid ${T.surfaceContainer}`,
@@ -2726,7 +2772,7 @@ function NewCampaignPageInner() {
                     flex: 1,
                     minHeight: '360px',
                     borderRadius: T.radiusLg,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 24px -4px rgba(15,23,42,0.12), 0 0 0 1px rgba(99,102,241,0.10)',
                     overflow: 'hidden',
                     backgroundColor: '#ffffff',
                     display: 'flex',
