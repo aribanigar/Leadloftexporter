@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "UAE",
+  "currency": "AED",
+  "campaign_code": "GG-AED-20260613-1",
+  "campaign_name": "UAE Summer Hydration - 13 Jun 2026",
+  "subject": "Beat the heat",
+  "angle": "UAE Summer Hydration",
+  "season": "Summer",
+  "theme": "Insulated drinkware",
+  "skus": [
+    "GG6373",
+    "GG9812",
+    "GG6750",
+    "GG9356"
+  ],
+  "products": [
+    {
+      "name": "Tampere",
+      "sku": "GG6373",
+      "usd": 17.85,
+      "price": 55.72,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6373.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6373"
+    },
+    {
+      "name": "Stelvio",
+      "sku": "GG9812",
+      "usd": 14.2,
+      "price": 44.33,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9812.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9812"
+    },
+    {
+      "name": "Turin",
+      "sku": "GG6750",
+      "usd": 12.9,
+      "price": 40.27,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6750.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6750"
+    },
+    {
+      "name": "Oregon",
+      "sku": "GG9356",
+      "usd": 6.4,
+      "price": 19.98,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9356.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9356"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Insulated+drinkware+set+%28GG-AED-20260613-1%29+for+UAE"
+}

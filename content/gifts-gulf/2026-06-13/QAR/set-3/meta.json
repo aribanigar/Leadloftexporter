@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "Qatar",
+  "currency": "QAR",
+  "campaign_code": "GG-QAR-20260613-3",
+  "campaign_name": "Qatar Green Desk - 13 Jun 2026",
+  "subject": "Green at work",
+  "angle": "Qatar Eco Gifting",
+  "season": "Eco / Summer",
+  "theme": "Eco desk",
+  "skus": [
+    "GG6791",
+    "GG6792",
+    "GG6480",
+    "GG6793"
+  ],
+  "products": [
+    {
+      "name": "Grow",
+      "sku": "GG6791",
+      "usd": 6.8,
+      "price": 21.04,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6791.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6791"
+    },
+    {
+      "name": "Stone",
+      "sku": "GG6792",
+      "usd": 5.9,
+      "price": 18.25,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6792.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6792"
+    },
+    {
+      "name": "Bamboo Pen",
+      "sku": "GG6480",
+      "usd": 1.6,
+      "price": 4.95,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6480.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6480"
+    },
+    {
+      "name": "Seedstick",
+      "sku": "GG6793",
+      "usd": 2.9,
+      "price": 8.97,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6793.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6793"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Eco+desk+set+%28GG-QAR-20260613-3%29+for+Qatar"
+}

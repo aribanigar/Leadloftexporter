@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "Qatar",
+  "currency": "QAR",
+  "campaign_code": "GG-QAR-20260613-1",
+  "campaign_name": "Qatar Recycled Carry - 13 Jun 2026",
+  "subject": "Recycled, never binned",
+  "angle": "Qatar Eco Gifting",
+  "season": "Eco / Summer",
+  "theme": "RPET bags",
+  "skus": [
+    "GG6701",
+    "GG6688",
+    "GG9846",
+    "GG6710"
+  ],
+  "products": [
+    {
+      "name": "Turin Pack",
+      "sku": "GG6701",
+      "usd": 16.8,
+      "price": 51.98,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6701.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6701"
+    },
+    {
+      "name": "Columbia",
+      "sku": "GG6688",
+      "usd": 4.6,
+      "price": 14.23,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6688.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6688"
+    },
+    {
+      "name": "Canvas",
+      "sku": "GG9846",
+      "usd": 3.2,
+      "price": 9.9,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9846.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9846"
+    },
+    {
+      "name": "Duffel",
+      "sku": "GG6710",
+      "usd": 22.3,
+      "price": 69.0,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6710.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6710"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+RPET+bags+set+%28GG-QAR-20260613-1%29+for+Qatar"
+}

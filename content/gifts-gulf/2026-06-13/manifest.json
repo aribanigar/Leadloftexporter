@@ -1,0 +1,150 @@
+{
+  "date": "2026-06-13",
+  "generated_utc": "2026-06-13T10:43:52.902307Z",
+  "sets": [
+    {
+      "campaign_code": "GG-AED-20260613-1",
+      "campaign_name": "UAE Summer Hydration - 13 Jun 2026",
+      "subject": "Beat the heat",
+      "market": "UAE",
+      "currency": "AED",
+      "angle": "UAE Summer Hydration",
+      "season": "Summer",
+      "theme": "Insulated drinkware",
+      "skus": [
+        "GG6373",
+        "GG9812",
+        "GG6750",
+        "GG9356"
+      ]
+    },
+    {
+      "campaign_code": "GG-AED-20260613-2",
+      "campaign_name": "UAE Cooler Season - 13 Jun 2026",
+      "subject": "Cold all day",
+      "market": "UAE",
+      "currency": "AED",
+      "angle": "UAE Summer Hydration",
+      "season": "Summer",
+      "theme": "Cooler bags",
+      "skus": [
+        "GG6404",
+        "GG6709",
+        "GG6388",
+        "GG9227"
+      ]
+    },
+    {
+      "campaign_code": "GG-AED-20260613-3",
+      "campaign_name": "UAE Sun and Shade - 13 Jun 2026",
+      "subject": "Made for shade",
+      "market": "UAE",
+      "currency": "AED",
+      "angle": "UAE Summer Hydration",
+      "season": "Summer",
+      "theme": "Caps and light hydration",
+      "skus": [
+        "GG7011",
+        "GG6433",
+        "GG6210",
+        "GG9910"
+      ]
+    },
+    {
+      "campaign_code": "GG-SAR-20260613-1",
+      "campaign_name": "KSA Power Your H2 - 13 Jun 2026",
+      "subject": "Power your H2",
+      "market": "KSA",
+      "currency": "SAR",
+      "angle": "KSA H2 Planning",
+      "season": "Mid-year",
+      "theme": "Tech carry",
+      "skus": [
+        "GG6584",
+        "GG6075",
+        "GG6395",
+        "GG9843"
+      ]
+    },
+    {
+      "campaign_code": "GG-SAR-20260613-2",
+      "campaign_name": "KSA Desk Done Right - 13 Jun 2026",
+      "subject": "Desk done right",
+      "market": "KSA",
+      "currency": "SAR",
+      "angle": "KSA H2 Planning",
+      "season": "Mid-year",
+      "theme": "Executive desk",
+      "skus": [
+        "GG8200",
+        "GG9479",
+        "GG6555",
+        "GG6489"
+      ]
+    },
+    {
+      "campaign_code": "GG-SAR-20260613-3",
+      "campaign_name": "KSA Client Appreciation - 13 Jun 2026",
+      "subject": "Pour the deal",
+      "market": "KSA",
+      "currency": "SAR",
+      "angle": "KSA H2 Planning",
+      "season": "Mid-year",
+      "theme": "Premium drinkware",
+      "skus": [
+        "GG6371",
+        "GG6044",
+        "GG6748",
+        "GG6612"
+      ]
+    },
+    {
+      "campaign_code": "GG-QAR-20260613-1",
+      "campaign_name": "Qatar Recycled Carry - 13 Jun 2026",
+      "subject": "Recycled, never binned",
+      "market": "Qatar",
+      "currency": "QAR",
+      "angle": "Qatar Eco Gifting",
+      "season": "Eco / Summer",
+      "theme": "RPET bags",
+      "skus": [
+        "GG6701",
+        "GG6688",
+        "GG9846",
+        "GG6710"
+      ]
+    },
+    {
+      "campaign_code": "GG-QAR-20260613-2",
+      "campaign_name": "Qatar Refill Culture - 13 Jun 2026",
+      "subject": "Sip, refill, repeat",
+      "market": "Qatar",
+      "currency": "QAR",
+      "angle": "Qatar Eco Gifting",
+      "season": "Eco / Summer",
+      "theme": "Recycled drinkware",
+      "skus": [
+        "GG6468",
+        "GG6390",
+        "GG6391",
+        "GG6492"
+      ]
+    },
+    {
+      "campaign_code": "GG-QAR-20260613-3",
+      "campaign_name": "Qatar Green Desk - 13 Jun 2026",
+      "subject": "Green at work",
+      "market": "Qatar",
+      "currency": "QAR",
+      "angle": "Qatar Eco Gifting",
+      "season": "Eco / Summer",
+      "theme": "Eco desk",
+      "skus": [
+        "GG6791",
+        "GG6792",
+        "GG6480",
+        "GG6793"
+      ]
+    }
+  ]
+}
