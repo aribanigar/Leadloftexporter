@@ -200,6 +200,8 @@ def create_reminder(
     task_id: Optional[str] = None,
     duration_minutes: int = 15,
     payload: Optional[dict] = None,
+    recipient_email: Optional[str] = None,
+    booking_id: Optional[str] = None,
     commit: bool = True,
 ) -> Reminder:
     if remind_at.tzinfo is None:
@@ -216,6 +218,8 @@ def create_reminder(
         channel=channel if channel in {"calendar", "email"} else "calendar",
         source=source,
         payload=payload or {},
+        recipient_email=recipient_email,
+        booking_id=booking_id,
         status="pending",
     )
     db.add(rem)
@@ -337,11 +341,14 @@ def deliver_reminder(db: Session, reminder: Reminder) -> bool:
     if reminder.status not in {"pending", "failed", "scheduled"}:
         return False
     try:
-        # If a calendar reminder has no calendar connected, fall back to email
-        # so SMTP-only users still get the nudge.
-        use_calendar = reminder.channel == "calendar" and calendar_account_for(
-            db, reminder.workspace_id, reminder.user_id
-        ) is not None
+        # Reminders addressed to an external recipient (booking invitees) always
+        # go by email. Otherwise a calendar reminder uses the calendar when one
+        # is connected, else falls back to email so SMTP-only users still get it.
+        use_calendar = (
+            reminder.channel == "calendar"
+            and not reminder.recipient_email
+            and calendar_account_for(db, reminder.workspace_id, reminder.user_id) is not None
+        )
         if use_calendar:
             ok = _deliver_calendar(db, reminder)
         else:
@@ -399,7 +406,8 @@ def _deliver_email(db: Session, reminder: Reminder) -> bool:
         reminder.status = "failed"
         reminder.error = "no_email_account_connected"
         return False
-    to_addr = account.external_id or (account.config or {}).get("from_email")
+    # Invitee reminders go to recipient_email; personal reminders to the owner.
+    to_addr = reminder.recipient_email or account.external_id or (account.config or {}).get("from_email")
     if not to_addr:
         reminder.status = "failed"
         reminder.error = "no_recipient_address"

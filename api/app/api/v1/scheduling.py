@@ -57,6 +57,7 @@ def _serialize(et: EventType) -> dict:
         "active": et.active,
         "availability": et.availability or sched.DEFAULT_AVAILABILITY,
         "questions": et.questions or [],
+        "reminder_offsets": et.reminder_offsets if et.reminder_offsets is not None else [1440, 60],
         "owner_id": et.owner_id,
     }
 
@@ -77,6 +78,7 @@ class EventTypeIn(BaseModel):
     active: bool = True
     availability: Optional[dict] = None
     questions: Optional[list] = None
+    reminder_offsets: Optional[list] = None
     slug: Optional[str] = None
 
 
@@ -126,6 +128,7 @@ def create_event_type(
         active=body.active,
         availability=body.availability or sched.DEFAULT_AVAILABILITY,
         questions=body.questions or [],
+        reminder_offsets=body.reminder_offsets if body.reminder_offsets is not None else [1440, 60],
     )
     db.add(et)
     db.commit()

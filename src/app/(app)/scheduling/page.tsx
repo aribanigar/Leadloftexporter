@@ -33,6 +33,7 @@ interface EventType {
   active: boolean;
   availability: Availability;
   questions: Question[];
+  reminder_offsets: number[];
 }
 interface Booking {
   id: string;
@@ -56,6 +57,12 @@ const LOCATIONS = [
   { v: "phone", l: "Phone call" },
   { v: "in_person", l: "In person" },
   { v: "custom", l: "Custom" },
+];
+const REMINDER_OFFSETS = [
+  { minutes: 10080, label: "1 week before" },
+  { minutes: 1440, label: "1 day before" },
+  { minutes: 60, label: "1 hour before" },
+  { minutes: 15, label: "15 min before" },
 ];
 
 export default function SchedulingPage() {
@@ -165,6 +172,7 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
           active: form.active,
           availability: form.availability,
           questions: form.questions,
+          reminder_offsets: form.reminder_offsets,
         },
       }),
     onSuccess: (updated) => {
@@ -345,6 +353,33 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Invitee reminders */}
+      <div className="card p-5">
+        <h3 className="mb-1 font-semibold">Invitee reminders</h3>
+        <p className="mb-3 text-xs text-slate-500">
+          Automatically email the invitee before the meeting (reduces no-shows).
+        </p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          {REMINDER_OFFSETS.map((o) => (
+            <label key={o.minutes} className="flex items-center gap-1.5 text-slate-700">
+              <input
+                type="checkbox"
+                checked={form.reminder_offsets.includes(o.minutes)}
+                onChange={(e) =>
+                  set(
+                    "reminder_offsets",
+                    e.target.checked
+                      ? [...form.reminder_offsets, o.minutes].sort((a, b) => b - a)
+                      : form.reminder_offsets.filter((m) => m !== o.minutes)
+                  )
+                }
+              />
+              {o.label}
+            </label>
+          ))}
         </div>
       </div>
 

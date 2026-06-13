@@ -198,9 +198,11 @@ def create_booking(
     db.commit()
     db.refresh(booking)
 
-    # Confirmation email to the invitee + a reminder for the owner. Best-effort.
+    # Confirmation email to the invitee + a reminder for the owner +
+    # automated appointment reminders to the invitee. All best-effort.
     _send_confirmation(db, event_type, booking)
     _owner_reminder(db, event_type, booking)
+    _schedule_invitee_reminders(db, event_type, booking)
     return booking
 
 
@@ -215,7 +217,65 @@ def cancel_booking(db: Session, booking: Booking) -> None:
             creds = gcal.ensure_credentials(db, account)
             if creds:
                 gcal.delete_event(creds, rsvc._write_calendar_id(account), booking.external_event_id)
+    # Cancel any pending invitee reminders so we don't ping a cancelled meeting.
+    from app.models import Reminder
+
+    db.query(Reminder).filter(
+        Reminder.booking_id == booking.id,
+        Reminder.status.in_(["pending", "failed"]),
+    ).update({"status": "cancelled"}, synchronize_session=False)
     db.commit()
+
+
+def _schedule_invitee_reminders(db: Session, event_type: EventType, booking: Booking) -> None:
+    """Queue 'your meeting is coming up' emails to the invitee at each configured
+    offset before the start (default 24h + 1h). Only future offsets are queued."""
+    try:
+        offsets = event_type.reminder_offsets or [1440, 60]
+        now = datetime.now(timezone.utc)
+        for minutes in offsets:
+            try:
+                minutes = int(minutes)
+            except (TypeError, ValueError):
+                continue
+            remind_at = booking.start_at - timedelta(minutes=minutes)
+            if remind_at <= now:
+                continue
+            when = booking.start_at.strftime("%A, %b %d at %H:%M UTC")
+            lead = _human_offset(minutes)
+            body = (
+                f"Hi {booking.invitee_name},\n\n"
+                f"This is a reminder that your {event_type.name} is {lead} — {when}.\n\n"
+                f"{_meeting_description(event_type, booking)}\n\n"
+                f"See you soon!"
+            )
+            rsvc.create_reminder(
+                db,
+                workspace_id=event_type.workspace_id,
+                user_id=event_type.owner_id,
+                title=f"Reminder: {event_type.name} {lead}",
+                body=body,
+                remind_at=remind_at,
+                channel="email",
+                source="booking_reminder",
+                lead_id=booking.lead_id,
+                recipient_email=booking.invitee_email,
+                booking_id=booking.id,
+                commit=False,
+            )
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("invitee reminders not scheduled for booking %s: %s", booking.id, exc)
+
+
+def _human_offset(minutes: int) -> str:
+    if minutes % 1440 == 0:
+        d = minutes // 1440
+        return "tomorrow" if d == 1 else f"in {d} days"
+    if minutes % 60 == 0:
+        h = minutes // 60
+        return f"in {h} hour{'s' if h != 1 else ''}"
+    return f"in {minutes} minutes"
 
 
 # --------------------------------------------------------------------------- #

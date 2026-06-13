@@ -444,7 +444,15 @@ class Reminder(Base, TimestampMixin):
     channel: Mapped[str] = mapped_column(String(20), default="calendar")  # calendar | email
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|scheduled|sent|failed|cancelled|skipped
     source: Mapped[str] = mapped_column(String(30), default="manual")
-    # manual | inbox_reply | stage_change | note | daily_agenda | booking
+    # manual | inbox_reply | stage_change | note | daily_agenda | booking | booking_reminder
+
+    # When set, the reminder is sent to this external address (e.g. a booking
+    # invitee) instead of the owning user's own inbox. user_id still scopes
+    # ownership + picks the sending account.
+    recipient_email: Mapped[Optional[str]] = mapped_column(String(320))
+    # Link to the booking that spawned this reminder (so cancelling a booking
+    # cancels its pending invitee reminders).
+    booking_id: Mapped[Optional[str]] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
 
     # The calendar account this lands on + the external (Google) event id once
     # written, so we can update/delete it idempotently.
@@ -877,6 +885,8 @@ class EventType(Base, TimestampMixin):
     availability: Mapped[dict] = mapped_column(JSONB, default=dict)
     # Custom intake questions: [{"key","label","type","required"}]
     questions: Mapped[list] = mapped_column(JSONB, default=list)
+    # Minutes-before-start at which to email the invitee a reminder.
+    reminder_offsets: Mapped[list] = mapped_column(JSONB, default=lambda: [1440, 60])
 
 
 class Booking(Base, TimestampMixin):
