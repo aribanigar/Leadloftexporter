@@ -101,6 +101,38 @@
     return true;
   }
 
+  // ─────────────────── shadow-DOM piercing ───────────────────
+  // CRITICAL: the 2026 LinkedIn "Add a note to your invitation?" modal is
+  // rendered INSIDE the open shadow root of #interop-outlet (same place the
+  // new messaging composer lives). Plain document.querySelector cannot see
+  // across the shadow boundary, so the modal's "Send without a note" button
+  // is invisible to a normal query. These helpers walk the document plus the
+  // known LinkedIn shadow hosts so we can find + click it.
+  function _shadowRoots() {
+    const roots = [document];
+    try {
+      document
+        .querySelectorAll(
+          '#interop-outlet, #interop-outlet-main, [data-testid="interop-shadowdom"], [data-testid="interop-shadowdom-main"]'
+        )
+        .forEach(host => { if (host && host.shadowRoot) roots.push(host.shadowRoot); });
+    } catch (_) {}
+    return roots;
+  }
+  function queryAcrossShadows(sel) {
+    for (const root of _shadowRoots()) {
+      try { const el = root.querySelector(sel); if (el) return el; } catch (_) {}
+    }
+    return null;
+  }
+  function queryAllAcrossShadows(sel) {
+    const out = [];
+    for (const root of _shadowRoots()) {
+      try { root.querySelectorAll(sel).forEach(e => out.push(e)); } catch (_) {}
+    }
+    return out;
+  }
+
   // ─────────────────── DOM detection ─────────────────────────
   // Each visible Connect anchor on the search page. We anchor on the href
   // (uniquely "/preload/search-custom-invite/") + the aria-label shape
@@ -127,12 +159,9 @@
 
   // The "Add a note to your invitation?" modal exposes a stable button:
   //   <button aria-label="Send without a note" ... >
-  // Scan the WHOLE document (per CLAUDE.md's load-bearing rule — sometimes
-  // LinkedIn renders the footer button outside the matched modal node).
+  // Lives inside #interop-outlet's shadow root, so we MUST pierce shadows.
   function findSendWithoutNoteBtn() {
-    const btns = document.querySelectorAll(
-      'button[aria-label="Send without a note"]'
-    );
+    const btns = queryAllAcrossShadows('button[aria-label="Send without a note"]');
     // Prefer one that's visible + enabled, else first match.
     let visible = null;
     for (const b of btns) {
@@ -144,17 +173,17 @@
   }
 
   // The invitation modal is open if either the dialog node is visible or a
-  // visible "Send without a note" button exists. Mirrors the resilience rule
-  // in the legacy flow.
+  // visible "Send without a note" button exists — both pierced across shadow.
   function invitationModalOpen() {
-    const dialog = document.querySelector(
-      '.artdeco-modal[role="dialog"], div[role="dialog"][data-test-modal-id]'
+    const dialog = queryAcrossShadows(
+      '.artdeco-modal[role="dialog"], div[role="dialog"][data-test-modal-id], ' +
+      'div[data-test-modal-id="send-invite-modal"]'
     );
     if (dialog) {
       const text = (dialog.textContent || "").toLowerCase();
       if (text.includes("add a note to your invitation")) return true;
     }
-    const sb = document.querySelector('button[aria-label="Send without a note"]');
+    const sb = queryAcrossShadows('button[aria-label="Send without a note"]');
     if (sb) {
       const r = sb.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) return true;
@@ -164,7 +193,7 @@
 
   // Dismiss the modal (for skipped rows so we don't leave it open).
   function dismissModal() {
-    const x = document.querySelector(
+    const x = queryAcrossShadows(
       '.artdeco-modal__dismiss[aria-label*="Dismiss" i],' +
       'button[aria-label="Dismiss"][data-test-modal-close-btn]'
     );
