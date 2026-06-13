@@ -71,7 +71,8 @@ async def _proxy(
     path: str,
     ctx: AuthContext,
     json_body: Optional[dict] = None,
-) -> dict:
+    params: Optional[dict] = None,
+) -> Any:
     base = _sidecar_url()
     if not base:
         # Surface a structured error instead of a 500 so the frontend can
@@ -81,12 +82,16 @@ async def _proxy(
             "whatsapp_sidecar_not_configured",
         )
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Media payloads (base64) can be a few MB; we accept up to 24MB at
+        # the sidecar's express layer, so allow a long enough timeout for
+        # the round-trip + WhatsApp upload.
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.request(
                 method,
                 f"{base}{path}",
                 headers=_headers(ctx),
                 json=json_body,
+                params=params,
             )
     except httpx.RequestError as e:
         raise HTTPException(
@@ -176,10 +181,19 @@ async def logout_account(
 # ─── Send + campaigns ────────────────────────────────────────────────────
 
 
+class MediaIn(BaseModel):
+    base64: str = Field(min_length=4)
+    mimetype: str = Field(min_length=1)
+    filename: Optional[str] = None
+
+
 class SendIn(BaseModel):
     account_id: Optional[str] = None
     phone: str = Field(min_length=4)
-    message: str = Field(min_length=1, max_length=4000)
+    # Either message OR media (or both — caption + image) must be present.
+    # The sidecar enforces this; we keep both optional here.
+    message: Optional[str] = Field(default=None, max_length=4000)
+    media: Optional[MediaIn] = None
     country_code: Optional[str] = "91"
 
 
@@ -188,17 +202,46 @@ async def send_one(
     body: SendIn,
     ctx: AuthContext = Depends(get_workspace_context),
 ):
-    return await _proxy(
-        "POST",
-        "/send",
-        ctx,
-        {
-            "accountId": body.account_id,
-            "phone": body.phone,
-            "message": body.message,
-            "countryCode": body.country_code or "91",
-        },
-    )
+    payload: dict[str, Any] = {
+        "accountId": body.account_id,
+        "phone": body.phone,
+        "message": body.message or "",
+        "countryCode": body.country_code or "91",
+    }
+    if body.media:
+        payload["media"] = {
+            "base64": body.media.base64,
+            "mimetype": body.media.mimetype,
+            "filename": body.media.filename or "",
+        }
+    return await _proxy("POST", "/send", ctx, payload)
+
+
+# ─── Inbox / chats ───────────────────────────────────────────────────────
+
+
+@router.get("/chats")
+async def list_chats(
+    account_id: Optional[str] = None,
+    ctx: AuthContext = Depends(get_workspace_context),
+):
+    """List 1:1 conversations for the given (or default-ready) account, most
+    recent message first. Group chats and status posts are excluded server-side
+    so the inbox stays focused on lead conversations."""
+    params = {"accountId": account_id} if account_id else None
+    return await _proxy("GET", "/chats", ctx, params=params)
+
+
+@router.get("/chats/{phone}")
+async def get_chat(
+    phone: str,
+    account_id: Optional[str] = None,
+    ctx: AuthContext = Depends(get_workspace_context),
+):
+    """Fetch the message thread for a single contact (last 200 messages, oldest
+    first). Reading a chat resets its unread counter."""
+    params = {"accountId": account_id} if account_id else None
+    return await _proxy("GET", f"/chats/{phone}", ctx, params=params)
 
 
 class StartCampaignIn(BaseModel):

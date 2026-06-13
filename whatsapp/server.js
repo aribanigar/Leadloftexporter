@@ -42,14 +42,33 @@ let pinoLogger;
 try { pinoLogger = require('pino')({ level: 'silent' }); } catch (_) { pinoLogger = undefined; }
 
 const app = express();
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: MAX_JSON_BYTES }));
 
 const PORT = process.env.PORT || 8001;
 const SIDECAR_TOKEN = process.env.WA_SIDECAR_TOKEN || '';
-const DATA_DIR = path.join(__dirname, 'data');
 const AUTH_DIR = path.join(__dirname, '.baileys_auth');
-fs.mkdirSync(DATA_DIR, { recursive: true });
+// CRITICAL: ``accounts.json`` and ``campaigns.json`` MUST live on the
+// persistent disk that Render mounts at ``.baileys_auth`` — otherwise they
+// are wiped on every redeploy, the boot-time restore sees an empty account
+// list, none of the previously-paired phones get re-initialised, and a
+// fresh QR pair will orphan the credentials already on disk. Keep these
+// inside AUTH_DIR.
+const DATA_DIR = path.join(AUTH_DIR, '_meta');
 fs.mkdirSync(AUTH_DIR, { recursive: true });
+fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Media upload limit — base64-encoded payloads inflate ~33%, so 24mb of
+// raw JSON gives ~17mb of binary, well above WhatsApp's per-message ceiling.
+const MAX_JSON_BYTES = '24mb';
+
+// Mime sniff map for sending media via JSON.
+const MEDIA_KIND_BY_MIME = (mt) => {
+  const t = String(mt || '').toLowerCase();
+  if (t.startsWith('image/')) return 'image';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  return 'document';
+};
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const CAMPAIGNS_FILE = path.join(DATA_DIR, 'campaigns.json');
@@ -113,6 +132,11 @@ async function initAccount(workspaceId, accountId, label) {
       clientState: { status: 'connecting', qrDataUrl: null, info: null },
       reconnecting: false,
       label: label || accountId,
+      // In-memory chat + message stores (per the reference implementation).
+      // Survives reconnects within a process; on container restart we re-sync
+      // via chats.upsert. Capped per chat in the upsert handler.
+      chatsStore: new Map(),     // phone -> { jid, phone, name, lastMessage, lastMessageTime, fromMe, unreadCount }
+      messagesStore: new Map(),  // jid -> [{ id, fromMe, sender, text, timestamp, type }, ...]
     });
   }
   const session = sessions.get(key);
@@ -184,6 +208,80 @@ async function initAccount(workspaceId, accountId, label) {
           const delay = statusCode === 408 ? 8000 : 5000;
           setTimeout(() => initAccount(workspaceId, accountId, session.label), delay);
         }
+      }
+    });
+
+    // ── Inbound capture (replies + sent-by-me echo) ──────────────────────
+    // Every WhatsApp message (incoming OR our own outgoing) flows through
+    // messages.upsert. We index it twice: once in chatsStore (so the inbox
+    // list shows the latest preview per phone) and once in messagesStore
+    // (so opening a chat returns the recent thread). Group + status JIDs
+    // are ignored so the inbox stays 1:1 conversations.
+    sock.ev.on('messages.upsert', ({ messages }) => {
+      for (const msg of messages || []) {
+        const jid = msg.key?.remoteJid;
+        if (!jid) continue;
+        if (jid.endsWith('@g.us')) continue;          // groups
+        if (jid === 'status@broadcast') continue;     // status posts
+        const phone = jid.split('@')[0];
+        const text =
+          msg.message?.conversation
+          || msg.message?.extendedTextMessage?.text
+          || msg.message?.imageMessage?.caption
+          || msg.message?.videoMessage?.caption
+          || msg.message?.documentMessage?.caption
+          || '';
+        const fromMe = !!msg.key?.fromMe;
+        const ts = Number(msg.messageTimestamp || 0) * 1000 || Date.now();
+
+        // Chat-list entry
+        const prior = session.chatsStore.get(phone) || {};
+        session.chatsStore.set(phone, {
+          jid,
+          phone,
+          name: msg.pushName || prior.name || phone,
+          lastMessage: (text || '').slice(0, 120),
+          lastMessageTime: ts,
+          fromMe,
+          unreadCount: fromMe ? 0 : (prior.unreadCount || 0) + 1,
+        });
+
+        // Append to per-chat message list, cap at 200 (reference parity)
+        const list = session.messagesStore.get(jid) || [];
+        list.push({
+          id: msg.key?.id || `${ts}-${list.length}`,
+          jid,
+          phone,
+          fromMe,
+          sender: fromMe ? 'me' : (msg.pushName || phone),
+          text,
+          timestamp: ts,
+          type: Object.keys(msg.message || { text: 1 })[0] || 'text',
+        });
+        while (list.length > 200) list.shift();
+        session.messagesStore.set(jid, list);
+      }
+    });
+
+    // ── Initial chat sync on reconnect ───────────────────────────────────
+    // Baileys fires chats.upsert with whatever the WhatsApp Web protocol
+    // hands us shortly after `connection: 'open'`. We seed the chat list so
+    // the inbox isn't empty until the next inbound message arrives.
+    sock.ev.on('chats.upsert', (chats) => {
+      for (const chat of chats || []) {
+        const id = chat?.id;
+        if (!id || id.endsWith('@g.us') || id === 'status@broadcast') continue;
+        const phone = id.split('@')[0];
+        if (session.chatsStore.has(phone)) continue;   // never overwrite a live entry
+        session.chatsStore.set(phone, {
+          jid: id,
+          phone,
+          name: chat.name || phone,
+          lastMessage: '',
+          lastMessageTime: Number(chat.conversationTimestamp || 0) * 1000,
+          fromMe: false,
+          unreadCount: chat.unreadCount || 0,
+        });
       }
     });
   } catch (e) {
@@ -292,13 +390,18 @@ app.post('/accounts/:id/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── Single message send ──────────────────────────────────────────────────────
+// ─── Single message send (text or media) ──────────────────────────────────────
+// Body shape:
+//   { accountId?, phone, message?, countryCode?,
+//     media?: { base64, mimetype, filename? } }   ← optional
+// Either ``message`` or ``media`` (or both — caption + image) must be present.
 app.post('/send', async (req, res) => {
   const ws = req.workspaceId;
-  const { accountId, phone, message, countryCode } = req.body || {};
+  const { accountId, phone, message, countryCode, media } = req.body || {};
   const s = (accountId && sessions.get(sKey(ws, accountId))) || getDefaultSession(ws);
   if (!s?.sock || s.clientState.status !== 'ready') return res.status(400).json({ error: 'wa_not_connected' });
-  if (!phone || !message) return res.status(400).json({ error: 'phone_and_message_required' });
+  if (!phone) return res.status(400).json({ error: 'phone_required' });
+  if (!message && !(media && media.base64)) return res.status(400).json({ error: 'message_or_media_required' });
 
   // Normalise number — strip non-digits and leading zeros, auto-prepend the
   // workspace's country code if the user typed a local-format phone.
@@ -320,11 +423,57 @@ app.post('/send', async (req, res) => {
       if (!onWA?.exists) return res.status(400).json({ error: 'not_on_whatsapp' });
       if (onWA.jid) sendJid = onWA.jid;
     } catch (_) { /* network failure on lookup — try anyway with constructed JID */ }
-    await s.sock.sendMessage(sendJid, { text: message });
+
+    let payload;
+    if (media && media.base64) {
+      const buf = Buffer.from(media.base64, 'base64');
+      const mimetype = media.mimetype || 'application/octet-stream';
+      const kind = MEDIA_KIND_BY_MIME(mimetype);
+      const caption = message || undefined;
+      if (kind === 'image')      payload = { image:    buf, caption, mimetype };
+      else if (kind === 'video') payload = { video:    buf, caption, mimetype };
+      else if (kind === 'audio') payload = { audio:    buf, mimetype, ptt: false };
+      else                       payload = { document: buf, caption, mimetype, fileName: media.filename || 'file' };
+    } else {
+      payload = { text: message };
+    }
+    await s.sock.sendMessage(sendJid, payload);
     res.json({ ok: true, jid: sendJid });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── Inbox ────────────────────────────────────────────────────────────────────
+// List 1:1 chats for an account (or the default-ready account if accountId
+// is omitted), newest-message-first. Group + status JIDs are excluded.
+app.get('/chats', (req, res) => {
+  const ws = req.workspaceId;
+  const accountId = req.query.accountId;
+  const s = (accountId && sessions.get(sKey(ws, String(accountId)))) || getDefaultSession(ws);
+  if (!s) return res.json([]);
+  const list = Array.from(s.chatsStore.values())
+    .sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
+    .slice(0, 200);
+  res.json(list);
+});
+
+// Fetch the message thread for one chat. ``phone`` is the digits portion
+// (no @s.whatsapp.net). Returns up to the last 200 messages, oldest first.
+app.get('/chats/:phone', (req, res) => {
+  const ws = req.workspaceId;
+  const accountId = req.query.accountId;
+  const s = (accountId && sessions.get(sKey(ws, String(accountId)))) || getDefaultSession(ws);
+  if (!s) return res.json({ chat: null, messages: [] });
+  const phone = String(req.params.phone).replace(/\D/g, '');
+  const chat = s.chatsStore.get(phone) || null;
+  // Reset unread on read.
+  if (chat && chat.unreadCount) {
+    s.chatsStore.set(phone, { ...chat, unreadCount: 0 });
+  }
+  const jid = chat?.jid || `${phone}@s.whatsapp.net`;
+  const messages = s.messagesStore.get(jid) || [];
+  res.json({ chat, messages });
 });
 
 // ─── Bulk campaigns ───────────────────────────────────────────────────────────
