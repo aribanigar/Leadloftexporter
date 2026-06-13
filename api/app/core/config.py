@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     gmail_client_secret: str = ""
     gmail_redirect_uri: str = "http://localhost:3000/api/integrations/gmail/callback"
 
+    # ---- Google Calendar OAuth ----
+    # A real OAuth2 web client (Google Cloud Console → Credentials) with the
+    # Calendar API enabled. Unlike Gmail (which uses an App Password + SMTP),
+    # calendar sync needs a true authorization-code flow so we get a
+    # refresh_token and can read free/busy + write events on the user's behalf.
+    # The same Google Cloud OAuth client can serve both Gmail and Calendar, but
+    # the consent screen must list the Calendar scopes. Set these in the
+    # backend env (Render). Leave the redirect blank to auto-derive it from
+    # public_api_url → "<public_api_url>/api/v1/calendar/oauth/google/callback".
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
+
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-7"
     anthropic_fast_model: str = "claude-haiku-4-5"
@@ -56,6 +69,27 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         return [o.strip() for o in self.frontend_origins.split(",") if o.strip()]
+
+    @property
+    def resolved_google_redirect_uri(self) -> str:
+        """Backend callback URL for the Google Calendar OAuth flow.
+
+        Uses an explicit GOOGLE_REDIRECT_URI if set, else derives it from the
+        public backend URL. This exact value must be added as an "Authorized
+        redirect URI" on the Google Cloud OAuth client.
+        """
+        if self.google_redirect_uri:
+            return self.google_redirect_uri.rstrip("/")
+        return self.public_api_url.rstrip("/") + "/api/v1/calendar/oauth/google/callback"
+
+    @property
+    def primary_frontend_origin(self) -> str:
+        """Best public frontend origin to redirect the browser back to after OAuth."""
+        origins = self.cors_origins
+        for o in origins:
+            if "localhost" not in o and "127.0.0.1" not in o:
+                return o.rstrip("/")
+        return (origins[0].rstrip("/") if origins else "http://localhost:3000")
 
     @property
     def resolved_smtp_relay_url(self) -> str:
