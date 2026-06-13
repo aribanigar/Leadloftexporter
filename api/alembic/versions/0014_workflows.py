@@ -13,7 +13,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 
 revision = "0014_workflows"
-down_revision = "0013_invitee_reminders"
+# Linearized after the concurrently-added WhatsApp migration so the chain has a
+# single head (both originally branched off 0013_invitee_reminders).
+down_revision = "0014_whatsapp_messages"
 branch_labels = None
 depends_on = None
 

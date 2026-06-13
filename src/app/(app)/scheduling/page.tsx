@@ -34,6 +34,12 @@ interface EventType {
   availability: Availability;
   questions: Question[];
   reminder_offsets: number[];
+  assignment: string;
+  host_ids: string[];
+}
+interface Member {
+  id: string;
+  name: string;
 }
 interface Booking {
   id: string;
@@ -70,12 +76,13 @@ export default function SchedulingPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
 
-  const { data } = useQuery<{ event_types: EventType[]; workspace_slug: string }>({
+  const { data } = useQuery<{ event_types: EventType[]; workspace_slug: string; members: Member[] }>({
     queryKey: ["event-types"],
     queryFn: () => api("/event-types"),
   });
   const eventTypes = useMemo(() => data?.event_types || [], [data]);
   const workspaceSlug = data?.workspace_slug || "";
+  const members = useMemo(() => data?.members || [], [data]);
 
   useEffect(() => {
     if (!selected && eventTypes.length) setSelected(eventTypes[0].id);
@@ -154,7 +161,7 @@ export default function SchedulingPage() {
         </div>
 
         {active ? (
-          <Editor key={active.id} et={active} workspaceSlug={workspaceSlug} />
+          <Editor key={active.id} et={active} workspaceSlug={workspaceSlug} members={members} />
         ) : (
           <div className="card p-8 text-center text-sm text-slate-500">
             Select or create an event type to configure its booking page.
@@ -166,7 +173,7 @@ export default function SchedulingPage() {
   );
 }
 
-function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string }) {
+function Editor({ et, workspaceSlug, members }: { et: EventType; workspaceSlug: string; members: Member[] }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<EventType>(et);
   const [copied, setCopied] = useState(false);
@@ -199,6 +206,8 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
           availability: form.availability,
           questions: form.questions,
           reminder_offsets: form.reminder_offsets,
+          assignment: form.assignment,
+          host_ids: form.host_ids,
         },
       }),
     onSuccess: (updated) => {
@@ -398,6 +407,38 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
             );
           })}
         </div>
+      </div>
+
+      {/* Team scheduling */}
+      <div className="card p-5">
+        <h3 className="mb-1 font-semibold">Team scheduling</h3>
+        <p className="mb-3 text-xs text-slate-500">Distribute bookings across teammates (round-robin by load + availability).</p>
+        <div className="mb-3 flex gap-4 text-sm">
+          {(["single", "round_robin"] as const).map((a) => (
+            <label key={a} className="flex items-center gap-1.5 text-slate-700">
+              <input type="radio" checked={form.assignment === a} onChange={() => set("assignment", a)} />
+              {a === "single" ? "Just me" : "Round-robin"}
+            </label>
+          ))}
+        </div>
+        {form.assignment === "round_robin" && (
+          <div className="space-y-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Hosts</span>
+            {members.map((m) => (
+              <label key={m.id} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.host_ids.includes(m.id)}
+                  onChange={(e) =>
+                    set("host_ids", e.target.checked ? [...form.host_ids, m.id] : form.host_ids.filter((x) => x !== m.id))
+                  }
+                />
+                {m.name}
+              </label>
+            ))}
+            {members.length === 0 && <p className="text-xs text-slate-400">No teammates in this workspace yet.</p>}
+          </div>
+        )}
       </div>
 
       {/* Invitee reminders */}

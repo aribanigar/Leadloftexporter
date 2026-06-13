@@ -59,6 +59,8 @@ def _serialize(et: EventType) -> dict:
         "availability": et.availability or sched.DEFAULT_AVAILABILITY,
         "questions": et.questions or [],
         "reminder_offsets": et.reminder_offsets if et.reminder_offsets is not None else [1440, 60],
+        "assignment": et.assignment or "single",
+        "host_ids": et.host_ids or [],
         "owner_id": et.owner_id,
     }
 
@@ -80,6 +82,8 @@ class EventTypeIn(BaseModel):
     availability: Optional[dict] = None
     questions: Optional[list] = None
     reminder_offsets: Optional[list] = None
+    assignment: Optional[str] = None
+    host_ids: Optional[list] = None
     slug: Optional[str] = None
 
 
@@ -94,9 +98,21 @@ def list_event_types(
         .order_by(EventType.created_at.asc())
         .all()
     )
+    from app.models import Membership, User
+
+    members = (
+        db.query(User)
+        .join(Membership, Membership.user_id == User.id)
+        .filter(Membership.workspace_id == ctx.workspace_id)
+        .all()
+    )
     return {
         "event_types": [_serialize(e) for e in rows],
         "workspace_slug": ctx.workspace.slug,
+        "members": [
+            {"id": u.id, "name": (f"{u.first_name or ''} {u.last_name or ''}".strip()) or u.email}
+            for u in members
+        ],
     }
 
 
@@ -130,6 +146,8 @@ def create_event_type(
         availability=body.availability or sched.DEFAULT_AVAILABILITY,
         questions=body.questions or [],
         reminder_offsets=body.reminder_offsets if body.reminder_offsets is not None else [1440, 60],
+        assignment=body.assignment or "single",
+        host_ids=body.host_ids or [],
     )
     db.add(et)
     db.commit()

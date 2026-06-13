@@ -918,6 +918,9 @@ class EventType(Base, TimestampMixin):
     questions: Mapped[list] = mapped_column(JSONB, default=list)
     # Minutes-before-start at which to email the invitee a reminder.
     reminder_offsets: Mapped[list] = mapped_column(JSONB, default=lambda: [1440, 60])
+    # Team scheduling: how bookings are assigned, and the candidate hosts.
+    assignment: Mapped[str] = mapped_column(String(20), default="single")  # single | round_robin
+    host_ids: Mapped[list] = mapped_column(JSONB, default=list)  # user ids; empty → just owner
 
 
 class Booking(Base, TimestampMixin):

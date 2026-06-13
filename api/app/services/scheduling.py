@@ -54,17 +54,24 @@ def _overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: date
     return a_start < b_end and b_start < a_end
 
 
-def _busy_intervals(
+def _host_ids(event_type: EventType) -> list[str]:
+    """Candidate hosts for a booking: the configured host list, else the owner."""
+    if event_type.assignment == "round_robin" and (event_type.host_ids or []):
+        return list(event_type.host_ids)
+    return [event_type.owner_id]
+
+
+def _busy_for_host(
     db: Session,
     event_type: EventType,
+    host_id: str,
     time_min: datetime,
     time_max: datetime,
 ) -> list[tuple[datetime, datetime]]:
-    """Owner's busy intervals (calendar free/busy + existing bookings), in UTC."""
+    """One host's busy intervals (calendar free/busy + their confirmed bookings)."""
     out: list[tuple[datetime, datetime]] = []
 
-    # Calendar free/busy (only if the owner connected a calendar).
-    account = rsvc.calendar_account_for(db, event_type.workspace_id, event_type.owner_id)
+    account = rsvc.calendar_account_for(db, event_type.workspace_id, host_id)
     if account:
         try:
             creds = gcal.ensure_credentials(db, account)
@@ -76,14 +83,12 @@ def _busy_intervals(
                     if s and e:
                         out.append((s, e))
         except Exception as exc:  # noqa: BLE001
-            log.warning("freebusy lookup failed for event_type %s: %s", event_type.id, exc)
+            log.warning("freebusy lookup failed for host %s: %s", host_id, exc)
 
-    # Existing confirmed bookings for this owner across all their event types.
     rows = (
         db.query(Booking)
-        .join(EventType, Booking.event_type_id == EventType.id)
         .filter(
-            EventType.owner_id == event_type.owner_id,
+            Booking.owner_id == host_id,
             Booking.workspace_id == event_type.workspace_id,
             Booking.status == "confirmed",
             Booking.end_at > time_min,
@@ -94,6 +99,28 @@ def _busy_intervals(
     for r in rows:
         out.append((_aware(r.start_at), _aware(r.end_at)))
     return out
+
+
+def _free_hosts_at(
+    db: Session,
+    event_type: EventType,
+    start_utc: datetime,
+    end_utc: datetime,
+    busy_by_host: Optional[dict] = None,
+) -> list[str]:
+    """Which candidate hosts have no conflict for [start, end] (buffers applied)."""
+    buf_before = event_type.buffer_before_minutes or 0
+    buf_after = event_type.buffer_after_minutes or 0
+    blocked_start = start_utc - timedelta(minutes=buf_before)
+    blocked_end = end_utc + timedelta(minutes=buf_after)
+    free: list[str] = []
+    for host_id in _host_ids(event_type):
+        busy = busy_by_host[host_id] if busy_by_host is not None else _busy_for_host(
+            db, event_type, host_id, blocked_start - timedelta(hours=2), blocked_end + timedelta(hours=2)
+        )
+        if not any(_overlaps(blocked_start, blocked_end, bs, be) for bs, be in busy):
+            free.append(host_id)
+    return free
 
 
 def compute_slots(
@@ -117,11 +144,14 @@ def compute_slots(
     buf_after = event_type.buffer_after_minutes or 0
     min_notice = now + timedelta(minutes=event_type.min_notice_minutes or 0)
 
-    busy = _busy_intervals(db, event_type, window_start - timedelta(days=1), window_end + timedelta(days=1))
+    # Pre-fetch each host's busy intervals once for the whole window.
+    span_min = window_start - timedelta(days=1)
+    span_max = window_end + timedelta(days=1)
+    busy_by_host = {h: _busy_for_host(db, event_type, h, span_min, span_max) for h in _host_ids(event_type)}
     availability = event_type.availability or DEFAULT_AVAILABILITY
 
     slots: list[str] = []
-    # Iterate day-by-day in the owner's timezone.
+    # Iterate day-by-day in the event timezone.
     day = now.astimezone(tz).date()
     last_day = window_end.astimezone(tz).date()
     while day <= last_day:
@@ -139,9 +169,8 @@ def compute_slots(
                 start_utc = cursor.astimezone(timezone.utc)
                 end_utc = start_utc + timedelta(minutes=duration)
                 if start_utc >= min_notice and start_utc >= window_start and start_utc < window_end:
-                    blocked_start = start_utc - timedelta(minutes=buf_before)
-                    blocked_end = end_utc + timedelta(minutes=buf_after)
-                    if not any(_overlaps(blocked_start, blocked_end, bs, be) for bs, be in busy):
+                    # Bookable if at least one host is free (collective availability).
+                    if _free_hosts_at(db, event_type, start_utc, end_utc, busy_by_host):
                         slots.append(start_utc.isoformat())
                 cursor += timedelta(minutes=step)
         day += timedelta(days=1)
@@ -152,14 +181,31 @@ def compute_slots(
 def slot_is_available(db: Session, event_type: EventType, start_utc: datetime) -> bool:
     duration = max(5, event_type.duration_minutes or 30)
     end_utc = start_utc + timedelta(minutes=duration)
-    buf_before = event_type.buffer_before_minutes or 0
-    buf_after = event_type.buffer_after_minutes or 0
     if start_utc < datetime.now(timezone.utc) + timedelta(minutes=event_type.min_notice_minutes or 0):
         return False
-    busy = _busy_intervals(db, event_type, start_utc - timedelta(hours=2), end_utc + timedelta(hours=2))
-    blocked_start = start_utc - timedelta(minutes=buf_before)
-    blocked_end = end_utc + timedelta(minutes=buf_after)
-    return not any(_overlaps(blocked_start, blocked_end, bs, be) for bs, be in busy)
+    return bool(_free_hosts_at(db, event_type, start_utc, end_utc))
+
+
+def _pick_host(db: Session, event_type: EventType, start_utc: datetime, end_utc: datetime) -> str:
+    """Choose the assigned host: a free host with the fewest confirmed bookings
+    (round-robin load-balancing); falls back to the owner."""
+    free = _free_hosts_at(db, event_type, start_utc, end_utc)
+    candidates = free or _host_ids(event_type)
+    if not candidates:
+        return event_type.owner_id
+
+    def load(host_id: str) -> int:
+        return (
+            db.query(Booking)
+            .filter(
+                Booking.event_type_id == event_type.id,
+                Booking.owner_id == host_id,
+                Booking.status == "confirmed",
+            )
+            .count()
+        )
+
+    return min(candidates, key=load)
 
 
 def create_booking(
@@ -177,10 +223,13 @@ def create_booking(
     duration = max(5, event_type.duration_minutes or 30)
     end_utc = start_utc + timedelta(minutes=duration)
 
+    # Round-robin: assign the booking to a free host (load-balanced).
+    host_id = _pick_host(db, event_type, start_utc, end_utc)
+
     booking = Booking(
         workspace_id=event_type.workspace_id,
         event_type_id=event_type.id,
-        owner_id=event_type.owner_id,
+        owner_id=host_id,
         invitee_name=invitee_name.strip()[:200],
         invitee_email=invitee_email.strip()[:320],
         invitee_phone=(invitee_phone or "").strip()[:60] or None,
@@ -193,7 +242,7 @@ def create_booking(
     db.add(booking)
 
     # Match-or-create the lead (a booking is a hot lead).
-    lead = _match_or_create_lead(db, event_type, invitee_name, invitee_email, invitee_phone)
+    lead = _match_or_create_lead(db, event_type, host_id, invitee_name, invitee_email, invitee_phone)
     if lead:
         booking.lead_id = lead.id
 
@@ -321,7 +370,7 @@ def _schedule_invitee_reminders(db: Session, event_type: EventType, booking: Boo
             rsvc.create_reminder(
                 db,
                 workspace_id=event_type.workspace_id,
-                user_id=event_type.owner_id,
+                user_id=booking.owner_id,
                 title=f"Reminder: {event_type.name} {lead}",
                 body=body,
                 remind_at=remind_at,
@@ -351,7 +400,7 @@ def _human_offset(minutes: int) -> str:
 # Side effects
 # --------------------------------------------------------------------------- #
 
-def _match_or_create_lead(db: Session, event_type: EventType, name: str, email: str, phone: str) -> Optional[Lead]:
+def _match_or_create_lead(db: Session, event_type: EventType, host_id: str, name: str, email: str, phone: str) -> Optional[Lead]:
     email = (email or "").strip().lower()
     if not email:
         return None
@@ -366,7 +415,7 @@ def _match_or_create_lead(db: Session, event_type: EventType, name: str, email: 
     parts = (name or "").strip().split(" ", 1)
     lead = Lead(
         workspace_id=event_type.workspace_id,
-        owner_id=event_type.owner_id,
+        owner_id=host_id,
         first_name=parts[0] if parts else None,
         last_name=parts[1] if len(parts) > 1 else None,
         full_name=name.strip() or email,
@@ -381,7 +430,7 @@ def _match_or_create_lead(db: Session, event_type: EventType, name: str, email: 
 
 
 def _write_calendar_event(db: Session, event_type: EventType, booking: Booking) -> None:
-    account = rsvc.calendar_account_for(db, event_type.workspace_id, event_type.owner_id)
+    account = rsvc.calendar_account_for(db, event_type.workspace_id, booking.owner_id)
     if not account:
         return
     try:
@@ -423,7 +472,7 @@ def _send_confirmation(db: Session, event_type: EventType, booking: Booking) -> 
     try:
         from app.services.email_sender import send_via_account
 
-        account = rsvc.email_account_for(db, event_type.workspace_id, event_type.owner_id)
+        account = rsvc.email_account_for(db, event_type.workspace_id, booking.owner_id)
         if not account:
             return
         when = booking.start_at.strftime("%A, %b %d at %H:%M UTC")
@@ -447,15 +496,15 @@ def _owner_reminder(db: Session, event_type: EventType, booking: Booking) -> Non
         if not workspace:
             return
         channel = rsvc.effective_channel(
-            db, event_type.workspace_id, event_type.owner_id,
-            (rsvc.agenda_config(workspace, event_type.owner_id).get("channels") or ["email"])[0],
+            db, event_type.workspace_id, booking.owner_id,
+            (rsvc.agenda_config(workspace, booking.owner_id).get("channels") or ["email"])[0],
         )
         if not channel:
             return
         rsvc.create_reminder(
             db,
             workspace_id=event_type.workspace_id,
-            user_id=event_type.owner_id,
+            user_id=booking.owner_id,
             title=f"Meeting: {booking.invitee_name} — {event_type.name}",
             body=_meeting_description(event_type, booking),
             remind_at=booking.start_at,
