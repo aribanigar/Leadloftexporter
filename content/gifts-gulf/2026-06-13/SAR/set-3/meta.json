@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "KSA",
+  "currency": "SAR",
+  "campaign_code": "GG-SAR-20260613-3",
+  "campaign_name": "KSA Client Appreciation - 13 Jun 2026",
+  "subject": "Pour the deal",
+  "angle": "KSA H2 Planning",
+  "season": "Mid-year",
+  "theme": "Premium drinkware",
+  "skus": [
+    "GG6371",
+    "GG6044",
+    "GG6748",
+    "GG6612"
+  ],
+  "products": [
+    {
+      "name": "Copper",
+      "sku": "GG6371",
+      "usd": 21.4,
+      "price": 68.21,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6371.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6371"
+    },
+    {
+      "name": "Exec",
+      "sku": "GG6044",
+      "usd": 13.6,
+      "price": 43.35,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6044.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6044"
+    },
+    {
+      "name": "Grande",
+      "sku": "GG6748",
+      "usd": 24.9,
+      "price": 79.37,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6748.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6748"
+    },
+    {
+      "name": "Aroma",
+      "sku": "GG6612",
+      "usd": 9.2,
+      "price": 29.32,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6612.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6612"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Premium+drinkware+set+%28GG-SAR-20260613-3%29+for+KSA"
+}

@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "UAE",
+  "currency": "AED",
+  "campaign_code": "GG-AED-20260613-3",
+  "campaign_name": "UAE Sun and Shade - 13 Jun 2026",
+  "subject": "Made for shade",
+  "angle": "UAE Summer Hydration",
+  "season": "Summer",
+  "theme": "Caps and light hydration",
+  "skus": [
+    "GG7011",
+    "GG6433",
+    "GG6210",
+    "GG9910"
+  ],
+  "products": [
+    {
+      "name": "Sonora",
+      "sku": "GG7011",
+      "usd": 3.4,
+      "price": 10.61,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO7011.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG7011"
+    },
+    {
+      "name": "Recacap",
+      "sku": "GG6433",
+      "usd": 4.1,
+      "price": 12.8,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6433.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6433"
+    },
+    {
+      "name": "Venice",
+      "sku": "GG6210",
+      "usd": 7.3,
+      "price": 22.79,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6210.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6210"
+    },
+    {
+      "name": "Pure",
+      "sku": "GG9910",
+      "usd": 4.95,
+      "price": 15.45,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9910.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9910"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Caps+and+light+hydration+set+%28GG-AED-20260613-3%29+for+UAE"
+}

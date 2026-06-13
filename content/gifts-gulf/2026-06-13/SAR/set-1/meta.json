@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "KSA",
+  "currency": "SAR",
+  "campaign_code": "GG-SAR-20260613-1",
+  "campaign_name": "KSA Power Your H2 - 13 Jun 2026",
+  "subject": "Power your H2",
+  "angle": "KSA H2 Planning",
+  "season": "Mid-year",
+  "theme": "Tech carry",
+  "skus": [
+    "GG6584",
+    "GG6075",
+    "GG6395",
+    "GG9843"
+  ],
+  "products": [
+    {
+      "name": "Stellar",
+      "sku": "GG6584",
+      "usd": 19.5,
+      "price": 62.16,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6584.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6584"
+    },
+    {
+      "name": "Flat",
+      "sku": "GG6075",
+      "usd": 12.3,
+      "price": 39.21,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6075.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6075"
+    },
+    {
+      "name": "Pad",
+      "sku": "GG6395",
+      "usd": 11.8,
+      "price": 37.61,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6395.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6395"
+    },
+    {
+      "name": "Duo",
+      "sku": "GG9843",
+      "usd": 3.95,
+      "price": 12.59,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9843.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9843"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Tech+carry+set+%28GG-SAR-20260613-1%29+for+KSA"
+}

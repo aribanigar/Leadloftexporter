@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "UAE",
+  "currency": "AED",
+  "campaign_code": "GG-AED-20260613-2",
+  "campaign_name": "UAE Cooler Season - 13 Jun 2026",
+  "subject": "Cold all day",
+  "angle": "UAE Summer Hydration",
+  "season": "Summer",
+  "theme": "Cooler bags",
+  "skus": [
+    "GG6404",
+    "GG6709",
+    "GG6388",
+    "GG9227"
+  ],
+  "products": [
+    {
+      "name": "Malmo",
+      "sku": "GG6404",
+      "usd": 9.6,
+      "price": 29.97,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6404.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6404"
+    },
+    {
+      "name": "Iceberg",
+      "sku": "GG6709",
+      "usd": 18.4,
+      "price": 57.44,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6709.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6709"
+    },
+    {
+      "name": "Fresh",
+      "sku": "GG6388",
+      "usd": 6.2,
+      "price": 19.35,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6388.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6388"
+    },
+    {
+      "name": "Track",
+      "sku": "GG9227",
+      "usd": 3.8,
+      "price": 11.86,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9227.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9227"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Cooler+bags+set+%28GG-AED-20260613-2%29+for+UAE"
+}
