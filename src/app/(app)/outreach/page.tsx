@@ -89,9 +89,10 @@ interface ConnectedAccount {
   provider: string;
   label: string | null;
   status: string;
-  // The actual from-address as returned by the integrations endpoint.
-  // Used to detect Resend-on-free-mailbox-domain, which Resend rejects.
+  // The actual from-address as returned by the senders endpoint. Used to
+  // detect Resend-on-free-mailbox-domain, which Resend rejects.
   external_id?: string | null;
+  from_address?: string | null;
 }
 
 // Free mailbox domains Resend refuses to send from without domain verification.
@@ -106,7 +107,7 @@ const FREE_MAILBOX_DOMAINS = new Set([
 
 function isResendDomainBlocked(acct: ConnectedAccount): boolean {
   if (acct.provider !== "resend") return false;
-  const email = (acct.external_id || acct.label || "").toLowerCase();
+  const email = (acct.from_address || acct.external_id || acct.label || "").toLowerCase();
   const at = email.lastIndexOf("@");
   if (at < 0) return false;
   const domain = email.slice(at + 1).trim();
@@ -119,6 +120,11 @@ export default function OutreachPage() {
   const [filter, setFilter] = useState<"all" | "email" | "whatsapp">("all");
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [channel, setChannel] = useState<Channel>("email");
+  // When ON: after a successful single send, jump to the next lead in the
+  // filtered list. Lets you blow through the whole list with no clicks
+  // between sends — same effect as Bulk mode but with one composer per lead
+  // (good if you want to tweak each subject/body before sending).
+  const [autoAdvance, setAutoAdvance] = useState(true);
   // Pending sends keyed by client-generated id so they render instantly
   // and flip to "confirmed" when the backend timeline catches up.
   const [pending, setPending] = useState<ConvMessage[]>([]);
@@ -153,15 +159,23 @@ export default function OutreachPage() {
     queryFn: () => api("/whatsapp/config"),
   });
 
+  // Use /campaigns/senders/list — the SAME endpoint Campaign Builder uses,
+  // which returns ONLY email-capable senders (SMTP, Gmail, Resend, SendGrid)
+  // filtered server-side. Previously this called /integrations/accounts
+  // which returns every connected account (LinkedIn, HubSpot, etc.) and
+  // missed senders that Campaigns could see — leaving users staring at the
+  // "Connect SMTP" modal even though Campaigns showed 3 active mailboxes.
+  // Refetches on window focus + every 30s so a newly-connected sender in
+  // Settings or Campaign Builder reflects here without a manual reload.
   const { data: emailAccts } = useQuery<ConnectedAccount[]>({
-    queryKey: ["connected-accounts"],
-    queryFn: () => api("/integrations/accounts"),
+    queryKey: ["outreach-senders"],
+    queryFn: () => api("/campaigns/senders/list"),
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+    staleTime: 0,
   });
   const emailConnected = useMemo(
-    () =>
-      (emailAccts || []).some((a) =>
-        ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider) && a.status === "active"
-      ),
+    () => (emailAccts || []).some((a) => a.status === "active"),
     [emailAccts]
   );
 
@@ -171,9 +185,7 @@ export default function OutreachPage() {
   // with no explanation. We now show a prominent banner pointing the user at
   // the only two fixes (verify a domain in Resend OR connect SMTP).
   const resendDomainBlock = useMemo(() => {
-    const accts = (emailAccts || []).filter(
-      (a) => ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider) && a.status === "active"
-    );
+    const accts = (emailAccts || []).filter((a) => a.status === "active");
     if (accts.length === 0) return null;
     const allBlocked = accts.every((a) => isResendDomainBlocked(a));
     if (!allBlocked) return null;
@@ -303,8 +315,8 @@ export default function OutreachPage() {
   // timeline poll. The mutation context carries the pending bubble id so
   // onSuccess/onError can target the right one.
   type SendEmailResp = {
-    id: string;
-    status: string;
+    id?: string;
+    status?: string;
     ok: boolean;
     error?: string | null;
     from_address?: string | null;
@@ -314,17 +326,37 @@ export default function OutreachPage() {
     Error,
     { subject: string; body: string; pendingId: string }
   >({
-    mutationFn: ({ subject, body }) =>
-      api("/inbox/send", {
+    // Route the single-lead send through the Vercel bridge (/api/outreach/send)
+    // instead of calling Python /inbox/send directly. Render's free tier
+    // blocks outbound SMTP ports — Python can't actually deliver, so direct
+    // sends silently fell through to Resend, which rejected every send
+    // ("sending domain isn't verified"). The bridge does prepare-send on
+    // Python, dispatches via nodemailer/Resend/SendGrid FROM Vercel (which
+    // CAN open SMTP), then commit-send on Python. This is the same path
+    // bulk send uses — now both work identically.
+    mutationFn: async ({ subject, body }) => {
+      const token = getToken();
+      const wsId = getWorkspaceId();
+      const res = await fetch("/api/outreach/send", {
         method: "POST",
-        body: {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token || ""}`,
+          "X-Workspace-Id": wsId || "",
+        },
+        body: JSON.stringify({
           lead_id: activeLeadId,
           to: activeLead?.email,
           subject,
           body_html: body.replace(/\n/g, "<br/>"),
           body_text: body,
-        },
-      }),
+        }),
+      });
+      const text = await res.text();
+      let r: SendEmailResp = { ok: false };
+      try { r = JSON.parse(text); } catch { r = { ok: false, error: "non_json_response" }; }
+      return r;
+    },
     onSuccess: (r, vars) => {
       // Resolved synchronously — flip the bubble immediately.
       setPending((cur) =>
@@ -339,6 +371,18 @@ export default function OutreachPage() {
         )
       );
       qc.invalidateQueries({ queryKey: ["lead-timeline", activeLeadId] });
+      qc.invalidateQueries({ queryKey: ["outreach-leads"] });
+      // Auto-advance to the next lead in the filtered list (skip ones with
+      // no email since they can't receive). Stops at the end of the list.
+      if (autoAdvance && r.ok && channel === "email") {
+        const targets = filteredLeads.filter((l) => (l.email || "").trim() !== "");
+        const idx = targets.findIndex((l) => l.id === activeLeadId);
+        const next = idx >= 0 && idx < targets.length - 1 ? targets[idx + 1] : null;
+        if (next) {
+          // Give the user a beat to see "sent" flip, then advance.
+          setTimeout(() => setActiveLeadId(next.id), 600);
+        }
+      }
     },
     onError: (_e, vars) => {
       setPending((cur) =>
@@ -527,7 +571,11 @@ export default function OutreachPage() {
         open={smtpModalOpen}
         onClose={() => setSmtpModalOpen(false)}
         onConnected={() => {
+          // Invalidate both keys — outreach-senders is what THIS page reads,
+          // connected-accounts is what other pages (e.g. Settings) may still use.
+          qc.invalidateQueries({ queryKey: ["outreach-senders"] });
           qc.invalidateQueries({ queryKey: ["connected-accounts"] });
+          setSmtpModalOpen(false);
         }}
       />
       <ConnectWhatsAppModal
@@ -784,7 +832,11 @@ export default function OutreachPage() {
           <EmptyState />
         ) : (
           <>
-            <LeadHeader lead={activeLead} />
+            <LeadHeader
+              lead={activeLead}
+              autoAdvance={autoAdvance}
+              onToggleAutoAdvance={setAutoAdvance}
+            />
             <ChannelTabs
               lead={activeLead}
               channel={channel}
@@ -831,7 +883,15 @@ function EmptyState() {
   );
 }
 
-function LeadHeader({ lead }: { lead: Lead }) {
+function LeadHeader({
+  lead,
+  autoAdvance,
+  onToggleAutoAdvance,
+}: {
+  lead: Lead;
+  autoAdvance: boolean;
+  onToggleAutoAdvance: (v: boolean) => void;
+}) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3.5">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 text-xs font-semibold uppercase text-slate-500">
@@ -888,6 +948,23 @@ function LeadHeader({ lead }: { lead: Lead }) {
           <ExternalLink className="h-3 w-3" />
         </a>
       )}
+      {/* Auto-advance toggle: after a successful single-send, jump to the
+          next lead in the filtered list. Lets the rep blow through 50
+          one-tweak emails without ever clicking a lead manually. */}
+      <button
+        type="button"
+        onClick={() => onToggleAutoAdvance(!autoAdvance)}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium",
+          autoAdvance
+            ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            : "border border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-700"
+        )}
+        title="When ON: after sending, auto-jump to the next lead in the list (skip ones with no email). OFF: stay on current lead."
+      >
+        {autoAdvance ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+        Auto-next
+      </button>
       <Link
         href={`/leads/${lead.id}`}
         className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-700"

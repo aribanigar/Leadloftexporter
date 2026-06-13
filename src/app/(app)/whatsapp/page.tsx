@@ -212,25 +212,7 @@ export default function WhatsAppOutreachPage() {
         </div>
       </div>
 
-      {sidecarUnavailable && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">WhatsApp service not yet provisioned</p>
-              <p className="mt-1">
-                Your backend doesn&apos;t have the WhatsApp sidecar URL configured
-                yet (<code className="rounded bg-amber-100 px-1">WA_SIDECAR_URL</code>).
-                Deploy the <code className="rounded bg-amber-100 px-1">/whatsapp</code>{" "}
-                service from this repo on Render, then set the env vars on the
-                main API and redeploy.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Accounts ------------------------------------------------------- */}
+      {/* Accounts (QR section) — self-contained, independent of the campaign API */}
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-2">
@@ -252,6 +234,22 @@ export default function WhatsAppOutreachPage() {
             Add number
           </button>
         </header>
+
+        {sidecarUnavailable && (
+          <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <p>
+                <span className="font-semibold">QR pairing unavailable.</span>{" "}
+                The WhatsApp sidecar service isn&apos;t reachable yet. Deploy
+                the <code className="rounded bg-amber-100 px-1">/whatsapp</code>{" "}
+                service on Render and set{" "}
+                <code className="rounded bg-amber-100 px-1">WA_SIDECAR_URL</code>{" "}
+                on the main API.
+              </p>
+            </div>
+          </div>
+        )}
 
         {accounts.length === 0 && !sidecarUnavailable && (
           <div className="p-10 text-center text-sm text-slate-500">
@@ -350,16 +348,33 @@ export default function WhatsAppOutreachPage() {
         </div>
       </section>
 
-      {/* Composer ------------------------------------------------------- */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <Send className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900">
-            Bulk WhatsApp campaign
-          </h2>
-        </div>
+      {/* Composer (campaign API section) — independent of the QR pairing above */}
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Send className="h-4 w-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-900">
+              Bulk WhatsApp campaign
+            </h2>
+          </div>
+        </header>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {sidecarUnavailable && (
+          <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-900">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <p>
+                <span className="font-semibold">Campaign API offline.</span>{" "}
+                Bulk sends are routed through the backend campaign endpoint,
+                which currently can&apos;t reach the WhatsApp sidecar. You can
+                still draft a message — sending will become available once the
+                sidecar is provisioned.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 p-5 md:grid-cols-2">
           {/* LEFT: settings */}
           <div className="space-y-4">
             <label className="block text-sm">
@@ -482,7 +497,7 @@ export default function WhatsAppOutreachPage() {
           </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4">
           <p className="text-xs text-slate-500">
             {!canSend
               ? "Pair a WhatsApp number above before sending."

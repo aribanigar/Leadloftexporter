@@ -1276,7 +1276,7 @@
                     if (state.connectActive) state.connectCancel = true;
                     if (state.applyActive) state.applyCancel = true;
                     if (state.messageActive) {
-                      state.messageActive = false;
+                      state.messageCancel = true;
                       _clearMsgRun().catch(() => {});
                     }
                     flashStatus("Stopping…", "warn");
@@ -6218,191 +6218,1036 @@
       : 95000 + Math.random() * 45000;                   // 95-140s (7%)
   }
 
-  // Send a LinkedIn message on the current profile page.
-  // Returns { ok, reason }.
-  async function _sendProfilePageMessage(messageText) {
-    const { sleep, readingPause } = globalThis.__lcHuman;
-    const { waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+  // ════════════════════════════════════════════════════════════════════
+  // PROFILE-PAGE MESSAGE SENDER  (rebuilt v1.0.200)
+  //
+  // Sends a personalised LinkedIn message on a /in/<handle> profile page.
+  // The previous version had three independent failure modes that all
+  // produced "0 sent" with different root causes:
+  //   1. timing — message button not yet in DOM when we looked
+  //   2. wrong target — picked up a right-rail "More profiles" person's button
+  //   3. silent click — clicked the button but composer never opened
+  //
+  // The new design is built around ONE strong positive signal that
+  // LinkedIn provides for free: the profile owner's Message button has an
+  // aria-label literally equal to "Message <Owner's Full Name>".  So if we
+  // (a) wait for the owner's <h1> name to render, then (b) match the button
+  // by aria-label against that name, we get the right button or no button —
+  // never the wrong button.  Geometry + aside filtering is kept as a
+  // fallback for the rare layout where the templated aria-label is missing.
+  //
+  // Every step toasts to the user so they can see exactly where a failure
+  // happens.  Every step logs to console with a STEP-N prefix so a stuck
+  // run is traceable.
+  // ════════════════════════════════════════════════════════════════════
 
-    await sleep(readingPause());
+  // Read the profile owner's full name from the page.  We try the H1 first
+  // (the canonical source on /in/ pages) then fall back to the document
+  // title (`Owner Name | LinkedIn`) which is set even before H1 hydration.
+  function _getProfileOwnerName() {
+    // H1 with non-empty text — LinkedIn's profile page always has one.
+    const h1s = document.querySelectorAll("main h1, h1.text-heading-xlarge, h1");
+    for (const h of h1s) {
+      let t = (h.textContent || "").replace(/\s+/g, " ").trim();
+      // Strip LinkedIn degree badge appended by a nested span: "Vimal Kumar · 1st" → "Vimal Kumar"
+      t = t.replace(/\s*[·•]\s*\d+(st|nd|rd|th)\b.*/i, "").trim();
+      if (t && t.length > 1 && t.length < 120 && !/linkedin/i.test(t)) return t;
+    }
+    // Fallback: document title is "<Name> | <Title> | LinkedIn"
+    const ttl = (document.title || "").split("|")[0].trim();
+    if (ttl && ttl.length > 1 && ttl.length < 120 && !/^linkedin/i.test(ttl)) return ttl;
+    return "";
+  }
 
-    // ── Step 1: click the Message button (unless compose dialog already open) ──
-    const _editorSels = [
-      "div.msg-form__contenteditable[contenteditable='true']",
-      "div[role='textbox'][contenteditable='true']",
-      ".msg-form__compose-box [contenteditable='true']",
-      ".msg-overlay-conversation-bubble [contenteditable='true']",
-      ".msg-overlay-list-bubble [contenteditable='true']",
-      "[contenteditable='true'][data-placeholder*='rite' i]",
-    ];
+  // Wait until BOTH the owner name and at least one candidate message button
+  // are present in the DOM.  Returns the owner name (or "" on timeout).
+  async function _waitProfileReady(maxMs = 14000) {
+    const { sleep } = globalThis.__lcHuman;
+    const t0 = Date.now();
+    let name = "";
+    // Prefer waiting until the BLUE primary Message button has actually painted —
+    // that's the owner's button and it sometimes lags the rest of the profile.
+    while (Date.now() - t0 < maxMs) {
+      name = _getProfileOwnerName();
+      const primary = document.querySelector(
+        "button.artdeco-button--primary[aria-label*='Message' i], " +
+        "a.artdeco-button--primary[aria-label*='Message' i]"
+      );
+      if (name && primary) return name;
+      await sleep(250);
+    }
+    // Final fallback: accept any message-labelled button so we still try.
+    while (Date.now() - t0 < maxMs + 2000) {
+      name = _getProfileOwnerName();
+      const anyMsgBtn = document.querySelector(
+        "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+      );
+      if (name && anyMsgBtn) return name;
+      await sleep(250);
+    }
+    return name;
+  }
 
-    let editor = document.querySelector(_editorSels.join(","));
+  // Strong-signal finder: returns the button whose aria-label is literally
+  // "Message <owner full name>" (case-insensitive, whitespace-flexible).
+  // LinkedIn templates every Message button this way, so the owner's button
+  // matches and right-rail people's buttons (Message Swet Prakash, Message
+  // SUGANDHA WAHAL …) cannot collide.
+  // True visual check: is this button painted with LinkedIn's primary blue
+  // background?  LinkedIn's brand blue is ~rgb(10, 102, 194) / #0a66c2 with
+  // some variance across themes.  We accept any solid colour where blue
+  // dominates (B > 150) and red/green are clearly lower (R + 40 < B).
+  function _hasBluePrimaryBg(el) {
+    if (!el) return false;
+    try {
+      const cs = window.getComputedStyle(el);
+      const bg = cs.backgroundColor || "";
+      const m = bg.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (!m) return false;
+      const r = +m[1], g = +m[2], b = +m[3], a = m[4] !== undefined ? +m[4] : 1;
+      if (a < 0.5) return false;
+      // Blue dominance: blue clearly above red and red below ~80 (LinkedIn blue).
+      return b >= 150 && r < 80 && b > r + 40 && b > g + 20;
+    } catch { return false; }
+  }
 
-    if (!editor) {
-      const _findMsgBtn = () => {
-        // COLUMN-GEOMETRY strategy — no dependency on the H1 (a hidden/zero-size
-        // <h1> made every earlier version return null → "0 sent"). No dependency
-        // on LinkedIn class names either.
-        //
-        // Fact about the profile layout: the profile owner's CTA row (Message /
-        // Connect / …) renders in the LEFT content column, near the top, at a
-        // small x (~340px). The right-rail "More profiles for you" people
-        // (Jihane, Andrew, …) render in the FAR-RIGHT column at a large x
-        // (~1350px). So: keep only Message buttons in the left ~60% of the
-        // viewport width, then pick the TOP-MOST one — that is always the
-        // profile owner's button, never a sidebar person's.
+  function _findOwnerMessageBtnByName(ownerName) {
+    const _candidateIsValid = (el) => {
+      if (!el) return false;
+      if (el.disabled) return false;
+      if (el.classList?.contains("lc-inline-save")) return false;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return false;
+      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return false;
+      const r = el.getBoundingClientRect();
+      const w = r.width || el.offsetWidth;
+      const h = r.height || el.offsetHeight;
+      return w >= 2 && h >= 2;
+    };
 
-        const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
-        const ARIA_SEL =
-          "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
-          "button.message-anywhere-button, [class*='message-anywhere-button'], " +
-          "button[data-control-name*='message' i]";
+    // Helper: does the button or its descendants say "Message"?
+    const _saysMessage = (el) => {
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      if (/\bmessage\b/.test(lbl)) return true;
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (txt === "message" || /\bmessage\b/.test(txt)) return true;
+      return false;
+    };
 
-        const candidates = [];
-        const seen = new Set();
+    // Pass 0a — TRUE VISUAL signal: any Message-labelled button whose
+    // computed background is LinkedIn's primary blue.  Scans ALL buttons —
+    // not only ones with aria-label — because LinkedIn occasionally ships
+    // the Message button as a plain <button><span>Message</span></button>.
+    const everyBtn = document.querySelectorAll("button, a[role='button'], [role='button']");
+    for (const el of everyBtn) {
+      if (!_candidateIsValid(el)) continue;
+      if (!_saysMessage(el)) continue;
+      if (!_hasBluePrimaryBg(el)) continue;
+      console.log("[LeadCaptura] msg STEP 2 → Pass 0a (blue paint) matched:", el);
+      return el;
+    }
 
-        const consider = (el) => {
-          if (!el || seen.has(el)) return;
-          seen.add(el);
-          if (el.disabled) return;
-          if (el.classList?.contains("lc-inline-save")) return;
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
-          // Defence-in-depth: never the right-rail / "More profiles" column.
-          if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
+    // Pass 0b — CLASS signal: artdeco-button--primary with "Message" anywhere.
+    // Belt and braces in case computed style hasn't resolved yet.
+    const primaries = document.querySelectorAll(
+      "button.artdeco-button--primary, a.artdeco-button--primary"
+    );
+    for (const el of primaries) {
+      if (!_candidateIsValid(el)) continue;
+      if (!_saysMessage(el)) continue;
+      console.log("[LeadCaptura] msg STEP 2 → Pass 0b (primary class) matched:", el);
+      return el;
+    }
+
+    if (!ownerName) return null;
+
+    const candidates = Array.from(document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i]"
+    ));
+
+    // Pass 1: exact full-name match — "Message <ownerName>" (whitespace-flexible).
+    const escapedFull = ownerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                                 .replace(/\s+/g, "\\s+");
+    const reFull = new RegExp("^\\s*Message\\s+" + escapedFull + "\\s*$", "i");
+    for (const el of candidates) {
+      const lbl = (el.getAttribute("aria-label") || "").trim();
+      if (reFull.test(lbl) && _candidateIsValid(el)) return el;
+    }
+
+    // Pass 2: first-two-words fallback — handles middle-name differences or
+    // localisation where the button omits the last name.
+    const words = ownerName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      const escapedShort = words.slice(0, 2)
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("\\s+");
+      const reShort = new RegExp("^\\s*Message\\s+" + escapedShort + "\\b", "i");
+      for (const el of candidates) {
+        const lbl = (el.getAttribute("aria-label") || "").trim();
+        if (reShort.test(lbl) && _candidateIsValid(el)) return el;
+      }
+    }
+
+    // Pass 3 — DOM locality from the H1.  H1 locality alone guarantees this
+    // is the owner's card, so we use a RELAXED validator (no aside filter —
+    // LinkedIn's profile card uses class names like `pv-text-details__aside`
+    // and the wildcard `[class*='aside']` was killing this pass).
+    const _localityValid = (el) => {
+      if (!el || el.disabled) return false;
+      if (el.classList?.contains("lc-inline-save")) return false;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return false;
+      const r = el.getBoundingClientRect();
+      return (r.width || el.offsetWidth) >= 2 && (r.height || el.offsetHeight) >= 2;
+    };
+    const h1 = document.querySelector("main h1, h1.text-heading-xlarge, h1");
+    if (h1) {
+      let scope = h1;
+      for (let i = 0; i < 10 && scope && scope !== document.body; i++) {
+        scope = scope.parentElement;
+        if (!scope) break;
+        const localBtns = scope.querySelectorAll("button, a[role='button'], a.artdeco-button");
+        // Prefer blue-painted ones, then primary class, then anything.
+        const matches = [];
+        for (const el of localBtns) {
+          if (!_localityValid(el)) continue;
           const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
           const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const hay = lbl + " " + txt;
-          if (!/\bmessage\b/.test(hay)) return;
-          if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
-          if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
-          const r = el.getBoundingClientRect();
-          if (r.width < 2 || r.height < 2) return;       // not visible
-          if (r.left > vw * 0.6) return;                  // right-rail — exclude
-          candidates.push({ el, top: r.top, left: r.left });
-        };
-
-        for (const el of document.querySelectorAll(ARIA_SEL)) consider(el);
-        // Text-content fallback — a "Message" button with no aria-label.
-        for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
-          if (seen.has(el)) continue;
-          const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
-          if (txt.toLowerCase() === "message") consider(el);
+          if (!(/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt))) continue;
+          const score =
+            (_hasBluePrimaryBg(el) ? 0 : 10) +
+            (el.classList?.contains("artdeco-button--primary") ? 0 : 1);
+          matches.push({ el, score });
         }
-
-        if (!candidates.length) return null;
-
-        // Top-most (then left-most) in the content column = the owner's CTA.
-        candidates.sort((a, b) => (a.top - b.top) || (a.left - b.left));
-        return candidates[0].el;
-      };
-
-      // Profile pages hydrate over ~3s. Poll up to 6s for the Message button.
-      let msgBtn = null;
-      for (let i = 0; i < 20; i++) {
-        msgBtn = _findMsgBtn();
-        if (msgBtn) break;
-        await sleep(300);
+        if (matches.length) {
+          matches.sort((a, b) => a.score - b.score);
+          console.log("[LeadCaptura] msg STEP 2 → Pass 3 (H1 locality) matched:", matches[0].el, "score:", matches[0].score);
+          return matches[0].el;
+        }
       }
+    }
 
+    // Diagnostic dump so we can see what's actually in the page when nothing matches.
+    try {
+      const allMsgEls = Array.from(document.querySelectorAll("button, a[role='button'], a"))
+        .filter((el) => {
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").trim().toLowerCase();
+          return /\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt);
+        });
+      console.log("[LeadCaptura] msg STEP 2 → ALL passes failed. H1 =", h1?.textContent?.trim(),
+                  "Message-like elements:", allMsgEls.length, allMsgEls);
+    } catch {}
+    return null;
+  }
+
+  // Geometry fallback when the name-based finder fails (rare — happens on
+  // localised UIs where the aria-label isn't "Message <Name>").  Keeps the
+  // strict aside-exclusion and 60% viewport cutoff from v1.0.199.
+  function _findMessageBtnByGeometry() {
+    const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+    const candidates = [];
+    const seen = new Set();
+    const consider = (el) => {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      if (el.disabled) return;
+      if (el.classList?.contains("lc-inline-save")) return;
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) return;
+      if (el.closest?.("aside, .scaffold-layout__aside, [class*='aside']")) return;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const hay = lbl + " " + txt;
+      if (!/\bmessage\b/.test(hay)) return;
+      if (/inmail|your team|recruiter|sales navigator/i.test(hay)) return;
+      if (/^(connect|follow|pending|connected|following)$/i.test(txt)) return;
+      const r = el.getBoundingClientRect();
+      const w = r.width || el.offsetWidth;
+      const h = r.height || el.offsetHeight;
+      if (w < 2 || h < 2) return;
+      if (r.left > vw * 0.7) return;
+      candidates.push({ el, top: r.top, left: r.left });
+    };
+    for (const el of document.querySelectorAll(
+      "button[aria-label*='Message' i], a[aria-label*='Message' i], " +
+      "button.message-anywhere-button, [class*='message-anywhere-button'], " +
+      "button[data-control-name*='message' i]"
+    )) consider(el);
+    for (const el of document.querySelectorAll("button, a[role='button'], [role='button']")) {
+      if (seen.has(el)) continue;
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (txt.toLowerCase() === "message") consider(el);
+    }
+    if (!candidates.length) return null;
+    // Strongest tie-breaker: actual painted blue background (LinkedIn primary
+    // blue ≈ #0a66c2).  Then the artdeco-button--primary class.  Then
+    // top-leftmost position.
+    candidates.sort((a, b) => {
+      const aBlue = _hasBluePrimaryBg(a.el) ? 0 : 1;
+      const bBlue = _hasBluePrimaryBg(b.el) ? 0 : 1;
+      if (aBlue !== bBlue) return aBlue - bBlue;
+      const aP = a.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
+      const bP = b.el.classList?.contains("artdeco-button--primary") ? 0 : 1;
+      if (aP !== bP) return aP - bP;
+      return (a.top - b.top) || (a.left - b.left);
+    });
+    return candidates[0].el;
+  }
+
+  // Find the active compose editor on this page.  LinkedIn renders it in
+  // either a fly-out overlay bubble (legacy), a centred "New message" dialog
+  // (new design), or a full-page composer at /messaging/compose.
+  const _MSG_EDITOR_SELS = [
+    // New "New message" dialog (the one your screenshot showed):
+    "[role='dialog'] div[role='textbox'][contenteditable='true']",
+    "[role='dialog'] [contenteditable='true']",
+    "[role='dialog'] textarea",
+    // Legacy fly-out bubble:
+    "div.msg-form__contenteditable[contenteditable='true']",
+    ".msg-form__msg-content-container [contenteditable='true']",
+    ".msg-form__compose-box [contenteditable='true']",
+    ".msg-overlay-conversation-bubble [contenteditable='true']",
+    ".msg-overlay-list-bubble [contenteditable='true']",
+    ".msg-form [contenteditable='true']",
+    // Generic last-resort signals:
+    "div[role='textbox'][contenteditable='true']",
+    "[contenteditable='true'][aria-label*='message' i]",
+    "[contenteditable='true'][data-placeholder*='rite' i]",
+    "[contenteditable='true'][data-placeholder*='essage' i]",
+  ];
+  // Loose "exists in layout" check — width/height > 0, not display:none.
+  // Used for editors that may be 0px before activation.
+  function _existsInLayout(el) {
+    if (!el) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") return false;
+      const r = el.getBoundingClientRect();
+      return r.width >= 1 && r.height >= 1;
+    } catch { return true; }
+  }
+
+  // Find the message dialog/overlay scope — any of the known LinkedIn
+  // surfaces.  We're flexible because LinkedIn ships several variants.
+  function _findMsgScope() {
+    const candidates = [
+      "[role='dialog']",
+      ".msg-form-popup",
+      ".msg-form",
+      ".msg-overlay-conversation-bubble",
+      ".msg-overlay-list-bubble",
+      "[class*='msg-form']",
+      "[class*='compose-overlay']",
+      "[class*='msg-overlay']",
+    ];
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      if (el && _existsInLayout(el)) return el;
+    }
+    return null;
+  }
+
+  // Find ALL editable surfaces inside a scope, deepest first.
+  function _allEditables(scope) {
+    if (!scope) return [];
+    const sels = [
+      "[contenteditable='true']",
+      "[contenteditable]:not([contenteditable='false'])",
+      "[role='textbox']",
+      "textarea",
+      "input[type='text']",
+    ];
+    const found = new Set();
+    for (const sel of sels) {
+      for (const el of scope.querySelectorAll(sel)) {
+        if (_existsInLayout(el)) found.add(el);
+      }
+    }
+    // Filter to only those NOT inside our own UI.
+    const filtered = Array.from(found).filter(el =>
+      !el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")
+    );
+    // Sort: leaves first (no contenteditable descendant).
+    return filtered.sort((a, b) => {
+      const aL = a.querySelector("[contenteditable='true'], [role='textbox'], textarea") ? 1 : 0;
+      const bL = b.querySelector("[contenteditable='true'], [role='textbox'], textarea") ? 1 : 0;
+      return aL - bL;
+    });
+  }
+
+  function _findMsgEditor() {
+    const scope = _findMsgScope();
+    if (scope) {
+      const eds = _allEditables(scope);
+      if (eds.length) return eds[0];
+    }
+    // Fallback: search the whole document.
+    const eds = _allEditables(document);
+    return eds[0] || null;
+  }
+
+  // Find the message compose dialog by searching for visible header text
+  // OR aria-label attributes. Class-name and role agnostic.
+  function _findDialogByHeaderText() {
+    const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i, /^compose message/i];
+    // 1) Text nodes.
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const t = (node.nodeValue || "").trim();
+      if (!t || t.length > 60) continue;
+      let match = false;
+      for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
+      if (!match) continue;
+      let p = node.parentElement;
+      while (p && p !== document.body) {
+        const r = p.getBoundingClientRect();
+        const cs = getComputedStyle(p);
+        const positioned = cs.position === "fixed" || cs.position === "absolute";
+        if (r.width >= 300 && r.height >= 250 && positioned) return p;
+        if (r.width >= 380 && r.height >= 380) return p;
+        p = p.parentElement;
+      }
+    }
+    // 2) Attributes (aria-label, title) containing the phrases.
+    const attrCandidates = document.querySelectorAll(
+      "[aria-label*='New message' i], [aria-label*='Compose' i], " +
+      "[aria-label*='Write a message' i], [aria-label*='Send a message' i], " +
+      "[title*='New message' i], [title*='Compose' i]"
+    );
+    for (const el of attrCandidates) {
+      const r = el.getBoundingClientRect();
+      if (r.width >= 300 && r.height >= 250) return el;
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        const pr = p.getBoundingClientRect();
+        if (pr.width >= 300 && pr.height >= 250) return p;
+        p = p.parentElement;
+      }
+    }
+    return null;
+  }
+
+  // Returns true if an element looks like a compose dialog — has an editable
+  // inside or a "Write a message" placeholder anywhere within.
+  function _looksLikeComposeDialog(el) {
+    if (!el) return false;
+    try {
+      if (el.querySelector("[contenteditable='true'], [contenteditable]:not([contenteditable='false']), [role='textbox'], textarea")) return true;
+      if (el.querySelector("[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]")) return true;
+      const t = (el.textContent || "");
+      if (/\bwrite a message\b/i.test(t)) return true;
+      if (/^\s*new message\b/i.test(t)) return true;
+    } catch {}
+    return false;
+  }
+
+  // Snapshot ALL big positioned elements currently on the page.
+  function _snapshotBigPositionedElements() {
+    const set = new Set();
+    try {
+      for (const el of document.querySelectorAll("body *")) {
+        try {
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+          const r = el.getBoundingClientRect();
+          if (r.width >= 280 && r.height >= 200) set.add(el);
+        } catch {}
+      }
+    } catch {}
+    return set;
+  }
+
+  // Find ALL currently open compose-like dialogs on the page — big positioned
+  // elements that contain an editable or "Write a message" placeholder.
+  function _findAllNewMessageDialogs() {
+    const dialogs = [];
+    try {
+      for (const el of document.querySelectorAll("body *")) {
+        try {
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 280 || r.height < 200) continue;
+          if (!_looksLikeComposeDialog(el)) continue;
+          dialogs.push(el);
+        } catch {}
+      }
+    } catch {}
+    if (!dialogs.length) {
+      console.log("[LeadCaptura] _findAllNewMessageDialogs: NONE found; body has 'Write a message':",
+        (document.body.innerText || "").includes("Write a message"));
+    }
+    return dialogs;
+  }
+
+  // Wait via MutationObserver for ANY new big positioned element (not in
+  // snapshot). We don't filter by compose-dialog signals because LinkedIn
+  // lazy-mounts Quill — when the dialog first appears the contenteditable
+  // doesn't exist YET. Returns the smallest new positioned element (the
+  // dialog itself, not the backdrop overlay).
+  function _waitForNewDialog(positionedBefore, maxMs = 10000) {
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+      const finish = (dlg) => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(dlg);
+      };
+      const tryFind = () => {
+        const newOnes = [];
+        try {
+          for (const el of document.querySelectorAll("body *")) {
+            if (positionedBefore.has(el)) continue;
+            try {
+              if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+              const cs = getComputedStyle(el);
+              if (cs.position !== "fixed" && cs.position !== "absolute") continue;
+              if (cs.display === "none" || cs.visibility === "hidden") continue;
+              const r = el.getBoundingClientRect();
+              if (r.width < 280 || r.height < 200) continue;
+              // Skip elements that fill the viewport (likely backdrop overlays).
+              if (r.width >= window.innerWidth * 0.98 && r.height >= window.innerHeight * 0.98) continue;
+              newOnes.push({ el, area: r.width * r.height });
+            } catch {}
+          }
+        } catch {}
+        if (!newOnes.length) return;
+        // Prefer one that looks like a compose dialog. If multiple, pick the
+        // SMALLEST area (the actual dialog, not a wrapper backdrop).
+        const composeMatches = newOnes.filter(x => _looksLikeComposeDialog(x.el));
+        const pool = composeMatches.length ? composeMatches : newOnes;
+        pool.sort((a, b) => a.area - b.area);
+        finish(pool[0].el);
+      };
+      tryFind();
+      if (done) return;
+      observer = new MutationObserver(() => tryFind());
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      timer = setTimeout(() => finish(null), maxMs);
+    });
+  }
+
+  // Aggressively close every "New message" dialog by clicking the X at the
+  // top-right corner of each one (by coordinates — class-name proof).
+  function _closeAllNewMessageDialogs() {
+    const dialogs = _findAllNewMessageDialogs();
+    for (const dlg of dialogs) {
+      try {
+        const r = dlg.getBoundingClientRect();
+        // Top-right corner — X close button is always there.
+        const cx = r.right - 20;
+        const cy = r.top + 20;
+        const closeEl = document.elementFromPoint(cx, cy);
+        if (closeEl) {
+          const btn = closeEl.closest?.("button") || closeEl;
+          btn.click();
+        }
+      } catch {}
+    }
+  }
+
+  // Wait via MutationObserver for a NEW dialog (one not in the snapshot)
+  // to appear. Returns the dialog element or null on timeout.
+  // Find the message editor INSIDE a specific dialog. Returns the textbox or
+  // null. Filters out recipient/name/to inputs.
+  function _findEditorInDialog(dialog) {
+    if (!dialog) return null;
+    const candidates = Array.from(dialog.querySelectorAll(
+      "[contenteditable='true'], [contenteditable]:not([contenteditable='false']), " +
+      "[role='textbox'], textarea, input[type='text']"
+    )).filter(el => {
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+      if (/search|filter|looking|recipient|name|to:|^to$/i.test(lbl + " " + ph)) return false;
+      return _existsInLayout(el);
+    });
+    if (!candidates.length) return null;
+    // Pick the LARGEST area editable (message box is biggest in dialog).
+    candidates.sort((a, b) => {
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      return (rb.width * rb.height) - (ra.width * ra.height);
+    });
+    // If the candidate is a wrapper (contenteditable=false), descend.
+    let best = candidates[0];
+    if (!best.isContentEditable) {
+      const inner = best.querySelector("[contenteditable='true'], [role='textbox']");
+      if (inner && _existsInLayout(inner)) best = inner;
+    }
+    return best;
+  }
+  function _waitForComposerMutation(editablesBefore, aeBefore, maxMs = 10000) {
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+      const finish = (result) => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(result);
+      };
+      const tryFind = () => {
+        // 1) Focused element became editable.
+        const ae = document.activeElement;
+        if (ae && ae !== document.body && ae !== aeBefore && (
+          ae.isContentEditable ||
+          ae.tagName === "TEXTAREA" ||
+          (ae.tagName === "INPUT" && ae.type === "text") ||
+          ae.getAttribute?.("role") === "textbox"
+        )) {
+          return finish({ kind: "editor", el: ae, via: "activeElement" });
+        }
+        // 2) New editable.
+        const now = _allEditables(document);
+        for (const el of now) {
+          if (!editablesBefore.has(el)) {
+            return finish({ kind: "editor", el, via: "newEditable" });
+          }
+        }
+        // 3) Largest visible editor (catch existing-but-now-visible composers).
+        const largest = _findLargestComposerEditor();
+        if (largest) {
+          return finish({ kind: "editor", el: largest, via: "largestEditor" });
+        }
+        // 4) Dialog by header text / aria label.
+        const dlg = _findDialogByHeaderText();
+        if (dlg) {
+          return finish({ kind: "dialog", el: dlg, via: "dialogText" });
+        }
+      };
+      // Initial check (in case it already happened).
+      tryFind();
+      if (done) return;
+      observer = new MutationObserver(() => { tryFind(); });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      timer = setTimeout(() => finish(null), maxMs);
+    });
+  }
+
+  // Find the LARGEST visible editable on the page that isn't search/filter/
+  // our own UI. Used as the "find the composer editor without knowing its
+  // class" strategy.
+  function _findLargestComposerEditor() {
+    const all = document.querySelectorAll(
+      "[contenteditable='true'], " +
+      "[contenteditable]:not([contenteditable='false']), " +
+      "[role='textbox'], textarea, input[type='text']"
+    );
+    let best = null, bestArea = 0;
+    for (const el of all) {
+      if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+      if (/search|filter|looking/i.test(lbl + " " + ph)) continue;
+      if (!_existsInLayout(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 100 || r.height < 30) continue;
+      const area = r.width * r.height;
+      if (area > bestArea) { best = el; bestArea = area; }
+    }
+    return best;
+  }
+
+  // Find a clickable area showing the "Write a message..." placeholder so
+  // we can click it to activate the editor.
+  function _findMsgPlaceholderClickTarget() {
+    const scope = _findMsgScope() || _findDialogByHeaderText() || document;
+    // 1) Anything with aria-placeholder / data-placeholder / placeholder = "Write a message…"
+    const phEls = scope.querySelectorAll(
+      "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+    );
+    for (const el of phEls) {
+      if (_existsInLayout(el)) return el;
+    }
+    // 2) Walk text nodes for "Write a message..."
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const t = (node.nodeValue || "").trim();
+      if (!t) continue;
+      if (!/write\s+a\s+message/i.test(t)) continue;
+      const parent = node.parentElement;
+      if (parent && _existsInLayout(parent)) return parent;
+    }
+    return null;
+  }
+  async function _waitMsgEditor(maxMs) {
+    const { sleep } = globalThis.__lcHuman;
+    const t0 = Date.now();
+    while (Date.now() - t0 < maxMs) {
+      const el = _findMsgEditor();
+      if (el) return el;
+      await sleep(150);
+    }
+    return null;
+  }
+
+  // Pull the current text out of any editor variant (textarea, input,
+  // contenteditable div).  Returns "" if nothing typed.
+  function _editorText(e) {
+    if (!e) return "";
+    if (typeof e.value === "string" && e.value) return e.value.trim();
+    return ((e.textContent || e.innerText || "")).trim();
+  }
+
+  // Robust multi-strategy typing into the active message editor.  Returns
+  // true if SOMETHING ended up in the editor, false if every strategy failed.
+  async function _robustTypeMessage(editor, text) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+    if (!editor || !text) return false;
+
+    // If the editor we received is a Quill wrapper (.ql-container or similar
+    // contenteditable=false outer), descend to the actual contenteditable=true
+    // leaf inside.
+    if (!editor.isContentEditable) {
+      const inner = editor.querySelector?.("[contenteditable='true'], [role='textbox']");
+      if (inner && _existsInLayout(inner)) {
+        console.log("[LeadCaptura] type: descended from wrapper to inner editable:", inner);
+        editor = inner;
+      }
+    }
+
+    // STEP A — REAL pointer click on the editor at the centre of its bounds.
+    // LinkedIn's Quill editor activates only after a pointerdown event.
+    try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+    await sleep(120);
+    try { await dispatchHumanClick(editor); } catch {}
+    await sleep(280 + Math.random() * 220);
+    try { editor.focus(); } catch {}
+    await sleep(220);
+    console.log("[LeadCaptura] type: after focus, activeElement =",
+      document.activeElement?.tagName, document.activeElement?.className,
+      "isCE=", document.activeElement?.isContentEditable);
+
+    // Position the selection at the end of the editor's contents — required
+    // for execCommand('insertText') to insert anywhere visible.
+    if (editor.isContentEditable) {
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) { console.log("[LeadCaptura] selection setup failed:", e); }
+    }
+
+    // STEP B — typeIntoEditable (existing — execCommand/insertText for
+    // contenteditable, native value setter for textarea/input).
+    try { await typeIntoEditable(editor, text); } catch (e) { console.log("[LeadCaptura] strategy B failed:", e); }
+    await sleep(300);
+    if (_editorText(editor)) {
+      console.log("[LeadCaptura] type strategy B (typeIntoEditable) succeeded");
+      return true;
+    }
+
+    // STEP C — Selection API + execCommand for contenteditable.  Some Quill
+    // editors only accept input when the selection is inside the editor.
+    if (editor.isContentEditable) {
+      try {
+        editor.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand("insertText", false, text);
+        await sleep(300);
+        if (_editorText(editor)) {
+          console.log("[LeadCaptura] type strategy C (Selection+insertText) succeeded");
+          return true;
+        }
+      } catch (e) { console.log("[LeadCaptura] strategy C failed:", e); }
+    }
+
+    // STEP D — beforeinput/input event simulation.  Char-by-char with full
+    // InputEvent. Quill and Lexical both listen to these.
+    try {
+      editor.focus();
+      await sleep(120);
+      for (const ch of text) {
+        const init = { data: ch, inputType: "insertText", bubbles: true, cancelable: true };
+        editor.dispatchEvent(new InputEvent("beforeinput", init));
+        if (editor.isContentEditable) {
+          document.execCommand("insertText", false, ch);
+        } else if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
+          const proto = editor.tagName === "TEXTAREA"
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+          const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+          setter.call(editor, (editor.value || "") + ch);
+        }
+        editor.dispatchEvent(new InputEvent("input", init));
+        await sleep(25 + Math.random() * 20);
+      }
+      await sleep(250);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy D (InputEvent loop) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy D failed:", e); }
+
+    // STEP E — synthesised paste.
+    try {
+      editor.focus();
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      dt.setData("text/html", text.replace(/\n/g, "<br>"));
+      const evt = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+      editor.dispatchEvent(evt);
+      await sleep(400);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy E (paste) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy E failed:", e); }
+
+    // STEP F — brute force: write directly to innerText / value, then fire input.
+    try {
+      if (editor.isContentEditable) {
+        editor.innerText = text;
+        editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
+      } else if (editor.tagName === "TEXTAREA" || editor.tagName === "INPUT") {
+        const proto = editor.tagName === "TEXTAREA"
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+        setter.call(editor, text);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+        editor.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      await sleep(400);
+      if (_editorText(editor)) {
+        console.log("[LeadCaptura] type strategy F (innerText/value) succeeded");
+        return true;
+      }
+    } catch (e) { console.log("[LeadCaptura] strategy F failed:", e); }
+
+    console.log("[LeadCaptura] ALL typing strategies failed for editor:", editor);
+    return false;
+  }
+
+  // Find the Send button inside whichever compose surface is open.  We
+  // search the smallest scope first (the bubble nearest the editor) and
+  // expand outward.
+  function _findMsgSendBtn(editor) {
+    const scopes = [];
+    if (editor) {
+      let n = editor;
+      for (let i = 0; i < 8 && n && n !== document.body; i++, n = n.parentElement) {
+        scopes.push(n);
+      }
+    }
+    // Widen scopes to include the New message dialog, the legacy overlay,
+    // and the full-page composer route.
+    scopes.push(
+      document.querySelector("[role='dialog']"),
+      document.querySelector(".msg-form__container"),
+      document.querySelector(".msg-overlay-conversation-bubble"),
+      document.querySelector(".msg-overlay-list-bubble"),
+      document.querySelector(".msg-form"),
+      document
+    );
+    for (const scope of scopes) {
+      if (!scope) continue;
+      for (const sel of [
+        "button.msg-form__send-button:not([disabled])",
+        "button[type='submit'].msg-form__send-button",
+        "button[aria-label='Send']:not([disabled])",
+        "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
+        "button[aria-label*='Send message' i]:not([disabled])",
+        "button.artdeco-button--primary[type='submit']:not([disabled])",
+      ]) {
+        const b = scope.querySelector?.(sel);
+        if (b && _isVisible(b)) return b;
+      }
+      // Text/aria-label = "Send" or "Send message".
+      for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
+        const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
+        if (!_isVisible(btn)) continue;
+        if (t === "send" || a === "send") return btn;
+        if (a === "send message" || t === "send message") return btn;
+        // The New message dialog's Send is often the primary button at the
+        // bottom-right with text "Send" — match more loosely.
+        if (/^send\b/.test(t) && btn.classList.contains("artdeco-button--primary")) return btn;
+      }
+    }
+    return null;
+  }
+
+  // The full send pipeline — returns { ok, reason }.
+  async function _sendProfilePageMessage(messageText) {
+    const { sleep, readingPause } = globalThis.__lcHuman;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+
+    // If a composer is already open (re-entry from a half-finished run), use it.
+    let editor = _findMsgEditor();
+
+    if (!editor) {
+      // STEP 1 — wait for the profile to be ready (name + a message button).
+      console.log("[LeadCaptura] msg STEP 1 → waiting for profile to render");
+      try { window.scrollTo({ top: 0, behavior: "instant" }); } catch {}
+      const ownerName = await _waitProfileReady(14000);
+      if (!ownerName) {
+        console.log("[LeadCaptura] msg STEP 1 ✗ profile name never rendered");
+        _lcToast("⚠️ Profile didn't load in time", 2800);
+        return { ok: false, reason: "profile_not_ready" };
+      }
+      console.log("[LeadCaptura] msg STEP 1 ✓ owner =", ownerName);
+      _lcToast(`👤 Profile loaded — ${ownerName}`, 1500);
+
+      // STEP 2 — find the owner's Message button by templated aria-label.
+      console.log("[LeadCaptura] msg STEP 2 → finding Message button");
+      let msgBtn = _findOwnerMessageBtnByName(ownerName);
+      let foundVia = "name";
       if (!msgBtn) {
-        console.log("[LeadCaptura] Message All: no Message button found on", location.pathname);
-        _lcToast("⚠️ Message button not found on this profile", 3000);
+        // Give one more re-paint cycle in case aria-label is filled async,
+        // then geometry-fallback.
+        await sleep(700);
+        msgBtn = _findOwnerMessageBtnByName(ownerName);
+        if (!msgBtn) {
+          msgBtn = _findMessageBtnByGeometry();
+          foundVia = "geometry";
+        }
+      }
+      if (!msgBtn) {
+        // Last-ditch fallback: any visible button with text/aria-label "Message"
+        // in the top half of the page, scored by blue-paint + primary-class.
+        const vh = window.innerHeight || 800;
+        const everything = Array.from(document.querySelectorAll("button, a[role='button'], a.artdeco-button"));
+        const desperate = [];
+        for (const el of everything) {
+          if (el.disabled) continue;
+          if (el.classList?.contains("lc-inline-save")) continue;
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel")) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) continue;
+          if (r.top > vh * 1.2) continue;
+          const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          if (!/\bmessage\b/.test(lbl) && txt !== "message" && !/\bmessage\b/.test(txt)) continue;
+          const score = (_hasBluePrimaryBg(el) ? 0 : 100)
+                      + (el.classList?.contains("artdeco-button--primary") ? 0 : 10)
+                      + r.top * 0.01;
+          desperate.push({ el, score });
+        }
+        if (desperate.length) {
+          desperate.sort((a, b) => a.score - b.score);
+          msgBtn = desperate[0].el;
+          foundVia = "desperate";
+          console.log("[LeadCaptura] msg STEP 2 → DESPERATE fallback picked:", msgBtn, "from", desperate.length, "candidates");
+        }
+      }
+      if (!msgBtn) {
+        console.log("[LeadCaptura] msg STEP 2 ✗ no Message button found for", ownerName);
+        _lcToast(`⚠️ No Message button for ${ownerName} (not connected?)`, 6000);
         return { ok: false, reason: "no_message_button" };
       }
-      _lcToast("✉️ Found Message button — opening composer…", 2000);
+      const lbl = msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim();
+      console.log(`[LeadCaptura] msg STEP 2 ✓ found via ${foundVia}: "${lbl}"`);
 
-      console.log("[LeadCaptura] Message All: clicking Message button", msgBtn.getAttribute("aria-label") || msgBtn.textContent?.trim());
+      // STEP 3 — spotlight the button and click.
       try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await sleep(450 + Math.random() * 350);
+      await sleep(350 + Math.random() * 250);
+      _showButtonSpotlight(msgBtn, `⚡ Messaging ${ownerName}`, "auto-clicking", 1100);
+      _lcToast(`✉️ Opening composer for ${ownerName}…`, 2000);
+      await sleep(700 + Math.random() * 250);
 
-      // Spotlight the Message button briefly so the user can see what's happening.
-      _showButtonSpotlight(msgBtn, "⚡ Opening Message", "auto-clicking now", 900);
-      await sleep(600 + Math.random() * 250);
-
-      // Click with dispatchHumanClick first (realistic pointer sequence — what
-      // LinkedIn's bot detection expects to see leading up to a click).
+      console.log("[LeadCaptura] msg STEP 3 → click");
       await dispatchHumanClick(msgBtn);
-      editor = await waitFor(_editorSels, { timeout: 3500 });
+      editor = await _waitMsgEditor(4500);
 
-      // Fallback: _forceClick (5-strategy including React fiber onClick) when
-      // pointer events alone don't trigger LinkedIn's handlers.
+      // Click retry 1: _forceClick (multi-strategy native click).
       if (!editor) {
-        console.log("[LeadCaptura] Message All: pointer click didn't open dialog — retrying via _forceClick");
+        console.log("[LeadCaptura] msg STEP 3 ↺ retry via _forceClick");
         _forceClick(msgBtn);
-        editor = await waitFor(_editorSels, { timeout: 5000 });
+        editor = await _waitMsgEditor(4500);
       }
-
+      // Click retry 2: click the inner <span>/<svg> — some Ember handlers
+      // bind to children rather than the button itself.
+      if (!editor) {
+        const inner = msgBtn.querySelector("span, svg, .artdeco-button__text");
+        if (inner) {
+          console.log("[LeadCaptura] msg STEP 3 ↺↺ retry via inner-child click");
+          _forceClick(inner);
+          editor = await _waitMsgEditor(4500);
+        }
+      }
       _removeSpotlight();
     }
 
     if (!editor) {
-      console.log("[LeadCaptura] Message All: compose editor not found after clicking Message");
+      console.log("[LeadCaptura] msg STEP 3 ✗ composer never opened after 3 clicks");
+      _lcToast("⚠️ Composer didn't open — skipping", 2500);
       return { ok: false, reason: "no_editor" };
     }
+    console.log("[LeadCaptura] msg STEP 3 ✓ composer open");
 
-    // ── Step 2: focus editor and type the message ──
+    // STEP 4 — focus + type.
+    console.log("[LeadCaptura] msg STEP 4 → typing", messageText.length, "chars");
     try { editor.click(); } catch {}
     try { editor.focus(); } catch {}
     await sleep(280 + Math.random() * 220);
-
     await typeIntoEditable(editor, messageText);
-    await sleep(400 + Math.random() * 400);
+    await sleep(450 + Math.random() * 350);
 
-    // ── Step 3: find and click the Send button ──
-    // Search inside the overlay bubble first, then fall back to document-wide.
-    const _findSendBtn = () => {
-      const scopes = [
-        document.querySelector(".msg-overlay-conversation-bubble"),
-        document.querySelector(".msg-overlay-list-bubble"),
-        document.querySelector(".msg-form__container"),
-        document,
-      ];
-      for (const scope of scopes) {
-        if (!scope) continue;
-        for (const sel of [
-          "button.msg-form__send-button:not([disabled])",
-          "button[aria-label='Send']:not([disabled])",
-          "button[aria-label*='Send' i].artdeco-button--primary:not([disabled])",
-        ]) {
-          const b = scope.querySelector?.(sel);
-          if (b && _isVisible(b)) return b;
-        }
-        for (const btn of scope.querySelectorAll?.("button:not([disabled])") || []) {
-          const t = (btn.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-          const a = (btn.getAttribute("aria-label") || "").trim().toLowerCase();
-          if ((t === "send" || a === "send") && _isVisible(btn)) return btn;
-        }
-      }
-      return null;
-    };
-    // Poll for the Send button to become enabled (LinkedIn enables it ~50-200ms
-    // after the last input event fires).
+    // Verify text actually landed in the editor.
+    const typed = (editor.textContent || "").trim();
+    if (!typed) {
+      console.log("[LeadCaptura] msg STEP 4 ✗ editor empty after typing");
+      _lcToast("⚠️ Couldn't type into composer", 2500);
+      return { ok: false, reason: "typing_failed" };
+    }
+    console.log("[LeadCaptura] msg STEP 4 ✓ typed");
+
+    // STEP 5 — find + click Send (poll up to 2.4s for enabled state).
+    console.log("[LeadCaptura] msg STEP 5 → finding Send button");
     let sendBtn = null;
     for (let i = 0; i < 12; i++) {
-      sendBtn = _findSendBtn();
+      sendBtn = _findMsgSendBtn(editor);
       if (sendBtn && !sendBtn.disabled) break;
       await sleep(200);
     }
-
     if (!sendBtn || sendBtn.disabled) {
-      console.log("[LeadCaptura] Message All: Send button not found or disabled");
+      console.log("[LeadCaptura] msg STEP 5 ✗ Send button not ready");
+      _lcToast("⚠️ Send button disabled", 2500);
       return { ok: false, reason: "send_disabled" };
     }
+    console.log("[LeadCaptura] msg STEP 5 ✓ Send ready");
 
-    console.log("[LeadCaptura] Message All: clicking Send");
-    _showButtonSpotlight(sendBtn, "📨 Sending message", "auto-send in progress", 800);
+    _showButtonSpotlight(sendBtn, "📨 Sending", "delivering message", 900);
     await sleep(400 + Math.random() * 200);
     await dispatchHumanClick(sendBtn);
-    // Verify the editor cleared (= send actually went through). If not, retry once.
+
+    // STEP 6 — verify send by editor clearing.  Retry once with _forceClick
+    // if not cleared within 1s.
     await sleep(900);
-    const stillHasText = (editor.textContent || "").trim().length > 0;
+    let stillHasText = (editor.textContent || "").trim().length > 0;
     if (stillHasText) {
-      console.log("[LeadCaptura] Message All: editor not cleared — retrying Send via _forceClick");
-      const retryBtn = _findSendBtn();
+      console.log("[LeadCaptura] msg STEP 6 ↺ editor still has text — retry via _forceClick");
+      const retryBtn = _findMsgSendBtn(editor);
       if (retryBtn) _forceClick(retryBtn);
-      await sleep(800);
+      await sleep(900);
+      stillHasText = (editor.textContent || "").trim().length > 0;
     }
     _removeSpotlight();
+
+    if (stillHasText) {
+      console.log("[LeadCaptura] msg STEP 6 ✗ message did not send");
+      _lcToast("⚠️ Send didn't go through", 2500);
+      return { ok: false, reason: "send_unverified" };
+    }
+    console.log("[LeadCaptura] msg STEP 6 ✓ sent");
+    _lcToast("✅ Message sent", 1800);
     return { ok: true };
   }
 
@@ -6517,22 +7362,423 @@
     ta.focus();
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // IN-PLACE MESSAGE ALL  (v1.0.206 — no profile navigation)
+  //
+  // Click the inline Message button on each card right on the connections /
+  // search page.  LinkedIn's new design renders the Message control as an
+  // <a href="/messaging/compose/?profileUrn=..."> anchor with hash-obfuscated
+  // CSS classes — NOT a button.artdeco-button--primary.  The href is the
+  // single most reliable signal.
+  // ════════════════════════════════════════════════════════════════════
+
+  // Find the Message anchor/button inside a card subtree.  Handles BOTH
+  // the new anchor-based design and the legacy button-based one.
+  function _findMessageBtnInCard(cardEl) {
+    if (!cardEl) return null;
+    // Strongest signal: new design ships an <a href="/messaging/compose/...">.
+    const composeLink = cardEl.querySelector(
+      "a[href*='/messaging/compose/'], a[href*='messaging/thread/new'], a[href*='messaging/compose']"
+    );
+    if (composeLink) return composeLink;
+    // Legacy: button with text/aria-label "Message".
+    const candidates = cardEl.querySelectorAll(
+      "button, a, [role='button']"
+    );
+    for (const el of candidates) {
+      if (el.disabled) continue;
+      if (el.classList?.contains("lc-inline-save")) continue;
+      const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  // Close LinkedIn's message overlay/dialog after a successful send. Handles
+  // BOTH the legacy bottom-right bubble AND the new design's centred "New
+  // message" dialog (close X at the top-right).
+  function _closeMsgOverlay() {
+    // 1) Legacy bubble close buttons.
+    const legacy = document.querySelectorAll(
+      ".msg-overlay-conversation-bubble button[aria-label*='Close' i], " +
+      ".msg-overlay-conversation-bubble button[data-control-name*='close' i], " +
+      ".msg-overlay-list-bubble button[aria-label*='Close' i], " +
+      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i]"
+    );
+    for (const b of legacy) { try { b.click(); } catch {} }
+
+    // 2) New dialog: scan all "New message" dialogs and click their X.
+    try {
+      const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      let node;
+      const dialogs = new Set();
+      while ((node = walker.nextNode())) {
+        const t = (node.nodeValue || "").trim();
+        if (!t || t.length > 60) continue;
+        let match = false;
+        for (const re of PHRASES) { if (re.test(t)) { match = true; break; } }
+        if (!match) continue;
+        let p = node.parentElement;
+        while (p && p !== document.body) {
+          const r = p.getBoundingClientRect();
+          if (r.width >= 300 && r.height >= 250) { dialogs.add(p); break; }
+          p = p.parentElement;
+        }
+      }
+      // Also catch aria-label-based dialogs.
+      for (const el of document.querySelectorAll("[aria-label*='New message' i], [aria-label*='Compose' i]")) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 300 && r.height >= 250) dialogs.add(el);
+      }
+      for (const dlg of dialogs) {
+        // Find close buttons inside.
+        const closes = dlg.querySelectorAll(
+          "button[aria-label*='Close' i], button[aria-label*='Dismiss' i], " +
+          "button[aria-label*='close' i], svg[aria-label*='close' i]"
+        );
+        for (const b of closes) { try { (b.closest("button") || b).click(); } catch {} }
+      }
+    } catch {}
+
+    // 3) Press Escape on the body — closes any modal dialog as last resort.
+    try {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
+    } catch {}
+  }
+
+  // Extract template variables from a connections-page card.
+  function _scrapeCardProfile(cardEl) {
+    const profile = {};
+    try {
+      const link = cardEl.querySelector("a[href*='/in/']");
+      const nameText = (link?.textContent || link?.getAttribute("aria-label") || "").trim();
+      const cleanName = nameText.replace(/\s+/g, " ").trim();
+      if (cleanName) {
+        profile.full_name = cleanName;
+        const parts = cleanName.split(/\s+/);
+        profile.first_name = parts[0];
+        profile.last_name = parts.slice(1).join(" ");
+      }
+      const subline = cardEl.querySelector(".artdeco-entity-lockup__subtitle, .entity-result__primary-subtitle, [class*='subtitle'], [class*='headline']");
+      if (subline) profile.title = subline.textContent.replace(/\s+/g, " ").trim();
+    } catch {}
+    return profile;
+  }
+
   async function _startMessageAll(message, useAI = false) {
+    const { sleep } = globalThis.__lcHuman;
+    const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
     if (!urls.length) { flashStatus("No profiles to message", "warn"); return; }
-    urls = urls.map((u) => { try { return new URL(u, "https://www.linkedin.com").href; } catch { return u; } });
 
-    const run = {
-      active: true, message, useAI, urls, index: 0, searchUrl: location.href,
-      sent: 0, failed: 0, skipped: 0, startedAt: Date.now(),
-    };
-    await _saveMsgRun(run);
-    flashStatus(`Message All started — ${urls.length} profile${urls.length === 1 ? "" : "s"}`, "ok");
-    _lcToast(`⚡ Message All — opening profile 1/${urls.length}`, 2800);
-    await new Promise((r) => setTimeout(r, 1500));
-    location.href = urls[0];
+    state.messageActive = true;
+    state.messageCancel = false;
+    try { renderToolbar(); } catch {}
+
+    let sent = 0, skipped = 0, failed = 0;
+    const total = urls.length;
+    flashStatus(`Message All started — ${total} profile${total === 1 ? "" : "s"}`, "ok");
+    _lcToast(`⚡ Message All — ${total} card${total === 1 ? "" : "s"}`, 2500);
+
+    try {
+      for (let i = 0; i < urls.length; i++) {
+        if (state.messageCancel) break;
+        const url = urls[i];
+        const idx = i + 1;
+
+        // Wrap each iteration so a thrown error in any helper counts as a
+        // failure and the loop CONTINUES rather than aborting the whole run.
+        try {
+          const card = chipCardEl.get(url);
+        if (!card || !document.body.contains(card)) {
+          console.log("[LeadCaptura] msg in-place: no card for", url);
+          skipped++;
+          _lcToast(`⏭ ${idx}/${total} — card not visible`, 1500);
+          continue;
+        }
+
+        // Close any leftover overlay before starting.
+        _closeMsgOverlay();
+        await sleep(300);
+
+        // Make the card visible.
+        try { card.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+        await sleep(500 + Math.random() * 350);
+
+        const msgBtn = _findMessageBtnInCard(card);
+        if (!msgBtn) {
+          console.log("[LeadCaptura] msg in-place: no Message btn on card", url, card);
+          skipped++;
+          _lcToast(`⏭ ${idx}/${total} — no Message button`, 1500);
+          continue;
+        }
+
+        const profile = _scrapeCardProfile(card);
+        let finalMsg;
+        if (useAI) {
+          finalMsg = await _aiPersonalizeMessage(message, profile).catch(() => null);
+          if (!finalMsg) finalMsg = _renderMsgTemplate(message, profile);
+        } else {
+          finalMsg = _renderMsgTemplate(message, profile);
+        }
+
+        const firstName = profile.first_name || "this connection";
+        _showButtonSpotlight(msgBtn, `✉️ Messaging ${firstName} (${idx}/${total})`, "auto-clicking", 1000);
+        _lcToast(`✉️ Opening composer for ${firstName}…`, 1800);
+        await sleep(650 + Math.random() * 300);
+
+        console.log(`[LeadCaptura] msg in-place ${idx}/${total} STEP 1 → click Message`, msgBtn);
+
+        // Close any stale "New message" dialogs before starting.
+        _closeAllNewMessageDialogs();
+        await sleep(400);
+
+        // Snapshot existing visible editables — anything new after the click
+        // is the textbox we want to type in. Don't try to find the dialog.
+        const _snapshotEditables = () => {
+          const set = new Set();
+          for (const el of document.querySelectorAll("[contenteditable='true'], [role='textbox'], textarea")) {
+            if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+            const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+            const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+            if (/search|filter|looking|recipient|^to$|to:/i.test(lbl + " " + ph)) continue;
+            if (_existsInLayout(el)) set.add(el);
+          }
+          return set;
+        };
+        const editablesBefore = _snapshotEditables();
+
+        await dispatchHumanClick(msgBtn);
+
+        // Helper: find textbox via multiple signals. Returns {el, kind} or null.
+        const _findTextboxOrClickTarget = () => {
+          const isOurUI = (el) => el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar");
+          const notInputForName = (el) => {
+            const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+            const ph = (el.getAttribute("placeholder") || el.getAttribute("aria-placeholder") || el.getAttribute("data-placeholder") || "").toLowerCase();
+            return !/search|filter|looking|recipient|^to$|to:/i.test(lbl + " " + ph);
+          };
+
+          // Try 1: NEW contenteditable / role=textbox / textarea (Quill is mounted).
+          const now = _snapshotEditables();
+          for (const el of now) {
+            if (editablesBefore.has(el)) continue;
+            return { el, kind: "editor" };
+          }
+          // Try 2: explicit Quill class (LinkedIn most likely uses Quill).
+          for (const sel of [
+            ".ql-editor[contenteditable='true']",
+            "[class*='ql-editor']",
+            ".msg-form__contenteditable",
+          ]) {
+            try {
+              for (const el of document.querySelectorAll(sel)) {
+                if (isOurUI(el)) continue;
+                if (!_existsInLayout(el)) continue;
+                return { el, kind: "ql-class" };
+              }
+            } catch {}
+          }
+          // Try 3: cursor:text — the I-beam visible signal. THIS catches the
+          // textbox even when Quill is unmounted and the placeholder is CSS.
+          try {
+            for (const el of document.querySelectorAll("body div, body section, body p, body span")) {
+              if (isOurUI(el)) continue;
+              let cs;
+              try { cs = getComputedStyle(el); } catch { continue; }
+              if (cs.cursor !== "text") continue;
+              if (!_existsInLayout(el)) continue;
+              const r = el.getBoundingClientRect();
+              if (r.width < 200 || r.height < 40) continue;
+              if (!notInputForName(el)) continue;
+              return { el, kind: "cursor-text" };
+            }
+          } catch {}
+          // Try 4: CSS pseudo-element ::before/::after containing message text.
+          try {
+            for (const el of document.querySelectorAll("body div, body span, body p")) {
+              if (isOurUI(el)) continue;
+              for (const pseudo of ["::before", "::after"]) {
+                let cs;
+                try { cs = getComputedStyle(el, pseudo); } catch { continue; }
+                const content = cs.content || "";
+                if (!/write a message|^.message/i.test(content)) continue;
+                if (!_existsInLayout(el)) continue;
+                const r = el.getBoundingClientRect();
+                if (r.width >= 150 && r.height >= 30) {
+                  return { el, kind: "pseudo-content" };
+                }
+              }
+            }
+          } catch {}
+          // Try 5: explicit placeholder attribute.
+          try {
+            for (const el of document.querySelectorAll(
+              "[aria-placeholder*='Write a message' i], [data-placeholder*='Write a message' i], [placeholder*='Write a message' i], " +
+              "[aria-placeholder*='message' i], [data-placeholder*='message' i], [placeholder*='message' i]"
+            )) {
+              if (isOurUI(el)) continue;
+              if (!_existsInLayout(el)) continue;
+              if (!notInputForName(el)) continue;
+              return { el, kind: "placeholder-attr" };
+            }
+          } catch {}
+          return null;
+        };
+
+        // Poll for editor / textbox target.
+        let editor = null;
+        let clickTarget = null;
+        for (let k = 0; k < 50; k++) {
+          const found = _findTextboxOrClickTarget();
+          if (found) {
+            if (found.kind === "editor") { editor = found.el; break; }
+            clickTarget = found.el;
+            console.log("[LeadCaptura] textbox click target via", found.kind, ":", clickTarget);
+            break;
+          }
+          await sleep(200);
+        }
+
+        // If we found a non-editor click target, click it to wake Quill.
+        if (!editor && clickTarget) {
+          try { await dispatchHumanClick(clickTarget); } catch {}
+          await sleep(500);
+          try { await dispatchHumanClick(clickTarget); } catch {}
+          await sleep(700);
+          // Re-poll for the now-mounted editor.
+          for (let k = 0; k < 30; k++) {
+            const f = _findTextboxOrClickTarget();
+            if (f && f.kind === "editor") { editor = f.el; break; }
+            // Also try activeElement.
+            const ae = document.activeElement;
+            if (ae && ae !== document.body && (
+              ae.isContentEditable ||
+              ae.tagName === "TEXTAREA" ||
+              (ae.tagName === "INPUT" && ae.type === "text") ||
+              ae.getAttribute("role") === "textbox"
+            )) {
+              const lbl = (ae.getAttribute("aria-label") || "").toLowerCase();
+              if (!/search|filter|recipient|^to$/i.test(lbl)) {
+                editor = ae;
+                break;
+              }
+            }
+            await sleep(150);
+          }
+          if (!editor) editor = clickTarget;
+        }
+
+        _removeSpotlight();
+
+        if (!editor) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't find textbox`, 2800);
+          continue;
+        }
+
+        console.log(`[LeadCaptura] msg ${idx}/${total} → editor:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
+        await sleep(450 + Math.random() * 300);
+
+        if (!editor) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't find editor in dialog`, 2500);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        // Type the message — multi-strategy.  LinkedIn's "New message"
+        // dialog uses a Quill-style editor that requires a real pointer
+        // click before it accepts input; focus() alone is silently ignored.
+        console.log(`[LeadCaptura] msg in-place ${idx}/${total} editor:`, editor.tagName, editor.className, "isCE=", editor.isContentEditable);
+        const ok = await _robustTypeMessage(editor, finalMsg);
+        if (!ok) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — couldn't type the message`, 2800);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        // Find + click Send.
+        let sendBtn = null;
+        for (let k = 0; k < 14; k++) {
+          sendBtn = _findMsgSendBtn(editor);
+          if (sendBtn && !sendBtn.disabled) break;
+          await sleep(200);
+        }
+        if (!sendBtn || sendBtn.disabled) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — Send disabled`, 2200);
+          _closeMsgOverlay();
+          continue;
+        }
+
+        _showButtonSpotlight(sendBtn, `📨 Sending to ${firstName}`, "delivering", 900);
+        await sleep(380 + Math.random() * 200);
+        await dispatchHumanClick(sendBtn);
+
+        // Verify by editor clearing.
+        await sleep(900);
+        let stillText = (editor.value ?? editor.textContent ?? "").trim().length > 0;
+        if (stillText) {
+          const retry = _findMsgSendBtn(editor);
+          if (retry) _forceClick(retry);
+          await sleep(900);
+          stillText = (editor.value ?? editor.textContent ?? "").trim().length > 0;
+        }
+        _removeSpotlight();
+
+        if (stillText) {
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — send didn't go through`, 2200);
+        } else {
+          sent++;
+          try { _markContacted(url); _applyContactedVisual(url); } catch {}
+          _lcToast(`✅ ${idx}/${total} sent to ${firstName}`, 1800);
+        }
+
+        _closeMsgOverlay();
+
+        // Human-paced gap before the next card.
+        if (i < urls.length - 1 && !state.messageCancel) {
+          const gap = _msgGap();
+          await _cancellableMessageSleep(gap);
+        }
+        } catch (err) {
+          console.log(`[LeadCaptura] msg in-place ${idx}/${total} threw:`, err);
+          failed++;
+          _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
+          try { _closeMsgOverlay(); } catch {}
+        }
+      }
+    } finally {
+      state.messageActive = false;
+      state.messageCancel = false;
+      try { renderToolbar(); } catch {}
+      flashStatus(
+        `Message All done: ${sent} sent, ${skipped} skipped, ${failed} failed ✓`,
+        "ok"
+      );
+      _lcToast(`✓ Message All done — ${sent} sent · ${skipped} skipped · ${failed} failed`, 8000);
+    }
+  }
+
+  // Cancellable sleep that respects state.messageCancel (Stop button).
+  async function _cancellableMessageSleep(ms) {
+    const { sleep } = globalThis.__lcHuman;
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (state.messageCancel) return;
+      await sleep(Math.min(150, end - Date.now()));
+    }
   }
 
   // Called on every page boot from main.js. If a Message Run is active and
@@ -7037,4 +8283,1148 @@
     updateMessageSpotlight,
     removeMessageSpotlight,
   };
+})();
+
+// ════════════════════════════════════════════════════════════════════
+// CASE #1 + CASE #2 — User-taught messaging flows (v1.0.226)
+// SELF-CONTAINED IIFE. Does NOT touch any existing code.
+// - Case #1: Floating "Send Message" pill on /in/<handle> pages.
+// - Case #2: Floating "Message All" pill on /mynetwork/invite-connect/connections/ AND /search/results/people/ pages.
+// Both use the EXACT DOM selectors the user provided:
+//   Textbox: div.msg-form__contenteditable[contenteditable='true'][role='textbox']
+//   Send:    button.msg-form__send-button
+//   Card Msg button: button[aria-label^="Send a message to"]
+//   Click confirm:   data-artdeco-is-focused="true"
+// ════════════════════════════════════════════════════════════════════
+(function () {
+  "use strict";
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // —— Helpers ——————————————————————————————————————————————————————
+
+  function _pointerClick(el) {
+    if (!el) return;
+    try {
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 };
+      el.dispatchEvent(new PointerEvent("pointerover", opts));
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+    } catch (e) {}
+  }
+
+  async function _waitFor(testFn, maxMs = 5000, intervalMs = 150) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      const result = testFn();
+      if (result) return result;
+      await sleep(intervalMs);
+    }
+    return null;
+  }
+
+  // MutationObserver-based wait — fires on next animation frame after ANY
+  // DOM change. Also observes inside #interop-outlet's shadow root (where
+  // LinkedIn now mounts the message dialog).
+  function _waitForObserver(testFn, maxMs = 12000) {
+    return new Promise((resolve) => {
+      let done = false;
+      const observers = [];
+      let timer = null;
+      const finish = (result) => {
+        if (done) return;
+        done = true;
+        for (const obs of observers) obs.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve(result);
+      };
+      // Initial check.
+      const initial = testFn();
+      if (initial) return finish(initial);
+      const onMutation = () => {
+        const result = testFn();
+        if (result) finish(result);
+      };
+      // Observe main document body.
+      const obs1 = new MutationObserver(onMutation);
+      obs1.observe(document.body, { childList: true, subtree: true, attributes: true });
+      observers.push(obs1);
+      // Observe inside #interop-outlet's shadow root if present.
+      const outlet = document.querySelector("#interop-outlet");
+      if (outlet && outlet.shadowRoot) {
+        const obs2 = new MutationObserver(onMutation);
+        obs2.observe(outlet.shadowRoot, { childList: true, subtree: true, attributes: true });
+        observers.push(obs2);
+      }
+      // Also: re-attach to shadow root if #interop-outlet appears later.
+      const obs3 = new MutationObserver(() => {
+        const outletLater = document.querySelector("#interop-outlet");
+        if (outletLater && outletLater.shadowRoot && observers.length < 4) {
+          const newObs = new MutationObserver(onMutation);
+          newObs.observe(outletLater.shadowRoot, { childList: true, subtree: true, attributes: true });
+          observers.push(newObs);
+        }
+        onMutation();
+      });
+      obs3.observe(document.documentElement, { childList: true, subtree: true });
+      observers.push(obs3);
+      timer = setTimeout(() => finish(null), maxMs);
+    });
+  }
+
+  // Helper: search inside a scope (document OR shadowRoot) for a matching
+  // element. Used by everything that needs to look inside #interop-outlet's
+  // shadow root, which is where LinkedIn now mounts the message dialog.
+  function _queryAcrossShadows(selector) {
+    // 1) Main document.
+    let el = document.querySelector(selector);
+    if (el) return el;
+    // 2) The known LinkedIn messaging shadow host.
+    const outlet = document.querySelector("#interop-outlet");
+    if (outlet && outlet.shadowRoot) {
+      el = outlet.shadowRoot.querySelector(selector);
+      if (el) return el;
+    }
+    // 3) Any other shadow roots on the page (defensive).
+    for (const host of document.querySelectorAll("*")) {
+      if (host.shadowRoot) {
+        try {
+          const found = host.shadowRoot.querySelector(selector);
+          if (found) return found;
+        } catch (e) {}
+      }
+    }
+    return null;
+  }
+
+  function _queryAllAcrossShadows(selector) {
+    const out = [];
+    document.querySelectorAll(selector).forEach((el) => out.push(el));
+    const outlet = document.querySelector("#interop-outlet");
+    if (outlet && outlet.shadowRoot) {
+      outlet.shadowRoot.querySelectorAll(selector).forEach((el) => out.push(el));
+    }
+    // Defensive: walk all shadow hosts.
+    for (const host of document.querySelectorAll("*")) {
+      if (host.shadowRoot) {
+        try {
+          host.shadowRoot.querySelectorAll(selector).forEach((el) => out.push(el));
+        } catch (e) {}
+      }
+    }
+    return out;
+  }
+
+  // Find the message textbox. CRITICAL: requires a <p> child to confirm Quill
+  // has finished mounting — without that child, typing will silently fail.
+  // Also searches inside #interop-outlet's shadowRoot (LinkedIn's new design
+  // mounts the dialog inside a shadow DOM).
+  function _findEditor() {
+    const editors = _queryAllAcrossShadows(
+      "div.msg-form__contenteditable[contenteditable='true']"
+    );
+    for (const ed of editors) {
+      if (ed.querySelector("p")) return ed; // Quill mounted + ready
+    }
+    // Activity-based fallback: focused contenteditable.
+    const ae = document.activeElement;
+    if (
+      ae && ae !== document.body && ae.isContentEditable &&
+      ae.closest("[class*='msg-form']") && ae.querySelector("p")
+    ) {
+      return ae;
+    }
+    return null;
+  }
+
+  function _findSendBtn(enabledOnly = true) {
+    if (enabledOnly) {
+      return _queryAcrossShadows("button.msg-form__send-button:not([disabled])");
+    }
+    return _queryAcrossShadows("button.msg-form__send-button");
+  }
+
+  function _closeMsgDialog() {
+    const closeSelectors = [
+      "button[aria-label*='Close your conversation' i]",
+      "section.msg-overlay-conversation-bubble button[aria-label*='Close' i]",
+      ".msg-overlay-conversation-bubble button[aria-label*='Close' i]",
+      "header.msg-overlay-bubble-header button[aria-label*='Close' i]",
+      ".msg-overlay-bubble-header__controls button[aria-label*='Close' i]",
+      "[class*='msg-overlay'] button[aria-label*='Close' i]",
+      "[role='dialog'] button[aria-label*='Close' i]",
+      "[role='dialog'] button[aria-label*='Dismiss' i]",
+    ];
+    for (const sel of closeSelectors) {
+      const btn = _queryAcrossShadows(sel);
+      if (btn) {
+        try { btn.click(); return true; } catch (e) {}
+      }
+    }
+    // Fallback: Escape
+    try {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+      document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+    } catch (e) {}
+    return false;
+  }
+
+  async function _typeIntoEditor(editor, text) {
+    if (!editor || !text) return false;
+    try { editor.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+    _pointerClick(editor);
+    await sleep(300);
+    try { editor.focus(); } catch (e) {}
+    await sleep(200);
+
+    // Position the cursor INSIDE the <p> child. Empty state is <p><br></p>,
+    // so collapsing inside <p> places the cursor where Quill expects it.
+    const pEl = editor.querySelector("p");
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      if (pEl) {
+        range.selectNodeContents(pEl);
+        range.collapse(false);
+      } else {
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
+
+    // Strategy 1: execCommand — produces <p>text</p> when cursor is in <p>
+    try {
+      document.execCommand("insertText", false, text);
+      await sleep(400);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    // Strategy 2: paste event
+    try {
+      editor.focus();
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+      await sleep(500);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    // Strategy 3: Directly set the <p> contents and fire input.
+    try {
+      const escaped = text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      if (pEl) {
+        pEl.innerHTML = escaped;
+      } else {
+        editor.innerHTML = "<p>" + escaped + "</p>";
+      }
+      editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste" }));
+      await sleep(400);
+      if ((editor.textContent || "").trim()) return true;
+    } catch (e) {}
+
+    return false;
+  }
+
+  // —— Floating Action Buttons ——————————————————————————————————————
+
+  const FAB_BASE_STYLE = {
+    position: "fixed",
+    bottom: "120px",
+    right: "24px",
+    zIndex: "2147483640",
+    background: "linear-gradient(135deg, #0a66c2, #004182)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "999px",
+    padding: "12px 22px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+    boxShadow: "0 4px 16px rgba(10, 102, 194, 0.4)",
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    transition: "transform 0.15s ease, box-shadow 0.15s ease",
+  };
+
+  function _mountFab(id, label, onClick) {
+    if (document.getElementById(id)) return;
+    const btn = document.createElement("button");
+    btn.id = id;
+    btn.type = "button";
+    btn.textContent = label;
+    Object.assign(btn.style, FAB_BASE_STYLE);
+    btn.addEventListener("mouseenter", () => {
+      btn.style.transform = "translateY(-2px)";
+      btn.style.boxShadow = "0 8px 24px rgba(10, 102, 194, 0.6)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.transform = "translateY(0)";
+      btn.style.boxShadow = "0 4px 16px rgba(10, 102, 194, 0.4)";
+    });
+    btn.addEventListener("click", onClick);
+    document.body.appendChild(btn);
+  }
+
+  function _unmountFab(id) {
+    document.getElementById(id)?.remove();
+  }
+
+  function _showToast(msg, ms = 2500) {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    Object.assign(t.style, {
+      position: "fixed",
+      bottom: "60px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(15, 23, 42, 0.95)",
+      color: "#fff",
+      padding: "10px 18px",
+      borderRadius: "999px",
+      fontSize: "13px",
+      fontWeight: "500",
+      zIndex: "2147483647",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+    });
+    document.documentElement.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // CASE #1 — Individual Profile "Send Message"
+  // ════════════════════════════════════════════════════════════════════
+  const CASE1_FAB_ID = "lc-case1-fab";
+  const CASE1_COMPOSER_ID = "lc-case1-composer";
+
+  function _showCase1Composer() {
+    document.getElementById(CASE1_COMPOSER_ID)?.remove();
+
+    const wrap = document.createElement("div");
+    wrap.id = CASE1_COMPOSER_ID;
+    Object.assign(wrap.style, {
+      position: "fixed",
+      bottom: "180px",
+      right: "24px",
+      width: "380px",
+      maxWidth: "calc(100vw - 40px)",
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "14px",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+      padding: "16px 18px",
+      zIndex: "2147483641",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+    });
+
+    wrap.innerHTML =
+      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:10px;">Send Message to this Profile</div>' +
+      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:120px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:8px;min-height:16px;"></div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">' +
+      '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
+      '<button data-role="send" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Send Message</button>' +
+      "</div>";
+
+    document.documentElement.appendChild(wrap);
+
+    const ta = wrap.querySelector("[data-role='ta']");
+    const statusEl = wrap.querySelector("[data-role='status']");
+    const cancelBtn = wrap.querySelector("[data-role='cancel']");
+    const sendBtn = wrap.querySelector("[data-role='send']");
+
+    cancelBtn.onclick = () => wrap.remove();
+    sendBtn.onclick = async () => {
+      const msg = ta.value.trim();
+      if (!msg) { ta.focus(); return; }
+      sendBtn.disabled = true;
+      cancelBtn.disabled = true;
+      ta.disabled = true;
+      try {
+        const result = await _case1Run(msg, (s) => { statusEl.textContent = s; });
+        if (result.ok) {
+          statusEl.textContent = "✅ Sent successfully";
+          setTimeout(() => wrap.remove(), 2000);
+        } else {
+          statusEl.textContent = "❌ " + result.reason;
+          sendBtn.disabled = false;
+          cancelBtn.disabled = false;
+          ta.disabled = false;
+        }
+      } catch (e) {
+        statusEl.textContent = "❌ " + (e.message || e);
+        sendBtn.disabled = false;
+        cancelBtn.disabled = false;
+        ta.disabled = false;
+      }
+    };
+    ta.focus();
+  }
+
+  async function _case1Run(messageText, onStatus) {
+    onStatus("Finding Message button on this profile...");
+    // Profile Message button: prefer the messaging compose anchor, exclude sidebar/aside.
+    let msgBtn = null;
+    const all = document.querySelectorAll("a[href*='/messaging/compose/'], button[aria-label^='Message'], a[aria-label^='Message']");
+    for (const el of all) {
+      if (el.closest("aside, [class*='aside']")) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      msgBtn = el;
+      break;
+    }
+    if (!msgBtn) return { ok: false, reason: "Message button not found on profile" };
+
+    onStatus("Clicking Message button...");
+    try { msgBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+    await sleep(400);
+    if (msgBtn.tagName === "A") {
+      try { msgBtn.click(); } catch (e) {}
+    } else {
+      _pointerClick(msgBtn);
+    }
+
+    onStatus("Waiting 2s for dialog...");
+    await sleep(2000);
+
+    // Progressive status during the editor wait. Existing threads (where
+    // you've already messaged the person) load the conversation history first
+    // and the textbox can take 15-25s to mount.
+    let phaseTimer = null;
+    let phase = 0;
+    onStatus("Finding textbox...");
+    phaseTimer = setInterval(() => {
+      phase++;
+      if (phase === 1) onStatus("Waiting for Quill editor to mount (existing threads load slowly)...");
+      else if (phase === 2) onStatus("Still waiting for textbox (loading conversation)...");
+      else if (phase === 3) onStatus("Almost there... existing threads can take 25s+");
+    }, 7000);
+    const editor = await _waitForObserver(_findEditor, 30000);
+    clearInterval(phaseTimer);
+    if (!editor) {
+      console.log("[Case1] Editor not found after 30s. msg-form__contenteditable present:",
+        !!document.querySelector("div.msg-form__contenteditable"),
+        "with <p>:",
+        !!document.querySelector("div.msg-form__contenteditable p"));
+      return { ok: false, reason: "Textbox not found (timeout 30s)" };
+    }
+
+    onStatus("Typing message...");
+    const typed = await _typeIntoEditor(editor, messageText);
+    if (!typed) return { ok: false, reason: "Could not type into textbox" };
+
+    onStatus("Waiting for Send button...");
+    const sendBtn = await _waitForObserver(() => _findSendBtn(true), 8000);
+    if (!sendBtn) return { ok: false, reason: "Send button disabled" };
+
+    onStatus("Clicking Send...");
+    _pointerClick(sendBtn);
+    await sleep(1500);
+
+    return { ok: true };
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // CASE #2 — Connection List "Message All"
+  // ════════════════════════════════════════════════════════════════════
+  const CASE2_FAB_ID = "lc-case2-fab";
+  const CASE2_COMPOSER_ID = "lc-case2-composer";
+  const _case2State = { running: false, cancelled: false };
+
+  // ───────── Sent-history & checkbox-selection persistence (Case #2) ─────────
+  const CASE2_SENT_KEY = "lcCase2SentUrls";
+  const CASE2_CB_CLASS = "lc-case2-cb";
+  const CASE2_LI_DECORATED = "lc-case2-li-decorated";
+  // Rolling window: anyone messaged more than 2h ago becomes messageable
+  // again. Storage shape: { "/in/<handle>": timestampMs, ... }.
+  const CASE2_SENT_TTL_MS = 2 * 60 * 60 * 1000;
+
+  // Case #2 is active on the connections list AND on /search/results/people/
+  // (filtered network search). Both surfaces have the same <li> + Message
+  // button structure that _findConnectionCards already handles.
+  function _isCase2Page() {
+    const p = location.pathname;
+    return (
+      p.startsWith("/mynetwork/invite-connect/connections") ||
+      p.startsWith("/search/results/people")
+    );
+  }
+
+  function _normalizeProfileUrl(href) {
+    if (!href) return null;
+    const m = href.match(/\/in\/([^/?#]+)/);
+    return m ? "/in/" + m[1] : null;
+  }
+
+  function _getProfileUrlFromLi(li) {
+    if (!li) return null;
+    const link = li.querySelector("a[href*='/in/']");
+    if (!link) return null;
+    return _normalizeProfileUrl(link.getAttribute("href"));
+  }
+
+  // Find connection cards on the page. Tries traditional class selectors
+  // first, then falls back to STRUCTURAL match (any <li> containing both a
+  // /in/<handle> link and a Message control). The structural match works
+  // regardless of how LinkedIn renames its CSS classes.
+  function _findConnectionCards() {
+    // Traditional.
+    let cards = Array.from(document.querySelectorAll(
+      "li.mn-connection-card, li[class*='mn-connection-card'], li[class*='connection-card']"
+    ));
+    if (cards.length) return cards;
+    // Structural fallback.
+    const allLis = document.querySelectorAll("li");
+    for (const li of allLis) {
+      const profileLink = li.querySelector("a[href*='/in/']");
+      if (!profileLink) continue;
+      let msgCtrl =
+        li.querySelector("a[href*='/messaging/compose/']") ||
+        li.querySelector("button[aria-label^='Send a message' i]");
+      if (!msgCtrl) {
+        // Look for any button/anchor with text "Message".
+        for (const el of li.querySelectorAll("button, a, [role='button']")) {
+          const t = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+          if (t === "message" || /\bmessage\b/.test(t)) {
+            msgCtrl = el;
+            break;
+          }
+        }
+      }
+      if (msgCtrl && !cards.includes(li)) cards.push(li);
+    }
+    // De-dup to outermost <li> (some pages have nested li-like structures).
+    cards = cards.filter((li, i) => !cards.some((other, j) => j !== i && other.contains(li)));
+    return cards;
+  }
+
+  function _runtimeAlive() {
+    try { return !!(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id); }
+    catch (e) { return false; }
+  }
+
+  // Load raw {url:timestamp} map from storage (1s timeout-safe).
+  function _loadSentMapRaw() {
+    return new Promise((resolve) => {
+      if (!_runtimeAlive()) { resolve({}); return; }
+      let done = false;
+      const finish = (v) => { if (done) return; done = true; resolve(v); };
+      const t = setTimeout(() => finish({}), 1000);
+      try {
+        chrome.storage.local.get(CASE2_SENT_KEY, (result) => {
+          clearTimeout(t);
+          if (chrome.runtime.lastError) { finish({}); return; }
+          const raw = result[CASE2_SENT_KEY];
+          // Backward compat: legacy array → discard (treat as expired).
+          if (Array.isArray(raw)) { finish({}); return; }
+          finish(raw && typeof raw === "object" ? raw : {});
+        });
+      } catch (e) { clearTimeout(t); finish({}); }
+    });
+  }
+
+  // Filter to URLs sent within the last 2 hours; auto-prune expired ones.
+  async function _loadSentSet() {
+    const map = await _loadSentMapRaw();
+    const now = Date.now();
+    const set = new Set();
+    const pruned = {};
+    let didPrune = false;
+    for (const [url, ts] of Object.entries(map)) {
+      if (typeof ts === "number" && (now - ts) < CASE2_SENT_TTL_MS) {
+        set.add(url);
+        pruned[url] = ts;
+      } else {
+        didPrune = true; // expired entry — will drop on next write
+      }
+    }
+    // Best-effort prune so storage stays tidy (no await needed).
+    if (didPrune && _runtimeAlive()) {
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: pruned }); } catch (e) {}
+    }
+    return set;
+  }
+
+  async function _markSent(url) {
+    if (!url) return;
+    if (!_runtimeAlive()) return;
+    try {
+      const map = await _loadSentMapRaw();
+      const now = Date.now();
+      // Drop any expired entries while we're here.
+      for (const [k, ts] of Object.entries(map)) {
+        if (typeof ts !== "number" || (now - ts) >= CASE2_SENT_TTL_MS) {
+          delete map[k];
+        }
+      }
+      map[url] = now;
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: map }); } catch (e) {}
+    } catch (e) {}
+  }
+
+  async function _clearSentHistory() {
+    if (!_runtimeAlive()) return;
+    try {
+      chrome.storage.local.set({ [CASE2_SENT_KEY]: {} });
+    } catch (e) {}
+  }
+
+  // Mount a checkbox top-right of each connection card. Tracks the
+  // profile URL on the input. Disabled + greyed if already-sent.
+  async function _decorateCase2Cards() {
+    if (!_isCase2Page()) return;
+    const sent = await _loadSentSet();
+    const lis = _findConnectionCards();
+    if (lis.length === 0) {
+      console.log("[Case2] decorator: 0 cards found — nothing to mount");
+      return;
+    }
+    let mounted = 0;
+    for (const li of lis) {
+      const url = _getProfileUrlFromLi(li);
+      if (!url) continue;
+      // Remove old checkbox if already there (re-decorate to refresh sent state).
+      const existing = li.querySelector("." + CASE2_CB_CLASS);
+      if (existing) {
+        const wasChecked = existing.checked;
+        existing.remove();
+        li.classList.remove(CASE2_LI_DECORATED);
+      }
+      // Mount fresh.
+      if (getComputedStyle(li).position === "static") {
+        try { li.style.position = "relative"; } catch (e) {}
+      }
+      const wrap = document.createElement("label");
+      wrap.className = CASE2_CB_CLASS + "-wrap";
+      Object.assign(wrap.style, {
+        position: "absolute",
+        top: "8px",
+        left: "8px",
+        zIndex: "20",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        padding: "4px 8px",
+        background: sent.has(url) ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.95)",
+        border: sent.has(url) ? "1px solid #22c55e" : "1px solid #cbd5e1",
+        borderRadius: "999px",
+        cursor: sent.has(url) ? "not-allowed" : "pointer",
+        fontSize: "10px",
+        fontWeight: "600",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        color: sent.has(url) ? "#15803d" : "#0a66c2",
+        userSelect: "none",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      });
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = CASE2_CB_CLASS;
+      cb.dataset.url = url;
+      cb.style.cssText = "width:13px;height:13px;cursor:inherit;margin:0;accent-color:#0a66c2;";
+      if (sent.has(url)) {
+        cb.disabled = true;
+        cb.checked = false;
+      }
+      const lbl = document.createElement("span");
+      lbl.textContent = sent.has(url) ? "✓ Messaged" : "Select";
+      wrap.appendChild(cb);
+      wrap.appendChild(lbl);
+      cb.addEventListener("change", () => {
+        lbl.textContent = cb.checked ? "Selected" : "Select";
+        wrap.style.background = cb.checked ? "rgba(10,102,194,0.12)" : "rgba(255,255,255,0.95)";
+        wrap.style.border = cb.checked ? "1px solid #0a66c2" : "1px solid #cbd5e1";
+      });
+      li.appendChild(wrap);
+      li.classList.add(CASE2_LI_DECORATED);
+      mounted++;
+    }
+    console.log("[Case2] decorator: " + lis.length + " cards, " + mounted + " checkboxes mounted, " + sent.size + " already-sent");
+  }
+
+  function _selectedUrlsFromCheckboxes() {
+    const set = new Set();
+    for (const cb of document.querySelectorAll("input." + CASE2_CB_CLASS + ":checked")) {
+      if (cb.dataset.url) set.add(cb.dataset.url);
+    }
+    return set;
+  }
+
+  // Watcher: decorate cards as user scrolls and LinkedIn paginates in new <li>.
+  let _case2DecorateTimer = null;
+  function _startCase2Decorator() {
+    if (_case2DecorateTimer) return;
+    _case2DecorateTimer = setInterval(() => {
+      if (!_isCase2Page()) return;
+      try { _decorateCase2Cards(); } catch (e) {}
+    }, 1500);
+  }
+  function _stopCase2Decorator() {
+    if (_case2DecorateTimer) {
+      clearInterval(_case2DecorateTimer);
+      _case2DecorateTimer = null;
+    }
+  }
+
+  function _showCase2Composer() {
+    document.getElementById(CASE2_COMPOSER_ID)?.remove();
+
+    const wrap = document.createElement("div");
+    wrap.id = CASE2_COMPOSER_ID;
+    Object.assign(wrap.style, {
+      position: "fixed",
+      bottom: "180px",
+      right: "24px",
+      width: "440px",
+      maxWidth: "calc(100vw - 40px)",
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "14px",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+      padding: "16px 18px",
+      zIndex: "2147483641",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+    });
+
+    wrap.innerHTML =
+      '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 2 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
+      '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
+      '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">' +
+      '<div data-role="progress" style="font-size:12px;color:#64748b;"></div>' +
+      '<div style="display:flex;gap:6px;">' +
+      '<button data-role="reset" type="button" style="padding:6px 12px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;cursor:pointer;font-size:12px;color:#b91c1c;font-family:inherit;" title="Clear remembered \'already-messaged\' history">Reset History</button>' +
+      '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
+      '<button data-role="start" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Start</button>' +
+      "</div></div>";
+
+    document.documentElement.appendChild(wrap);
+
+    const ta = wrap.querySelector("[data-role='ta']");
+    const statsEl = wrap.querySelector("[data-role='stats']");
+    const statusEl = wrap.querySelector("[data-role='status']");
+    const progressEl = wrap.querySelector("[data-role='progress']");
+    const cancelBtn = wrap.querySelector("[data-role='cancel']");
+    const startBtn = wrap.querySelector("[data-role='start']");
+    const resetBtn = wrap.querySelector("[data-role='reset']");
+
+    // Refresh stats periodically.
+    const refreshStats = async () => {
+      try {
+        const sent = await _loadSentSet();
+        const selected = _selectedUrlsFromCheckboxes();
+        const totalCards = _findConnectionCards().length;
+        statsEl.textContent =
+          "📊 " + totalCards + " visible · " +
+          sent.size + " messaged in last 2h · " +
+          selected.size + " selected via checkbox";
+      } catch (e) {}
+    };
+    refreshStats();
+    const statsTimer = setInterval(refreshStats, 1500);
+
+    resetBtn.onclick = async () => {
+      if (!confirm("Clear the 2-hour sent-history? All cards (including ones messaged in the last 2h) will become selectable again.")) return;
+      await _clearSentHistory();
+      _decorateCase2Cards();
+      refreshStats();
+    };
+
+    cancelBtn.onclick = () => {
+      if (_case2State.running) {
+        _case2State.cancelled = true;
+        cancelBtn.textContent = "Stopping after current...";
+        cancelBtn.disabled = true;
+      } else {
+        clearInterval(statsTimer);
+        wrap.remove();
+      }
+    };
+
+    startBtn.onclick = async () => {
+      const msg = ta.value.trim();
+      if (!msg) { ta.focus(); return; }
+      startBtn.disabled = true;
+      ta.disabled = true;
+      cancelBtn.textContent = "Stop";
+      _case2State.running = true;
+      _case2State.cancelled = false;
+      try {
+        await _case2Run(msg, statusEl, progressEl);
+      } catch (e) {
+        statusEl.textContent = "❌ " + (e.message || e);
+      } finally {
+        _case2State.running = false;
+        _case2State.cancelled = false;
+        startBtn.disabled = false;
+        ta.disabled = false;
+        cancelBtn.textContent = "Close";
+        cancelBtn.disabled = false;
+        cancelBtn.onclick = () => wrap.remove();
+      }
+    };
+
+    ta.focus();
+  }
+
+  // Find all Message buttons on the connection list — robust to aria-label
+  // variations and lazy rendering. Returns DOM-ordered array.
+  function _findCase2MessageButtons() {
+    const isOurUI = (el) =>
+      el.closest("#lc-case1-fab, #lc-case2-fab, #lc-case1-composer, #lc-case2-composer, .lc-overlay-root, .lc-toolbar");
+
+    // PRIMARY: iterate <li class="mn-connection-card"> and find the Message
+    // control inside each. Uses the SAME trait as the legacy
+    // _findMessageBtnInCard: anchor first (new design ships
+    // <a href="/messaging/compose/...">), button as legacy fallback.
+    const liItems = _findConnectionCards();
+    console.log("[Case2] connection cards found (structural):", liItems.length);
+    let buttons = [];
+
+    const findInsideCard = (li) => {
+      // 1) Strongest signal: anchor that goes to messaging/compose.
+      const composeLink = li.querySelector(
+        "a[href*='/messaging/compose/'], a[href*='messaging/thread/new'], a[href*='messaging/compose']"
+      );
+      if (composeLink && !isOurUI(composeLink)) return composeLink;
+      // 2) button[aria-label^='Send a message to']
+      const ariaBtn = li.querySelector("button[aria-label^='Send a message to' i]");
+      if (ariaBtn && !isOurUI(ariaBtn)) return ariaBtn;
+      // 3) Any button/anchor/role=button inside the card with "message" in label/text.
+      const candidates = li.querySelectorAll("button, a, [role='button']");
+      for (const el of candidates) {
+        if (el.disabled) continue;
+        if (isOurUI(el)) continue;
+        if (el.classList?.contains("lc-inline-save")) continue;
+        const lbl = (el.getAttribute("aria-label") || "").toLowerCase();
+        const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+        if (/\bmessage\b/.test(lbl) || txt === "message" || /\bmessage\b/.test(txt)) {
+          return el;
+        }
+      }
+      return null;
+    };
+
+    for (const li of liItems) {
+      const found = findInsideCard(li);
+      if (found && !buttons.includes(found)) buttons.push(found);
+    }
+    if (buttons.length) {
+      console.log("[Case2] PRIMARY (li.mn-connection-card) found:", buttons.length,
+        "first:", buttons[0]?.tagName, buttons[0]?.getAttribute("aria-label") || buttons[0]?.getAttribute("href"));
+      return buttons;
+    }
+
+    // FALLBACK 1: document-wide aria-label.
+    buttons = Array.from(
+      document.querySelectorAll("button[aria-label^='Send a message to' i]")
+    ).filter((b) => !isOurUI(b));
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 1 (doc-wide aria-label) found:", buttons.length);
+      return buttons;
+    }
+
+    // FALLBACK 2: document-wide messaging compose anchors.
+    buttons = Array.from(
+      document.querySelectorAll("a[href*='/messaging/compose/']")
+    ).filter((b) => !isOurUI(b));
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 2 (doc-wide compose anchor) found:", buttons.length);
+      return buttons;
+    }
+
+    // FALLBACK 3: card-scope text=Message.
+    const cardScopes = Array.from(
+      document.querySelectorAll(
+        ".mn-connection-card, [class*='connection-card'], .entry-point, [class*='entry-point']"
+      )
+    );
+    for (const card of cardScopes) {
+      for (const btn of card.querySelectorAll("button, a, [role='button']")) {
+        if (isOurUI(btn)) continue;
+        const txt = (btn.textContent || "").trim().toLowerCase();
+        const lbl = (btn.getAttribute("aria-label") || "").toLowerCase();
+        if (txt === "message" || /\bmessage\b/.test(lbl)) {
+          if (!buttons.includes(btn)) buttons.push(btn);
+        }
+      }
+    }
+    if (buttons.length) {
+      console.log("[Case2] FALLBACK 3 (card scope) found:", buttons.length);
+      return buttons;
+    }
+
+    // FALLBACK 4: doc-wide visible Message element.
+    for (const btn of document.querySelectorAll("button, a, [role='button']")) {
+      if (isOurUI(btn)) continue;
+      if (btn.closest("nav, header, [role='navigation'], .msg-overlay-list-bubble, .global-nav")) continue;
+      const txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt === "message") {
+        const r = btn.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && !buttons.includes(btn)) buttons.push(btn);
+      }
+    }
+    console.log("[Case2] FALLBACK 4 (doc-wide text='Message') found:", buttons.length);
+    return buttons;
+  }
+
+  async function _case2Run(messageText, statusEl, progressEl) {
+    statusEl.textContent = "Looking for Message buttons...";
+    try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
+    await sleep(400);
+
+    const allButtons = _findCase2MessageButtons();
+    if (!allButtons.length) {
+      statusEl.textContent = "❌ No Message buttons found on the page";
+      return;
+    }
+
+    // Load sent set + selected set.
+    const sentSet = await _loadSentSet();
+    const selectedSet = _selectedUrlsFromCheckboxes();
+    const hasSelection = selectedSet.size > 0;
+
+    // Build {btn, url, name, li} list and filter.
+    const allCands = allButtons.map((btn) => {
+      const li = btn.closest("li");
+      const url = _getProfileUrlFromLi(li);
+      return { btn, url, li };
+    });
+    let skippedAlreadySent = 0;
+    let skippedNotSelected = 0;
+    const buttons = [];
+    for (const c of allCands) {
+      if (!c.url) { buttons.push(c.btn); continue; } // no URL → can't dedupe, still try
+      if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
+      if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
+      buttons.push(c.btn);
+    }
+
+    const total = buttons.length;
+    if (!total) {
+      statusEl.textContent =
+        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 2h" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
+      return;
+    }
+    if (skippedAlreadySent || skippedNotSelected) {
+      statusEl.textContent =
+        "Starting (" + total + " to send · " + skippedAlreadySent + " skipped as already-messaged" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "") + ")";
+      await sleep(800);
+    }
+    let sent = 0, failed = 0;
+    progressEl.textContent = "0 sent · 0 failed · 0/" + total;
+
+    for (let i = 0; i < buttons.length; i++) {
+      if (_case2State.cancelled) break;
+      const btn = buttons[i];
+      // Name: aria-label first, then climb to <li> and grab the profile name.
+      let name = "";
+      const ariaLbl = btn.getAttribute("aria-label") || "";
+      if (/^Send a message to\s+/i.test(ariaLbl)) {
+        name = ariaLbl.replace(/^Send a message to\s+/i, "").trim();
+      }
+      if (!name) {
+        const li = btn.closest("li");
+        const nameEl = li?.querySelector(".mn-connection-card__name, [class*='name'], .artdeco-entity-lockup__title, h3");
+        if (nameEl) name = (nameEl.textContent || "").trim();
+      }
+      if (!name) name = "Unknown";
+      statusEl.textContent = "[" + (i + 1) + "/" + total + "] Messaging " + name + "...";
+
+      try {
+        // STEP 1: Scroll button into view + click.
+        if (!document.body.contains(btn)) {
+          failed++;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+        try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+        await sleep(500);
+        // Snapshot existing textboxes BEFORE click — we need to identify the
+        // NEW one that mounts for this specific recipient, not a stale/cached
+        // editor in the shadow DOM.
+        const editorsBefore = new Set(_queryAllAcrossShadows(
+          "div.msg-form__contenteditable[contenteditable='true']"
+        ));
+        // Single click only. Buttons fire onClick from .click(); anchors
+        // also fire SPA navigation via href + onClick.
+        try { btn.click(); } catch (e) {
+          // Anchor-only fallback if .click() doesn't fire for some reason.
+          _pointerClick(btn);
+        }
+
+        // STEP 2: Wait for click confirmation: data-artdeco-is-focused="true"
+        let confirmed = false;
+        for (let k = 0; k < 30; k++) {
+          if (btn.getAttribute("data-artdeco-is-focused") === "true") { confirmed = true; break; }
+          await sleep(100);
+        }
+
+        // STEP 3: Wait 2s for dialog (per user spec).
+        await sleep(2000);
+
+        // STEP 4: Find the NEW editor (one that wasn't in editorsBefore).
+        // This avoids the false-positive where my code finds a cached/preload
+        // editor in shadow DOM that isn't connected to the visible dialog.
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] Waiting for textbox to mount...";
+        const findNewEditor = () => {
+          const editors = _queryAllAcrossShadows(
+            "div.msg-form__contenteditable[contenteditable='true']"
+          );
+          for (const ed of editors) {
+            if (editorsBefore.has(ed)) continue; // skip stale
+            if (ed.querySelector("p")) return ed;
+          }
+          return null;
+        };
+        const editor = await _waitForObserver(findNewEditor, 25000);
+        if (!editor) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 5: Type message.
+        const typed = await _typeIntoEditor(editor, messageText);
+        if (!typed) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Could not type for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 6: Find Send button (poll until enabled).
+        const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
+        if (!sendBtn) {
+          failed++;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Send disabled for " + name;
+          _closeMsgDialog();
+          await sleep(1000);
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          continue;
+        }
+
+        // STEP 7: Click Send.
+        _pointerClick(sendBtn);
+        await sleep(1500);
+
+        // Success.
+        sent++;
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ✅ Sent to " + name;
+
+        // Persist: mark this profile URL as messaged so future runs skip it.
+        try {
+          const liForBtn = btn.closest("li");
+          const url = _getProfileUrlFromLi(liForBtn);
+          if (url) {
+            await _markSent(url);
+            // Visually update the card's chip to "Messaged" state.
+            const cb = liForBtn?.querySelector("input." + CASE2_CB_CLASS);
+            if (cb) {
+              cb.disabled = true;
+              cb.checked = false;
+              const wrap = cb.closest("label");
+              if (wrap) {
+                wrap.style.background = "rgba(34,197,94,0.12)";
+                wrap.style.border = "1px solid #22c55e";
+                wrap.style.color = "#15803d";
+                wrap.style.cursor = "not-allowed";
+                const lbl = wrap.querySelector("span");
+                if (lbl) lbl.textContent = "✓ Messaged";
+              }
+            }
+          }
+        } catch (e) {}
+
+        // STEP 8: Close dialog with X.
+        _closeMsgDialog();
+        await sleep(800);
+
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+
+        // STEP 9: Random 15-30s gap between messages (skip if last or cancelled).
+        if (i < buttons.length - 1 && !_case2State.cancelled) {
+          const waitMs = 15000 + Math.floor(Math.random() * 15000);
+          const waitS = Math.round(waitMs / 1000);
+          for (let s = waitS; s > 0; s--) {
+            if (_case2State.cancelled) break;
+            statusEl.textContent = "Waiting " + s + "s before next...";
+            await sleep(1000);
+          }
+        }
+      } catch (e) {
+        failed++;
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Error: " + (e.message || e);
+        try { _closeMsgDialog(); } catch (err) {}
+        await sleep(1000);
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+      }
+    }
+
+    statusEl.textContent = "Done. " + sent + " sent, " + failed + " failed.";
+  }
+
+  // —— Self-mounting watcher ——————————————————————————————————————
+
+  function _syncFabs() {
+    const path = location.pathname;
+    const onProfile = path.startsWith("/in/");
+    const onConnections = _isCase2Page();
+
+    if (onProfile) {
+      _mountFab(CASE1_FAB_ID, "✉️ Send Message", _showCase1Composer);
+    } else {
+      _unmountFab(CASE1_FAB_ID);
+      document.getElementById(CASE1_COMPOSER_ID)?.remove();
+    }
+
+    if (onConnections) {
+      _mountFab(CASE2_FAB_ID, "✉️ Message All", _showCase2Composer);
+      _startCase2Decorator();
+      _decorateCase2Cards();
+    } else {
+      _unmountFab(CASE2_FAB_ID);
+      _stopCase2Decorator();
+      // Don't close composer if a run is active.
+      if (!_case2State.running) {
+        document.getElementById(CASE2_COMPOSER_ID)?.remove();
+      }
+    }
+  }
+
+  // Initial mount once body is ready.
+  function _initWhenReady() {
+    if (document.body) {
+      _syncFabs();
+      // Watch URL changes (SPA navigation).
+      let lastPath = location.pathname;
+      setInterval(() => {
+        if (location.pathname !== lastPath) {
+          lastPath = location.pathname;
+          _syncFabs();
+        } else {
+          // Also re-mount if the FAB got ripped out by LinkedIn's React re-render.
+          _syncFabs();
+        }
+      }, 1500);
+    } else {
+      setTimeout(_initWhenReady, 300);
+    }
+  }
+  _initWhenReady();
 })();

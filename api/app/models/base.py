@@ -562,7 +562,10 @@ class Campaign(Base, TimestampMixin):
     subject: Mapped[str] = mapped_column(String(500), default="")
     preheader: Mapped[Optional[str]] = mapped_column(String(500))
     body_html: Mapped[str] = mapped_column(Text, default="")
+    body_amp: Mapped[Optional[str]] = mapped_column(Text)        # AMP for Email
     body_text: Mapped[Optional[str]] = mapped_column(Text)
+    preview_text: Mapped[Optional[str]] = mapped_column(String(200))
+    brand_color: Mapped[Optional[str]] = mapped_column(String(20))
     # Sender identity (display only — the actual SMTP envelope-from is the
     # connected sender account picked by the rotation).
     from_name: Mapped[Optional[str]] = mapped_column(String(240))

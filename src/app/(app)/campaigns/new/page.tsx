@@ -75,6 +75,194 @@ function Icon({ name, size = 16, color, style }: IconProps) {
   return <Cmp size={size} color={color} style={{ flexShrink: 0, ...style }} strokeWidth={2} />;
 }
 
+// ─── AI Generator Panel ───────────────────────────────────────────────────────
+// Inline at the top of the editor. Marketer types a brief → calls
+// POST /ai/write/marketing-html → Claude returns subject + preview_text +
+// responsive HTML + (optional) AMP-for-Email HTML. Result is merged into the
+// form via onResult — we don't overwrite the user's subject if they already
+// typed one.
+interface AIGenResult {
+  subject: string;
+  preview_text: string;
+  html: string;
+  amp_html: string;
+}
+function AIGeneratorPanel({
+  brandColor,
+  onBrandColor,
+  generateAmp,
+  onResult,
+}: {
+  brandColor: string;
+  onBrandColor: (c: string) => void;
+  generateAmp: boolean;
+  onResult: (r: AIGenResult) => void;
+}) {
+  const [brief, setBrief] = useState('');
+  const [tone, setTone] = useState<'professional' | 'friendly' | 'witty' | 'urgent'>('professional');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(true);
+
+  async function generate() {
+    if (!brief.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const result = await api<AIGenResult>('/ai/write/marketing-html', {
+        method: 'POST',
+        body: {
+          brief: brief.trim(),
+          brand_color: brandColor,
+          tone,
+          include_amp: generateAmp,
+        },
+      });
+      onResult(result);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{
+      borderBottom: '1px solid rgba(99, 102, 241, 0.18)',
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(168,85,247,0.06) 100%)',
+      padding: open ? '14px 18px' : '8px 18px',
+      transition: 'padding 0.18s ease',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: open ? 10 : 0 }}>
+        <div style={{
+          width: 24, height: 24, borderRadius: 8,
+          background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Wand2 size={13} color="#fff" strokeWidth={2.4} />
+        </div>
+        <span style={{
+          fontSize: 12, fontWeight: 700, letterSpacing: '-0.01em',
+          fontFamily: 'Manrope, Inter, sans-serif',
+          background: 'linear-gradient(135deg, #4f46e5, #a855f7)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+        }}>
+          AI Email Builder {generateAmp && '· AMP'}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="color"
+            value={brandColor}
+            onChange={e => onBrandColor(e.target.value)}
+            title="Brand color — used in hero + CTA"
+            style={{
+              width: 24, height: 24, border: 'none', cursor: 'pointer',
+              padding: 0, background: 'transparent',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setOpen(v => !v)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#6366f1', fontSize: 11, fontWeight: 600,
+              fontFamily: 'Inter, sans-serif',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {open ? 'Hide' : 'Show'}
+          </button>
+        </span>
+      </div>
+      {open && (
+        <>
+          <textarea
+            value={brief}
+            onChange={e => setBrief(e.target.value)}
+            placeholder="Describe the email you want — e.g. 'Welcome new SaaS subscribers. Highlight 3 product wins. Friendly tone. Drive to a Setup Guide button.'"
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: 12.5,
+              lineHeight: 1.55,
+              color: '#1e293b',
+              backgroundColor: '#ffffff',
+              border: '1px solid rgba(99, 102, 241, 0.25)',
+              borderRadius: 10,
+              fontFamily: 'Inter, sans-serif',
+              outline: 'none',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <select
+              value={tone}
+              onChange={e => setTone(e.target.value as 'professional' | 'friendly' | 'witty' | 'urgent')}
+              style={{
+                padding: '6px 10px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#475569',
+                background: '#ffffff',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: 8,
+                fontFamily: 'Inter, sans-serif',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="professional">Professional</option>
+              <option value="friendly">Friendly</option>
+              <option value="witty">Witty</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <span style={{ fontSize: 11, color: '#64748b', flex: 1 }}>
+              {generateAmp
+                ? 'Generates both responsive HTML AND an AMP version (Gmail interactive).'
+                : 'Generates responsive, table-based HTML with inline styles for max client compatibility.'}
+            </span>
+            <button
+              type="button"
+              onClick={generate}
+              disabled={busy || !brief.trim()}
+              style={{
+                padding: '8px 18px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#fff',
+                background: brief.trim() && !busy
+                  ? 'linear-gradient(135deg, #6366f1, #a855f7)'
+                  : 'linear-gradient(135deg, #cbd5e1, #94a3b8)',
+                border: 'none',
+                borderRadius: 9,
+                cursor: brief.trim() && !busy ? 'pointer' : 'not-allowed',
+                fontFamily: 'Inter, sans-serif',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: brief.trim() && !busy ? '0 4px 12px rgba(99,102,241,0.28)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              {busy ? <RefreshCw size={13} className="lc-spin" /> : <Wand2 size={13} />}
+              {busy ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
+          {err && (
+            <div style={{
+              marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#b91c1c',
+              background: '#fee2e2', borderRadius: 6,
+            }}>
+              {err}
+            </div>
+          )}
+          <style>{`@keyframes lc-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}.lc-spin{animation:lc-spin 0.8s linear infinite;}`}</style>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FollowUp {
@@ -102,8 +290,11 @@ interface FormState {
   replyTo: string;
   tags: string;
   htmlContent: string;
+  ampHtml: string;          // AMP for Email body — delivered as text/x-amp-html alternative
   plainText: string;
-  contentMode: 'visual' | 'html' | 'upload' | 'plain';
+  previewText: string;      // <90-char preheader shown in inbox under subject
+  brandColor: string;       // Used by AI generator + future visual builder
+  contentMode: 'visual' | 'html' | 'upload' | 'plain' | 'amp';
   manualEmails: string;
   includeAllLeads: boolean;
   stageId: string;         // Pipeline stage filter — pull every lead in this stage
@@ -456,7 +647,10 @@ function NewCampaignPageInner() {
     replyTo: '',
     tags: '',
     htmlContent: '',
+    ampHtml: '',
     plainText: '',
+    previewText: '',
+    brandColor: '#0a66c2',
     contentMode: 'html',
     manualEmails: prefillEmail,
     includeAllLeads: false,
@@ -564,7 +758,10 @@ function NewCampaignPageInner() {
           replyTo: c.reply_to || '',
           tags: Array.isArray(c.tags) ? c.tags.join(', ') : '',
           htmlContent: c.body_html || '',
+          ampHtml: (c as CampaignDetail & { body_amp?: string }).body_amp || '',
           plainText: (c as CampaignDetail & { body_text?: string }).body_text || '',
+          previewText: (c as CampaignDetail & { preview_text?: string }).preview_text || '',
+          brandColor: (c as CampaignDetail & { brand_color?: string }).brand_color || '#0a66c2',
           contentMode: 'html',
           manualEmails: (c.recipient_data || []).map(r => r.email).join('\n'),
           includeAllLeads: !!c.include_all_leads,
@@ -754,7 +951,10 @@ function NewCampaignPageInner() {
       name: form.name.trim() || form.subject.trim() || 'Untitled campaign',
       subject: form.subject,
       body_html: bodyHtml,
+      body_amp: form.ampHtml || undefined,
       body_text: form.plainText || '',
+      preview_text: form.previewText || undefined,
+      brand_color: form.brandColor || undefined,
       from_name: form.fromName || undefined,
       from_email: form.fromEmail || undefined,
       reply_to: form.replyTo || undefined,
@@ -793,7 +993,10 @@ function NewCampaignPageInner() {
       name: form.name.trim() || form.subject.trim() || 'Untitled campaign',
       subject: form.subject,
       body_html: bodyHtml,
+      body_amp: form.ampHtml || undefined,
       body_text: form.plainText || '',
+      preview_text: form.previewText || undefined,
+      brand_color: form.brandColor || undefined,
       from_name: form.fromName || undefined,
       from_email: form.fromEmail || undefined,
       reply_to: form.replyTo || undefined,
@@ -1898,6 +2101,7 @@ function NewCampaignPageInner() {
               }}>
                 {([
                   { mode: 'html'   as const, label: 'Write HTML' },
+                  { mode: 'amp'    as const, label: 'AMP ✨' },
                   { mode: 'plain'  as const, label: 'Plain Text' },
                   { mode: 'upload' as const, label: 'Upload HTML' },
                   { mode: 'visual' as const, label: 'Preview' },
@@ -2124,6 +2328,48 @@ function NewCampaignPageInner() {
               {/* Left: editor area */}
               <div style={{ borderRight: `1px solid ${T.surfaceContainer}`, display: 'flex', flexDirection: 'column' }}>
 
+                {/* AI Generator panel — visible in HTML and AMP modes. Click
+                    Generate → backend Claude call → HTML (and AMP if asked)
+                    populated. Brief stays in state so the user can iterate. */}
+                {(form.contentMode === 'html' || form.contentMode === 'amp') && (
+                  <AIGeneratorPanel
+                    brandColor={form.brandColor}
+                    onBrandColor={(c) => setForm(f => ({ ...f, brandColor: c }))}
+                    generateAmp={form.contentMode === 'amp'}
+                    onResult={(r) => setForm(f => ({
+                      ...f,
+                      subject: f.subject || r.subject,
+                      previewText: f.previewText || r.preview_text,
+                      htmlContent: r.html || f.htmlContent,
+                      ampHtml: r.amp_html || f.ampHtml,
+                    }))}
+                  />
+                )}
+
+                {/* Preview-text input — universal, lives in inbox preview pane */}
+                {(form.contentMode === 'html' || form.contentMode === 'amp') && (
+                  <input
+                    type="text"
+                    value={form.previewText}
+                    onChange={e => setForm(f => ({ ...f, previewText: e.target.value }))}
+                    placeholder="Preview text (shown next to subject in inbox) — keep it under 90 chars"
+                    maxLength={120}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '10px 18px',
+                      fontSize: '12px',
+                      color: T.onSurface,
+                      backgroundColor: T.surfaceContainerLowest,
+                      border: 'none',
+                      borderBottom: `1px solid ${T.surfaceContainer}`,
+                      fontFamily: 'Inter, sans-serif',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                )}
+
                 {/* HTML Code mode */}
                 {form.contentMode === 'html' && (
                   <textarea
@@ -2138,6 +2384,35 @@ function NewCampaignPageInner() {
                       padding: '18px 20px',
                       backgroundColor: '#1e1e1e',
                       color: '#4ec9b0',
+                      border: 'none',
+                      fontFamily: '"Fira Code", "Courier New", monospace',
+                      fontSize: '12.5px',
+                      lineHeight: '1.65',
+                      outline: 'none',
+                      resize: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                )}
+
+                {/* AMP for Email mode — separate body, Gmail uses this when
+                    delivered as the text/x-amp-html MIME alternative. Other
+                    clients fall back to body_html silently. Lets the marketer
+                    embed <amp-anim> GIFs, <amp-carousel> sliders, <amp-form>
+                    inline RSVP / NPS without leaving the inbox. */}
+                {form.contentMode === 'amp' && (
+                  <textarea
+                    value={form.ampHtml}
+                    onChange={e => setForm(f => ({ ...f, ampHtml: e.target.value }))}
+                    placeholder={'<!doctype html>\n<html ⚡4email lang="en"><head><meta charset="utf-8">\n<script async src="https://cdn.ampproject.org/v0.js"></script>\n<script async custom-element="amp-anim" src="https://cdn.ampproject.org/v0/amp-anim-0.1.js"></script>\n<style amp4email-boilerplate>body{visibility:hidden}</style>\n<style amp-custom>.cta{background:#0a66c2;color:#fff;padding:14px 28px;border-radius:10px;}</style>\n</head>\n<body>\n  <h1>Hi {first_name},</h1>\n  <amp-anim width="600" height="360" layout="responsive" src="https://media.tenor.com/m/EW5N0gI2VJsAAAAd/celebrate-party.gif" alt="celebrate"></amp-anim>\n  <p><a class="cta" href="https://">Take a look</a></p>\n</body></html>'}
+                    style={{
+                      flex: 1,
+                      display: 'block',
+                      width: '100%',
+                      minHeight: '460px',
+                      padding: '18px 20px',
+                      backgroundColor: '#1e1e1e',
+                      color: '#dcdcaa',
                       border: 'none',
                       fontFamily: '"Fira Code", "Courier New", monospace',
                       fontSize: '12.5px',

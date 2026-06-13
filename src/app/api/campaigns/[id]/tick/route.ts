@@ -47,6 +47,8 @@ interface EmailJob {
   subject: string;
   html: string;
   text: string;
+  amp_html?: string;       // AMP for Email source. Gmail renders this; others use html.
+  preview_text?: string;   // <90-char preheader shown in inbox preview pane.
   send_config: SendConfig;
 }
 
@@ -73,12 +75,28 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
       socketTimeout: 20_000,
     });
     try {
+      // AMP for Email: attach as text/x-amp-html alternative. Gmail (web,
+      // iOS, Android) renders the AMP version; every other client falls
+      // back to text/html. Senders MUST be DKIM-signed and registered with
+      // Gmail's AMP Sender program for delivery — we still attach because
+      // unsigned senders just degrade gracefully to text/html.
+      const alternatives: Array<{ contentType: string; content: string }> = [];
+      if (job.amp_html) {
+        alternatives.push({ contentType: "text/x-amp-html", content: job.amp_html });
+      }
+      const headers: Record<string, string> = {};
+      // Preheader / preview text via a Gmail-respected header. The visible
+      // hidden preheader span injected into the HTML body itself is what
+      // actually fills the inbox preview pane — this header is a hint.
+      if (job.preview_text) headers["X-Preheader"] = job.preview_text;
       await t.sendMail({
         from: fromHeader,
         to: job.to,
         subject: job.subject,
         html: job.html || undefined,
         text: job.text || undefined,
+        alternatives: alternatives.length ? alternatives : undefined,
+        headers: Object.keys(headers).length ? headers : undefined,
       });
       return { ok: true };
     } catch (err) {
