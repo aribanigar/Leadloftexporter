@@ -120,6 +120,11 @@ export default function OutreachPage() {
   const [filter, setFilter] = useState<"all" | "email" | "whatsapp">("all");
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [channel, setChannel] = useState<Channel>("email");
+  // When ON: after a successful single send, jump to the next lead in the
+  // filtered list. Lets you blow through the whole list with no clicks
+  // between sends — same effect as Bulk mode but with one composer per lead
+  // (good if you want to tweak each subject/body before sending).
+  const [autoAdvance, setAutoAdvance] = useState(true);
   // Pending sends keyed by client-generated id so they render instantly
   // and flip to "confirmed" when the backend timeline catches up.
   const [pending, setPending] = useState<ConvMessage[]>([]);
@@ -346,6 +351,18 @@ export default function OutreachPage() {
         )
       );
       qc.invalidateQueries({ queryKey: ["lead-timeline", activeLeadId] });
+      qc.invalidateQueries({ queryKey: ["outreach-leads"] });
+      // Auto-advance to the next lead in the filtered list (skip ones with
+      // no email since they can't receive). Stops at the end of the list.
+      if (autoAdvance && r.ok && channel === "email") {
+        const targets = filteredLeads.filter((l) => (l.email || "").trim() !== "");
+        const idx = targets.findIndex((l) => l.id === activeLeadId);
+        const next = idx >= 0 && idx < targets.length - 1 ? targets[idx + 1] : null;
+        if (next) {
+          // Give the user a beat to see "sent" flip, then advance.
+          setTimeout(() => setActiveLeadId(next.id), 600);
+        }
+      }
     },
     onError: (_e, vars) => {
       setPending((cur) =>
@@ -795,7 +812,11 @@ export default function OutreachPage() {
           <EmptyState />
         ) : (
           <>
-            <LeadHeader lead={activeLead} />
+            <LeadHeader
+              lead={activeLead}
+              autoAdvance={autoAdvance}
+              onToggleAutoAdvance={setAutoAdvance}
+            />
             <ChannelTabs
               lead={activeLead}
               channel={channel}
@@ -842,7 +863,15 @@ function EmptyState() {
   );
 }
 
-function LeadHeader({ lead }: { lead: Lead }) {
+function LeadHeader({
+  lead,
+  autoAdvance,
+  onToggleAutoAdvance,
+}: {
+  lead: Lead;
+  autoAdvance: boolean;
+  onToggleAutoAdvance: (v: boolean) => void;
+}) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3.5">
       <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 text-xs font-semibold uppercase text-slate-500">
@@ -899,6 +928,23 @@ function LeadHeader({ lead }: { lead: Lead }) {
           <ExternalLink className="h-3 w-3" />
         </a>
       )}
+      {/* Auto-advance toggle: after a successful single-send, jump to the
+          next lead in the filtered list. Lets the rep blow through 50
+          one-tweak emails without ever clicking a lead manually. */}
+      <button
+        type="button"
+        onClick={() => onToggleAutoAdvance(!autoAdvance)}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium",
+          autoAdvance
+            ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            : "border border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-700"
+        )}
+        title="When ON: after sending, auto-jump to the next lead in the list (skip ones with no email). OFF: stay on current lead."
+      >
+        {autoAdvance ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+        Auto-next
+      </button>
       <Link
         href={`/leads/${lead.id}`}
         className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
