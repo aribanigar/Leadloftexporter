@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarRange, Plus, Trash2, Copy, ExternalLink, Check } from "lucide-react";
+import { CalendarRange, Plus, Trash2, Copy, ExternalLink, Check, Code } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface Window {
@@ -168,6 +168,7 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
   const qc = useQueryClient();
   const [form, setForm] = useState<EventType>(et);
   const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const set = <K extends keyof EventType>(k: K, v: EventType[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const bookingUrl = useMemo(() => {
@@ -251,6 +252,19 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
         >
           <ExternalLink className="h-4 w-4" /> Open
         </a>
+        <button
+          onClick={() => {
+            const snippet = `<iframe src="${bookingUrl}?embed=1" width="100%" height="720" frameborder="0" style="border:0;"></iframe>`;
+            navigator.clipboard.writeText(snippet);
+            setEmbedCopied(true);
+            setTimeout(() => setEmbedCopied(false), 1500);
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-sm hover:bg-slate-50"
+          title="Copy an iframe snippet to embed this booking page on any website"
+        >
+          {embedCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Code className="h-4 w-4" />}
+          {embedCopied ? "Copied" : "Embed"}
+        </button>
       </div>
 
       {/* Basics */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Clock, MapPin, Calendar, Check, ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
@@ -37,6 +37,13 @@ export default function PublicBookingPage({
 }) {
   const { workspace, event } = use(params);
   const base = `/book/${workspace}/${event}`;
+
+  // Embed mode (?embed=1) drops the gray full-screen frame so the page sits
+  // flush inside a host site's iframe.
+  const [embed, setEmbed] = useState(false);
+  useEffect(() => {
+    setEmbed(new URLSearchParams(window.location.search).get("embed") === "1");
+  }, []);
 
   const { data: ev, isLoading, isError } = useQuery<PublicEvent>({
     queryKey: ["public-event", workspace, event],
@@ -116,7 +123,7 @@ export default function PublicBookingPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 py-10">
+    <div className={embed ? "bg-transparent p-2" : "min-h-screen bg-slate-100 py-10"}>
       <div className="mx-auto grid max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:grid-cols-[300px_1fr]">
         {/* Event info */}
         <div className="border-b border-slate-100 p-6 md:border-b-0 md:border-r" style={{ borderTopColor: ev.color }}>
