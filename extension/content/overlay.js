@@ -8289,7 +8289,7 @@
 // CASE #1 + CASE #2 — User-taught messaging flows (v1.0.226)
 // SELF-CONTAINED IIFE. Does NOT touch any existing code.
 // - Case #1: Floating "Send Message" pill on /in/<handle> pages.
-// - Case #2: Floating "Message All" pill on /mynetwork/invite-connect/connections/ pages.
+// - Case #2: Floating "Message All" pill on /mynetwork/invite-connect/connections/ AND /search/results/people/ pages.
 // Both use the EXACT DOM selectors the user provided:
 //   Textbox: div.msg-form__contenteditable[contenteditable='true'][role='textbox']
 //   Send:    button.msg-form__send-button
@@ -8746,6 +8746,17 @@
   // again. Storage shape: { "/in/<handle>": timestampMs, ... }.
   const CASE2_SENT_TTL_MS = 2 * 60 * 60 * 1000;
 
+  // Case #2 is active on the connections list AND on /search/results/people/
+  // (filtered network search). Both surfaces have the same <li> + Message
+  // button structure that _findConnectionCards already handles.
+  function _isCase2Page() {
+    const p = location.pathname;
+    return (
+      p.startsWith("/mynetwork/invite-connect/connections") ||
+      p.startsWith("/search/results/people")
+    );
+  }
+
   function _normalizeProfileUrl(href) {
     if (!href) return null;
     const m = href.match(/\/in\/([^/?#]+)/);
@@ -8868,7 +8879,7 @@
   // Mount a checkbox top-right of each connection card. Tracks the
   // profile URL on the input. Disabled + greyed if already-sent.
   async function _decorateCase2Cards() {
-    if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
+    if (!_isCase2Page()) return;
     const sent = await _loadSentSet();
     const lis = _findConnectionCards();
     if (lis.length === 0) {
@@ -8950,7 +8961,7 @@
   function _startCase2Decorator() {
     if (_case2DecorateTimer) return;
     _case2DecorateTimer = setInterval(() => {
-      if (!location.pathname.startsWith("/mynetwork/invite-connect/connections")) return;
+      if (!_isCase2Page()) return;
       try { _decorateCase2Cards(); } catch (e) {}
     }, 1500);
   }
@@ -9373,7 +9384,7 @@
   function _syncFabs() {
     const path = location.pathname;
     const onProfile = path.startsWith("/in/");
-    const onConnections = path.startsWith("/mynetwork/invite-connect/connections");
+    const onConnections = _isCase2Page();
 
     if (onProfile) {
       _mountFab(CASE1_FAB_ID, "✉️ Send Message", _showCase1Composer);
