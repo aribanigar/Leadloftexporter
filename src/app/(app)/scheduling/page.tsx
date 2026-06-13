@@ -41,6 +41,7 @@ interface Booking {
   invitee_email: string;
   start_at: string;
   status: string;
+  disposition: string | null;
 }
 
 const DAYS: { key: string; label: string }[] = [
@@ -89,6 +90,7 @@ export default function SchedulingPage() {
   });
 
   const active = eventTypes.find((e) => e.id === selected) || null;
+  const [tab, setTab] = useState<"events" | "workflows">("events");
 
   return (
     <div className="p-6">
@@ -97,6 +99,26 @@ export default function SchedulingPage() {
         <h1 className="text-lg font-semibold">Scheduling</h1>
       </div>
 
+      <div className="mb-4 flex gap-1 border-b border-slate-200">
+        {(["events", "workflows"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={
+              "relative px-4 py-2 text-sm font-medium " +
+              (tab === t
+                ? "text-brand-700 after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:bg-brand-600"
+                : "text-slate-500 hover:text-slate-700")
+            }
+          >
+            {t === "events" ? "Event types" : "Workflows"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "workflows" ? (
+        <WorkflowsManager eventTypes={eventTypes} />
+      ) : (
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <div className="space-y-2">
           <button
@@ -137,6 +159,7 @@ export default function SchedulingPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -192,6 +215,11 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
   });
   const cancelBooking = useMutation({
     mutationFn: (id: string) => api(`/bookings/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["event-bookings", et.id] }),
+  });
+  const disposition = useMutation({
+    mutationFn: ({ id, disposition }: { id: string; disposition: string }) =>
+      api(`/bookings/${id}/disposition`, { method: "PATCH", body: { disposition } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["event-bookings", et.id] }),
   });
 
@@ -413,8 +441,27 @@ function Editor({ et, workspaceSlug }: { et: EventType; workspaceSlug: string })
                 </div>
                 <div className="text-xs text-slate-400">
                   {new Date(b.start_at).toLocaleString()} · {b.status}
+                  {b.disposition ? ` · ${b.disposition.replace("_", "-")}` : ""}
                 </div>
               </div>
+              {b.status === "confirmed" && !b.disposition && new Date(b.start_at).getTime() < Date.now() && (
+                <>
+                  <button
+                    onClick={() => disposition.mutate({ id: b.id, disposition: "completed" })}
+                    className="rounded border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                    title="Mark completed"
+                  >
+                    Done
+                  </button>
+                  <button
+                    onClick={() => disposition.mutate({ id: b.id, disposition: "no_show" })}
+                    className="rounded border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                    title="Mark no-show"
+                  >
+                    No-show
+                  </button>
+                </>
+              )}
               {b.status === "confirmed" && (
                 <button
                   onClick={() => cancelBooking.mutate(b.id)}
@@ -440,6 +487,308 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <label className="block">
       <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span>
       {children}
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workflows
+// ---------------------------------------------------------------------------
+
+interface WfAction {
+  type: string;
+  params: Record<string, string | number>;
+}
+interface Workflow {
+  id: string;
+  name: string;
+  trigger: string;
+  active: boolean;
+  filters: Record<string, string>;
+  actions: WfAction[];
+}
+
+const TRIGGER_LABEL: Record<string, string> = {
+  booking_created: "When a booking is made",
+  booking_cancelled: "When a booking is cancelled",
+  meeting_completed: "When a meeting is marked completed",
+  meeting_no_show: "When a meeting is marked no-show",
+};
+const ACTION_LABEL: Record<string, string> = {
+  send_email: "Send email",
+  create_task: "Create task",
+  move_stage: "Move pipeline stage",
+  add_tag: "Add tag",
+  schedule_reminder: "Schedule reminder",
+};
+
+function WorkflowsManager({ eventTypes }: { eventTypes: EventType[] }) {
+  const qc = useQueryClient();
+  const { data } = useQuery<{ workflows: Workflow[]; triggers: string[]; action_types: string[] }>({
+    queryKey: ["workflows"],
+    queryFn: () => api("/workflows"),
+  });
+  const workflows = data?.workflows || [];
+
+  const create = useMutation({
+    mutationFn: () =>
+      api("/workflows", {
+        method: "POST",
+        body: { name: "New workflow", trigger: "booking_created", actions: [] },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workflows"] }),
+  });
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          Automate what happens around your meetings — send a follow-up, create a task, move the lead, or tag it.
+        </p>
+        <button
+          onClick={() => create.mutate()}
+          disabled={create.isPending}
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          <Plus className="h-4 w-4" /> New workflow
+        </button>
+      </div>
+      {workflows.length === 0 && (
+        <div className="card p-8 text-center text-sm text-slate-500">No workflows yet.</div>
+      )}
+      {workflows.map((w) => (
+        <WorkflowCard key={w.id} wf={w} eventTypes={eventTypes} actionTypes={data?.action_types || []} />
+      ))}
+    </div>
+  );
+}
+
+function WorkflowCard({
+  wf,
+  eventTypes,
+  actionTypes,
+}: {
+  wf: Workflow;
+  eventTypes: EventType[];
+  actionTypes: string[];
+}) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<Workflow>(wf);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/workflows/${wf.id}`, {
+        method: "PATCH",
+        body: { name: form.name, trigger: form.trigger, active: form.active, filters: form.filters, actions: form.actions },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workflows"] }),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/workflows/${wf.id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workflows"] }),
+  });
+
+  const setAction = (i: number, next: WfAction) =>
+    setForm({ ...form, actions: form.actions.map((a, j) => (j === i ? next : a)) });
+  const addAction = () =>
+    setForm({ ...form, actions: [...form.actions, { type: "send_email", params: { to: "invitee" } }] });
+  const removeAction = (i: number) => setForm({ ...form, actions: form.actions.filter((_, j) => j !== i) });
+
+  return (
+    <div className="card space-y-3 p-5">
+      <div className="flex items-center gap-2">
+        <input
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm font-medium"
+        />
+        <label className="flex items-center gap-1.5 text-sm text-slate-600">
+          <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+          Active
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Trigger</span>
+          <select
+            value={form.trigger}
+            onChange={(e) => setForm({ ...form, trigger: e.target.value })}
+            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+          >
+            {Object.keys(TRIGGER_LABEL).map((t) => (
+              <option key={t} value={t}>
+                {TRIGGER_LABEL[t]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Limit to event type</span>
+          <select
+            value={form.filters?.event_type_id || ""}
+            onChange={(e) => setForm({ ...form, filters: e.target.value ? { event_type_id: e.target.value } : {} })}
+            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+          >
+            <option value="">Any event type</option>
+            {eventTypes.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Actions</span>
+        {form.actions.map((a, i) => (
+          <ActionEditor
+            key={i}
+            action={a}
+            actionTypes={actionTypes}
+            onChange={(next) => setAction(i, next)}
+            onRemove={() => removeAction(i)}
+          />
+        ))}
+        <button onClick={addAction} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+          + Add action
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {save.isPending ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={() => confirm("Delete this workflow?") && del.mutate()}
+          className="rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActionEditor({
+  action,
+  actionTypes,
+  onChange,
+  onRemove,
+}: {
+  action: WfAction;
+  actionTypes: string[];
+  onChange: (a: WfAction) => void;
+  onRemove: () => void;
+}) {
+  const p = action.params || {};
+  const setP = (k: string, v: string | number) => onChange({ ...action, params: { ...p, [k]: v } });
+  const types = actionTypes.length ? actionTypes : Object.keys(ACTION_LABEL);
+
+  return (
+    <div className="rounded-md border border-slate-200 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <select
+          value={action.type}
+          onChange={(e) => onChange({ type: e.target.value, params: {} })}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm font-medium"
+        >
+          {types.map((t) => (
+            <option key={t} value={t}>
+              {ACTION_LABEL[t] || t}
+            </option>
+          ))}
+        </select>
+        <button onClick={onRemove} className="ml-auto rounded p-1 text-slate-400 hover:text-rose-600">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {action.type === "send_email" && (
+          <>
+            <Sel label="To" value={String(p.to || "invitee")} options={["invitee", "owner"]} onChange={(v) => setP("to", v)} />
+            <Inp label="Subject" value={String(p.subject || "")} onChange={(v) => setP("subject", v)} />
+            <div className="sm:col-span-2">
+              <Inp label="Body" value={String(p.body || "")} onChange={(v) => setP("body", v)} textarea />
+            </div>
+          </>
+        )}
+        {action.type === "create_task" && (
+          <>
+            <Inp label="Title" value={String(p.title || "")} onChange={(v) => setP("title", v)} />
+            <Inp label="Due in (hours)" value={String(p.due_in_hours ?? "")} onChange={(v) => setP("due_in_hours", v)} />
+          </>
+        )}
+        {action.type === "move_stage" && (
+          <Inp label="Stage slug" value={String(p.stage_slug || "")} onChange={(v) => setP("stage_slug", v)} />
+        )}
+        {action.type === "add_tag" && <Inp label="Tag" value={String(p.tag || "")} onChange={(v) => setP("tag", v)} />}
+        {action.type === "schedule_reminder" && (
+          <>
+            <Sel label="To" value={String(p.to || "owner")} options={["owner", "invitee"]} onChange={(v) => setP("to", v)} />
+            <Inp label="Offset (min, +after start)" value={String(p.offset_minutes ?? "60")} onChange={(v) => setP("offset_minutes", v)} />
+            <div className="sm:col-span-2">
+              <Inp label="Message" value={String(p.body || "")} onChange={(v) => setP("body", v)} textarea />
+            </div>
+          </>
+        )}
+      </div>
+      <p className="mt-2 text-[11px] text-slate-400">
+        Merge tags: {"{invitee_name}"} {"{event_name}"} {"{owner_name}"} {"{start}"} {"{lead_name}"}
+      </p>
+    </div>
+  );
+}
+
+function Inp({
+  label,
+  value,
+  onChange,
+  textarea,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  textarea?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      {textarea ? (
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm" />
+      ) : (
+        <input value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm" />
+      )}
+    </label>
+  );
+}
+
+function Sel({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm">
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

@@ -912,8 +912,30 @@ class Booking(Base, TimestampMixin):
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="confirmed")  # confirmed | cancelled
+    # Post-meeting outcome, set by the owner: completed | no_show (else None).
+    disposition: Mapped[Optional[str]] = mapped_column(String(20))
     answers: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     calendar_account_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connected_accounts.id", ondelete="SET NULL"))
     external_event_id: Mapped[Optional[str]] = mapped_column(String(255))
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class Workflow(Base, TimestampMixin):
+    """A booking-lifecycle automation: when ``trigger`` fires, run ``actions``.
+
+    Triggers: booking_created | booking_cancelled | meeting_completed |
+    meeting_no_show. Actions are a JSON list of {type, params}; supported types:
+    send_email, create_task, move_stage, add_tag, schedule_reminder.
+    """
+
+    __tablename__ = "workflows"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    trigger: Mapped[str] = mapped_column(String(40), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Optional scoping, e.g. {"event_type_id": "..."} to limit to one event type.
+    filters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    actions: Mapped[list] = mapped_column(JSONB, default=list)

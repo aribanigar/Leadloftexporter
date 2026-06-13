@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import Booking, EventType
+from app.models import Booking, EventType, Workflow
 from app.services import scheduling as sched
+from app.services import workflows as wf_svc
 
 router = APIRouter(prefix="/event-types", tags=["scheduling"])
 
@@ -215,6 +216,7 @@ def _serialize_booking(b: Booking) -> dict:
         "start_at": b.start_at,
         "end_at": b.end_at,
         "status": b.status,
+        "disposition": b.disposition,
         "answers": b.answers or {},
         "lead_id": b.lead_id,
         "created_at": b.created_at,
@@ -240,4 +242,133 @@ def cancel_booking(
     if not b:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
     sched.cancel_booking(db, b)
+    return {"ok": True}
+
+
+class DispositionIn(BaseModel):
+    disposition: str  # completed | no_show
+
+
+@bookings_router.patch("/{booking_id}/disposition")
+def set_disposition(
+    booking_id: str,
+    body: DispositionIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    if body.disposition not in ("completed", "no_show"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_disposition")
+    b = (
+        db.query(Booking)
+        .filter(Booking.id == booking_id, Booking.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    sched.set_disposition(db, b, body.disposition)
+    return {"ok": True, "disposition": b.disposition}
+
+
+# --------------------------------------------------------------------------- #
+# Workflows (booking-lifecycle automations)
+# --------------------------------------------------------------------------- #
+
+workflows_router = APIRouter(prefix="/workflows", tags=["workflows"])
+
+
+def _serialize_workflow(w: Workflow) -> dict:
+    return {
+        "id": w.id,
+        "name": w.name,
+        "trigger": w.trigger,
+        "active": w.active,
+        "filters": w.filters or {},
+        "actions": w.actions or [],
+        "created_at": w.created_at,
+    }
+
+
+class WorkflowIn(BaseModel):
+    name: str
+    trigger: str
+    active: bool = True
+    filters: Optional[dict] = None
+    actions: Optional[list] = None
+
+
+@workflows_router.get("")
+def list_workflows(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Workflow)
+        .filter(Workflow.workspace_id == ctx.workspace_id)
+        .order_by(Workflow.created_at.asc())
+        .all()
+    )
+    return {"workflows": [_serialize_workflow(w) for w in rows], "triggers": sorted(wf_svc.TRIGGERS), "action_types": sorted(wf_svc.ACTION_TYPES)}
+
+
+@workflows_router.post("")
+def create_workflow(
+    body: WorkflowIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    if body.trigger not in wf_svc.TRIGGERS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_trigger")
+    w = Workflow(
+        workspace_id=ctx.workspace_id,
+        name=body.name.strip() or "Workflow",
+        trigger=body.trigger,
+        active=body.active,
+        filters=body.filters or {},
+        actions=body.actions or [],
+    )
+    db.add(w)
+    db.commit()
+    db.refresh(w)
+    return _serialize_workflow(w)
+
+
+@workflows_router.patch("/{workflow_id}")
+def update_workflow(
+    workflow_id: str,
+    body: WorkflowIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    w = (
+        db.query(Workflow)
+        .filter(Workflow.id == workflow_id, Workflow.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not w:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    data = body.model_dump(exclude_unset=True)
+    if "trigger" in data and data["trigger"] not in wf_svc.TRIGGERS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_trigger")
+    for k, v in data.items():
+        setattr(w, k, v)
+    db.commit()
+    db.refresh(w)
+    return _serialize_workflow(w)
+
+
+@workflows_router.delete("/{workflow_id}")
+def delete_workflow(
+    workflow_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    w = (
+        db.query(Workflow)
+        .filter(Workflow.id == workflow_id, Workflow.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not w:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    db.delete(w)
+    db.commit()
     return {"ok": True}

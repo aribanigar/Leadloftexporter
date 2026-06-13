@@ -203,6 +203,7 @@ def create_booking(
     _send_confirmation(db, event_type, booking)
     _owner_reminder(db, event_type, booking)
     _schedule_invitee_reminders(db, event_type, booking)
+    _fire_workflows(db, "booking_created", booking)
     return booking
 
 
@@ -225,6 +226,25 @@ def cancel_booking(db: Session, booking: Booking) -> None:
         Reminder.status.in_(["pending", "failed"]),
     ).update({"status": "cancelled"}, synchronize_session=False)
     db.commit()
+    _fire_workflows(db, "booking_cancelled", booking)
+
+
+def set_disposition(db: Session, booking: Booking, disposition: str) -> None:
+    """Mark a meeting completed or no_show and fire the matching workflows."""
+    if disposition not in ("completed", "no_show"):
+        return
+    booking.disposition = disposition
+    db.commit()
+    _fire_workflows(db, "meeting_completed" if disposition == "completed" else "meeting_no_show", booking)
+
+
+def _fire_workflows(db: Session, trigger: str, booking: Booking) -> None:
+    try:
+        from app.services import workflows as wf
+
+        wf.run_for_booking(db, trigger=trigger, booking=booking)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("workflow run (%s) failed for booking %s: %s", trigger, booking.id, exc)
 
 
 def _schedule_invitee_reminders(db: Session, event_type: EventType, booking: Booking) -> None:
