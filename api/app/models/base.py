@@ -544,6 +544,65 @@ class Credit(Base, TimestampMixin):
 # source of truth, advancing only "pending" rows.
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# Content Hub — Google-Drive-style folders ("businesses"), each holding a
+# library of reusable marketing assets (HTML emails / WhatsApp / captions /
+# SMS / other). A ContentBusiness also carries light brand attributes
+# (brand_color / accent_color / tone) so the same folder can later feed the
+# AI campaign writer with on-brand defaults.
+# ──────────────────────────────────────────────────────────────────────────
+
+
+class ContentBusiness(Base, TimestampMixin):
+    __tablename__ = "content_businesses"
+    __table_args__ = (
+        Index("ix_content_biz_workspace", "workspace_id"),
+        UniqueConstraint("workspace_id", "slug", name="uq_content_biz_slug"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    slug: Mapped[str] = mapped_column(String(140), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    brand_color: Mapped[str] = mapped_column(String(20), default="#00361a")
+    accent_color: Mapped[Optional[str]] = mapped_column(String(20))
+    tone: Mapped[Optional[str]] = mapped_column(String(40))
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500))
+
+    assets: Mapped[list["ContentAsset"]] = relationship(
+        back_populates="business", cascade="all, delete-orphan"
+    )
+
+
+class ContentAsset(Base, TimestampMixin):
+    __tablename__ = "content_assets"
+    __table_args__ = (
+        Index("ix_content_asset_biz_type", "business_id", "type"),
+        Index("ix_content_asset_workspace", "workspace_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    business_id: Mapped[str] = mapped_column(
+        ForeignKey("content_businesses.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    # html_email | whatsapp | caption | sms | other
+    type: Mapped[str] = mapped_column(String(20), nullable=False, default="html_email")
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    subject: Mapped[Optional[str]] = mapped_column(String(300))   # email subject line
+    platform: Mapped[Optional[str]] = mapped_column(String(40))   # caption platform
+    tags: Mapped[list] = mapped_column(JSONB, default=list)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    business: Mapped["ContentBusiness"] = relationship(back_populates="assets")
+
+
 class Campaign(Base, TimestampMixin):
     __tablename__ = "campaigns"
     __table_args__ = (

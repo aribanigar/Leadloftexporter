@@ -29,6 +29,8 @@ from app.models.base import (
     Credit,
     Campaign,
     CampaignRecipient,
+    ContentBusiness,
+    ContentAsset,
     SenderWarmup,
     Suppression,
 )
@@ -64,6 +66,8 @@ __all__ = [
     "Credit",
     "Campaign",
     "CampaignRecipient",
+    "ContentBusiness",
+    "ContentAsset",
     "SenderWarmup",
     "Suppression",
 ]

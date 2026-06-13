@@ -20,6 +20,7 @@ import {
   Sparkles,
   Mail,
   MessageCircle,
+  FolderOpen,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/outreach", label: "Outreach", icon: Sparkles },
   { href: "/campaigns", label: "Campaigns", icon: Mail },
+  { href: "/content-hub", label: "Content Hub", icon: FolderOpen },
   { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/messaging", label: "Messaging", icon: MessageSquare },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

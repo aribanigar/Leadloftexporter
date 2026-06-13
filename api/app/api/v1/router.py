@@ -18,6 +18,7 @@ from app.api.v1 import (
     whatsapp_web,
     linkedin_bridge,
     campaigns,
+    content_hub,
     tracking,
 )
 
@@ -40,4 +41,5 @@ api_router.include_router(whatsapp.router)
 api_router.include_router(whatsapp_web.router)
 api_router.include_router(linkedin_bridge.router)
 api_router.include_router(campaigns.router)
+api_router.include_router(content_hub.router)
 api_router.include_router(tracking.router)
