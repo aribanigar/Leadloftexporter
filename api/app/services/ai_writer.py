@@ -225,7 +225,13 @@ def generate_marketing_html(
     """
     client = _client_or_none()
     if not client:
-        return _fallback_marketing_html(brief=brief, brand_color=brand_color, include_amp=include_amp)
+        # No ANTHROPIC_API_KEY configured — render the hand-built template
+        # and tell the frontend so it can surface a "set API key for AI"
+        # banner instead of silently echoing the user's brief.
+        result = _fallback_marketing_html(brief=brief, brand_color=brand_color, include_amp=include_amp)
+        result["mode"] = "fallback"
+        result["mode_reason"] = "anthropic_api_key_not_set"
+        return result
 
     style_notes = ""
     if workspace:
@@ -256,12 +262,16 @@ def generate_marketing_html(
     except json.JSONDecodeError:
         start = text.find("{")
         end = text.rfind("}")
-        data = json.loads(text[start : end + 1]) if start >= 0 and end > start else {}
+        try:
+            data = json.loads(text[start : end + 1]) if start >= 0 and end > start else {}
+        except json.JSONDecodeError:
+            data = {}
     return {
         "subject": data.get("subject") or "",
         "preview_text": data.get("preview_text") or "",
         "html": data.get("html") or _fallback_marketing_html(brief=brief, brand_color=brand_color, include_amp=False)["html"],
         "amp_html": data.get("amp_html") or "",
+        "mode": "ai",
     }
 
 
@@ -270,9 +280,37 @@ def _fallback_marketing_html(*, brief: str, brand_color: str, include_amp: bool)
 
     Still gives the user a real, polished starting point — Unsplash hero image,
     3-column benefit grid, gradient CTA, P.S. line — that they can edit.
+
+    The brief is used as theme inspiration but is NEVER echoed verbatim as the
+    subject or hero headline (that's what the AI is for). Instead we infer a
+    theme keyword from the brief and pick from curated subject/headline pools.
     """
-    safe_brief = (brief or "Your message here.")[:300].replace("<", "&lt;").replace(">", "&gt;")
-    title = safe_brief.split("\n")[0][:80] or "A quick note"
+    safe_brief = (brief or "Your message here.")[:280].replace("<", "&lt;").replace(">", "&gt;")
+    # Theme detection from brief keywords — picks a coherent set of strings.
+    bl = (brief or "").lower()
+    if any(w in bl for w in ("welcome", "onboard", "subscribe", "sign up", "joined")):
+        theme = "welcome"
+    elif any(w in bl for w in ("launch", "introduce", "announce", "new ", "release")):
+        theme = "launch"
+    elif any(w in bl for w in ("sale", "discount", "off ", "promo", "black friday", "deal")):
+        theme = "promo"
+    elif any(w in bl for w in ("event", "webinar", "rsvp", "join us", "session")):
+        theme = "event"
+    elif any(w in bl for w in ("social", "marketing", "campaign", "graphics", "creative", "brand")):
+        theme = "creative"
+    else:
+        theme = "general"
+    pools = {
+        "welcome":  ("You're in — here's where to start", "Welcome aboard, {first_name}.",       "Built for what's next."),
+        "launch":   ("Something new just dropped",        "Meet the next chapter.",              "Bigger, faster, sharper."),
+        "promo":    ("A limited window just opened",      "A little something for you.",         "While it lasts."),
+        "event":    ("Save your seat",                    "We saved you a spot.",                "Don't miss this one."),
+        "creative": ("A campaign worth your inbox",       "Made to be seen.",                    "Designed to convert."),
+        "general":  ("A quick idea for you",              "Here's the short version.",           "Worth a minute."),
+    }
+    subject, hero_eyebrow, hero_headline = pools[theme]
+    # Title for <head><title> — keep it generic too.
+    title = hero_headline
     # Stable Unsplash hero (rotates across a small curated set so previews
     # don't all look identical when used as starter content).
     hero_ids = [
@@ -299,11 +337,12 @@ def _fallback_marketing_html(*, brief: str, brand_color: str, include_amp: bool)
         <img src=\"{hero}\" alt=\"\" width=\"600\" height=\"240\" style=\"display:block;width:100%;height:auto;\" />
       </td></tr>
       <tr><td style=\"background:linear-gradient(135deg,{brand_color},{brand_color}cc);padding:32px 40px;color:#fff;\">
-        <p style=\"margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;\">Hi {{first_name}},</p>
-        <h1 class=\"lc-h\" style=\"margin:0;color:#fff;font-size:30px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;\">{title}</h1>
+        <p style=\"margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;\">{hero_eyebrow}</p>
+        <h1 class=\"lc-h\" style=\"margin:0;color:#fff;font-size:30px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;\">{hero_headline}</h1>
       </td></tr>
       <tr><td class=\"lc-p\" style=\"padding:32px 40px 8px;color:#1f2937;font-size:16px;line-height:1.65;\">
-        <p style=\"margin:0 0 20px;\">{safe_brief}</p>
+        <p style=\"margin:0 0 12px;\">Hi {{first_name}},</p>
+        <p style=\"margin:0 0 20px;color:#475569;\">{safe_brief}</p>
       </td></tr>
       <!-- 3-column benefit grid -->
       <tr><td class=\"lc-p\" style=\"padding:16px 32px 8px;\">
@@ -377,10 +416,10 @@ def _fallback_marketing_html(*, brief: str, brand_color: str, include_amp: bool)
 <div class=\"card\">
   <amp-anim width=\"1200\" height=\"720\" layout=\"responsive\" src=\"https://images.unsplash.com/photo-{hero_id}?w=1200&q=80&auto=format&fit=crop\" alt=\"hero\"></amp-anim>
   <div class=\"hero\">
-    <p class=\"eyebrow\">Hi {{first_name}},</p>
-    <h1>{title}</h1>
+    <p class=\"eyebrow\">{hero_eyebrow}</p>
+    <h1>{hero_headline}</h1>
   </div>
-  <div class=\"body\"><p>{safe_brief}</p></div>
+  <div class=\"body\"><p>Hi {{first_name}},</p><p style=\"color:#475569;\">{safe_brief}</p></div>
   <div class=\"features\">
     <div class=\"feature\"><div class=\"icon\">⚡</div><div class=\"label\">Fast setup</div><div class=\"detail\">Live in under 5 min</div></div>
     <div class=\"feature\"><div class=\"icon\">📈</div><div class=\"label\">Real results</div><div class=\"detail\">Lift in week one</div></div>
@@ -397,8 +436,8 @@ def _fallback_marketing_html(*, brief: str, brand_color: str, include_amp: bool)
 </div>
 </body></html>"""
     return {
-        "subject": (brief[:75] or "A quick note from your team"),
-        "preview_text": (brief[:90] or "We thought you'd want to see this."),
+        "subject": subject,
+        "preview_text": f"{hero_headline} A two-minute read.",
         "html": html,
         "amp_html": amp_html,
     }

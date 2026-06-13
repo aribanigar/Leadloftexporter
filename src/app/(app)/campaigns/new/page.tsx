@@ -86,6 +86,8 @@ interface AIGenResult {
   preview_text: string;
   html: string;
   amp_html: string;
+  mode?: 'ai' | 'fallback';
+  mode_reason?: string;
 }
 function AIGeneratorPanel({
   brandColor,
@@ -276,6 +278,21 @@ function AIGeneratorPanel({
               {err}
             </div>
           )}
+          {lastResult && !busy && !err && lastResult.mode === 'fallback' && (
+            <div style={{
+              marginTop: 10, padding: '10px 12px',
+              background: 'linear-gradient(135deg, rgba(234,179,8,0.10), rgba(245,158,11,0.10))',
+              border: '1px solid rgba(245,158,11,0.30)', borderRadius: 9,
+              display: 'flex', alignItems: 'center', gap: 10,
+              fontSize: 11.5, fontFamily: 'Inter, sans-serif',
+            }}>
+              <AlertCircle size={14} color="#b45309" />
+              <span style={{ color: '#92400e', fontWeight: 600, lineHeight: 1.5 }}>
+                <strong>Template mode</strong> — Claude AI is not configured on the API server, so a hand-built template was rendered instead of an AI-written campaign.
+                Set <code style={{ background: '#fef3c7', padding: '0 5px', borderRadius: 4 }}>ANTHROPIC_API_KEY</code> on Render to switch to real AI generation.
+              </span>
+            </div>
+          )}
           {lastResult && !busy && !err && (
             <div style={{
               marginTop: 10, padding: '8px 12px',
@@ -289,6 +306,7 @@ function AIGeneratorPanel({
                 Generated · {lastResult.html.length.toLocaleString()} chars
                 {generateAmp && lastResult.amp_html ? ` · AMP ${lastResult.amp_html.length.toLocaleString()} chars` : ''}
                 {generateAmp && !lastResult.amp_html ? ' · AMP empty ⚠' : ''}
+                {lastResult.mode === 'ai' ? ' · Claude AI' : ''}
               </span>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 <button
