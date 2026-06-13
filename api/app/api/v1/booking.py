@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models import EventType, User, Workspace
+from app.models import Booking, EventType, User, Workspace
 from app.services import scheduling as sched
 
 router = APIRouter(prefix="/book", tags=["booking"])
@@ -125,3 +125,56 @@ def _parse(s: Optional[str]) -> Optional[datetime]:
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except Exception:  # noqa: BLE001
         return None
+
+
+# --------------------------------------------------------------------------- #
+# Invitee self-service: manage an existing booking (cancel / reschedule).
+# The booking id is an unguessable UUID, used as the manage token.
+# --------------------------------------------------------------------------- #
+
+def _booking(db: Session, booking_id: str) -> Booking:
+    b = db.get(Booking, booking_id)
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    return b
+
+
+@router.get("/manage/{booking_id}")
+def manage_get(booking_id: str, db: Session = Depends(get_db)):
+    b = _booking(db, booking_id)
+    et = db.get(EventType, b.event_type_id)
+    ws = db.get(Workspace, b.workspace_id)
+    return {
+        "id": b.id,
+        "status": b.status,
+        "start_at": b.start_at,
+        "end_at": b.end_at,
+        "invitee_name": b.invitee_name,
+        "event_name": et.name if et else "meeting",
+        "duration_minutes": et.duration_minutes if et else None,
+        "workspace_slug": ws.slug if ws else None,
+        "event_slug": et.slug if et else None,
+    }
+
+
+@router.post("/manage/{booking_id}/cancel")
+def manage_cancel(booking_id: str, db: Session = Depends(get_db)):
+    b = _booking(db, booking_id)
+    if b.status == "confirmed":
+        sched.cancel_booking(db, b)
+    return {"ok": True, "status": b.status}
+
+
+class RescheduleIn(BaseModel):
+    start: str
+
+
+@router.post("/manage/{booking_id}/reschedule")
+def manage_reschedule(booking_id: str, body: RescheduleIn, db: Session = Depends(get_db)):
+    b = _booking(db, booking_id)
+    start = _parse(body.start)
+    if not start:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_start")
+    if not sched.reschedule_booking(db, b, start):
+        raise HTTPException(status.HTTP_409_CONFLICT, "slot_no_longer_available")
+    return {"ok": True, "start_at": b.start_at, "end_at": b.end_at}

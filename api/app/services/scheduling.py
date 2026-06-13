@@ -19,11 +19,18 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import Booking, EventType, Lead, Workspace
 from app.services import google_calendar as gcal
 from app.services import reminders as rsvc
 
 log = logging.getLogger(__name__)
+_settings = get_settings()
+
+
+def manage_url(booking: Booking) -> str:
+    """Public self-service link an invitee uses to reschedule/cancel."""
+    return f"{_settings.primary_frontend_origin}/book/manage/{booking.id}"
 
 DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -238,6 +245,48 @@ def set_disposition(db: Session, booking: Booking, disposition: str) -> None:
     _fire_workflows(db, "meeting_completed" if disposition == "completed" else "meeting_no_show", booking)
 
 
+def reschedule_booking(db: Session, booking: Booking, new_start: datetime) -> bool:
+    """Move a confirmed booking to a new start time. Validates the slot, updates
+    the calendar event, and re-queues the invitee reminders. Returns False if
+    the slot isn't available."""
+    if booking.status != "confirmed":
+        return False
+    event_type = db.get(EventType, booking.event_type_id)
+    if not event_type or not slot_is_available(db, event_type, new_start):
+        return False
+    duration = max(5, event_type.duration_minutes or 30)
+    booking.start_at = new_start
+    booking.end_at = new_start + timedelta(minutes=duration)
+
+    # Move the calendar event.
+    if booking.external_event_id and booking.calendar_account_id:
+        from app.models import ConnectedAccount
+
+        account = db.get(ConnectedAccount, booking.calendar_account_id)
+        if account:
+            creds = gcal.ensure_credentials(db, account)
+            if creds:
+                try:
+                    gcal.update_event(
+                        creds, rsvc._write_calendar_id(account), booking.external_event_id,
+                        start=booking.start_at, end=booking.end_at,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("calendar move failed for booking %s: %s", booking.id, exc)
+
+    # Re-queue invitee reminders against the new time.
+    from app.models import Reminder
+
+    db.query(Reminder).filter(
+        Reminder.booking_id == booking.id,
+        Reminder.source == "booking_reminder",
+        Reminder.status.in_(["pending", "failed"]),
+    ).update({"status": "cancelled"}, synchronize_session=False)
+    db.commit()
+    _schedule_invitee_reminders(db, event_type, booking)
+    return True
+
+
 def _fire_workflows(db: Session, trigger: str, booking: Booking) -> None:
     try:
         from app.services import workflows as wf
@@ -383,6 +432,7 @@ def _send_confirmation(db: Session, event_type: EventType, booking: Booking) -> 
             f"Hi {booking.invitee_name},\n\n"
             f"Your {event_type.name} ({event_type.duration_minutes} min) is confirmed for {when}.\n\n"
             f"{_meeting_description(event_type, booking)}\n\n"
+            f"Need to change it? Reschedule or cancel here: {manage_url(booking)}\n\n"
             f"See you then!"
         )
         html = "<p>" + body.replace("\n\n", "</p><p>").replace("\n", "<br/>") + "</p>"

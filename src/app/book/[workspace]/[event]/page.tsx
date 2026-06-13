@@ -51,12 +51,12 @@ export default function PublicBookingPage({
   });
 
   const [selected, setSelected] = useState<string | null>(null);
-  const [done, setDone] = useState<{ start: string } | null>(null);
+  const [done, setDone] = useState<{ start: string; id: string } | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", answers: {} as Record<string, string> });
 
   const book = useMutation({
     mutationFn: () =>
-      api<{ start_at: string }>(base, {
+      api<{ start_at: string; id: string }>(base, {
         method: "POST",
         body: {
           name: form.name,
@@ -67,7 +67,7 @@ export default function PublicBookingPage({
           answers: form.answers,
         },
       }),
-    onSuccess: (r) => setDone({ start: r.start_at }),
+    onSuccess: (r) => setDone({ start: r.start_at, id: r.id }),
   });
 
   const slotsByDate = useMemo(() => {
@@ -107,6 +107,9 @@ export default function PublicBookingPage({
             })}
           </p>
           <p className="mt-2 text-sm text-slate-500">A confirmation has been emailed to {form.email}.</p>
+          <a href={`/book/manage/${done.id}`} className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+            Reschedule or cancel
+          </a>
         </div>
       </Centered>
     );
