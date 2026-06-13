@@ -9,13 +9,15 @@ three ways:
    auto-creates a follow-up reminder (the "make my day from inbox/pipeline/notes"
    behaviour). These hooks are best-effort: they never raise into the request.
 3. **By the daily-agenda job** — once a day per user we gather the day's open
-   threads, due tasks, fresh replies and notes, ask Claude to compose a clear
-   "who to talk to & about what" briefing, and drop it on the calendar.
+   threads, due tasks, fresh replies and notes into a clear, prioritized
+   "who to talk to & about what" plan (deterministic, no AI) and deliver it.
 
 Delivery mirrors the EnrollmentStepRun pattern: rows sit ``pending`` until
 ``remind_at`` passes, then ``tick_reminders`` (Celery beat) delivers them —
 writing a Google Calendar event for ``channel="calendar"`` or sending mail for
-``channel="email"`` — and flips them to ``sent``/``failed``.
+``channel="email"`` — and flips them to ``sent``/``failed``. The whole system
+works over plain email/SMTP with no calendar connected; calendar delivery is an
+optional upgrade.
 """
 from __future__ import annotations
 
@@ -77,28 +79,98 @@ def conflict_calendar_ids(account: ConnectedAccount) -> list[str]:
     return [_write_calendar_id(account)]
 
 
-def agenda_config(account: ConnectedAccount, workspace: Optional[Workspace] = None) -> dict:
-    cfg = (account.config or {}).get("agenda") or {}
-    tz = cfg.get("timezone")
-    if not tz and workspace:
-        tz = (workspace.settings or {}).get("outreach", {}).get("timezone")
+# Reminder preferences (agenda + auto-reminders) are stored PER-USER in
+# ``workspace.settings["reminder_prefs"][user_id]`` — deliberately NOT on the
+# calendar account, so the whole reminder/agenda system works over plain
+# email/SMTP even when no calendar is connected. The calendar account only
+# holds calendar-specific roles (write/conflict calendars).
+DEFAULT_AGENDA = {"enabled": True, "hour": 8, "channels": ["email"]}
+DEFAULT_AUTO = {"inbox_reply": True, "stage_change": True, "note": True, "default_offset_minutes": 60}
+
+
+def _prefs_root(workspace: Workspace) -> dict:
+    return (workspace.settings or {}).get("reminder_prefs", {}) or {}
+
+
+def _user_prefs(workspace: Workspace, user_id: str) -> dict:
+    return _prefs_root(workspace).get(user_id) or {}
+
+
+def agenda_config(workspace: Workspace, user_id: str) -> dict:
+    stored = _user_prefs(workspace, user_id).get("agenda") or {}
+    tz = stored.get("timezone") or (workspace.settings or {}).get("outreach", {}).get("timezone") or "UTC"
     return {
-        "enabled": cfg.get("enabled", True),
-        "hour": int(cfg.get("hour", 8)),
-        "timezone": tz or "UTC",
-        "channels": cfg.get("channels") or ["calendar"],
-        "last_generated_date": cfg.get("last_generated_date"),
+        "enabled": bool(stored.get("enabled", DEFAULT_AGENDA["enabled"])),
+        "hour": int(stored.get("hour", DEFAULT_AGENDA["hour"])),
+        "timezone": tz,
+        "channels": stored.get("channels") or list(DEFAULT_AGENDA["channels"]),
+        "last_generated_date": stored.get("last_generated_date"),
     }
 
 
-def auto_reminder_config(account: ConnectedAccount) -> dict:
-    cfg = (account.config or {}).get("auto_reminders") or {}
+def auto_reminder_config(workspace: Workspace, user_id: str) -> dict:
+    stored = _user_prefs(workspace, user_id).get("auto_reminders") or {}
     return {
-        "inbox_reply": cfg.get("inbox_reply", True),
-        "stage_change": cfg.get("stage_change", True),
-        "note": cfg.get("note", True),
-        "default_offset_minutes": int(cfg.get("default_offset_minutes", 60)),
+        "inbox_reply": bool(stored.get("inbox_reply", DEFAULT_AUTO["inbox_reply"])),
+        "stage_change": bool(stored.get("stage_change", DEFAULT_AUTO["stage_change"])),
+        "note": bool(stored.get("note", DEFAULT_AUTO["note"])),
+        "default_offset_minutes": int(stored.get("default_offset_minutes", DEFAULT_AUTO["default_offset_minutes"])),
     }
+
+
+def set_prefs(
+    db: Session,
+    workspace: Workspace,
+    user_id: str,
+    *,
+    agenda: Optional[dict] = None,
+    auto_reminders: Optional[dict] = None,
+) -> None:
+    """Merge a patch into a user's reminder prefs and persist."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    settings = dict(workspace.settings or {})
+    root = dict(settings.get("reminder_prefs", {}) or {})
+    entry = dict(root.get(user_id, {}) or {})
+    if agenda is not None:
+        entry["agenda"] = {**(entry.get("agenda") or {}), **agenda}
+    if auto_reminders is not None:
+        entry["auto_reminders"] = {**(entry.get("auto_reminders") or {}), **auto_reminders}
+    root[user_id] = entry
+    settings["reminder_prefs"] = root
+    workspace.settings = settings
+    flag_modified(workspace, "settings")
+    db.commit()
+
+
+# ---- delivery availability (calendar OR email/SMTP) ----
+
+def email_account_for(db: Session, workspace_id: str, user_id: str):
+    from app.services.email_sender import _pick_account
+
+    return _pick_account(db, workspace_id, user_id)
+
+
+def delivery_options(db: Session, workspace_id: str, user_id: str) -> dict:
+    return {
+        "calendar": calendar_account_for(db, workspace_id, user_id) is not None,
+        "email": email_account_for(db, workspace_id, user_id) is not None,
+    }
+
+
+def effective_channel(db: Session, workspace_id: str, user_id: str, requested: str) -> Optional[str]:
+    """Resolve the channel a reminder can actually be delivered on, falling back
+    when the requested one isn't available. Returns None if nothing is set up."""
+    opts = delivery_options(db, workspace_id, user_id)
+    if requested == "calendar" and opts["calendar"]:
+        return "calendar"
+    if requested == "email" and opts["email"]:
+        return "email"
+    if opts["calendar"]:
+        return "calendar"
+    if opts["email"]:
+        return "email"
+    return None
 
 
 def _zone(name: str):
@@ -187,11 +259,16 @@ def _lead_label(lead: Optional[Lead]) -> str:
 
 def _signal_reminder(db: Session, *, workspace_id: str, user_id: str, lead: Optional[Lead], source: str, title: str, body: str) -> None:
     try:
-        account = calendar_account_for(db, workspace_id, user_id)
-        if not account:
-            return  # no calendar connected → nothing to remind on
-        ar = auto_reminder_config(account)
+        workspace = db.get(Workspace, workspace_id)
+        if not workspace:
+            return
+        ar = auto_reminder_config(workspace, user_id)
         if source in ar and not ar.get(source, True):
+            return
+        # Need somewhere to deliver — a calendar OR an email/SMTP account.
+        requested = (agenda_config(workspace, user_id).get("channels") or ["email"])[0]
+        channel = effective_channel(db, workspace_id, user_id, requested)
+        if not channel:
             return
         if _has_recent_reminder(db, workspace_id, user_id, source, lead.id if lead else None):
             return
@@ -204,7 +281,7 @@ def _signal_reminder(db: Session, *, workspace_id: str, user_id: str, lead: Opti
             title=title,
             body=body,
             remind_at=remind_at,
-            channel=(agenda_config(account).get("channels") or ["calendar"])[0],
+            channel=channel,
             source=source,
             lead_id=lead.id if lead else None,
         )
@@ -260,7 +337,12 @@ def deliver_reminder(db: Session, reminder: Reminder) -> bool:
     if reminder.status not in {"pending", "failed", "scheduled"}:
         return False
     try:
-        if reminder.channel == "calendar":
+        # If a calendar reminder has no calendar connected, fall back to email
+        # so SMTP-only users still get the nudge.
+        use_calendar = reminder.channel == "calendar" and calendar_account_for(
+            db, reminder.workspace_id, reminder.user_id
+        ) is not None
+        if use_calendar:
             ok = _deliver_calendar(db, reminder)
         else:
             ok = _deliver_email(db, reminder)
@@ -464,14 +546,17 @@ def generate_daily_agenda(
 ) -> Optional[Reminder]:
     """Build today's agenda for a user and schedule it as a reminder.
 
-    Skips silently if the user has no calendar connected, agenda is disabled, or
-    today's agenda was already generated (unless ``force``)."""
-    account = calendar_account_for(db, workspace.id, user_id)
-    if not account:
-        return None
-    cfg = agenda_config(account, workspace)
+    Works over email/SMTP or calendar — whichever is connected. Skips silently
+    if agenda is disabled, there's no delivery channel, or today's agenda was
+    already generated (unless ``force``)."""
+    cfg = agenda_config(workspace, user_id)
     if not cfg["enabled"] and not force:
         return None
+
+    requested = (cfg.get("channels") or ["email"])[0]
+    channel = effective_channel(db, workspace.id, user_id, requested)
+    if not channel:
+        return None  # nowhere to deliver (no calendar, no email account)
 
     tz = _zone(cfg["timezone"])
     now_local = datetime.now(timezone.utc).astimezone(tz)
@@ -489,7 +574,6 @@ def generate_daily_agenda(
         target_local = now_local
     remind_at = target_local.astimezone(timezone.utc)
 
-    channel = (cfg.get("channels") or ["calendar"])[0]
     title = f"📋 Your day — {count} item{'s' if count != 1 else ''}" if count else "📋 Your day — clear"
     rem = create_reminder(
         db,
@@ -505,12 +589,7 @@ def generate_daily_agenda(
         commit=False,
     )
 
-    # Stamp last_generated_date so we don't regenerate today.
-    new_cfg = dict(account.config or {})
-    agenda_block = dict(new_cfg.get("agenda") or {})
-    agenda_block["last_generated_date"] = today_str
-    new_cfg["agenda"] = agenda_block
-    account.config = new_cfg
-    db.commit()
+    # Stamp last_generated_date in the user's prefs so we don't regenerate today.
+    set_prefs(db, workspace, user_id, agenda={"last_generated_date": today_str})
     db.refresh(rem)
     return rem

@@ -406,39 +406,35 @@ def tick_reminders() -> dict:
 
 @celery_app.task
 def generate_daily_agendas() -> dict:
-    """Once per local morning, build each connected user's AI daily agenda.
+    """Once per local morning, build each user's daily agenda.
 
-    Runs hourly; generate_daily_agenda() is idempotent per (user, day) and only
-    fires when the user's configured agenda hour has arrived in their timezone,
-    so an hourly beat naturally lands one agenda per user per day.
+    Iterates over every user who has reminder prefs set (stored per-user in
+    workspace.settings["reminder_prefs"]) — works for calendar AND email/SMTP
+    users alike. Runs hourly; generate_daily_agenda() is idempotent per
+    (user, day) and only fires when the user's configured agenda hour has
+    arrived in their timezone, so an hourly beat lands one agenda per user/day.
     """
-    from app.models import ConnectedAccount, Workspace
-    from app.services import google_calendar as gcal
+    from app.models import Workspace
     from app.services import reminders as rsvc
 
     generated = 0
     with session_scope() as db:
-        accounts = (
-            db.query(ConnectedAccount)
-            .filter(ConnectedAccount.provider == gcal.PROVIDER, ConnectedAccount.status == "active")
-            .all()
-        )
-        for acct in accounts:
-            cfg = rsvc.agenda_config(acct)
-            if not cfg.get("enabled", True):
-                continue
-            # Only fire when the local hour matches the configured agenda hour.
-            tz = rsvc._zone(cfg["timezone"])
-            local_hour = datetime.now(timezone.utc).astimezone(tz).hour
-            if local_hour != int(cfg.get("hour", 8)):
-                continue
-            ws = db.get(Workspace, acct.workspace_id)
-            if not ws:
-                continue
-            try:
-                rem = rsvc.generate_daily_agenda(db, workspace=ws, user_id=acct.user_id)
-                if rem:
-                    generated += 1
-            except Exception as exc:  # noqa: BLE001
-                log.exception("daily agenda failed for account %s: %s", acct.id, exc)
+        workspaces = db.query(Workspace).all()
+        for ws in workspaces:
+            prefs_root = (ws.settings or {}).get("reminder_prefs") or {}
+            for user_id, entry in prefs_root.items():
+                agenda = (entry or {}).get("agenda") or {}
+                if not agenda.get("enabled", True):
+                    continue
+                cfg = rsvc.agenda_config(ws, user_id)
+                tz = rsvc._zone(cfg["timezone"])
+                local_hour = datetime.now(timezone.utc).astimezone(tz).hour
+                if local_hour != int(cfg.get("hour", 8)):
+                    continue
+                try:
+                    rem = rsvc.generate_daily_agenda(db, workspace=ws, user_id=user_id)
+                    if rem:
+                        generated += 1
+                except Exception as exc:  # noqa: BLE001
+                    log.exception("daily agenda failed for user %s: %s", user_id, exc)
     return {"generated": generated}

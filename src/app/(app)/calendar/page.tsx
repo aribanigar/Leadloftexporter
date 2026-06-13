@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import {
   CalendarClock,
   CheckCircle2,
   Trash2,
   Plus,
   Sparkles,
-  AlertTriangle,
+  Mail,
   RefreshCw,
   Link2,
   X,
@@ -34,22 +35,22 @@ interface AutoReminders {
   note: boolean;
   default_offset_minutes: number;
 }
-interface CalAccount {
+interface CalConn {
   id: string;
   email: string | null;
   label: string | null;
   status: string;
   write_calendar_id: string;
   conflict_calendar_ids: string[];
-  agenda: AgendaCfg;
-  auto_reminders: AutoReminders;
   calendars: CalendarInfo[];
 }
 interface CalStatus {
   configured: boolean;
   connected: boolean;
   provider: string | null;
-  account: CalAccount | null;
+  delivery: { calendar: boolean; email: boolean };
+  prefs: { agenda: AgendaCfg; auto_reminders: AutoReminders };
+  calendar: CalConn | null;
   redirect_uri: string;
 }
 interface Reminder {
@@ -67,6 +68,8 @@ interface Reminder {
   error: string | null;
   created_at: string;
 }
+
+type Banner = { kind: "ok" | "err"; msg: string } | null;
 
 const SOURCE_LABEL: Record<string, string> = {
   manual: "Manual",
@@ -86,16 +89,14 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 function localInputValue(d: Date): string {
-  // YYYY-MM-DDTHH:mm in local time for <input type="datetime-local">
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export default function CalendarPage() {
   const qc = useQueryClient();
-  const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+  const [banner, setBanner] = useState<Banner>(null);
 
-  // Surface the OAuth round-trip result (?connected=google|error).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get("connected");
@@ -111,41 +112,17 @@ export default function CalendarPage() {
     refetchInterval: 30000,
   });
 
-  const connect = useMutation({
-    mutationFn: () => api<{ url: string }>("/calendar/connect/google"),
-    onSuccess: (d) => {
-      window.location.href = d.url;
-    },
-    onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
-  });
-
-  const disconnect = useMutation({
-    mutationFn: () => api("/calendar/connection", { method: "DELETE" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["calendar-status"] });
-      qc.invalidateQueries({ queryKey: ["reminders"] });
-    },
-  });
-
-  if (isLoading) {
+  if (isLoading || !status) {
     return <div className="p-6 text-sm text-slate-500">Loading calendar…</div>;
   }
 
+  const noDelivery = !status.delivery.calendar && !status.delivery.email;
+
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5 text-brand-600" />
-          <h1 className="text-lg font-semibold">Calendar &amp; Reminders</h1>
-        </div>
-        {status?.connected && (
-          <button
-            onClick={() => disconnect.mutate()}
-            className="text-sm text-slate-500 hover:text-rose-600"
-          >
-            Disconnect
-          </button>
-        )}
+      <div className="mb-4 flex items-center gap-2">
+        <CalendarClock className="h-5 w-5 text-brand-600" />
+        <h1 className="text-lg font-semibold">Calendar &amp; Reminders</h1>
       </div>
 
       {banner && (
@@ -162,96 +139,210 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {!status?.configured ? (
-        <NotConfigured redirectUri={status?.redirect_uri || ""} />
-      ) : !status?.connected ? (
-        <Disconnected onConnect={() => connect.mutate()} connecting={connect.isPending} />
-      ) : (
-        <Connected account={status.account!} onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })} setBanner={setBanner} />
+      {noDelivery && (
+        <div className="mb-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Reminders need somewhere to go. Connect an email account in{" "}
+          <Link href="/settings/integrations" className="font-medium underline">
+            Settings → Integrations
+          </Link>{" "}
+          (any SMTP/Gmail inbox works), or connect Google Calendar below.
+        </div>
       )}
-    </div>
-  );
-}
 
-function NotConfigured({ redirectUri }: { redirectUri: string }) {
-  return (
-    <div className="card max-w-2xl p-6">
-      <div className="mb-2 flex items-center gap-2 text-amber-700">
-        <AlertTriangle className="h-5 w-5" />
-        <h2 className="font-semibold">Google Calendar isn&apos;t configured yet</h2>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <RemindersPanel setBanner={setBanner} />
+        </div>
+        <div className="space-y-6">
+          <DeliveryCard
+            status={status}
+            onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })}
+            setBanner={setBanner}
+          />
+          <ReminderSettings
+            status={status}
+            onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })}
+            setBanner={setBanner}
+          />
+        </div>
       </div>
-      <p className="text-sm text-slate-600">
-        An administrator needs to set <code className="rounded bg-slate-100 px-1">GOOGLE_CLIENT_ID</code> and{" "}
-        <code className="rounded bg-slate-100 px-1">GOOGLE_CLIENT_SECRET</code> on the backend (a Google Cloud OAuth
-        client with the Calendar API enabled). Add this exact <strong>Authorized redirect URI</strong> to that OAuth
-        client:
-      </p>
-      <pre className="mt-3 overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs text-slate-100">{redirectUri}</pre>
     </div>
   );
 }
 
-function Disconnected({ onConnect, connecting }: { onConnect: () => void; connecting: boolean }) {
-  return (
-    <div className="card max-w-2xl p-6">
-      <h2 className="mb-1 font-semibold">Connect your calendar</h2>
-      <p className="mb-4 text-sm text-slate-600">
-        Sync Google Calendar so LeadCaptura can read your busy times and write reminders &amp; your daily agenda
-        straight onto your calendar — who to talk to and about what, every morning.
-      </p>
-      <button
-        onClick={onConnect}
-        disabled={connecting}
-        className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-      >
-        <Link2 className="h-4 w-4" />
-        {connecting ? "Redirecting…" : "Connect Google Calendar"}
-      </button>
-    </div>
-  );
-}
-
-function Connected({
-  account,
+function DeliveryCard({
+  status,
   onChanged,
   setBanner,
 }: {
-  account: CalAccount;
+  status: CalStatus;
   onChanged: () => void;
-  setBanner: (b: { kind: "ok" | "err"; msg: string } | null) => void;
+  setBanner: (b: Banner) => void;
 }) {
   const qc = useQueryClient();
-  const cals = account.calendars || [];
+  const cal = status.calendar;
 
-  const [writeId, setWriteId] = useState(account.write_calendar_id);
-  const [conflictIds, setConflictIds] = useState<string[]>(account.conflict_calendar_ids || []);
-  const [agenda, setAgenda] = useState<AgendaCfg>(account.agenda);
-  const [auto, setAuto] = useState<AutoReminders>(account.auto_reminders);
-
-  const saveConfig = useMutation({
-    mutationFn: () =>
-      api("/calendar/config", {
-        method: "PATCH",
-        body: {
-          write_calendar_id: writeId,
-          conflict_calendar_ids: conflictIds,
-          agenda,
-          auto_reminders: auto,
-        },
-      }),
-    onSuccess: () => {
-      setBanner({ kind: "ok", msg: "Settings saved." });
-      onChanged();
+  const connect = useMutation({
+    mutationFn: () => api<{ url: string }>("/calendar/connect/google"),
+    onSuccess: (d) => {
+      window.location.href = d.url;
     },
     onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
   });
-
+  const disconnect = useMutation({
+    mutationFn: () => api("/calendar/connection", { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-status"] }),
+  });
   const refreshCals = useMutation({
     mutationFn: () => api("/calendar/calendars"),
     onSuccess: () => onChanged(),
   });
 
-  const generateAgenda = useMutation({
+  const [writeId, setWriteId] = useState(cal?.write_calendar_id || "primary");
+  const [conflictIds, setConflictIds] = useState<string[]>(cal?.conflict_calendar_ids || []);
+  const saveRoles = useMutation({
+    mutationFn: () =>
+      api("/calendar/config", {
+        method: "PATCH",
+        body: { write_calendar_id: writeId, conflict_calendar_ids: conflictIds },
+      }),
+    onSuccess: () => {
+      setBanner({ kind: "ok", msg: "Calendar settings saved." });
+      onChanged();
+    },
+    onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
+  });
+  const toggleConflict = (id: string) =>
+    setConflictIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  return (
+    <div className="card p-5">
+      <h3 className="mb-3 font-semibold">Delivery</h3>
+
+      {/* Email/SMTP delivery — the simple default */}
+      <div className="mb-4 flex items-start gap-2 text-sm">
+        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        <div>
+          <div className="font-medium text-slate-800">Email / SMTP</div>
+          {status.delivery.email ? (
+            <div className="text-emerald-600">Connected — reminders can be emailed.</div>
+          ) : (
+            <div className="text-slate-500">
+              No email account.{" "}
+              <Link href="/settings/integrations" className="text-brand-700 underline">
+                Connect one
+              </Link>
+              .
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Google Calendar — optional upgrade */}
+      <div className="border-t border-slate-100 pt-4">
+        <div className="mb-1 flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-medium text-slate-800">Google Calendar</span>
+          {cal && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+        </div>
+
+        {!cal ? (
+          status.configured ? (
+            <button
+              onClick={() => connect.mutate()}
+              disabled={connect.isPending}
+              className="mt-1 inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+            >
+              <Link2 className="h-4 w-4" />
+              {connect.isPending ? "Redirecting…" : "Connect (optional)"}
+            </button>
+          ) : (
+            <p className="text-xs text-slate-500">Not configured on the server. Email reminders work without it.</p>
+          )
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-sm text-slate-600">{cal.email || cal.label}</span>
+              <button onClick={() => disconnect.mutate()} className="text-xs text-slate-400 hover:text-rose-600">
+                Disconnect
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Add events to</label>
+              <button
+                onClick={() => refreshCals.mutate()}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600"
+              >
+                <RefreshCw className={"h-3.5 w-3.5 " + (refreshCals.isPending ? "animate-spin" : "")} /> Refresh
+              </button>
+            </div>
+            <select
+              value={writeId}
+              onChange={(e) => setWriteId(e.target.value)}
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+            >
+              {cal.calendars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.primary ? " (primary)" : ""}
+                </option>
+              ))}
+            </select>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                Check for conflicts
+              </label>
+              <div className="space-y-1">
+                {cal.calendars.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={conflictIds.includes(c.id)}
+                      onChange={() => toggleConflict(c.id)}
+                    />
+                    <span className="truncate">{c.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => saveRoles.mutate()}
+              disabled={saveRoles.isPending}
+              className="w-full rounded-md border border-brand-600 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+            >
+              {saveRoles.isPending ? "Saving…" : "Save calendar roles"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReminderSettings({
+  status,
+  onChanged,
+  setBanner,
+}: {
+  status: CalStatus;
+  onChanged: () => void;
+  setBanner: (b: Banner) => void;
+}) {
+  const qc = useQueryClient();
+  const [agenda, setAgenda] = useState<AgendaCfg>(status.prefs.agenda);
+  const [auto, setAuto] = useState<AutoReminders>(status.prefs.auto_reminders);
+  const [agendaPreview, setAgendaPreview] = useState<Reminder | null>(null);
+
+  const save = useMutation({
+    mutationFn: () => api("/calendar/config", { method: "PATCH", body: { agenda, auto_reminders: auto } }),
+    onSuccess: () => {
+      setBanner({ kind: "ok", msg: "Reminder settings saved." });
+      onChanged();
+    },
+    onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
+  });
+
+  const generate = useMutation({
     mutationFn: () => api<Reminder>("/calendar/agenda/generate", { method: "POST" }),
     onSuccess: (r) => {
       setBanner({ kind: "ok", msg: "Daily agenda generated." });
@@ -260,186 +351,116 @@ function Connected({
     },
     onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
   });
-  const [agendaPreview, setAgendaPreview] = useState<Reminder | null>(null);
 
-  const toggleConflict = (id: string) =>
-    setConflictIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const calendarAvailable = status.delivery.calendar;
+
+  const toggleChannel = (ch: string, on: boolean) =>
+    setAgenda({
+      ...agenda,
+      channels: on ? [...agenda.channels.filter((c) => c !== ch), ch] : agenda.channels.filter((x) => x !== ch),
+    });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        <RemindersPanel setBanner={setBanner} />
-        {agendaPreview && (
-          <div className="card p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-brand-600" />
-              <h3 className="font-semibold">Today&apos;s agenda preview</h3>
-            </div>
-            <pre className="whitespace-pre-wrap text-sm text-slate-700">{agendaPreview.body}</pre>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {/* Connection */}
-        <div className="card p-5">
-          <div className="mb-1 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <h3 className="font-semibold">Connected</h3>
-          </div>
-          <p className="text-sm text-slate-600">{account.email || account.label}</p>
-        </div>
-
-        {/* Calendar roles */}
-        <div className="card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold">Calendars</h3>
-            <button
-              onClick={() => refreshCals.mutate()}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600"
-            >
-              <RefreshCw className={"h-3.5 w-3.5 " + (refreshCals.isPending ? "animate-spin" : "")} /> Refresh
-            </button>
-          </div>
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-            Add bookings &amp; reminders to
-          </label>
+    <>
+      <div className="card p-5">
+        <h3 className="mb-3 font-semibold">Daily agenda</h3>
+        <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={agenda.enabled}
+            onChange={(e) => setAgenda({ ...agenda, enabled: e.target.checked })}
+          />
+          Deliver a daily &quot;your day&quot; briefing
+        </label>
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Each day at</span>
           <select
-            value={writeId}
-            onChange={(e) => setWriteId(e.target.value)}
-            className="mb-4 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+            value={agenda.hour}
+            onChange={(e) => setAgenda({ ...agenda, hour: Number(e.target.value) })}
+            className="rounded-md border border-slate-200 px-2 py-1"
           >
-            {cals.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.primary ? " (primary)" : ""}
+            {Array.from({ length: 24 }).map((_, h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, "0")}:00
               </option>
             ))}
           </select>
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-            Check these for conflicts
-          </label>
-          <div className="space-y-1">
-            {cals.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={conflictIds.includes(c.id)}
-                  onChange={() => toggleConflict(c.id)}
-                />
-                <span className="truncate">{c.name}</span>
-              </label>
-            ))}
-          </div>
+          <span className="text-slate-400">{agenda.timezone}</span>
         </div>
-
-        {/* Daily agenda */}
-        <div className="card p-5">
-          <h3 className="mb-3 font-semibold">Daily agenda</h3>
-          <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+        <div className="mb-4 flex gap-3 text-sm">
+          <label className="flex items-center gap-1.5 text-slate-700">
             <input
               type="checkbox"
-              checked={agenda.enabled}
-              onChange={(e) => setAgenda({ ...agenda, enabled: e.target.checked })}
+              checked={agenda.channels.includes("email")}
+              onChange={(e) => toggleChannel("email", e.target.checked)}
             />
-            Deliver a daily &quot;your day&quot; briefing
+            Email
           </label>
-          <div className="mb-3 flex items-center gap-2 text-sm">
-            <span className="text-slate-500">Each day at</span>
-            <select
-              value={agenda.hour}
-              onChange={(e) => setAgenda({ ...agenda, hour: Number(e.target.value) })}
-              className="rounded-md border border-slate-200 px-2 py-1"
-            >
-              {Array.from({ length: 24 }).map((_, h) => (
-                <option key={h} value={h}>
-                  {String(h).padStart(2, "0")}:00
-                </option>
-              ))}
-            </select>
-            <span className="text-slate-400">{agenda.timezone}</span>
-          </div>
-          <div className="mb-4 flex gap-3 text-sm">
-            {(["calendar", "email"] as const).map((ch) => (
-              <label key={ch} className="flex items-center gap-1.5 text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={agenda.channels.includes(ch)}
-                  onChange={(e) =>
-                    setAgenda({
-                      ...agenda,
-                      channels: e.target.checked
-                        ? [...agenda.channels, ch]
-                        : agenda.channels.filter((x) => x !== ch),
-                    })
-                  }
-                />
-                {ch === "calendar" ? "Calendar" : "Email"}
-              </label>
-            ))}
-          </div>
-          <button
-            onClick={() => generateAgenda.mutate()}
-            disabled={generateAgenda.isPending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-          >
-            <Sparkles className="h-4 w-4" />
-            {generateAgenda.isPending ? "Generating…" : "Generate today's agenda now"}
-          </button>
-        </div>
-
-        {/* Auto reminders */}
-        <div className="card p-5">
-          <h3 className="mb-3 font-semibold">Auto-reminders from CRM</h3>
-          <p className="mb-3 text-xs text-slate-500">
-            Create a calendar reminder automatically when these happen.
-          </p>
-          {(
-            [
-              ["inbox_reply", "A lead replies"],
-              ["stage_change", "A lead changes pipeline stage"],
-              ["note", "I add a note"],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="mb-2 flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={auto[key]}
-                onChange={(e) => setAuto({ ...auto, [key]: e.target.checked })}
-              />
-              {label}
-            </label>
-          ))}
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            <span className="text-slate-500">Remind</span>
+          <label className={"flex items-center gap-1.5 " + (calendarAvailable ? "text-slate-700" : "text-slate-300")}>
             <input
-              type="number"
-              min={5}
-              value={auto.default_offset_minutes}
-              onChange={(e) => setAuto({ ...auto, default_offset_minutes: Number(e.target.value) })}
-              className="w-20 rounded-md border border-slate-200 px-2 py-1"
+              type="checkbox"
+              disabled={!calendarAvailable}
+              checked={agenda.channels.includes("calendar")}
+              onChange={(e) => toggleChannel("calendar", e.target.checked)}
             />
-            <span className="text-slate-500">min later</span>
-          </div>
+            Calendar
+          </label>
         </div>
-
         <button
-          onClick={() => saveConfig.mutate()}
-          disabled={saveConfig.isPending}
-          className="w-full rounded-md border border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+          onClick={() => generate.mutate()}
+          disabled={generate.isPending}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
         >
-          {saveConfig.isPending ? "Saving…" : "Save calendar settings"}
+          <Sparkles className="h-4 w-4" />
+          {generate.isPending ? "Generating…" : "Generate today's agenda now"}
         </button>
+        {agendaPreview && (
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs text-slate-700">
+            {agendaPreview.body}
+          </pre>
+        )}
       </div>
-    </div>
+
+      <div className="card p-5">
+        <h3 className="mb-3 font-semibold">Auto-reminders from CRM</h3>
+        <p className="mb-3 text-xs text-slate-500">Create a reminder automatically when these happen.</p>
+        {(
+          [
+            ["inbox_reply", "A lead replies"],
+            ["stage_change", "A lead changes pipeline stage"],
+            ["note", "I add a note"],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="mb-2 flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={auto[key]} onChange={(e) => setAuto({ ...auto, [key]: e.target.checked })} />
+            {label}
+          </label>
+        ))}
+        <div className="mt-2 flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Remind</span>
+          <input
+            type="number"
+            min={5}
+            value={auto.default_offset_minutes}
+            onChange={(e) => setAuto({ ...auto, default_offset_minutes: Number(e.target.value) })}
+            className="w-20 rounded-md border border-slate-200 px-2 py-1"
+          />
+          <span className="text-slate-500">min later</span>
+        </div>
+      </div>
+
+      <button
+        onClick={() => save.mutate()}
+        disabled={save.isPending}
+        className="w-full rounded-md border border-brand-600 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+      >
+        {save.isPending ? "Saving…" : "Save reminder settings"}
+      </button>
+    </>
   );
 }
 
-function RemindersPanel({
-  setBanner,
-}: {
-  setBanner: (b: { kind: "ok" | "err"; msg: string } | null) => void;
-}) {
+function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
   const qc = useQueryClient();
   const { data } = useQuery<{ reminders: Reminder[] }>({
     queryKey: ["reminders"],
@@ -451,7 +472,7 @@ function RemindersPanel({
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
-  const [channel, setChannel] = useState("calendar");
+  const [channel, setChannel] = useState("email");
 
   const create = useMutation({
     mutationFn: () =>
@@ -513,8 +534,8 @@ function RemindersPanel({
             onChange={(e) => setChannel(e.target.value)}
             className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
           >
-            <option value="calendar">Calendar</option>
             <option value="email">Email</option>
+            <option value="calendar">Calendar</option>
           </select>
           <button
             onClick={() => title.trim() && create.mutate()}
@@ -532,7 +553,12 @@ function RemindersPanel({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-medium text-slate-800">{r.title}</span>
-                <span className={"shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium " + (STATUS_STYLE[r.status] || "bg-slate-100 text-slate-500")}>
+                <span
+                  className={
+                    "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium " +
+                    (STATUS_STYLE[r.status] || "bg-slate-100 text-slate-500")
+                  }
+                >
                   {r.status}
                 </span>
               </div>
@@ -552,8 +578,8 @@ function RemindersPanel({
         ))}
         {reminders.length === 0 && (
           <li className="px-5 py-6 text-sm text-slate-500">
-            No reminders yet. They&apos;ll appear here when you add one, or automatically from replies, stage changes,
-            and notes.
+            No reminders yet. Add one above, or they&apos;ll appear automatically from replies, stage changes, and
+            notes.
           </li>
         )}
       </ul>

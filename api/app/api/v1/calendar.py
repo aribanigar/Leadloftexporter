@@ -66,7 +66,14 @@ def calendar_status(
         "configured": gcal.is_configured(),
         "connected": connected,
         "provider": "google_calendar" if connected else None,
-        "account": (
+        # Reminder prefs live per-user and work over email/SMTP even with no
+        # calendar connected, so they're returned independently of `calendar`.
+        "delivery": rsvc.delivery_options(db, ctx.workspace_id, ctx.user_id),
+        "prefs": {
+            "agenda": rsvc.agenda_config(ctx.workspace, ctx.user_id),
+            "auto_reminders": rsvc.auto_reminder_config(ctx.workspace, ctx.user_id),
+        },
+        "calendar": (
             {
                 "id": account.id,
                 "email": account.external_id,
@@ -74,8 +81,6 @@ def calendar_status(
                 "status": account.status,
                 "write_calendar_id": rsvc._write_calendar_id(account),
                 "conflict_calendar_ids": rsvc.conflict_calendar_ids(account),
-                "agenda": rsvc.agenda_config(account, ctx.workspace),
-                "auto_reminders": rsvc.auto_reminder_config(account),
                 "calendars": (account.config or {}).get("calendars", []),
             }
             if account
@@ -230,25 +235,28 @@ def update_config(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    # Reminder prefs (agenda + auto-reminders) are saved per-user regardless of
+    # whether a calendar is connected — so SMTP-only users can configure them.
+    if body.agenda is not None or body.auto_reminders is not None:
+        rsvc.set_prefs(
+            db, ctx.workspace, ctx.user_id,
+            agenda=body.agenda, auto_reminders=body.auto_reminders,
+        )
+    # Calendar-specific roles only apply when a calendar is connected.
     account = rsvc.calendar_account_for(db, ctx.workspace_id, ctx.user_id)
-    if not account:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_connected")
-    cfg = dict(account.config or {})
-    if body.write_calendar_id is not None:
-        cfg["write_calendar_id"] = body.write_calendar_id
-    if body.conflict_calendar_ids is not None:
-        cfg["conflict_calendar_ids"] = body.conflict_calendar_ids
-    if body.agenda is not None:
-        cfg["agenda"] = {**(cfg.get("agenda") or {}), **body.agenda}
-    if body.auto_reminders is not None:
-        cfg["auto_reminders"] = {**(cfg.get("auto_reminders") or {}), **body.auto_reminders}
-    account.config = cfg
-    db.commit()
+    if account and (body.write_calendar_id is not None or body.conflict_calendar_ids is not None):
+        cfg = dict(account.config or {})
+        if body.write_calendar_id is not None:
+            cfg["write_calendar_id"] = body.write_calendar_id
+        if body.conflict_calendar_ids is not None:
+            cfg["conflict_calendar_ids"] = body.conflict_calendar_ids
+        account.config = cfg
+        db.commit()
     return {
-        "write_calendar_id": rsvc._write_calendar_id(account),
-        "conflict_calendar_ids": rsvc.conflict_calendar_ids(account),
-        "agenda": rsvc.agenda_config(account, ctx.workspace),
-        "auto_reminders": rsvc.auto_reminder_config(account),
+        "agenda": rsvc.agenda_config(ctx.workspace, ctx.user_id),
+        "auto_reminders": rsvc.auto_reminder_config(ctx.workspace, ctx.user_id),
+        "write_calendar_id": rsvc._write_calendar_id(account) if account else None,
+        "conflict_calendar_ids": rsvc.conflict_calendar_ids(account) if account else [],
     }
 
 
@@ -412,13 +420,14 @@ def generate_agenda(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    account = rsvc.calendar_account_for(db, ctx.workspace_id, ctx.user_id)
-    if not account:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_connected")
+    # Works over email/SMTP or calendar — needs only one delivery channel.
     workspace = db.get(Workspace, ctx.workspace_id)
     rem = rsvc.generate_daily_agenda(db, workspace=workspace, user_id=ctx.user_id, force=True)
     if not rem:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "agenda_unavailable")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "agenda_unavailable: connect a calendar or an email account to receive your agenda.",
+        )
     return _serialize_reminder(rem)
 
 
