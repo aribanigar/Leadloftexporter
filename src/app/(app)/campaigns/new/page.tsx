@@ -9,7 +9,7 @@ import {
   ListChecks, Maximize2, Minimize2, Users, ShieldCheck, Eye, Save,
   Send, Smartphone, Columns, Lightbulb, TrendingUp, Upload, AlertCircle,
   Flag, Newspaper, Tag, RefreshCw, BadgeCheck, Leaf, Megaphone, Settings2,
-  Bold, Italic, Underline, Link as LinkIcon, List, type LucideIcon,
+  Bold, Italic, Underline, Link as LinkIcon, List, Download, type LucideIcon,
 } from 'lucide-react';
 
 // ─── Icon — maps Material Symbol names → lucide components ────────────────
@@ -92,17 +92,22 @@ function AIGeneratorPanel({
   onBrandColor,
   generateAmp,
   onResult,
+  onPreview,
+  onDownload,
 }: {
   brandColor: string;
   onBrandColor: (c: string) => void;
   generateAmp: boolean;
   onResult: (r: AIGenResult) => void;
+  onPreview: () => void;
+  onDownload: () => void;
 }) {
   const [brief, setBrief] = useState('');
   const [tone, setTone] = useState<'professional' | 'friendly' | 'witty' | 'urgent'>('professional');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
+  const [lastResult, setLastResult] = useState<AIGenResult | null>(null);
 
   async function generate() {
     if (!brief.trim()) return;
@@ -118,7 +123,10 @@ function AIGeneratorPanel({
           include_amp: generateAmp,
         },
       });
+      setLastResult(result);
       onResult(result);
+      // Auto-open the live preview so the user immediately sees their email.
+      onPreview();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
     } finally {
@@ -254,6 +262,48 @@ function AIGeneratorPanel({
               background: '#fee2e2', borderRadius: 6,
             }}>
               {err}
+            </div>
+          )}
+          {lastResult && !busy && !err && (
+            <div style={{
+              marginTop: 10, padding: '8px 12px',
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.10), rgba(99,102,241,0.10))',
+              border: '1px solid rgba(16,185,129,0.25)', borderRadius: 9,
+              display: 'flex', alignItems: 'center', gap: 10,
+              fontSize: 11.5, fontFamily: 'Inter, sans-serif',
+            }}>
+              <CheckCircle2 size={14} color="#059669" />
+              <span style={{ color: '#065f46', fontWeight: 600 }}>
+                Generated · {lastResult.html.length.toLocaleString()} chars
+                {generateAmp && lastResult.amp_html ? ` · AMP ${lastResult.amp_html.length.toLocaleString()} chars` : ''}
+                {generateAmp && !lastResult.amp_html ? ' · AMP empty ⚠' : ''}
+              </span>
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={onPreview}
+                  style={{
+                    padding: '5px 11px', fontSize: 11, fontWeight: 600, color: '#4338ca',
+                    background: '#fff', border: '1px solid rgba(99,102,241,0.35)', borderRadius: 7,
+                    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <Eye size={12} /> Live Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={onDownload}
+                  style={{
+                    padding: '5px 11px', fontSize: 11, fontWeight: 600, color: '#4338ca',
+                    background: '#fff', border: '1px solid rgba(99,102,241,0.35)', borderRadius: 7,
+                    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <Download size={12} /> Download HTML
+                </button>
+              </span>
             </div>
           )}
           <style>{`@keyframes lc-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}.lc-spin{animation:lc-spin 0.8s linear infinite;}`}</style>
@@ -690,7 +740,32 @@ function NewCampaignPageInner() {
 
   const currentHtml = form.contentMode === 'visual' && editorRef.current
     ? editorRef.current.innerHTML
-    : form.htmlContent;
+    : form.contentMode === 'amp' && form.ampHtml
+      ? form.ampHtml
+      : form.htmlContent;
+
+  // Download the active body as a .html file the marketer can preview /
+  // archive / hand off to a designer. Picks AMP when the AMP tab is active
+  // and ampHtml is populated; otherwise the HTML body.
+  function downloadCurrentEmail() {
+    const isAmp = form.contentMode === 'amp' && form.ampHtml.trim().length > 0;
+    const body = isAmp ? form.ampHtml : (form.htmlContent || currentHtml);
+    if (!body || !body.trim()) return;
+    const safeName = (form.name || 'campaign')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'campaign';
+    const suffix = isAmp ? '-amp.html' : '.html';
+    const blob = new Blob([body], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}${suffix}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   const manualCount = (() => {
     const emails = parseEmails(form.manualEmails).filter(e => e.includes('@'));
@@ -2343,6 +2418,8 @@ function NewCampaignPageInner() {
                       htmlContent: r.html || f.htmlContent,
                       ampHtml: r.amp_html || f.ampHtml,
                     }))}
+                    onPreview={() => setShowSplitPreview(true)}
+                    onDownload={downloadCurrentEmail}
                   />
                 )}
 
@@ -2619,6 +2696,21 @@ function NewCampaignPageInner() {
                       }}
                     >
                       <Icon name={'smartphone'} size={13} />
+                    </button>
+                    <button
+                      onClick={downloadCurrentEmail}
+                      disabled={!currentHtml || !currentHtml.trim()}
+                      title="Download current email as .html"
+                      style={{
+                        padding: '3px 7px', borderRadius: '5px', border: 'none',
+                        cursor: currentHtml && currentHtml.trim() ? 'pointer' : 'not-allowed',
+                        backgroundColor: T.surfaceContainer,
+                        color: currentHtml && currentHtml.trim() ? T.primary : T.onSurfaceVariant,
+                        opacity: currentHtml && currentHtml.trim() ? 1 : 0.45,
+                        display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      <Download size={13} />
                     </button>
                   </div>
                 </div>
@@ -3108,6 +3200,24 @@ function NewCampaignPageInner() {
                 >
                   <Icon name={'smartphone'} size={13} />
                   Mobile
+                </button>
+                <button
+                  onClick={downloadCurrentEmail}
+                  disabled={!currentHtml || !currentHtml.trim()}
+                  title="Download current email as .html"
+                  style={{
+                    padding: '5px 10px', borderRadius: T.radiusLg,
+                    border: 'none',
+                    backgroundColor: T.surfaceContainerLow,
+                    color: currentHtml && currentHtml.trim() ? T.primary : T.onSurfaceVariant,
+                    opacity: currentHtml && currentHtml.trim() ? 1 : 0.45,
+                    fontSize: '11px', fontWeight: 600,
+                    cursor: currentHtml && currentHtml.trim() ? 'pointer' : 'not-allowed',
+                    fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
+                  }}
+                >
+                  <Download size={13} />
+                  Download
                 </button>
                 <button
                   onClick={() => setShowSplitPreview(false)}
