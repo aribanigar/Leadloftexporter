@@ -315,8 +315,8 @@ export default function OutreachPage() {
   // timeline poll. The mutation context carries the pending bubble id so
   // onSuccess/onError can target the right one.
   type SendEmailResp = {
-    id: string;
-    status: string;
+    id?: string;
+    status?: string;
     ok: boolean;
     error?: string | null;
     from_address?: string | null;
@@ -326,17 +326,37 @@ export default function OutreachPage() {
     Error,
     { subject: string; body: string; pendingId: string }
   >({
-    mutationFn: ({ subject, body }) =>
-      api("/inbox/send", {
+    // Route the single-lead send through the Vercel bridge (/api/outreach/send)
+    // instead of calling Python /inbox/send directly. Render's free tier
+    // blocks outbound SMTP ports — Python can't actually deliver, so direct
+    // sends silently fell through to Resend, which rejected every send
+    // ("sending domain isn't verified"). The bridge does prepare-send on
+    // Python, dispatches via nodemailer/Resend/SendGrid FROM Vercel (which
+    // CAN open SMTP), then commit-send on Python. This is the same path
+    // bulk send uses — now both work identically.
+    mutationFn: async ({ subject, body }) => {
+      const token = getToken();
+      const wsId = getWorkspaceId();
+      const res = await fetch("/api/outreach/send", {
         method: "POST",
-        body: {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token || ""}`,
+          "X-Workspace-Id": wsId || "",
+        },
+        body: JSON.stringify({
           lead_id: activeLeadId,
           to: activeLead?.email,
           subject,
           body_html: body.replace(/\n/g, "<br/>"),
           body_text: body,
-        },
-      }),
+        }),
+      });
+      const text = await res.text();
+      let r: SendEmailResp = { ok: false };
+      try { r = JSON.parse(text); } catch { r = { ok: false, error: "non_json_response" }; }
+      return r;
+    },
     onSuccess: (r, vars) => {
       // Resolved synchronously — flip the bubble immediately.
       setPending((cur) =>
