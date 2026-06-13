@@ -21,6 +21,8 @@ from app.api.v1 import (
     content_hub,
     tracking,
     calendar,
+    scheduling,
+    booking,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -45,3 +47,6 @@ api_router.include_router(campaigns.router)
 api_router.include_router(content_hub.router)
 api_router.include_router(tracking.router)
 api_router.include_router(calendar.router)
+api_router.include_router(scheduling.router)
+api_router.include_router(scheduling.bookings_router)
+api_router.include_router(booking.router)

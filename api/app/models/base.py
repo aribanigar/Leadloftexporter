@@ -843,3 +843,67 @@ class Suppression(Base, TimestampMixin):
     source_campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL")
     )
+
+
+class EventType(Base, TimestampMixin):
+    """A reusable bookable meeting template — the GReminders/Calendly "event
+    type". A prospect picks an open slot on its public page; we compute slots
+    from the owner's weekly availability minus calendar busy times and existing
+    bookings, then write the confirmed meeting to the owner's calendar.
+    """
+
+    __tablename__ = "event_types"
+    __table_args__ = (UniqueConstraint("workspace_id", "slug", name="uq_event_type_slug"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    duration_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    location_type: Mapped[str] = mapped_column(String(30), default="google_meet")
+    # google_meet | phone | in_person | custom
+    location_details: Mapped[Optional[str]] = mapped_column(String(500))
+    buffer_before_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    buffer_after_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    min_notice_minutes: Mapped[int] = mapped_column(Integer, default=120)
+    date_range_days: Mapped[int] = mapped_column(Integer, default=30)
+    slot_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    color: Mapped[str] = mapped_column(String(20), default="#3b82f6")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Weekly availability: {"mon": [{"start": "09:00", "end": "17:00"}], ...}
+    availability: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Custom intake questions: [{"key","label","type","required"}]
+    questions: Mapped[list] = mapped_column(JSONB, default=list)
+
+
+class Booking(Base, TimestampMixin):
+    """A confirmed booking against an EventType, made from the public page."""
+
+    __tablename__ = "bookings"
+    __table_args__ = (
+        Index("ix_bookings_event_start", "event_type_id", "start_at"),
+        Index("ix_bookings_workspace_start", "workspace_id", "start_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    event_type_id: Mapped[str] = mapped_column(ForeignKey("event_types.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    lead_id: Mapped[Optional[str]] = mapped_column(ForeignKey("leads.id", ondelete="SET NULL"))
+
+    invitee_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    invitee_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    invitee_phone: Mapped[Optional[str]] = mapped_column(String(60))
+    invitee_timezone: Mapped[Optional[str]] = mapped_column(String(64))
+
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="confirmed")  # confirmed | cancelled
+    answers: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    calendar_account_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connected_accounts.id", ondelete="SET NULL"))
+    external_event_id: Mapped[Optional[str]] = mapped_column(String(255))
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
