@@ -23,6 +23,7 @@ from app.api.v1 import (
     calendar,
     scheduling,
     booking,
+    routing,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -51,3 +52,5 @@ api_router.include_router(scheduling.router)
 api_router.include_router(scheduling.bookings_router)
 api_router.include_router(scheduling.workflows_router)
 api_router.include_router(booking.router)
+api_router.include_router(routing.router)
+api_router.include_router(routing.public_router)

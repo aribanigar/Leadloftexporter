@@ -970,3 +970,23 @@ class Workflow(Base, TimestampMixin):
     # Optional scoping, e.g. {"event_type_id": "..."} to limit to one event type.
     filters: Mapped[dict] = mapped_column(JSONB, default=dict)
     actions: Mapped[list] = mapped_column(JSONB, default=list)
+
+
+class RoutingForm(Base, TimestampMixin):
+    """A qualifying form whose answers route a prospect to an event type or an
+    external URL (GReminders/Calendly "routing forms")."""
+
+    __tablename__ = "routing_forms"
+    __table_args__ = (UniqueConstraint("workspace_id", "slug", name="uq_routing_form_slug"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Fields: [{"key","label","type":"text"|"select","options":[...],"required":bool}]
+    fields: Mapped[list] = mapped_column(JSONB, default=list)
+    # Rules: [{"conditions":[{"field","op","value"}], "action":{"type":"event"|"url","target"}}]
+    rules: Mapped[list] = mapped_column(JSONB, default=list)
+    # Fallback when no rule matches: {"type":"event"|"url","target"}
+    default_action: Mapped[dict] = mapped_column(JSONB, default=dict)

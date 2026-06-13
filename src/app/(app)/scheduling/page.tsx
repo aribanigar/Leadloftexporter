@@ -90,7 +90,7 @@ export default function SchedulingPage() {
   });
 
   const active = eventTypes.find((e) => e.id === selected) || null;
-  const [tab, setTab] = useState<"events" | "workflows">("events");
+  const [tab, setTab] = useState<"events" | "workflows" | "routing">("events");
 
   return (
     <div className="p-6">
@@ -100,24 +100,26 @@ export default function SchedulingPage() {
       </div>
 
       <div className="mb-4 flex gap-1 border-b border-slate-200">
-        {(["events", "workflows"] as const).map((t) => (
+        {(["events", "workflows", "routing"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={
-              "relative px-4 py-2 text-sm font-medium " +
+              "relative px-4 py-2 text-sm font-medium capitalize " +
               (tab === t
                 ? "text-brand-700 after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:bg-brand-600"
                 : "text-slate-500 hover:text-slate-700")
             }
           >
-            {t === "events" ? "Event types" : "Workflows"}
+            {t === "events" ? "Event types" : t}
           </button>
         ))}
       </div>
 
       {tab === "workflows" ? (
         <WorkflowsManager eventTypes={eventTypes} />
+      ) : tab === "routing" ? (
+        <RoutingManager eventTypes={eventTypes} />
       ) : (
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <div className="space-y-2">
@@ -804,5 +806,284 @@ function Sel({
         ))}
       </select>
     </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Routing forms
+// ---------------------------------------------------------------------------
+
+interface RFField {
+  key: string;
+  label: string;
+  type: string;
+  options?: string[];
+}
+interface RFAction {
+  type: string;
+  target: string;
+}
+interface RFRule {
+  conditions: { field: string; op: string; value: string }[];
+  action: RFAction;
+}
+interface RoutingFormT {
+  id: string;
+  name: string;
+  slug: string;
+  active: boolean;
+  fields: RFField[];
+  rules: RFRule[];
+  default_action: RFAction;
+}
+
+function RoutingManager({ eventTypes }: { eventTypes: EventType[] }) {
+  const qc = useQueryClient();
+  const { data } = useQuery<{ forms: RoutingFormT[]; workspace_slug: string }>({
+    queryKey: ["routing-forms"],
+    queryFn: () => api("/routing-forms"),
+  });
+  const forms = data?.forms || [];
+  const wsSlug = data?.workspace_slug || "";
+
+  const create = useMutation({
+    mutationFn: () => api("/routing-forms", { method: "POST", body: { name: "New routing form" } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["routing-forms"] }),
+  });
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">Ask qualifying questions, then send each prospect to the right meeting or a URL.</p>
+        <button
+          onClick={() => create.mutate()}
+          disabled={create.isPending}
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          <Plus className="h-4 w-4" /> New form
+        </button>
+      </div>
+      {forms.length === 0 && <div className="card p-8 text-center text-sm text-slate-500">No routing forms yet.</div>}
+      {forms.map((f) => (
+        <RoutingCard key={f.id} form={f} eventTypes={eventTypes} workspaceSlug={wsSlug} />
+      ))}
+    </div>
+  );
+}
+
+function RoutingCard({ form: initial, eventTypes, workspaceSlug }: { form: RoutingFormT; eventTypes: EventType[]; workspaceSlug: string }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<RoutingFormT>(initial);
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== "undefined" ? `${window.location.origin}/route/${workspaceSlug}/${form.slug}` : "";
+
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/routing-forms/${form.id}`, {
+        method: "PATCH",
+        body: { name: form.name, active: form.active, fields: form.fields, rules: form.rules, default_action: form.default_action },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["routing-forms"] }),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/routing-forms/${form.id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["routing-forms"] }),
+  });
+
+  const fieldKeys = form.fields.map((f) => f.key).filter(Boolean);
+
+  return (
+    <div className="card space-y-3 p-5">
+      <div className="flex items-center gap-2">
+        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm font-medium" />
+        <label className="flex items-center gap-1.5 text-sm text-slate-600">
+          <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded bg-slate-50 px-2 py-1 text-xs text-slate-600">{url}</code>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />} {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+
+      {/* Fields */}
+      <div>
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Questions</span>
+        <div className="mt-1 space-y-2">
+          {form.fields.map((fld, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2">
+              <input
+                placeholder="Question label"
+                value={fld.label}
+                onChange={(e) => {
+                  const label = e.target.value;
+                  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+                  setForm({ ...form, fields: form.fields.map((x, j) => (j === i ? { ...x, label, key } : x)) });
+                }}
+                className="min-w-[10rem] flex-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+              />
+              <select
+                value={fld.type}
+                onChange={(e) => setForm({ ...form, fields: form.fields.map((x, j) => (j === i ? { ...x, type: e.target.value } : x)) })}
+                className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+              >
+                <option value="text">Text</option>
+                <option value="select">Choices</option>
+              </select>
+              {fld.type === "select" && (
+                <input
+                  placeholder="Option A, Option B"
+                  value={(fld.options || []).join(", ")}
+                  onChange={(e) =>
+                    setForm({ ...form, fields: form.fields.map((x, j) => (j === i ? { ...x, options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : x)) })
+                  }
+                  className="min-w-[10rem] flex-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+                />
+              )}
+              <button onClick={() => setForm({ ...form, fields: form.fields.filter((_, j) => j !== i) })} className="rounded p-1 text-slate-400 hover:text-rose-600">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setForm({ ...form, fields: [...form.fields, { key: "", label: "", type: "text" }] })}
+            className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+          >
+            + Add question
+          </button>
+        </div>
+      </div>
+
+      {/* Rules */}
+      <div>
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Rules (first match wins)</span>
+        <div className="mt-1 space-y-2">
+          {form.rules.map((rule, ri) => (
+            <div key={ri} className="rounded-md border border-slate-200 p-2">
+              {rule.conditions.map((c, ci) => (
+                <div key={ci} className="mb-1 flex flex-wrap items-center gap-1 text-sm">
+                  <span className="text-slate-400">If</span>
+                  <select
+                    value={c.field}
+                    onChange={(e) => updateCond(setForm, form, ri, ci, { field: e.target.value })}
+                    className="rounded border border-slate-200 px-1.5 py-1 text-sm"
+                  >
+                    <option value="">field…</option>
+                    {fieldKeys.map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={c.op}
+                    onChange={(e) => updateCond(setForm, form, ri, ci, { op: e.target.value })}
+                    className="rounded border border-slate-200 px-1.5 py-1 text-sm"
+                  >
+                    <option value="equals">is</option>
+                    <option value="not_equals">is not</option>
+                    <option value="contains">contains</option>
+                  </select>
+                  <input
+                    value={c.value}
+                    onChange={(e) => updateCond(setForm, form, ri, ci, { value: e.target.value })}
+                    placeholder="value"
+                    className="w-28 rounded border border-slate-200 px-1.5 py-1 text-sm"
+                  />
+                </div>
+              ))}
+              <button
+                onClick={() =>
+                  setForm({ ...form, rules: form.rules.map((r, j) => (j === ri ? { ...r, conditions: [...r.conditions, { field: "", op: "equals", value: "" }] } : r)) })
+                }
+                className="mb-2 text-xs text-brand-700 hover:underline"
+              >
+                + condition
+              </button>
+              <ActionPicker
+                eventTypes={eventTypes}
+                value={rule.action}
+                onChange={(a) => setForm({ ...form, rules: form.rules.map((r, j) => (j === ri ? { ...r, action: a } : r)) })}
+              />
+              <button onClick={() => setForm({ ...form, rules: form.rules.filter((_, j) => j !== ri) })} className="mt-1 text-xs text-rose-600 hover:underline">
+                Remove rule
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setForm({ ...form, rules: [...form.rules, { conditions: [{ field: "", op: "equals", value: "" }], action: { type: "event", target: "" } }] })}
+            className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+          >
+            + Add rule
+          </button>
+        </div>
+      </div>
+
+      {/* Default action */}
+      <div>
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Otherwise (default)</span>
+        <div className="mt-1">
+          <ActionPicker eventTypes={eventTypes} value={form.default_action} onChange={(a) => setForm({ ...form, default_action: a })} />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button onClick={() => save.mutate()} disabled={save.isPending} className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+          {save.isPending ? "Saving…" : "Save"}
+        </button>
+        <button onClick={() => confirm("Delete this form?") && del.mutate()} className="rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50">
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function updateCond(
+  setForm: React.Dispatch<React.SetStateAction<RoutingFormT>>,
+  form: RoutingFormT,
+  ri: number,
+  ci: number,
+  patch: Partial<{ field: string; op: string; value: string }>
+) {
+  setForm({
+    ...form,
+    rules: form.rules.map((r, j) =>
+      j === ri ? { ...r, conditions: r.conditions.map((c, k) => (k === ci ? { ...c, ...patch } : c)) } : r
+    ),
+  });
+}
+
+function ActionPicker({ eventTypes, value, onChange }: { eventTypes: EventType[]; value: RFAction; onChange: (a: RFAction) => void }) {
+  const v = value || { type: "event", target: "" };
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-slate-400">→</span>
+      <select value={v.type} onChange={(e) => onChange({ type: e.target.value, target: "" })} className="rounded border border-slate-200 px-1.5 py-1 text-sm">
+        <option value="event">Book event</option>
+        <option value="url">External URL</option>
+      </select>
+      {v.type === "event" ? (
+        <select value={v.target} onChange={(e) => onChange({ ...v, target: e.target.value })} className="rounded border border-slate-200 px-1.5 py-1 text-sm">
+          <option value="">choose…</option>
+          {eventTypes.map((e) => (
+            <option key={e.id} value={e.slug}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input value={v.target} onChange={(e) => onChange({ ...v, target: e.target.value })} placeholder="https://…" className="min-w-[12rem] flex-1 rounded border border-slate-200 px-1.5 py-1 text-sm" />
+      )}
+    </div>
   );
 }
