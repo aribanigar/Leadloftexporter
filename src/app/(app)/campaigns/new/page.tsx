@@ -114,10 +114,22 @@ function AIGeneratorPanel({
     setBusy(true);
     setErr(null);
     try {
+      // Strip HTML tags from the brief — if the user accidentally pasted HTML
+      // (closing tags, DOCTYPE, etc.) we'd otherwise send it as the AI prompt
+      // AND the fallback template would echo it back as visible body text.
+      const cleanBrief = brief
+        .replace(/<[^>]+>/g, ' ')      // strip tags
+        .replace(/&[a-z]+;/gi, ' ')    // strip entities
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleanBrief) {
+        setErr('Brief looks like HTML markup — describe your email in plain words.');
+        return;
+      }
       const result = await api<AIGenResult>('/ai/write/marketing-html', {
         method: 'POST',
         body: {
-          brief: brief.trim(),
+          brief: cleanBrief,
           brand_color: brandColor,
           tone,
           include_amp: generateAmp,
@@ -743,6 +755,28 @@ function NewCampaignPageInner() {
     : form.contentMode === 'amp' && form.ampHtml
       ? form.ampHtml
       : form.htmlContent;
+
+  // Render-safe variant of currentHtml for the preview iframe:
+  // - AMP boilerplate hides <body> until the AMP runtime reveals it; without
+  //   that runtime, our srcDoc iframe shows a blank rectangle. Force the
+  //   body visible.
+  // - Bare HTML fragments (no <html>/<body>) are wrapped in a default shell
+  //   so things like `<div>Hi</div>` render with a sensible font baseline.
+  function buildPreviewDoc(src: string): string {
+    if (!src || !src.trim()) return '';
+    const hasHtml = /<html[\s>]/i.test(src);
+    const unhide = '<style>html,body{visibility:visible !important;opacity:1 !important;}</style>';
+    if (hasHtml) {
+      // Inject the visibility reset just before </head> (or, failing that,
+      // at the very top) so it wins over amp4email-boilerplate.
+      if (/<\/head>/i.test(src)) {
+        return src.replace(/<\/head>/i, `${unhide}</head>`);
+      }
+      return unhide + src;
+    }
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${unhide}<style>body{margin:0;padding:24px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2937;background:#fff;}</style></head><body>${src}</body></html>`;
+  }
+  const previewDoc = buildPreviewDoc(currentHtml);
 
   // Download the active body as a .html file the marketer can preview /
   // archive / hand off to a designer. Picks AMP when the AMP tab is active
@@ -2454,13 +2488,20 @@ function NewCampaignPageInner() {
                     brandColor={form.brandColor}
                     onBrandColor={(c) => setForm(f => ({ ...f, brandColor: c }))}
                     generateAmp={form.contentMode === 'amp'}
-                    onResult={(r) => setForm(f => ({
-                      ...f,
-                      subject: f.subject || r.subject,
-                      previewText: f.previewText || r.preview_text,
-                      htmlContent: r.html || f.htmlContent,
-                      ampHtml: r.amp_html || f.ampHtml,
-                    }))}
+                    onResult={(r) => {
+                      // Defensive: reject AI subject/preview if they leak HTML
+                      // — the fallback echoes raw brief otherwise.
+                      const looksLikeHtml = (s: string) => /<[a-z!\/][^>]*>/i.test(s);
+                      const cleanSubject = looksLikeHtml(r.subject) ? '' : r.subject;
+                      const cleanPreview = looksLikeHtml(r.preview_text) ? '' : r.preview_text;
+                      setForm(f => ({
+                        ...f,
+                        subject: f.subject || cleanSubject,
+                        previewText: f.previewText || cleanPreview,
+                        htmlContent: r.html || f.htmlContent,
+                        ampHtml: r.amp_html || f.ampHtml,
+                      }));
+                    }}
                     onPreview={() => setShowSplitPreview(true)}
                     onDownload={downloadCurrentEmail}
                   />
@@ -2780,7 +2821,7 @@ function NewCampaignPageInner() {
                   }}>
                     <iframe
                       srcDoc={
-                        currentHtml ||
+                        previewDoc ||
                         '<div style="padding:40px 24px;text-align:center;font-family:Inter,sans-serif;color:#9ca3af"><div style="font-size:32px;margin-bottom:12px">✉</div><p style="font-size:13px;margin:0;line-height:1.6">Start writing HTML<br/>to see a live preview</p></div>'
                       }
                       style={{
@@ -2792,7 +2833,7 @@ function NewCampaignPageInner() {
                         display: 'block',
                         backgroundColor: '#ffffff',
                       }}
-                      sandbox="allow-same-origin"
+                      sandbox="allow-same-origin allow-popups"
                       title="Quick Email Preview"
                     />
                   </div>
@@ -3286,7 +3327,7 @@ function NewCampaignPageInner() {
               padding: previewDevice === 'mobile' ? '20px' : '0',
             }}>
               <iframe
-                srcDoc={currentHtml || `<p style="padding:40px;color:#9ca3af;text-align:center;font-family:Inter,sans-serif;font-size:13px">Start writing your email to see the preview here…</p>`}
+                srcDoc={previewDoc || `<p style="padding:40px;color:#9ca3af;text-align:center;font-family:Inter,sans-serif;font-size:13px">Start writing your email to see the preview here…</p>`}
                 style={{
                   border: 'none',
                   width: previewDevice === 'mobile' ? '375px' : '100%',
@@ -3297,7 +3338,7 @@ function NewCampaignPageInner() {
                   borderRadius: previewDevice === 'mobile' ? T.radiusXl : '0',
                   flexShrink: 0,
                 }}
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-popups"
                 title="Live Email Preview"
               />
             </div>
