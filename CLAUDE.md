@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in four independent deployables:
+The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in four independent deployables plus a content-engine sidecar:
 
 ```
 /api         FastAPI backend (Postgres + Redis + Celery)  → Render
 (root)       Next.js 15 frontend (App Router + TanStack)  → Vercel
 /extension   Chrome MV3 extension (LinkedIn capture)      → unpacked / zipped
 /whatsapp    Node/Baileys WhatsApp sidecar (Express)      → Render (Docker)
+/scripts     Standalone Python helpers (Content Hub DB seeder, etc.)
+/content     Generated daily marketing content, committed to main per day
+             (e.g. content/gifts-gulf/<YYYY-MM-DD>/<CUR>/set-<n>/email.html …)
 ```
 
 Each can be modified independently. The extension talks to the API; the frontend talks to the API; nothing talks to the extension. The WhatsApp sidecar is **internal only** — the FastAPI router `whatsapp_web.py` proxies frontend calls to it using `WA_SIDECAR_URL` + `WA_SIDECAR_TOKEN` env vars. Sessions are workspace-scoped by `X-Workspace-Id`.
@@ -136,6 +139,79 @@ Two-column screen. Left rail is profile + stage selector + tasks + lead-info fie
 ### Reusable cross-page modal: `EnrollPlaybookModal`
 
 `src/components/enroll-playbook-modal.tsx` is consumed in two places: hover send-icon on Pipeline rows, and the "Add to Playbook" button on Lead Detail. Successful enrollment swaps the row's Enroll button for an inline "Enrolled ✓" pill — the modal stays open so the user can enroll into multiple playbooks in one go. If you add a third entry point, reuse this component rather than rolling another.
+
+### Campaign Builder (`/campaigns/new`)
+
+The biggest single page in the app — table-based marketing-email builder with AI generation, AMP-for-Email, recipient picker (CRM + CSV + pipeline stage), sender rotation, per-step follow-ups, and live preview.
+
+**Editor modes** (state: `form.contentMode`):
+- `html` — code editor, marketer-pasted HTML.
+- `amp` — AMP-for-Email body. Surfaces as a gradient pill in the tab bar so it's obvious AMP is the premium send mode.
+- `plain` / `upload` / `visual` — text, file upload, contentEditable preview.
+
+**AI panel** — `AIGeneratorPanel` lives inline at the top of the editor. Sends `POST /ai/write/marketing-html` with `brief`, `brand_color`, `tone`, `include_amp`, and optional `client_id`. Returns `{subject, preview_text, html, amp_html, mode}` where `mode === 'fallback'` means `ANTHROPIC_API_KEY` isn't configured server-side and the hand-built template fired — the panel shows an amber banner so the user knows to set the key on Render. The brief is HTML-stripped client-side to stop pasted markup from being echoed by the fallback as the subject.
+
+**Preview pipeline** — `buildPreviewDoc()` is the small but load-bearing helper that **rewrites the AMP boilerplate visibility rule before stuffing into the iframe srcDoc**. AMP4Email's boilerplate (`<style amp4email-boilerplate>body{visibility:hidden}</style>`) keeps the body hidden until the AMP runtime reveals it; without the runtime in the preview iframe, AMP bodies render as a blank rectangle. The helper injects `html,body{visibility:visible !important}` just before `</head>` (preview only — the sent body is untouched). The Live Preview panel is `position: fixed; right: 0; z-index: 90` — was originally a flex sibling at `width: 400px` and got pushed off-screen on narrower viewports. Don't revert.
+
+**Content Hub integration** — when `?from_asset=<id>` is on the URL, the builder fetches that Content Hub asset and pre-fills name (`<Business> — <Asset title>`), subject, `htmlContent`, and `ampHtml`. The "Use email from Content Hub" picker modal (top of editor, when no edit/from_asset is in URL) calls `GET /content-hub/assets/html-emails` for a workspace-wide list with the business name + AMP badge.
+
+### Content Hub (`/content-hub`)
+
+Multi-business, Google-Drive-style folder system for storing reusable marketing assets (HTML emails with optional AMP body, WhatsApp messages, captions, SMS, "other"). Two routes: `/content-hub` (businesses grid) and `/content-hub/[slug]` (one business's asset library).
+
+**Data model** (`api/app/models/base.py`):
+- `ContentBusiness` — workspace-scoped folder. Auto-slugified name with collision-suffixing (`Acme Co` → `acme-co`, `acme-co-2`, …). Carries `brand_color`, `accent_color`, `tone`, `logo_url` so it can later feed the AI writer with on-brand defaults.
+- `ContentAsset` — belongs to a business. Type enum: `html_email | whatsapp | caption | sms | other`. HTML email assets carry an **optional `amp_content`** column so one asset = one deliverable to all clients with AMP as the Gmail-only enhancement (migration `0010_content_asset_amp`).
+
+**Routes** (`api/app/api/v1/content_hub.py`):
+- `GET/POST /content-hub/businesses` — list (with per-type asset counts) / create. Lookup by `{ref}` accepts slug **or** id.
+- `GET/POST /content-hub/businesses/{business_id}/assets` — nested asset CRUD.
+- `GET /content-hub/assets/html-emails` — workspace-wide HTML email list with business name, slug, color, AMP flag, content size. **Declared BEFORE `/assets/{asset_id}`** so the literal route wins the FastAPI match.
+- `GET/PATCH/DELETE /content-hub/assets/{asset_id}` — direct asset access.
+
+**Send-test from an asset** — the asset library's send-test modal routes through the existing Vercel SMTP bridge (`/api/outreach/send`), forwarding `body_amp` when an AMP body is attached. The bridge attaches AMP as the `text/x-amp-html` MIME alternative via nodemailer; Gmail renders it, every other client falls back to the HTML body.
+
+### Daily content pipeline (`/content` + `/scripts`)
+
+A side-channel for AI-routine-generated marketing content. Each business has its own folder under `content/<biz-slug>/`. The current consumer is **Gifts Gulf** (corporate-gifting catalogue marketing in AED/SAR/QAR).
+
+**Tree layout per day:**
+```
+content/gifts-gulf/<YYYY-MM-DD>/
+├── manifest.json                       # the 9 sets that day
+├── <CUR>/                              # AED | SAR | QAR
+│   └── set-<n>/                        # n = 1..3
+│       ├── email.html                  # the file that gets sent
+│       ├── email.amp.html              # optional AMP upgrade (Gmail only)
+│       ├── whatsapp.txt                # WhatsApp broadcast message
+│       ├── linkedin.txt                # LinkedIn outreach DM
+│       └── meta.json                   # {date, currency, theme, subject, skus, products[]}
+└── _state/
+    ├── history.json                    # 14-day no-repeat + forever-unique subjects
+    └── used-skus.json                  # legacy; same idea
+```
+
+**Image rule (load-bearing) — for product photos in marketing emails:**
+- Use the **raw midocean CDN URL** directly: `https://cdn1.midocean.com/image/original/<code>.jpg`. This renders in Gmail (proven by the working "Premium Drinkware" email).
+- Do **NOT** use the giftsgulf `_next/image` optimizer — Gmail's image proxy can time out on the cold optimizer and cache the failure (blank tile forever for that message).
+- Do **NOT** hand-construct `mo####-##` codes. Pull each code straight from the catalogue row for that SKU. A guessed code 404s upstream → blank tile.
+
+**`scripts/publish_to_hub.py`** — the DB seeder. The Hub HTTP API also exists, but the routine runs the script directly because the routine sandbox can reach Postgres easily but flaked on the HTTP/JWT path. The script:
+- Resolves the `gifts-gulf` (or any) business by `(workspace_id, slug)`. Creates it on first run with Gifts Gulf branding (`#00a544` green, `#008138` accent, gglogo.svg as logo).
+- For each set under `content/<biz>/<date>/<CUR>/set-<n>/`, inserts **3 ContentAsset rows**: `html_email` (with `amp_content`), `whatsapp`, and `caption` (with `platform: linkedin`).
+- **Idempotent** — skips inserts whose `(business_id, title)` tuple already exists. Title encodes date + currency + theme, so reruns are no-ops.
+- **Schema-tolerant `meta.json`** — only needs date + currency + theme + skus + products. `campaign_code`/`campaign_name` are optional; the publisher builds a title from date + currency + theme when not provided.
+- Required env: `DATABASE_URL` (Neon, accepts the `postgresql+psycopg://` SQLAlchemy prefix; stripped before handing to `psycopg`), `HUB_WORKSPACE` (workspace UUID).
+
+**Usage:**
+```bash
+pip3 install -r scripts/requirements.txt   # psycopg[binary]
+export DATABASE_URL='<rotated Neon URL>'
+export HUB_WORKSPACE='<workspace uuid>'
+python3 scripts/publish_to_hub.py --date 2026-06-13
+```
+
+Prints `{date, business_id, business_slug, created_business, inserted, skipped, failures}` on stdout. Exits non-zero only when `failures` is non-empty.
 
 ## Extension architecture (`/extension`)
 
