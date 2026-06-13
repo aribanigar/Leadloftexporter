@@ -295,6 +295,37 @@ class LinkedInMessage(Base, TimestampMixin):
     replied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class WhatsAppMessage(Base, TimestampMixin):
+    """A single 1:1 WhatsApp message captured by the Baileys sidecar.
+
+    The sidecar POSTs every real-time message (inbound reply OR our own
+    outbound send) to ``/whatsapp-web/webhook/inbound``; the backend matches
+    the phone to a Lead and writes one of these rows so the conversation
+    surfaces in the Lead Detail timeline. ``provider_message_id`` is the
+    WhatsApp message id and is unique per workspace so reconnect history
+    replays don't create duplicates.
+    """
+
+    __tablename__ = "whatsapp_messages"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "provider_message_id", name="uq_wa_msg_provider"),
+        Index("ix_wa_msg_lead_created", "lead_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    # Nullable: we still store messages from numbers that don't map to a lead
+    # yet, so the row exists if the lead is created later (and to dedup).
+    lead_id: Mapped[Optional[str]] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"), index=True)
+    direction: Mapped[str] = mapped_column(String(10), default="inbound")  # inbound|outbound
+    phone: Mapped[str] = mapped_column(String(40), index=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(200))
+    body: Mapped[Optional[str]] = mapped_column(Text)
+    msg_type: Mapped[str] = mapped_column(String(40), default="text")
+    provider_message_id: Mapped[Optional[str]] = mapped_column(String(128), index=True)
+    provider_ts: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class CallLog(Base, TimestampMixin):
     __tablename__ = "call_logs"
 

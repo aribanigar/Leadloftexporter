@@ -18,6 +18,8 @@ The **LeadCaptura monorepo** — a LinkedIn lead-generation SaaS in four indepen
 
 Each can be modified independently. The extension talks to the API; the frontend talks to the API; nothing talks to the extension. The WhatsApp sidecar is **internal only** — the FastAPI router `whatsapp_web.py` proxies frontend calls to it using `WA_SIDECAR_URL` + `WA_SIDECAR_TOKEN` env vars. Sessions are workspace-scoped by `X-Workspace-Id`.
 
+The sidecar also pushes captured messages **back** to the API for CRM timeline sync (see "WhatsApp inbox + CRM sync" below). That direction uses the sidecar's `WA_BACKEND_URL` env (the API origin) and the **same** `WA_SIDECAR_TOKEN` as a shared secret, POSTed to `/whatsapp-web/webhook/inbound`. If `WA_BACKEND_URL` is unset the inbox still works in-memory; only the lead-timeline sync is disabled.
+
 ## Commands
 
 ### Backend (`/api`)
@@ -96,6 +98,12 @@ The Lead Detail page in the frontend depends on a small cluster of endpoints on 
 - `GET/POST /leads/{id}/tasks`  — per-lead task list and creation. `PATCH /leads/tasks/{id}` toggles status.
 
 If you add a new lead-scoped resource, follow the same pattern and add a branch to `_ensure_lead()` + extend `lead_timeline()` so it surfaces in the activity feed.
+
+### WhatsApp inbox + CRM sync
+
+The Baileys sidecar (`/whatsapp`) captures every real-time 1:1 message via a `messages.upsert` handler and keeps an **in-memory** per-session `chatsStore` + `messagesStore` (capped 200/chat). The web `/whatsapp` page reads these through two proxied endpoints — `GET /whatsapp-web/chats` and `/whatsapp-web/chats/{phone}` — to render an inbox with a reply box. This store is process-memory only; a container restart rebuilds it from `chats.upsert` on reconnect.
+
+For durable CRM history, the sidecar **also** fire-and-forgets each `notify` (real-time, not reconnect-replay) message to `POST /whatsapp-web/webhook/inbound`. That endpoint is the **one** route not behind `get_workspace_context` — the sidecar can't hold a user JWT, so it authenticates with the shared `WA_SIDECAR_TOKEN` via the `X-Sidecar-Token` header. The handler matches the phone to a `Lead` (last-9-digits suffix match, tolerant of country-code/punctuation differences) and writes a **`WhatsAppMessage`** row (`migration 0014`), plus an `Activity(type=whatsapp_received)` for inbound matched messages. `(workspace_id, provider_message_id)` is unique so replays are idempotent. `lead_timeline()` merges these as `kind:"whatsapp"`. Unmatched numbers are still stored (`lead_id` null) for dedup. Outbound bulk/manual sends flow through the same `messages.upsert` echo (`fromMe:true`) so the timeline shows both sides.
 
 ### Outreach engine
 

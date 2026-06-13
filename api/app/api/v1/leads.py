@@ -24,6 +24,7 @@ from app.models import (
     Note,
     PipelineStage,
     Task,
+    WhatsAppMessage,
 )
 from app.schemas import (
     LeadCreate,
@@ -1176,6 +1177,19 @@ def lead_timeline(
             "duration_seconds": c.duration_seconds,
             "notes": c.notes,
             "at": c.created_at,
+        })
+    for w in (
+        db.query(WhatsAppMessage)
+        .filter(WhatsAppMessage.workspace_id == ctx.workspace_id, WhatsAppMessage.lead_id == lead_id)
+        .all()
+    ):
+        items.append({
+            "kind": "whatsapp",
+            "id": w.id,
+            "direction": w.direction,
+            "preview": (w.body or "")[:280],
+            "msg_type": w.msg_type,
+            "at": w.provider_ts or w.created_at,
         })
     items.sort(key=lambda x: x["at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return items

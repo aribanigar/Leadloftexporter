@@ -13,6 +13,7 @@ import {
   Star,
   StickyNote,
   PhoneCall,
+  MessageCircle,
   Plus,
   CheckCircle2,
   Circle,
@@ -27,12 +28,13 @@ import { LinkedInBridgePanel } from "@/components/linkedin-bridge-panel";
 type ComposerTab = "email" | "linkedin" | "note" | "call";
 
 interface TimelineItem {
-  kind: "activity" | "email" | "note" | "call";
+  kind: "activity" | "email" | "note" | "call" | "whatsapp";
   id: string;
   at: string;
   type?: string;
   payload?: Record<string, unknown>;
   direction?: "inbound" | "outbound";
+  msg_type?: string;
   from?: string;
   to?: string;
   subject?: string | null;
@@ -814,6 +816,9 @@ function Timeline({ items }: { items: TimelineItem[] }) {
                 {it.kind === "email" && <Mail className="h-3.5 w-3.5" />}
                 {it.kind === "note" && <StickyNote className="h-3.5 w-3.5" />}
                 {it.kind === "call" && <PhoneCall className="h-3.5 w-3.5" />}
+                {it.kind === "whatsapp" && (
+                  <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                )}
                 {it.kind === "activity" && <Plus className="h-3.5 w-3.5" />}
                 <strong className="font-medium text-slate-700">
                   {labelFor(it)}
@@ -855,6 +860,19 @@ function Timeline({ items }: { items: TimelineItem[] }) {
                 )}
               </div>
             )}
+            {it.kind === "whatsapp" && (
+              <div>
+                {it.preview ? (
+                  <p className="whitespace-pre-wrap text-sm text-slate-700">
+                    {it.preview}
+                  </p>
+                ) : (
+                  <p className="text-sm italic text-slate-400">
+                    [{it.msg_type || "media"}]
+                  </p>
+                )}
+              </div>
+            )}
             {it.kind === "activity" && (
               <p className="text-sm text-slate-600">{it.type}</p>
             )}
@@ -870,6 +888,9 @@ function labelFor(it: TimelineItem): string {
     return it.direction === "outbound" ? "Email sent" : "Email received";
   if (it.kind === "note") return "Note";
   if (it.kind === "call") return "Call logged";
+  if (it.kind === "whatsapp")
+    return it.direction === "outbound" ? "WhatsApp sent" : "WhatsApp reply";
+  if (it.type === "whatsapp_received") return "WhatsApp reply";
   if (it.type === "lead_captured") return "Lead captured";
   if (it.type === "lead_created_manual") return "Lead created";
   if (it.type === "stage_changed") return "Stage changed";

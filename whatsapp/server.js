@@ -46,6 +46,12 @@ app.use(express.json({ limit: MAX_JSON_BYTES }));
 
 const PORT = process.env.PORT || 8001;
 const SIDECAR_TOKEN = process.env.WA_SIDECAR_TOKEN || '';
+// Where to push captured messages so the backend can match them to a Lead and
+// surface the conversation on the Lead Detail timeline. Optional — if unset,
+// the in-memory inbox still works; only CRM timeline sync is disabled. Accepts
+// either the API origin (https://api.example.com) or the full webhook URL.
+const BACKEND_URL = (process.env.WA_BACKEND_URL || '').replace(/\/+$/, '');
+let warnedNoBackend = false;
 const AUTH_DIR = path.join(__dirname, '.baileys_auth');
 // CRITICAL: ``accounts.json`` and ``campaigns.json`` MUST live on the
 // persistent disk that Render mounts at ``.baileys_auth`` — otherwise they
@@ -217,7 +223,7 @@ async function initAccount(workspaceId, accountId, label) {
     // list shows the latest preview per phone) and once in messagesStore
     // (so opening a chat returns the recent thread). Group + status JIDs
     // are ignored so the inbox stays 1:1 conversations.
-    sock.ev.on('messages.upsert', ({ messages }) => {
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
       for (const msg of messages || []) {
         const jid = msg.key?.remoteJid;
         if (!jid) continue;
@@ -260,6 +266,22 @@ async function initAccount(workspaceId, accountId, label) {
         });
         while (list.length > 200) list.shift();
         session.messagesStore.set(jid, list);
+
+        // CRM timeline sync — only real-time messages (type === 'notify'), not
+        // the history Baileys replays on reconnect (type 'append'/'prepend'),
+        // and only when there's body text to show. Dedup at the backend by
+        // message id makes this safe even if a notify is delivered twice.
+        if (type === 'notify' && text) {
+          pushToBackend(workspaceId, {
+            phone,
+            text,
+            from_me: fromMe,
+            timestamp: ts,
+            message_id: msg.key?.id || null,
+            msg_type: Object.keys(msg.message || { text: 1 })[0] || 'text',
+            contact_name: msg.pushName || null,
+          });
+        }
       }
     });
 
@@ -489,6 +511,30 @@ function mergeMessage(template, contact) {
 
 function randomDelay(min, max) {
   return new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
+}
+
+// Fire-and-forget push of a captured message to the backend's CRM sync webhook.
+// Never throws into the caller — a backend hiccup must not break message
+// handling or the inbox. Uses the same shared token the proxy authenticates
+// with (X-Sidecar-Token).
+function pushToBackend(workspaceId, payload) {
+  if (!BACKEND_URL) {
+    if (!warnedNoBackend) {
+      console.log('[wa] WA_BACKEND_URL unset — CRM timeline sync disabled (inbox still works).');
+      warnedNoBackend = true;
+    }
+    return;
+  }
+  const url = `${BACKEND_URL}/api/v1/whatsapp-web/webhook/inbound`;
+  Promise.resolve()
+    .then(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Sidecar-Token': SIDECAR_TOKEN },
+        body: JSON.stringify({ workspace_id: workspaceId, ...payload }),
+      })
+    )
+    .catch((e) => console.log('[wa] backend webhook failed:', e?.message || e));
 }
 
 // Build the Baileys send payload for a campaign, given the per-contact merged

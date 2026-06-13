@@ -39,9 +39,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
+from datetime import datetime, timezone
+
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import Lead
+from app.models import Activity, Lead, WhatsAppMessage
 
 router = APIRouter(prefix="/whatsapp-web", tags=["whatsapp-web"])
 
@@ -242,6 +244,115 @@ async def get_chat(
     first). Reading a chat resets its unread counter."""
     params = {"accountId": account_id} if account_id else None
     return await _proxy("GET", f"/chats/{phone}", ctx, params=params)
+
+
+# ─── Sidecar → backend webhook (CRM timeline sync) ─────────────────────────
+# The sidecar POSTs every real-time 1:1 message here. This is the ONE endpoint
+# that is NOT behind get_workspace_context — the sidecar can't hold a user JWT,
+# so it authenticates with the same shared WA_SIDECAR_TOKEN it receives on the
+# proxy path, sent as X-Sidecar-Token. We match the phone to a Lead in the
+# given workspace and persist a WhatsAppMessage (+ Activity) so replies surface
+# on the Lead Detail timeline. Unmatched numbers are still stored (lead_id null)
+# for dedup and so a later-created lead can be backfilled.
+
+
+class InboundWebhookIn(BaseModel):
+    workspace_id: str
+    phone: str
+    text: Optional[str] = ""
+    from_me: bool = False
+    timestamp: Optional[int] = None  # epoch ms
+    message_id: Optional[str] = None
+    msg_type: Optional[str] = "text"
+    contact_name: Optional[str] = None
+
+
+def _match_lead_by_phone(db: Session, workspace_id: str, phone_digits: str) -> Optional[Lead]:
+    """Find a lead in the workspace whose phone matches. WhatsApp gives us the
+    full international number (e.g. 971501234567); CRM phones may be stored with
+    or without the country code / with punctuation. We compare on the last 9
+    digits, which is enough to disambiguate within a workspace without being so
+    short it collides."""
+    if not phone_digits:
+        return None
+    tail = phone_digits[-9:]
+    candidates = (
+        db.query(Lead)
+        .filter(Lead.workspace_id == workspace_id, Lead.phone.isnot(None))
+        .filter(Lead.phone.ilike(f"%{tail}%"))
+        .limit(25)
+        .all()
+    )
+    for lead in candidates:
+        if _phone_digits(lead.phone).endswith(tail):
+            return lead
+    return None
+
+
+@router.post("/webhook/inbound")
+def inbound_webhook(
+    body: InboundWebhookIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    expected = _sidecar_token()
+    provided = request.headers.get("X-Sidecar-Token", "")
+    # If no token is configured we refuse rather than accept anonymous writes.
+    if not expected or provided != expected:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_sidecar_token")
+
+    digits = _phone_digits(body.phone)
+    if not digits:
+        return {"ok": True, "matched": False}
+
+    # Idempotency: a reconnect can replay history. Skip if we already stored it.
+    if body.message_id:
+        existing = (
+            db.query(WhatsAppMessage)
+            .filter(
+                WhatsAppMessage.workspace_id == body.workspace_id,
+                WhatsAppMessage.provider_message_id == body.message_id,
+            )
+            .first()
+        )
+        if existing:
+            return {"ok": True, "duplicate": True, "matched": existing.lead_id is not None}
+
+    lead = _match_lead_by_phone(db, body.workspace_id, digits)
+    ts = None
+    if body.timestamp:
+        try:
+            ts = datetime.fromtimestamp(body.timestamp / 1000, tz=timezone.utc)
+        except (ValueError, OSError, OverflowError):
+            ts = None
+
+    direction = "outbound" if body.from_me else "inbound"
+    msg = WhatsAppMessage(
+        workspace_id=body.workspace_id,
+        lead_id=lead.id if lead else None,
+        direction=direction,
+        phone=digits,
+        contact_name=body.contact_name,
+        body=body.text or "",
+        msg_type=body.msg_type or "text",
+        provider_message_id=body.message_id,
+        provider_ts=ts,
+    )
+    db.add(msg)
+    # Only drop an Activity for matched leads (the timeline is lead-scoped) and
+    # only for inbound replies — outbound shows as a WhatsApp bubble already and
+    # an "activity" line per blast would be noise.
+    if lead and direction == "inbound":
+        db.add(
+            Activity(
+                workspace_id=body.workspace_id,
+                lead_id=lead.id,
+                type="whatsapp_received",
+                payload={"preview": (body.text or "")[:200], "phone": digits},
+            )
+        )
+    db.commit()
+    return {"ok": True, "matched": lead is not None, "lead_id": lead.id if lead else None}
 
 
 class StartCampaignIn(BaseModel):
