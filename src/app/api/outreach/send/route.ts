@@ -154,6 +154,8 @@ export async function POST(req: NextRequest) {
     subject?: string;
     body_html?: string;
     body_text?: string;
+    body_amp?: string;       // AMP-for-Email body (Gmail renders, others fall back)
+    preview_text?: string;   // inbox preheader
   };
   try {
     body = await req.json();
@@ -177,6 +179,8 @@ export async function POST(req: NextRequest) {
       subject: body.subject || "",
       body_html: body.body_html || "",
       body_text: body.body_text || "",
+      body_amp: body.body_amp || "",
+      preview_text: body.preview_text || "",
     }),
   });
   if (!prepRes.ok) {

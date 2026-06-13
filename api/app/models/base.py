@@ -595,6 +595,9 @@ class ContentAsset(Base, TimestampMixin):
     # html_email | whatsapp | caption | sms | other
     type: Mapped[str] = mapped_column(String(20), nullable=False, default="html_email")
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Optional AMP-for-Email body attached to an html_email asset. Gmail
+    # renders this; every other client falls through to ``content`` (HTML).
+    amp_content: Mapped[Optional[str]] = mapped_column(Text)
     subject: Mapped[Optional[str]] = mapped_column(String(300))   # email subject line
     platform: Mapped[Optional[str]] = mapped_column(String(40))   # caption platform
     tags: Mapped[list] = mapped_column(JSONB, default=list)

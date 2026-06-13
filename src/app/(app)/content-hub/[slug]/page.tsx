@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, FolderOpen, Plus, Search, X, Upload, Eye, Send, Download,
   Copy, Pencil, Trash2, CheckCircle2, MailCheck, MessageCircle, Camera,
-  MessageSquare, FileText, type LucideIcon,
+  MessageSquare, FileText, Zap, ChevronDown, ChevronUp, type LucideIcon,
 } from "lucide-react";
 import { api, ApiError, getToken, getWorkspaceId } from "@/lib/api";
 
@@ -40,6 +40,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 interface Asset {
   id: string; _id: string; business_id: string;
   title: string; type: AssetType; content: string;
+  amp_content: string;
   subject: string; platform: string; tags: string[]; notes: string;
   createdAt: string | null; updatedAt: string | null;
 }
@@ -229,6 +230,11 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest }: {
           <div style={{ fontFamily: "Manrope, Inter, sans-serif", fontWeight: 800, fontSize: 14, color: "#111827", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{asset.title}</div>
           <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: "2px 7px", borderRadius: 99 }}>{cfg.label}</span>
+            {asset.amp_content && (
+              <span title="AMP-for-Email body attached — Gmail will render it" style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 800, color: "#fff", background: "linear-gradient(135deg, #6366f1, #a855f7)", padding: "2px 7px", borderRadius: 99 }}>
+                <Zap size={9} /> AMP
+              </span>
+            )}
             {asset.platform && <span style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", background: "#f9fafb", padding: "2px 7px", borderRadius: 99, border: "1px solid #e5e7eb" }}>{PLATFORM_LABELS[asset.platform] || asset.platform}</span>}
             {asset.subject && <span style={{ fontSize: 10, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 170 }}>Sub: {asset.subject}</span>}
           </div>
@@ -304,6 +310,8 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
   const [title, setTitle] = useState(initial?.title || "");
   const [type, setType] = useState<AssetType>(initial?.type || "html_email");
   const [content, setContent] = useState(initial?.content || "");
+  const [ampContent, setAmpContent] = useState(initial?.amp_content || "");
+  const [ampOpen, setAmpOpen] = useState(!!initial?.amp_content);
   const [subject, setSubject] = useState(initial?.subject || "");
   const [platform, setPlatform] = useState(initial?.platform || "");
   const [tags, setTags] = useState((initial?.tags || []).join(", "));
@@ -311,6 +319,7 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const ampFileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -320,11 +329,24 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
     reader.readAsText(file);
   };
 
+  const handleAmpFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setAmpContent((ev.target?.result as string) || "");
+    reader.readAsText(file);
+  };
+
   const save = async () => {
     if (!title.trim() || !content.trim()) { setErr("Title and content are required."); return; }
     setSaving(true); setErr("");
     try {
-      const payload = { title, type, content, subject, platform, tags, notes };
+      // AMP is only meaningful on html_email assets; ignore the field for
+      // other types and clear it server-side via empty string.
+      const payload = {
+        title, type, content, subject, platform, tags, notes,
+        amp_content: type === "html_email" ? ampContent : "",
+      };
       if (isEdit) await api(`/content-hub/assets/${initial!.id}`, { method: "PATCH", body: payload });
       else await api(`/content-hub/businesses/${businessId}/assets`, { method: "POST", body: payload });
       onSaved();
@@ -401,6 +423,45 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
               style={{ ...input, height: type === "html_email" ? 220 : 130, resize: "vertical", fontFamily: type === "html_email" ? "monospace" : "inherit", fontSize: type === "html_email" ? 12 : 14, lineHeight: 1.6 }} />
           </div>
 
+          {/* AMP-for-Email body — optional second-channel alternative for HTML
+              emails. Gmail renders this version (carousels, GIFs, forms);
+              every other client falls through to the HTML above. Hidden
+              behind a toggle so it doesn't clutter the basic flow. */}
+          {type === "html_email" && (
+            <div style={{ border: "1.5px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+              <button type="button" onClick={() => setAmpOpen((v) => !v)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", background: ampOpen ? "rgba(99,102,241,0.06)" : "#fafafa", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                <span style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Zap size={13} color="#fff" strokeWidth={2.4} />
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#4338ca", fontFamily: "Manrope, sans-serif", letterSpacing: "-0.01em" }}>AMP for Email</span>
+                <span style={{ fontSize: 11, color: "#6b7280", flex: 1 }}>
+                  {ampContent.trim()
+                    ? `${(ampContent.length / 1024).toFixed(1)} KB · Gmail will render this; other clients fall back to HTML`
+                    : "Optional. Add an AMP version for Gmail (carousels, GIFs, forms)."}
+                </span>
+                {ampOpen ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
+              </button>
+              {ampOpen && (
+                <div style={{ padding: "14px", borderTop: "1px solid #e5e7eb" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.5 }}>
+                      Must start with <code style={{ background: "#f3f4f6", padding: "1px 5px", borderRadius: 4 }}>&lt;!doctype html&gt;&lt;html ⚡4email&gt;</code> and include the AMP boilerplate.
+                    </span>
+                    <button type="button" onClick={() => ampFileRef.current?.click()}
+                      style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#4338ca", background: "rgba(99,102,241,0.10)", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", flexShrink: 0 }}>
+                      <Upload size={13} /> Upload AMP file
+                    </button>
+                    <input ref={ampFileRef} type="file" accept=".html,.htm,.amp" onChange={handleAmpFile} style={{ display: "none" }} />
+                  </div>
+                  <textarea value={ampContent} onChange={(e) => setAmpContent(e.target.value)} rows={10}
+                    placeholder={'<!doctype html>\n<html ⚡4email lang="en"><head><meta charset="utf-8">\n<script async src="https://cdn.ampproject.org/v0.js"></script>\n<style amp4email-boilerplate>body{visibility:hidden}</style>\n<style amp-custom>/* your styles */</style>\n</head><body>\n  <!-- AMP body here -->\n</body></html>'}
+                    style={{ ...input, height: 200, resize: "vertical", fontFamily: "monospace", fontSize: 12, lineHeight: 1.6, background: "#0f172a", color: "#dcdcaa", border: "1px solid #1e293b" }} />
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <span style={label}>Tags (comma-separated)</span>
             <input style={input} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="welcome, week1, english" />
@@ -467,6 +528,7 @@ function SendTestModal({ asset, onClose }: { asset: Asset; onClose: () => void }
           subject: `[TEST] ${asset.subject || asset.title}`,
           body_html: asset.content,
           body_text: "",
+          body_amp: asset.amp_content || "",
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -492,6 +554,11 @@ function SendTestModal({ asset, onClose }: { asset: Asset; onClose: () => void }
         <div style={{ fontSize: 11.5, color: "#9ca3af", marginBottom: 14, lineHeight: 1.5 }}>
           Sends via your connected email sender (Settings → Email Senders), the same path Campaigns use.
         </div>
+        {asset.amp_content && (
+          <div style={{ marginBottom: 12, padding: "8px 11px", borderRadius: 7, background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08))", border: "1px solid rgba(99,102,241,0.20)", fontSize: 11.5, color: "#4338ca", display: "flex", alignItems: "center", gap: 7, lineHeight: 1.5 }}>
+            <Zap size={13} /> AMP body attached — Gmail will render the AMP version; other clients fall back to HTML.
+          </div>
+        )}
         {err && <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "rgba(220,38,38,0.08)", fontSize: 13, color: "#dc2626" }}>{err}</div>}
         {result && <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 7, background: "rgba(22,163,74,0.08)", fontSize: 13, color: "#16a34a", display: "flex", alignItems: "center", gap: 7 }}><CheckCircle2 size={16} /> {result}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>

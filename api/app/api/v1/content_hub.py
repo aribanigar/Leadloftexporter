@@ -122,6 +122,7 @@ def _asset_dict(a: ContentAsset) -> dict:
         "title": a.title,
         "type": a.type,
         "content": a.content or "",
+        "amp_content": a.amp_content or "",
         "subject": a.subject or "",
         "platform": a.platform or "",
         "tags": a.tags or [],
@@ -187,6 +188,7 @@ class AssetIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     type: str = "html_email"
     content: str
+    amp_content: Optional[str] = None
     subject: Optional[str] = None
     platform: Optional[str] = None
     tags: Optional[object] = None
@@ -197,6 +199,7 @@ class AssetUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
     type: Optional[str] = None
     content: Optional[str] = None
+    amp_content: Optional[str] = None
     subject: Optional[str] = None
     platform: Optional[str] = None
     tags: Optional[object] = None
@@ -358,6 +361,7 @@ def create_asset(
         title=body.title.strip(),
         type=body.type,
         content=body.content,
+        amp_content=(body.amp_content or None),
         subject=(body.subject or None),
         platform=(body.platform or None),
         tags=_norm_tags(body.tags),
@@ -395,8 +399,8 @@ def update_asset(
         data["title"] = data["title"].strip()
         if not data["title"]:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "title_required")
-    # Empty-string subject/platform/notes become NULL for cleanliness.
-    for k in ("subject", "platform", "notes"):
+    # Empty-string optional fields become NULL for cleanliness.
+    for k in ("subject", "platform", "notes", "amp_content"):
         if k in data and data[k] == "":
             data[k] = None
     for k, v in data.items():

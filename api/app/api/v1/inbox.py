@@ -306,6 +306,11 @@ def prepare_send(
     subject = body.get("subject") or ""
     body_html = body.get("body_html") or body.get("body") or ""
     body_text = body.get("body_text") or ""
+    # Optional AMP-for-Email body. Gmail renders this; every other client
+    # falls through to body_html. The Vercel SMTP bridge attaches it as
+    # the text/x-amp-html MIME alternative.
+    body_amp = body.get("body_amp") or ""
+    preview_text = body.get("preview_text") or ""
     if not to_address or not (body_html or body_text):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "to_and_body_required")
 
@@ -368,6 +373,8 @@ def prepare_send(
         "subject": subject,
         "html": body_html,
         "text": body_text,
+        "amp_html": body_amp,
+        "preview_text": preview_text,
         "send_config": send_config,
     }
 
