@@ -23,6 +23,7 @@ import {
   FolderOpen,
   CalendarClock,
   CalendarRange,
+  Mic,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -36,6 +37,7 @@ const NAV = [
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/calendar", label: "Calendar", icon: CalendarClock },
   { href: "/scheduling", label: "Scheduling", icon: CalendarRange },
+  { href: "/notetaker", label: "Notetaker", icon: Mic },
   { href: "/playbooks", label: "Playbooks", icon: Send },
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/outreach", label: "Outreach", icon: Sparkles },

@@ -993,3 +993,26 @@ class RoutingForm(Base, TimestampMixin):
     rules: Mapped[list] = mapped_column(JSONB, default=list)
     # Fallback when no rule matches: {"type":"event"|"url","target"}
     default_action: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class MeetingNote(Base, TimestampMixin):
+    """A meeting recording turned into notes: an uploaded audio file (or pasted
+    transcript) → transcript → summary + action items. The 'AI notetaker'
+    pillar, done as an upload flow rather than an auto-joining bot."""
+
+    __tablename__ = "meeting_notes"
+    __table_args__ = (Index("ix_meeting_notes_workspace_created", "workspace_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    lead_id: Mapped[Optional[str]] = mapped_column(ForeignKey("leads.id", ondelete="SET NULL"))
+    booking_id: Mapped[Optional[str]] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"))
+
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    transcript: Mapped[Optional[str]] = mapped_column(Text)
+    summary: Mapped[Optional[str]] = mapped_column(Text)
+    action_items: Mapped[list] = mapped_column(JSONB, default=list)
+    source: Mapped[str] = mapped_column(String(20), default="audio")  # audio | transcript
+    status: Mapped[str] = mapped_column(String(20), default="done")  # done | failed
+    error: Mapped[Optional[str]] = mapped_column(Text)

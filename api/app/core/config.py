@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-opus-4-7"
     anthropic_fast_model: str = "claude-haiku-4-5"
 
+    # ---- Meeting Notetaker transcription ----
+    # Audio → text needs a speech-to-text service (Claude can't transcribe
+    # audio). Default to OpenAI Whisper (POST /v1/audio/transcriptions,
+    # model whisper-1). Set OPENAI_API_KEY to enable MP3/audio uploads; without
+    # it the notetaker still works from a pasted transcript. Summaries always
+    # use Claude (anthropic_api_key) with a deterministic fallback.
+    openai_api_key: str = ""
+    whisper_model: str = "whisper-1"
+
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
 
