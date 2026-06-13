@@ -1436,22 +1436,23 @@ function NewCampaignPageInner() {
           </button>
         )}
 
-        {/* Live Preview toggle */}
+        {/* Live Preview toggle — label flips so a second click is obviously
+            "Hide", not the mystery toggle people reported. */}
         <button
           onClick={() => setShowSplitPreview(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '7px 14px',
             borderRadius: T.radiusLg,
-            border: 'none',
-            backgroundColor: showSplitPreview ? T.surfaceContainer : T.surfaceContainerLow,
+            border: showSplitPreview ? `1px solid ${T.primary}` : '1px solid transparent',
+            backgroundColor: showSplitPreview ? 'rgba(0,54,26,0.10)' : T.surfaceContainerLow,
             color: showSplitPreview ? T.primary : T.onSurfaceVariant,
-            fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+            fontSize: '12px', fontWeight: 700, cursor: 'pointer',
             fontFamily: 'Inter, sans-serif',
           }}
         >
-          <Icon name={'splitscreen'} size={15} />
-          Live Preview
+          <Icon name={showSplitPreview ? 'visibility' : 'splitscreen'} size={15} />
+          {showSplitPreview ? 'Hide Preview' : 'Live Preview'}
         </button>
 
         {/* Save Draft */}
@@ -3257,69 +3258,72 @@ function NewCampaignPageInner() {
             boxShadow: '-12px 0 32px -8px rgba(15,23,42,0.18)',
           }}>
             <div style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               borderBottom: `1px solid ${T.surfaceContainer}`,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               flexShrink: 0,
+              minHeight: '46px',
+              background: 'linear-gradient(180deg, rgba(99,102,241,0.04), transparent)',
             }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: T.primary, fontFamily: 'Manrope, Inter, sans-serif' }}>
-                Live Preview
+              <span style={{
+                fontSize: '13px', fontWeight: 800, color: T.primary,
+                fontFamily: 'Manrope, Inter, sans-serif',
+                display: 'flex', alignItems: 'center', gap: '6px',
+              }}>
+                <Eye size={14} /> Live Preview
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                 <button
                   onClick={() => setPreviewDevice('desktop')}
+                  title="Desktop view"
                   style={{
-                    padding: '5px 10px', borderRadius: T.radiusLg,
+                    padding: '5px 8px', borderRadius: '7px',
                     border: 'none',
                     backgroundColor: previewDevice === 'desktop' ? T.primary : T.surfaceContainerLow,
                     color: previewDevice === 'desktop' ? '#fff' : T.onSurfaceVariant,
-                    fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                    fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
                   }}
                 >
-                  <Icon name={'computer'} size={13} />
-                  Desktop
+                  <Icon name={'computer'} size={14} />
                 </button>
                 <button
                   onClick={() => setPreviewDevice('mobile')}
+                  title="Mobile view"
                   style={{
-                    padding: '5px 10px', borderRadius: T.radiusLg,
+                    padding: '5px 8px', borderRadius: '7px',
                     border: 'none',
                     backgroundColor: previewDevice === 'mobile' ? T.primary : T.surfaceContainerLow,
                     color: previewDevice === 'mobile' ? '#fff' : T.onSurfaceVariant,
-                    fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                    fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
                   }}
                 >
-                  <Icon name={'smartphone'} size={13} />
-                  Mobile
+                  <Icon name={'smartphone'} size={14} />
                 </button>
                 <button
                   onClick={downloadCurrentEmail}
                   disabled={!currentHtml || !currentHtml.trim()}
                   title="Download current email as .html"
                   style={{
-                    padding: '5px 10px', borderRadius: T.radiusLg,
+                    padding: '5px 8px', borderRadius: '7px',
                     border: 'none',
                     backgroundColor: T.surfaceContainerLow,
                     color: currentHtml && currentHtml.trim() ? T.primary : T.onSurfaceVariant,
                     opacity: currentHtml && currentHtml.trim() ? 1 : 0.45,
-                    fontSize: '11px', fontWeight: 600,
                     cursor: currentHtml && currentHtml.trim() ? 'pointer' : 'not-allowed',
-                    fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '4px',
+                    display: 'flex', alignItems: 'center',
                   }}
                 >
-                  <Download size={13} />
-                  Download
+                  <Download size={14} />
                 </button>
                 <button
                   onClick={() => setShowSplitPreview(false)}
+                  title="Close preview"
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', color: T.onSurfaceVariant, padding: '4px',
+                    display: 'flex', alignItems: 'center', color: T.onSurfaceVariant, padding: '5px 6px',
                   }}
                 >
-                  <Icon name={'close'} size={18} />
+                  <Icon name={'close'} size={16} />
                 </button>
               </div>
             </div>
