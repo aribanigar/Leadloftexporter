@@ -373,3 +373,72 @@ def tick_email_campaigns() -> dict:
             except Exception as exc:  # noqa: BLE001
                 log.exception("campaign tick failed for %s: %s", c.id, exc)
     return {"processed": processed}
+
+
+@celery_app.task
+def tick_reminders() -> dict:
+    """Deliver due reminders — write the calendar block (or send the email) for
+    every pending/failed reminder whose remind_at has passed. Mirrors
+    tick_outreach_scheduler: claim due rows, deliver, flip status."""
+    from app.models import Reminder
+    from app.services import reminders as rsvc
+
+    processed = 0
+    delivered = 0
+    with session_scope() as db:
+        now = datetime.now(timezone.utc)
+        rows = (
+            db.query(Reminder)
+            .filter(Reminder.status.in_(["pending", "failed"]), Reminder.remind_at <= now)
+            .order_by(Reminder.remind_at.asc())
+            .limit(200)
+            .all()
+        )
+        for r in rows:
+            processed += 1
+            try:
+                if rsvc.deliver_reminder(db, r):
+                    delivered += 1
+            except Exception as exc:  # noqa: BLE001
+                log.exception("reminder delivery failed for %s: %s", r.id, exc)
+    return {"processed": processed, "delivered": delivered}
+
+
+@celery_app.task
+def generate_daily_agendas() -> dict:
+    """Once per local morning, build each connected user's AI daily agenda.
+
+    Runs hourly; generate_daily_agenda() is idempotent per (user, day) and only
+    fires when the user's configured agenda hour has arrived in their timezone,
+    so an hourly beat naturally lands one agenda per user per day.
+    """
+    from app.models import ConnectedAccount, Workspace
+    from app.services import google_calendar as gcal
+    from app.services import reminders as rsvc
+
+    generated = 0
+    with session_scope() as db:
+        accounts = (
+            db.query(ConnectedAccount)
+            .filter(ConnectedAccount.provider == gcal.PROVIDER, ConnectedAccount.status == "active")
+            .all()
+        )
+        for acct in accounts:
+            cfg = rsvc.agenda_config(acct)
+            if not cfg.get("enabled", True):
+                continue
+            # Only fire when the local hour matches the configured agenda hour.
+            tz = rsvc._zone(cfg["timezone"])
+            local_hour = datetime.now(timezone.utc).astimezone(tz).hour
+            if local_hour != int(cfg.get("hour", 8)):
+                continue
+            ws = db.get(Workspace, acct.workspace_id)
+            if not ws:
+                continue
+            try:
+                rem = rsvc.generate_daily_agenda(db, workspace=ws, user_id=acct.user_id)
+                if rem:
+                    generated += 1
+            except Exception as exc:  # noqa: BLE001
+                log.exception("daily agenda failed for account %s: %s", acct.id, exc)
+    return {"generated": generated}

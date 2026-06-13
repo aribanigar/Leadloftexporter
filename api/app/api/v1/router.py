@@ -20,6 +20,7 @@ from app.api.v1 import (
     campaigns,
     content_hub,
     tracking,
+    calendar,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -43,3 +44,4 @@ api_router.include_router(linkedin_bridge.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(content_hub.router)
 api_router.include_router(tracking.router)
+api_router.include_router(calendar.router)

@@ -56,6 +56,19 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.tick_email_campaigns",
         "schedule": crontab(minute="*"),
     },
+    # Deliver due calendar/email reminders (write the calendar block or send the
+    # nudge) the moment their remind_at passes.
+    "tick-reminders": {
+        "task": "app.workers.tasks.tick_reminders",
+        "schedule": crontab(minute="*"),
+    },
+    # Build each connected user's AI daily agenda. Hourly + idempotent-per-day:
+    # the task only generates when the user's configured local agenda hour
+    # arrives, so this naturally lands one agenda per user per day.
+    "generate-daily-agendas": {
+        "task": "app.workers.tasks.generate_daily_agendas",
+        "schedule": crontab(minute="5"),
+    },
 }
 
 import app.workers.tasks  # noqa: E402,F401
