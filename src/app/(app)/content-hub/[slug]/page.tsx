@@ -67,6 +67,15 @@ export default function BusinessAssetsPage() {
     router.push(`/campaigns/new?from_asset=${encodeURIComponent(a.id)}`);
   };
 
+  // Launch a bulk WhatsApp campaign pre-filled with this asset's message. The
+  // WhatsApp page honours ?from_asset=<id> the same way the Campaign Builder
+  // does — it fetches the asset content and seeds the composer's message,
+  // every field stays editable, and the user attaches a product image + picks
+  // recipients there.
+  const sendOnWhatsApp = (a: Asset) => {
+    router.push(`/whatsapp?from_asset=${encodeURIComponent(a.id)}`);
+  };
+
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -184,7 +193,7 @@ export default function BusinessAssetsPage() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
           {assets.map((a) => (
-            <AssetCard key={a.id} asset={a} onEdit={setEditAsset} onDelete={handleDelete} onPreview={setPreviewAsset} onSendTest={setSendTestAsset} onStartCampaign={startCampaignFromAsset} />
+            <AssetCard key={a.id} asset={a} onEdit={setEditAsset} onDelete={handleDelete} onPreview={setPreviewAsset} onSendTest={setSendTestAsset} onStartCampaign={startCampaignFromAsset} onSendWhatsApp={sendOnWhatsApp} />
           ))}
         </div>
       )}
@@ -203,13 +212,14 @@ export default function BusinessAssetsPage() {
 }
 
 /* ─── Asset card ─────────────────────────────────────── */
-function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCampaign }: {
+function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCampaign, onSendWhatsApp }: {
   asset: Asset;
   onEdit: (a: Asset) => void;
   onDelete: (id: string) => void;
   onPreview: (a: Asset) => void;
   onSendTest: (a: Asset) => void;
   onStartCampaign: (a: Asset) => void;
+  onSendWhatsApp: (a: Asset) => void;
 }) {
   const cfg = TYPE_CFG[asset.type] || TYPE_CFG.other;
   const Icon = cfg.Icon;
@@ -278,6 +288,9 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCamp
             <ActionBtn Icon={Download} label="Download" color={BRAND} onClick={() => download("html", "text/html")} />
             <ActionBtn Icon={Copy} label={copied ? "Copied!" : "Copy HTML"} color="#374151" onClick={copy} />
           </>
+        )}
+        {asset.type === "whatsapp" && (
+          <ActionBtn Icon={Rocket} label="Send on WhatsApp" color="#16a34a" onClick={() => onSendWhatsApp(asset)} prominent />
         )}
         {(asset.type === "whatsapp" || asset.type === "sms" || asset.type === "caption" || asset.type === "other") && (
           <>

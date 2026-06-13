@@ -19,7 +19,8 @@
  *   /whatsapp-web/campaigns         — list runs + live progress
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   useQuery,
   useMutation,
@@ -41,6 +42,7 @@ import {
   Paperclip,
   X,
   Inbox as InboxIcon,
+  FolderOpen,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PipelineStage } from "@/lib/types";
@@ -177,6 +179,30 @@ export default function WhatsAppOutreachPage() {
   // Optional media attached to every message in the bulk send (the personalised
   // text becomes the caption — e.g. product photo + "{first_name}, …").
   const [media, setMedia] = useState<{ base64: string; mimetype: string; filename: string } | null>(null);
+
+  // ── Pre-fill from a Content Hub whatsapp asset ────────────────────────
+  // /whatsapp?from_asset=<id> — the "Send on WhatsApp" button on a Content
+  // Hub WhatsApp asset lands here. Fetch the asset and seed the composer
+  // message once; every field stays editable and the user attaches a product
+  // image + picks recipients here.
+  const searchParams = useSearchParams();
+  const fromAssetId = searchParams.get("from_asset") || "";
+  const [assetNotice, setAssetNotice] = useState<string>("");
+  const prefilledRef = useRef<string>("");
+
+  const { data: fromAsset } = useQuery<{ id: string; title: string; type: string; content: string }>({
+    queryKey: ["wa-from-asset", fromAssetId],
+    queryFn: () => api(`/content-hub/assets/${fromAssetId}`),
+    enabled: !!fromAssetId,
+  });
+
+  useEffect(() => {
+    if (fromAsset?.content && prefilledRef.current !== fromAsset.id) {
+      prefilledRef.current = fromAsset.id;
+      setMessage(fromAsset.content);
+      setAssetNotice(`Message loaded from Content Hub: "${fromAsset.title}"`);
+    }
+  }, [fromAsset]);
 
   async function onPickMedia(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -445,6 +471,14 @@ export default function WhatsAppOutreachPage() {
             </h2>
           </div>
         </header>
+
+        {assetNotice && (
+          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-5 py-2.5 text-xs text-emerald-800">
+            <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+            <span>{assetNotice}</span>
+            <span className="text-emerald-500">— edit it below, attach a product image, then pick recipients.</span>
+          </div>
+        )}
 
         {sidecarUnavailable && (
           <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-900">

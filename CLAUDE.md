@@ -192,6 +192,8 @@ Multi-business, Google-Drive-style folder system for storing reusable marketing 
 
 **Send-test from an asset** — the asset library's send-test modal routes through the existing Vercel SMTP bridge (`/api/outreach/send`), forwarding `body_amp` when an AMP body is attached. The bridge attaches AMP as the `text/x-amp-html` MIME alternative via nodemailer; Gmail renders it, every other client falls back to the HTML body.
 
+**Send on WhatsApp from an asset** — `whatsapp`-type assets get a prominent "Send on WhatsApp" action that deep-links to `/whatsapp?from_asset=<id>`. The WhatsApp page reads that param (mirroring the Campaign Builder's `?from_asset` precedent), fetches the asset via `GET /content-hub/assets/{id}`, and seeds the bulk-campaign message once (guarded by a ref so re-renders don't clobber edits). The user then attaches a product image and picks recipients there. `html_email` assets keep going to the Campaign Builder; only `whatsapp` assets surface the WhatsApp action.
+
 ### Daily content pipeline (`/content` + `/scripts`)
 
 A side-channel for AI-routine-generated marketing content. Each business has its own folder under `content/<biz-slug>/`. The current consumer is **Gifts Gulf** (corporate-gifting catalogue marketing in AED/SAR/QAR).
