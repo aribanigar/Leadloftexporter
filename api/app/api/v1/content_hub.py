@@ -373,6 +373,43 @@ def create_asset(
     return _asset_dict(a)
 
 
+@router.get("/assets/html-emails")
+def list_workspace_html_emails(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """List every ``html_email`` asset across the workspace, with its parent
+    business name. Powers the Campaign Builder's "From Content Hub" picker
+    so a marketer can pull any saved email into a fresh draft campaign in
+    one click — no download + re-upload round-trip.
+    """
+    rows = (
+        db.query(ContentAsset, ContentBusiness.name, ContentBusiness.slug, ContentBusiness.brand_color)
+        .join(ContentBusiness, ContentAsset.business_id == ContentBusiness.id)
+        .filter(
+            ContentAsset.workspace_id == ctx.workspace_id,
+            ContentAsset.type == "html_email",
+        )
+        .order_by(ContentAsset.updated_at.desc())
+        .all()
+    )
+    out = []
+    for a, biz_name, biz_slug, biz_color in rows:
+        out.append({
+            "id": a.id,
+            "title": a.title,
+            "subject": a.subject or "",
+            "has_amp": bool(a.amp_content),
+            "content_kb": round(len(a.content or "") / 1024, 1),
+            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+            "business_id": a.business_id,
+            "business_name": biz_name,
+            "business_slug": biz_slug,
+            "business_color": biz_color or "#00361a",
+        })
+    return {"assets": out, "count": len(out)}
+
+
 @router.get("/assets/{asset_id}")
 def get_asset(
     asset_id: str,

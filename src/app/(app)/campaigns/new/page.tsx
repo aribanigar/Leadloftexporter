@@ -9,7 +9,8 @@ import {
   ListChecks, Maximize2, Minimize2, Users, ShieldCheck, Eye, Save,
   Send, Smartphone, Columns, Lightbulb, TrendingUp, Upload, AlertCircle,
   Flag, Newspaper, Tag, RefreshCw, BadgeCheck, Leaf, Megaphone, Settings2,
-  Bold, Italic, Underline, Link as LinkIcon, List, Download, type LucideIcon,
+  Bold, Italic, Underline, Link as LinkIcon, List, Download, FolderOpen,
+  type LucideIcon,
 } from 'lucide-react';
 
 // ─── Icon — maps Material Symbol names → lucide components ────────────────
@@ -473,6 +474,115 @@ const GOALS = [
   { value: 'custom',         label: 'Custom / Other',            icon: 'tune',           multiplier: 0.70 },
 ];
 
+// ─── Content Hub picker (browse + pick a saved HTML email asset) ────────────
+
+interface HubAsset {
+  id: string;
+  title: string;
+  subject: string;
+  has_amp: boolean;
+  content_kb: number;
+  updated_at: string | null;
+  business_id: string;
+  business_name: string;
+  business_slug: string;
+  business_color: string;
+}
+
+function ContentHubPickerModal({
+  assets, loading, onClose, onPick,
+}: {
+  assets: HubAsset[];
+  loading: boolean;
+  onClose: () => void;
+  onPick: (a: HubAsset) => void;
+}) {
+  const [q, setQ] = useState('');
+  const filtered = assets.filter(a => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    return (
+      a.title.toLowerCase().includes(needle) ||
+      a.subject.toLowerCase().includes(needle) ||
+      a.business_name.toLowerCase().includes(needle)
+    );
+  });
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 18, width: '100%', maxWidth: 720,
+        maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{
+            width: 30, height: 30, borderRadius: 9,
+            background: 'linear-gradient(135deg, #00361a, #1e6e3a)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FolderOpen size={15} color="#fff" strokeWidth={2.4} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Manrope, Inter, sans-serif', fontWeight: 800, fontSize: 16, color: '#0f172a' }}>Use an email from Content Hub</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Pick a saved HTML email — it pre-fills this draft.</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af' }}><X size={20} /></button>
+        </div>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid #f3f4f6' }}>
+          <input
+            autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by title, subject, or business…"
+            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e5e7eb', borderRadius: 9, fontSize: 13, outline: 'none', fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+          {loading && <div style={{ padding: 30, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Loading…</div>}
+          {!loading && filtered.length === 0 && (
+            <div style={{ padding: 30, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+              No HTML emails in Content Hub yet. Add one from <Link href="/content-hub" style={{ color: '#00361a', fontWeight: 700 }}>Content Hub →</Link>
+            </div>
+          )}
+          {filtered.map((a) => (
+            <button key={a.id} onClick={() => onPick(a)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '11px 12px',
+              border: '1.5px solid transparent', borderRadius: 11, background: 'transparent',
+              cursor: 'pointer', textAlign: 'left', marginBottom: 4, fontFamily: 'inherit',
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.borderColor = '#e5e7eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+            >
+              <span style={{
+                width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                background: `linear-gradient(135deg, ${a.business_color}, ${a.business_color}cc)`,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <FolderOpen size={16} color="#fff" />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontWeight: 800, fontSize: 13.5, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</span>
+                  {a.has_amp && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 9, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#6366f1,#a855f7)', padding: '2px 6px', borderRadius: 99 }}>
+                      AMP
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {a.business_name} · {a.subject ? `Subject: ${a.subject}` : `${a.content_kb} KB`}
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#00361a', background: 'rgba(0,54,26,0.08)', padding: '4px 10px', borderRadius: 7, flexShrink: 0 }}>
+                Use →
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ─── Score engine ─────────────────────────────────────────────────────────────
 
 interface ScoreItem { label: string; done: boolean; points: number; tip?: string; }
@@ -717,6 +827,14 @@ function NewCampaignPageInner() {
   const router = useRouter();
   const prefillEmail = searchParams.get('prefill') || '';
   const editId = searchParams.get('id') || '';
+  // /campaigns/new?from_asset=<id> — start a fresh draft pre-filled from a
+  // Content Hub HTML email asset. Skipped when an edit id is also present.
+  const fromAssetId = searchParams.get('from_asset') || '';
+  const [hydratedFromAsset, setHydratedFromAsset] = useState(false);
+  const [fromAssetMeta, setFromAssetMeta] = useState<{ id: string; title: string; business_name: string } | null>(null);
+  const [showHubPicker, setShowHubPicker] = useState(false);
+  const [hubAssets, setHubAssets] = useState<HubAsset[]>([]);
+  const [hubLoading, setHubLoading] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: '',
@@ -922,6 +1040,86 @@ function NewCampaignPageInner() {
       .finally(() => { if (!cancelled) setLoadingEdit(false); });
     return () => { cancelled = true; };
   }, [editId]);
+
+  // ── Pre-fill a fresh draft from a Content Hub HTML email asset.
+  // Triggered when /campaigns/new?from_asset=<id> is present AND we're not
+  // editing an existing campaign. The form stays fully editable — this is
+  // a one-time hydration, not a binding.
+  useEffect(() => {
+    if (!fromAssetId || editId || hydratedFromAsset) return;
+    let cancelled = false;
+    type AssetPayload = {
+      id: string; title: string; subject?: string; content: string;
+      amp_content?: string; business_id: string;
+    };
+    type BusinessPayload = { name: string };
+    api<AssetPayload>(`/content-hub/assets/${fromAssetId}`)
+      .then(async (a) => {
+        if (cancelled || !a) return;
+        // Fetch business for a nicer pre-filled campaign name like
+        // "{Business} — {Asset title}". Best-effort — fall back to plain.
+        let bizName = '';
+        try {
+          const biz = await api<BusinessPayload>(`/content-hub/businesses/${a.business_id}`);
+          bizName = biz?.name || '';
+        } catch { /* ignore */ }
+        if (cancelled) return;
+        const presetName = bizName ? `${bizName} — ${a.title}` : a.title;
+        const presetSubject = a.subject || a.title;
+        setForm(f => ({
+          ...f,
+          name: f.name || presetName,
+          subject: f.subject || presetSubject,
+          htmlContent: f.htmlContent || a.content || '',
+          ampHtml: f.ampHtml || a.amp_content || '',
+          contentMode: 'html',
+        }));
+        setFromAssetMeta({ id: a.id, title: a.title, business_name: bizName });
+        setHydratedFromAsset(true);
+      })
+      .catch(() => { if (!cancelled) setHydratedFromAsset(true); });
+    return () => { cancelled = true; };
+  }, [fromAssetId, editId, hydratedFromAsset]);
+
+  // ── Load Content Hub HTML emails count once. The full list is
+  // re-fetched when the picker actually opens (kept tiny + fast on mount).
+  useEffect(() => {
+    let cancelled = false;
+    api<{ assets: HubAsset[]; count: number }>('/content-hub/assets/html-emails')
+      .then((r) => { if (!cancelled) setHubAssets(r?.assets || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  function openHubPicker() {
+    setShowHubPicker(true);
+    setHubLoading(true);
+    api<{ assets: HubAsset[]; count: number }>('/content-hub/assets/html-emails')
+      .then((r) => setHubAssets(r?.assets || []))
+      .catch(() => {})
+      .finally(() => setHubLoading(false));
+  }
+
+  function applyHubAsset(a: HubAsset) {
+    // Fetch the full asset (the list endpoint omits .content + .amp_content
+    // to keep the payload tiny).
+    type FullAsset = { id: string; title: string; subject?: string; content: string; amp_content?: string };
+    api<FullAsset>(`/content-hub/assets/${a.id}`).then((full) => {
+      if (!full) return;
+      const presetName = a.business_name ? `${a.business_name} — ${a.title}` : a.title;
+      const presetSubject = full.subject || a.subject || a.title;
+      setForm(f => ({
+        ...f,
+        name: presetName,
+        subject: presetSubject,
+        htmlContent: full.content || '',
+        ampHtml: full.amp_content || '',
+        contentMode: 'html',
+      }));
+      setFromAssetMeta({ id: a.id, title: a.title, business_name: a.business_name });
+      setShowHubPicker(false);
+    }).catch(() => {});
+  }
 
   // ── execCommand helpers (main editor)
   const exec = (cmd: string, val?: string) => {
@@ -2210,6 +2408,71 @@ function NewCampaignPageInner() {
             </p>
           </div>
 
+          {/* ── From Content Hub banner — pick a saved HTML email ── */}
+          {!editId && (
+            <div style={{ margin: '16px 32px 0', flexShrink: 0 }}>
+              {fromAssetMeta ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 11,
+                  background: 'linear-gradient(135deg, rgba(0,54,26,0.06), rgba(0,54,26,0.10))',
+                  border: '1px solid rgba(0,54,26,0.18)',
+                }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'linear-gradient(135deg, #00361a, #1e6e3a)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <FolderOpen size={14} color="#fff" strokeWidth={2.4} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: T.primary, fontFamily: 'Manrope, Inter, sans-serif' }}>
+                      Pre-filled from Content Hub
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#475569', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {fromAssetMeta.business_name ? `${fromAssetMeta.business_name} · ` : ''}{fromAssetMeta.title} — fully editable below
+                    </div>
+                  </div>
+                  <button onClick={openHubPicker} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: T.primary, textDecoration: 'underline', fontFamily: 'Inter, sans-serif' }}>
+                    Change…
+                  </button>
+                </div>
+              ) : (
+                <button onClick={openHubPicker} style={{
+                  display: 'flex', alignItems: 'center', gap: 11, width: '100%',
+                  padding: '12px 16px', borderRadius: 11,
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(168,85,247,0.04))',
+                  border: '1px dashed rgba(99,102,241,0.30)',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                }}>
+                  <span style={{
+                    width: 30, height: 30, borderRadius: 9,
+                    background: 'linear-gradient(135deg, #00361a, #1e6e3a)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <FolderOpen size={15} color="#fff" strokeWidth={2.4} />
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.onSurface, fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.01em' }}>
+                      Use an email from Content Hub
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>
+                      {hubAssets.length === 0
+                        ? 'No saved HTML emails yet — add one in Content Hub, then start a campaign from it in one click.'
+                        : `${hubAssets.length} HTML email${hubAssets.length === 1 ? '' : 's'} available · name + subject + body pre-fill, then edit as a draft.`}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: '#4338ca',
+                    background: 'rgba(99,102,241,0.10)', padding: '6px 12px', borderRadius: 8,
+                  }}>
+                    Browse →
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* ── Email Content Editor Card ── */}
           <div style={{
             margin: '20px 32px 0',
@@ -3390,6 +3653,16 @@ function NewCampaignPageInner() {
 
       {/* ── Toast */}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* ── Content Hub picker */}
+      {showHubPicker && (
+        <ContentHubPickerModal
+          assets={hubAssets}
+          loading={hubLoading}
+          onClose={() => setShowHubPicker(false)}
+          onPick={applyHubAsset}
+        />
+      )}
 
       {/* ── Keyframe */}
       <style>{`

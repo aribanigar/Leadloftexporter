@@ -10,12 +10,13 @@
  */
 import { useState, useRef, type ComponentType } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, FolderOpen, Plus, Search, X, Upload, Eye, Send, Download,
   Copy, Pencil, Trash2, CheckCircle2, MailCheck, MessageCircle, Camera,
-  MessageSquare, FileText, Zap, ChevronDown, ChevronUp, type LucideIcon,
+  MessageSquare, FileText, Zap, Rocket, ChevronDown, ChevronUp,
+  type LucideIcon,
 } from "lucide-react";
 import { api, ApiError, getToken, getWorkspaceId } from "@/lib/api";
 
@@ -55,8 +56,16 @@ function fmtDate(d: string | null) {
 /* ═══════════════════════════════════════════════════════ */
 export default function BusinessAssetsPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = String(params.slug);
   const qc = useQueryClient();
+
+  // Launch a fresh draft Campaign pre-filled with this asset. The Campaign
+  // Builder honours ?from_asset=<id> — it fetches the asset content + AMP
+  // body and seeds the name/subject/body, while every field stays editable.
+  const startCampaignFromAsset = (a: Asset) => {
+    router.push(`/campaigns/new?from_asset=${encodeURIComponent(a.id)}`);
+  };
 
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
@@ -175,7 +184,7 @@ export default function BusinessAssetsPage() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
           {assets.map((a) => (
-            <AssetCard key={a.id} asset={a} onEdit={setEditAsset} onDelete={handleDelete} onPreview={setPreviewAsset} onSendTest={setSendTestAsset} />
+            <AssetCard key={a.id} asset={a} onEdit={setEditAsset} onDelete={handleDelete} onPreview={setPreviewAsset} onSendTest={setSendTestAsset} onStartCampaign={startCampaignFromAsset} />
           ))}
         </div>
       )}
@@ -194,12 +203,13 @@ export default function BusinessAssetsPage() {
 }
 
 /* ─── Asset card ─────────────────────────────────────── */
-function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest }: {
+function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCampaign }: {
   asset: Asset;
   onEdit: (a: Asset) => void;
   onDelete: (id: string) => void;
   onPreview: (a: Asset) => void;
   onSendTest: (a: Asset) => void;
+  onStartCampaign: (a: Asset) => void;
 }) {
   const cfg = TYPE_CFG[asset.type] || TYPE_CFG.other;
   const Icon = cfg.Icon;
@@ -262,6 +272,7 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest }: {
       <div style={{ padding: "10px 14px", borderTop: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", gap: 6 }}>
         {asset.type === "html_email" && (
           <>
+            <ActionBtn Icon={Rocket} label="Start Campaign" color={BRAND} onClick={() => onStartCampaign(asset)} prominent />
             <ActionBtn Icon={Eye} label="Preview" color="#1d4ed8" onClick={() => onPreview(asset)} />
             <ActionBtn Icon={Send} label="Send Test" color="#7c3aed" onClick={() => onSendTest(asset)} />
             <ActionBtn Icon={Download} label="Download" color={BRAND} onClick={() => download("html", "text/html")} />
@@ -291,13 +302,20 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest }: {
   );
 }
 
-function ActionBtn({ Icon, label, color, onClick }: { Icon: ComponentType<{ size?: number }>; label: string; color: string; onClick: () => void }) {
+function ActionBtn({ Icon, label, color, onClick, prominent }: {
+  Icon: ComponentType<{ size?: number; color?: string }>;
+  label: string; color: string; onClick: () => void;
+  prominent?: boolean;
+}) {
+  const styles: React.CSSProperties = prominent
+    ? { display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: "none", background: color, fontSize: 11, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: `0 2px 8px ${color}55` }
+    : { display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, border: `1.5px solid ${color}20`, background: `${color}0d`, fontSize: 11, fontWeight: 700, color, cursor: "pointer" };
   return (
-    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, border: `1.5px solid ${color}20`, background: `${color}0d`, fontSize: 11, fontWeight: 700, color, cursor: "pointer" }}
-      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
+    <button onClick={onClick} style={styles}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
       onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
     >
-      <Icon size={13} /> {label}
+      <Icon size={13} color={prominent ? "#fff" : color} /> {label}
     </button>
   );
 }
