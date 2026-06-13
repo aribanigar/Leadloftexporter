@@ -89,9 +89,10 @@ interface ConnectedAccount {
   provider: string;
   label: string | null;
   status: string;
-  // The actual from-address as returned by the integrations endpoint.
-  // Used to detect Resend-on-free-mailbox-domain, which Resend rejects.
+  // The actual from-address as returned by the senders endpoint. Used to
+  // detect Resend-on-free-mailbox-domain, which Resend rejects.
   external_id?: string | null;
+  from_address?: string | null;
 }
 
 // Free mailbox domains Resend refuses to send from without domain verification.
@@ -106,7 +107,7 @@ const FREE_MAILBOX_DOMAINS = new Set([
 
 function isResendDomainBlocked(acct: ConnectedAccount): boolean {
   if (acct.provider !== "resend") return false;
-  const email = (acct.external_id || acct.label || "").toLowerCase();
+  const email = (acct.from_address || acct.external_id || acct.label || "").toLowerCase();
   const at = email.lastIndexOf("@");
   if (at < 0) return false;
   const domain = email.slice(at + 1).trim();
@@ -153,15 +154,23 @@ export default function OutreachPage() {
     queryFn: () => api("/whatsapp/config"),
   });
 
+  // Use /campaigns/senders/list — the SAME endpoint Campaign Builder uses,
+  // which returns ONLY email-capable senders (SMTP, Gmail, Resend, SendGrid)
+  // filtered server-side. Previously this called /integrations/accounts
+  // which returns every connected account (LinkedIn, HubSpot, etc.) and
+  // missed senders that Campaigns could see — leaving users staring at the
+  // "Connect SMTP" modal even though Campaigns showed 3 active mailboxes.
+  // Refetches on window focus + every 30s so a newly-connected sender in
+  // Settings or Campaign Builder reflects here without a manual reload.
   const { data: emailAccts } = useQuery<ConnectedAccount[]>({
-    queryKey: ["connected-accounts"],
-    queryFn: () => api("/integrations/accounts"),
+    queryKey: ["outreach-senders"],
+    queryFn: () => api("/campaigns/senders/list"),
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+    staleTime: 0,
   });
   const emailConnected = useMemo(
-    () =>
-      (emailAccts || []).some((a) =>
-        ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider) && a.status === "active"
-      ),
+    () => (emailAccts || []).some((a) => a.status === "active"),
     [emailAccts]
   );
 
@@ -171,9 +180,7 @@ export default function OutreachPage() {
   // with no explanation. We now show a prominent banner pointing the user at
   // the only two fixes (verify a domain in Resend OR connect SMTP).
   const resendDomainBlock = useMemo(() => {
-    const accts = (emailAccts || []).filter(
-      (a) => ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider) && a.status === "active"
-    );
+    const accts = (emailAccts || []).filter((a) => a.status === "active");
     if (accts.length === 0) return null;
     const allBlocked = accts.every((a) => isResendDomainBlocked(a));
     if (!allBlocked) return null;
@@ -527,7 +534,11 @@ export default function OutreachPage() {
         open={smtpModalOpen}
         onClose={() => setSmtpModalOpen(false)}
         onConnected={() => {
+          // Invalidate both keys — outreach-senders is what THIS page reads,
+          // connected-accounts is what other pages (e.g. Settings) may still use.
+          qc.invalidateQueries({ queryKey: ["outreach-senders"] });
           qc.invalidateQueries({ queryKey: ["connected-accounts"] });
+          setSmtpModalOpen(false);
         }}
       />
       <ConnectWhatsAppModal
