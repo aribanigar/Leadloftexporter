@@ -2820,6 +2820,7 @@ function NewCampaignPageInner() {
                     flexDirection: 'column',
                   }}>
                     <iframe
+                      key={`quick-${form.contentMode}-${previewDoc.length}`}
                       srcDoc={
                         previewDoc ||
                         '<div style="padding:40px 24px;text-align:center;font-family:Inter,sans-serif;color:#9ca3af"><div style="font-size:32px;margin-bottom:12px">✉</div><p style="font-size:13px;margin:0;line-height:1.6">Start writing HTML<br/>to see a live preview</p></div>'
@@ -2833,7 +2834,6 @@ function NewCampaignPageInner() {
                         display: 'block',
                         backgroundColor: '#ffffff',
                       }}
-                      sandbox="allow-same-origin allow-popups"
                       title="Quick Email Preview"
                     />
                   </div>
@@ -3237,18 +3237,24 @@ function NewCampaignPageInner() {
         {/* ─── END RIGHT PANEL ────────────────────────────────────────────── */}
 
         {/* ─── DETACHED SPLIT PREVIEW PANEL ────────────────────────────────── */}
+        {/* Rendered as a FIXED overlay so it can't get pushed off-screen by
+            narrow viewports and so it doesn't have to fight the flex row for
+            horizontal space. Anchored top-right under the 60px header. */}
         {showSplitPreview && (
           <div style={{
-            width: '400px',
-            flexShrink: 0,
-            position: 'sticky',
+            position: 'fixed',
             top: '60px',
-            height: 'calc(100vh - 60px)',
+            right: 0,
+            bottom: 0,
+            width: '440px',
+            maxWidth: 'calc(100vw - 320px)',
+            zIndex: 90,
             borderLeft: `1px solid ${T.surfaceContainer}`,
             backgroundColor: T.surfaceContainerLowest,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            boxShadow: '-12px 0 32px -8px rgba(15,23,42,0.18)',
           }}>
             <div style={{
               padding: '12px 16px',
@@ -3320,25 +3326,29 @@ function NewCampaignPageInner() {
 
             <div style={{
               flex: 1,
+              minHeight: 0,
               overflow: 'auto',
               backgroundColor: T.surfaceContainerLow,
               display: 'flex',
               justifyContent: 'center',
+              alignItems: 'stretch',
               padding: previewDevice === 'mobile' ? '20px' : '0',
             }}>
               <iframe
+                key={`live-${form.contentMode}-${previewDoc.length}`}
                 srcDoc={previewDoc || `<p style="padding:40px;color:#9ca3af;text-align:center;font-family:Inter,sans-serif;font-size:13px">Start writing your email to see the preview here…</p>`}
                 style={{
                   border: 'none',
                   width: previewDevice === 'mobile' ? '375px' : '100%',
-                  height: '100%',
-                  minHeight: previewDevice === 'mobile' ? '600px' : 'auto',
-                  backgroundColor: T.surfaceContainerLowest,
+                  height: 'auto',
+                  minHeight: previewDevice === 'mobile' ? '600px' : '500px',
+                  alignSelf: 'stretch',
+                  backgroundColor: '#ffffff',
                   boxShadow: previewDevice === 'mobile' ? '0 4px 20px rgba(0,0,0,0.12)' : 'none',
                   borderRadius: previewDevice === 'mobile' ? T.radiusXl : '0',
                   flexShrink: 0,
+                  display: 'block',
                 }}
-                sandbox="allow-same-origin allow-popups"
                 title="Live Email Preview"
               />
             </div>
