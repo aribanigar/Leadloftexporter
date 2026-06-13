@@ -61,6 +61,7 @@ def _serialize(et: EventType) -> dict:
         "reminder_offsets": et.reminder_offsets if et.reminder_offsets is not None else [1440, 60],
         "assignment": et.assignment or "single",
         "host_ids": et.host_ids or [],
+        "brief_offset_minutes": et.brief_offset_minutes if et.brief_offset_minutes is not None else 30,
         "owner_id": et.owner_id,
     }
 
@@ -84,6 +85,7 @@ class EventTypeIn(BaseModel):
     reminder_offsets: Optional[list] = None
     assignment: Optional[str] = None
     host_ids: Optional[list] = None
+    brief_offset_minutes: Optional[int] = None
     slug: Optional[str] = None
 
 
@@ -148,6 +150,7 @@ def create_event_type(
         reminder_offsets=body.reminder_offsets if body.reminder_offsets is not None else [1440, 60],
         assignment=body.assignment or "single",
         host_ids=body.host_ids or [],
+        brief_offset_minutes=body.brief_offset_minutes if body.brief_offset_minutes is not None else 30,
     )
     db.add(et)
     db.commit()

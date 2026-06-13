@@ -921,6 +921,8 @@ class EventType(Base, TimestampMixin):
     # Team scheduling: how bookings are assigned, and the candidate hosts.
     assignment: Mapped[str] = mapped_column(String(20), default="single")  # single | round_robin
     host_ids: Mapped[list] = mapped_column(JSONB, default=list)  # user ids; empty → just owner
+    # Minutes before start to send the host a pre-meeting brief (0 = disabled).
+    brief_offset_minutes: Mapped[int] = mapped_column(Integer, default=30)
 
 
 class Booking(Base, TimestampMixin):

@@ -36,6 +36,7 @@ interface EventType {
   reminder_offsets: number[];
   assignment: string;
   host_ids: string[];
+  brief_offset_minutes: number;
 }
 interface Member {
   id: string;
@@ -208,6 +209,7 @@ function Editor({ et, workspaceSlug, members }: { et: EventType; workspaceSlug: 
           reminder_offsets: form.reminder_offsets,
           assignment: form.assignment,
           host_ids: form.host_ids,
+          brief_offset_minutes: form.brief_offset_minutes,
         },
       }),
     onSuccess: (updated) => {
@@ -439,6 +441,24 @@ function Editor({ et, workspaceSlug, members }: { et: EventType; workspaceSlug: 
             {members.length === 0 && <p className="text-xs text-slate-400">No teammates in this workspace yet.</p>}
           </div>
         )}
+      </div>
+
+      {/* Pre-meeting brief */}
+      <div className="card p-5">
+        <h3 className="mb-1 font-semibold">Pre-meeting brief</h3>
+        <p className="mb-3 text-xs text-slate-500">
+          Send the host a brief (lead context + the invitee&apos;s answers) before the meeting.
+        </p>
+        <div className="flex items-center gap-2 text-sm">
+          <input
+            type="number"
+            min={0}
+            value={form.brief_offset_minutes}
+            onChange={(e) => set("brief_offset_minutes", Number(e.target.value))}
+            className="w-24 rounded-md border border-slate-200 px-2 py-1"
+          />
+          <span className="text-slate-500">minutes before (0 = off)</span>
+        </div>
       </div>
 
       {/* Invitee reminders */}

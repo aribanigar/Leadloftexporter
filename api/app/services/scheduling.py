@@ -20,7 +20,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Booking, EventType, Lead, Workspace
+from app.models import Booking, EventType, Lead, Note, Workspace
 from app.services import google_calendar as gcal
 from app.services import reminders as rsvc
 
@@ -259,6 +259,7 @@ def create_booking(
     _send_confirmation(db, event_type, booking)
     _owner_reminder(db, event_type, booking)
     _schedule_invitee_reminders(db, event_type, booking)
+    _schedule_pre_meeting_brief(db, event_type, booking)
     _fire_workflows(db, "booking_created", booking)
     return booking
 
@@ -323,16 +324,17 @@ def reschedule_booking(db: Session, booking: Booking, new_start: datetime) -> bo
                 except Exception as exc:  # noqa: BLE001
                     log.warning("calendar move failed for booking %s: %s", booking.id, exc)
 
-    # Re-queue invitee reminders against the new time.
+    # Re-queue invitee reminders + the host brief against the new time.
     from app.models import Reminder
 
     db.query(Reminder).filter(
         Reminder.booking_id == booking.id,
-        Reminder.source == "booking_reminder",
+        Reminder.source.in_(["booking_reminder", "pre_meeting_brief"]),
         Reminder.status.in_(["pending", "failed"]),
     ).update({"status": "cancelled"}, synchronize_session=False)
     db.commit()
     _schedule_invitee_reminders(db, event_type, booking)
+    _schedule_pre_meeting_brief(db, event_type, booking)
     return True
 
 
@@ -394,6 +396,81 @@ def _human_offset(minutes: int) -> str:
         h = minutes // 60
         return f"in {h} hour{'s' if h != 1 else ''}"
     return f"in {minutes} minutes"
+
+
+def _build_brief(db: Session, event_type: EventType, booking: Booking) -> str:
+    """A deterministic pre-meeting brief: who the host is about to meet, drawn
+    from the matched lead's CRM context + the invitee's intake answers."""
+    lines = [f"Pre-meeting brief — {event_type.name} with {booking.invitee_name}", ""]
+    lead = db.get(Lead, booking.lead_id) if booking.lead_id else None
+    if lead:
+        if lead.title:
+            lines.append(f"Title: {lead.title}")
+        if lead.company:
+            lines.append(f"Company: {lead.company.name}")
+        if lead.stage:
+            lines.append(f"Pipeline stage: {lead.stage.name}")
+        if lead.location:
+            lines.append(f"Location: {lead.location}")
+        if lead.last_activity_at:
+            lines.append(f"Last activity: {lead.last_activity_at:%b %d %H:%M}")
+        recent = (
+            db.query(Note)
+            .filter(Note.lead_id == lead.id)
+            .order_by(Note.created_at.desc())
+            .limit(3)
+            .all()
+        )
+        if recent:
+            lines.append("")
+            lines.append("Recent notes:")
+            for n in recent:
+                lines.append(f"• {n.body[:160]}")
+    else:
+        lines.append(f"Contact: {booking.invitee_name} <{booking.invitee_email}>")
+    if booking.answers:
+        lines.append("")
+        lines.append("They told us:")
+        for k, v in booking.answers.items():
+            lines.append(f"• {k}: {v}")
+    return "\n".join(lines)
+
+
+def _schedule_pre_meeting_brief(db: Session, event_type: EventType, booking: Booking) -> None:
+    """Schedule a brief to the host shortly before the meeting (best-effort)."""
+    try:
+        offset = event_type.brief_offset_minutes if event_type.brief_offset_minutes is not None else 30
+        if offset <= 0:
+            return
+        remind_at = booking.start_at - timedelta(minutes=offset)
+        if remind_at <= datetime.now(timezone.utc):
+            return
+        workspace = db.get(Workspace, event_type.workspace_id)
+        if not workspace:
+            return
+        channel = rsvc.effective_channel(
+            db, event_type.workspace_id, booking.owner_id,
+            (rsvc.agenda_config(workspace, booking.owner_id).get("channels") or ["email"])[0],
+        )
+        if not channel:
+            return
+        rsvc.create_reminder(
+            db,
+            workspace_id=event_type.workspace_id,
+            user_id=booking.owner_id,
+            title=f"Brief: {booking.invitee_name} — {event_type.name}",
+            body=_build_brief(db, event_type, booking),
+            remind_at=remind_at,
+            channel=channel,
+            source="pre_meeting_brief",
+            lead_id=booking.lead_id,
+            booking_id=booking.id,
+            duration_minutes=10,
+            commit=False,
+        )
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pre-meeting brief not scheduled for booking %s: %s", booking.id, exc)
 
 
 # --------------------------------------------------------------------------- #
