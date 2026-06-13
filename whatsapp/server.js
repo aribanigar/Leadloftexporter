@@ -491,6 +491,22 @@ function randomDelay(min, max) {
   return new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
+// Build the Baileys send payload for a campaign, given the per-contact merged
+// caption/text. When the campaign carries media, the merged text rides as the
+// caption (image/video/document) so the product photo + personalised line go
+// out as one message.
+function buildCampaignPayload(campaign, text) {
+  const m = campaign.media;
+  if (m && m.buffer) {
+    const kind = MEDIA_KIND_BY_MIME(m.mimetype);
+    if (kind === 'image')      return { image:    m.buffer, caption: text || undefined, mimetype: m.mimetype };
+    if (kind === 'video')      return { video:    m.buffer, caption: text || undefined, mimetype: m.mimetype };
+    if (kind === 'audio')      return { audio:    m.buffer, mimetype: m.mimetype, ptt: false };
+    return { document: m.buffer, caption: text || undefined, mimetype: m.mimetype, fileName: m.filename || 'file' };
+  }
+  return { text };
+}
+
 async function runCampaign(campaign) {
   campaign.status = 'running';
   campaign.startedAt = campaign.startedAt || Date.now();
@@ -521,7 +537,7 @@ async function runCampaign(campaign) {
         }
         if (onWA.jid) sendJid = onWA.jid;
       } catch (_) { /* swallow lookup failures, try anyway */ }
-      await s.sock.sendMessage(sendJid, { text });
+      await s.sock.sendMessage(sendJid, buildCampaignPayload(campaign, text));
       contact.result = 'sent';
       campaign.stats.sent++;
     } catch (e) {
@@ -553,19 +569,34 @@ function persistHistory(c) {
 }
 
 // Start a campaign. `contacts` is [{ phone, name?, ...mergeTokens? }, ...].
+// Optional `media: { base64, mimetype, filename? }` attaches an image / video /
+// document to every message (the personalised text becomes the caption).
 app.post('/campaigns/start', (req, res) => {
   const ws = req.workspaceId;
-  const { contacts, message, accountId, delayMin = 5000, delayMax = 12000, countryCode = '91' } = req.body || {};
+  const { contacts, message, accountId, delayMin = 5000, delayMax = 12000, countryCode = '91', media } = req.body || {};
   const s = (accountId && sessions.get(sKey(ws, accountId))) || getDefaultSession(ws);
   if (!s || s.clientState.status !== 'ready') return res.status(400).json({ error: 'wa_not_connected' });
   if (!Array.isArray(contacts) || !contacts.length) return res.status(400).json({ error: 'no_contacts' });
-  if (!message?.trim()) return res.status(400).json({ error: 'message_required' });
+  const hasMedia = !!(media && media.base64);
+  if (!message?.trim() && !hasMedia) return res.status(400).json({ error: 'message_or_media_required' });
+  // Decode the media ONCE into a Buffer kept on the campaign — not per contact.
+  let mediaObj = null;
+  if (hasMedia) {
+    try {
+      mediaObj = {
+        buffer: Buffer.from(media.base64, 'base64'),
+        mimetype: media.mimetype || 'application/octet-stream',
+        filename: media.filename || 'file',
+      };
+    } catch (_) { return res.status(400).json({ error: 'bad_media_base64' }); }
+  }
   const id = uuidv4();
   const campaign = {
     id, workspaceId: ws, accountId: accountId || listAccounts(ws)[0]?.id || null,
     countryCode: String(countryCode).replace(/\D/g, '') || '91',
     contacts: contacts.map(c => ({ ...c, result: null })),
-    message,
+    message: message || '',
+    media: mediaObj,
     delayMin: Math.max(Number(delayMin) || 5000, 3000),
     delayMax: Math.max(Number(delayMax) || 12000, 6000),
     status: 'queued', progress: 0,

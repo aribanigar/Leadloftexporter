@@ -246,7 +246,10 @@ async def get_chat(
 
 class StartCampaignIn(BaseModel):
     account_id: Optional[str] = None
-    message: str = Field(min_length=1, max_length=4000)
+    # Optional when media is attached (media-only broadcast). The sidecar
+    # enforces "message or media required".
+    message: str = Field(default="", max_length=4000)
+    media: Optional[MediaIn] = None
     # Free-form contacts uploaded from CSV / manual entry. Frontend can also
     # send `lead_ids` / `stage_id` instead and we resolve them server-side.
     contacts: Optional[list[dict[str, Any]]] = None
@@ -316,19 +319,21 @@ async def start_campaign(
             "no_contacts_with_phone",
         )
 
-    return await _proxy(
-        "POST",
-        "/campaigns/start",
-        ctx,
-        {
-            "accountId": body.account_id,
-            "message": body.message,
-            "contacts": contacts,
-            "delayMin": body.delay_min,
-            "delayMax": body.delay_max,
-            "countryCode": body.country_code or "91",
-        },
-    )
+    payload: dict[str, Any] = {
+        "accountId": body.account_id,
+        "message": body.message,
+        "contacts": contacts,
+        "delayMin": body.delay_min,
+        "delayMax": body.delay_max,
+        "countryCode": body.country_code or "91",
+    }
+    if body.media:
+        payload["media"] = {
+            "base64": body.media.base64,
+            "mimetype": body.media.mimetype,
+            "filename": body.media.filename or "",
+        }
+    return await _proxy("POST", "/campaigns/start", ctx, payload)
 
 
 @router.get("/campaigns")

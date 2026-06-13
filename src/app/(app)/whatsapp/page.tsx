@@ -38,9 +38,45 @@ import {
   Users,
   Play,
   Pause,
+  Paperclip,
+  X,
+  Inbox as InboxIcon,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PipelineStage } from "@/lib/types";
+
+// Read a File into a raw base64 string (no data: prefix) for the JSON API.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || "");
+      resolve(s.includes(",") ? s.split(",")[1] : s);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+interface WaChat {
+  jid: string;
+  phone: string;
+  name: string;
+  lastMessage: string;
+  lastMessageTime: number;
+  fromMe: boolean;
+  unreadCount: number;
+}
+
+interface WaMessage {
+  id: string;
+  phone: string;
+  fromMe: boolean;
+  sender: string;
+  text: string;
+  timestamp: number;
+  type: string;
+}
 
 interface WaAccount {
   id: string;
@@ -138,6 +174,21 @@ export default function WhatsAppOutreachPage() {
   const [delayMin, setDelayMin] = useState<number>(5);
   const [delayMax, setDelayMax] = useState<number>(12);
   const [lastRunNotice, setLastRunNotice] = useState<string>("");
+  // Optional media attached to every message in the bulk send (the personalised
+  // text becomes the caption — e.g. product photo + "{first_name}, …").
+  const [media, setMedia] = useState<{ base64: string; mimetype: string; filename: string } | null>(null);
+
+  async function onPickMedia(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (file.size > 16 * 1024 * 1024) {
+      setLastRunNotice("Attachment too large (max 16MB).");
+      return;
+    }
+    const base64 = await fileToBase64(file);
+    setMedia({ base64, mimetype: file.type || "application/octet-stream", filename: file.name });
+  }
 
   // Pipeline stage picker → lets the user pull recipients directly from CRM.
   const { data: stages = [] } = useQuery<PipelineStage[]>({
@@ -170,6 +221,7 @@ export default function WhatsAppOutreachPage() {
         body: {
           account_id: accountId || undefined,
           message,
+          media: media || undefined,
           stage_id: stageId || undefined,
           delay_min: Math.max(3, delayMin) * 1000,
           delay_max: Math.max(6, delayMax) * 1000,
@@ -195,6 +247,41 @@ export default function WhatsAppOutreachPage() {
 
   const readyAccount = accounts.find((a) => a.status === "ready");
   const canSend = !!readyAccount;
+  const readyAccounts = accounts.filter((a) => a.status === "ready");
+
+  // ── Inbox (incoming replies) ──────────────────────────────────────────
+  const [inboxAccountId, setInboxAccountId] = useState<string>("");
+  const [openPhone, setOpenPhone] = useState<string>("");
+  const [reply, setReply] = useState<string>("");
+
+  const inboxQs = inboxAccountId ? `?account_id=${inboxAccountId}` : "";
+
+  const { data: chats = [] } = useQuery<WaChat[]>({
+    queryKey: ["wa-chats", inboxAccountId],
+    queryFn: () => api(`/whatsapp-web/chats${inboxQs}`),
+    enabled: canSend,
+    refetchInterval: 5000,
+  });
+
+  const { data: thread } = useQuery<{ chat: WaChat | null; messages: WaMessage[] }>({
+    queryKey: ["wa-thread", inboxAccountId, openPhone],
+    queryFn: () => api(`/whatsapp-web/chats/${openPhone}${inboxQs}`),
+    enabled: !!openPhone && canSend,
+    refetchInterval: 4000,
+  });
+
+  const sendReply = useMutation({
+    mutationFn: () =>
+      api("/whatsapp-web/send", {
+        method: "POST",
+        body: { account_id: inboxAccountId || undefined, phone: openPhone, message: reply },
+      }),
+    onSuccess: () => {
+      setReply("");
+      qc.invalidateQueries({ queryKey: ["wa-thread", inboxAccountId, openPhone] });
+      qc.invalidateQueries({ queryKey: ["wa-chats", inboxAccountId] });
+    },
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -494,6 +581,42 @@ export default function WhatsAppOutreachPage() {
                 )
               )}
             </p>
+
+            {/* Attachment — image / video / PDF sent with the text as caption */}
+            <div className="mt-3">
+              {media ? (
+                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="truncate">{media.filename}</span>
+                  <span className="text-emerald-500">
+                    ({Math.round((media.base64.length * 0.75) / 1024)} KB)
+                  </span>
+                  <button
+                    onClick={() => setMedia(null)}
+                    className="ml-auto rounded p-0.5 hover:bg-emerald-100"
+                    title="Remove attachment"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Attach image / video / PDF
+                  <input
+                    type="file"
+                    accept="image/*,video/*,application/pdf"
+                    onChange={onPickMedia}
+                    className="hidden"
+                  />
+                </label>
+              )}
+              {media && (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  The message above is sent as the caption on this attachment.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -512,7 +635,7 @@ export default function WhatsAppOutreachPage() {
               disabled={
                 !canSend ||
                 startCampaign.isPending ||
-                !message.trim() ||
+                (!message.trim() && !media) ||
                 !stageId
               }
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -526,6 +649,151 @@ export default function WhatsAppOutreachPage() {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* Inbox — incoming replies + reply box --------------------------- */}
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <InboxIcon className="h-4 w-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-900">Inbox — replies</h2>
+          </div>
+          {readyAccounts.length > 1 && (
+            <select
+              value={inboxAccountId}
+              onChange={(e) => {
+                setInboxAccountId(e.target.value);
+                setOpenPhone("");
+              }}
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+            >
+              <option value="">Default account</option>
+              {readyAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </header>
+
+        {!canSend ? (
+          <div className="p-10 text-center text-sm text-slate-500">
+            Pair a WhatsApp number above to see replies here.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-[270px_1fr] md:divide-x md:divide-y-0">
+            {/* Conversation list */}
+            <div className="max-h-[460px] overflow-y-auto">
+              {chats.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  No conversations yet. Replies from people you message will
+                  appear here.
+                </div>
+              ) : (
+                chats.map((ch) => {
+                  const active = ch.phone === openPhone;
+                  return (
+                    <button
+                      key={ch.phone}
+                      onClick={() => setOpenPhone(ch.phone)}
+                      className={`flex w-full items-start gap-2 border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 ${
+                        active ? "bg-emerald-50" : ""
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-medium text-slate-900">
+                            {ch.name || `+${ch.phone}`}
+                          </p>
+                          {ch.unreadCount > 0 && (
+                            <span className="flex-shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              {ch.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {ch.fromMe ? "You: " : ""}
+                          {ch.lastMessage || "—"}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Thread + reply */}
+            <div className="flex max-h-[460px] flex-col">
+              {!openPhone ? (
+                <div className="flex flex-1 items-center justify-center p-10 text-sm text-slate-400">
+                  Select a conversation to read + reply.
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50 p-4">
+                    {(thread?.messages || []).length === 0 ? (
+                      <div className="py-8 text-center text-xs text-slate-400">
+                        No messages loaded yet.
+                      </div>
+                    ) : (
+                      (thread?.messages || []).map((m) => (
+                        <div
+                          key={m.id}
+                          className={`flex ${m.fromMe ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                              m.fromMe
+                                ? "bg-emerald-600 text-white"
+                                : "border border-slate-200 bg-white text-slate-800"
+                            }`}
+                          >
+                            {m.text || (
+                              <span className="italic opacity-70">[{m.type}]</span>
+                            )}
+                            <div
+                              className={`mt-0.5 text-[10px] ${
+                                m.fromMe ? "text-emerald-100" : "text-slate-400"
+                              }`}
+                            >
+                              {new Date(m.timestamp).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 border-t border-slate-100 p-3">
+                    <input
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey && reply.trim()) {
+                          e.preventDefault();
+                          sendReply.mutate();
+                        }
+                      }}
+                      placeholder="Type a reply…"
+                      className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                      onClick={() => sendReply.mutate()}
+                      disabled={!reply.trim() || sendReply.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {sendReply.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Campaign history ----------------------------------------------- */}
