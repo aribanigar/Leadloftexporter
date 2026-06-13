@@ -82,19 +82,19 @@ def _resolve_or_create_business(cur, workspace_id: str, slug: str, name: str) ->
     return business_id
 
 
-def _asset_exists(cur, workspace_id: str, business_id: str, campaign_code: str, title: str) -> bool:
-    """Skip if a row with this (workspace, business, title) and campaign_code
-    tag already exists. Means re-running the same day is safe + cheap."""
+def _asset_exists(cur, workspace_id: str, business_id: str, title: str) -> bool:
+    """Skip if a row with this (workspace, business, title) already exists.
+    Titles encode date + currency + theme, so they are unique per day and a
+    re-run of the same day is a safe no-op."""
     cur.execute(
         """
         SELECT 1 FROM content_assets
         WHERE workspace_id = %s
           AND business_id  = %s
           AND title        = %s
-          AND tags @> %s::jsonb
         LIMIT 1
         """,
-        (workspace_id, business_id, title, json.dumps([campaign_code])),
+        (workspace_id, business_id, title),
     )
     return cur.fetchone() is not None
 
@@ -178,13 +178,20 @@ def publish_day(date: str, root: Path) -> dict:
                         continue
 
                     code = meta.get("campaign_code") or ""
-                    name = meta.get("campaign_name") or ""
                     subj = meta.get("subject") or ""
                     currency = meta.get("currency") or cur_dir.name
                     season = meta.get("season") or ""
-                    if not (code and name):
-                        failures.append((str(meta_path), "missing_campaign_code_or_name"))
-                        continue
+                    theme = meta.get("theme") or ""
+                    # Title: prefer an explicit campaign_name; otherwise build a
+                    # stable, unique-per-day label from date + currency + theme
+                    # (falling back to the set folder name). No campaign code
+                    # required — the simple meta.json schema works fine.
+                    name = (
+                        meta.get("campaign_name")
+                        or " ".join(p for p in (date, currency, theme) if p)
+                        or f"{date} {currency} {set_dir.name}"
+                    )
+                    tags = [t for t in (code or date, currency, (season or theme)) if t]
 
                     html = _read(set_dir / "email.html")
                     amp = _read(set_dir / "email.amp.html")
@@ -198,20 +205,20 @@ def publish_day(date: str, root: Path) -> dict:
                             "content": html,
                             "amp_content": amp or None,
                             "subject": subj,
-                            "tags": [t for t in (code, currency, season) if t],
+                            "tags": tags,
                         },
                         {
                             "title": f"{name} - WhatsApp",
                             "type": "whatsapp",
                             "content": wa,
-                            "tags": [code, currency],
+                            "tags": [t for t in (code or date, currency) if t],
                         },
                         {
                             "title": f"{name} - LinkedIn",
                             "type": "caption",
                             "platform": "linkedin",
                             "content": li,
-                            "tags": [code, currency],
+                            "tags": [t for t in (code or date, currency) if t],
                         },
                     ]
 
@@ -219,7 +226,7 @@ def publish_day(date: str, root: Path) -> dict:
                         if not (spec.get("content") or "").strip():
                             failures.append((spec["title"], "empty_content"))
                             continue
-                        if _asset_exists(cur, workspace_id, biz_id, code, spec["title"]):
+                        if _asset_exists(cur, workspace_id, biz_id, spec["title"]):
                             skipped += 1
                             continue
                         try:
