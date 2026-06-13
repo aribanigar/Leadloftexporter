@@ -409,6 +409,53 @@ class ConnectedAccount(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="active")
 
 
+class Reminder(Base, TimestampMixin):
+    """A time-based nudge delivered to the user (not the lead) via their synced
+    calendar and/or email — the engine behind calendar-driven reminders and the
+    AI daily agenda.
+
+    Mirrors the EnrollmentStepRun "row with run_at + status, drained by a beat
+    tick" pattern: `tick_reminders` picks up pending rows whose remind_at has
+    passed and delivers them. `source` records what created it (a manual add, an
+    inbound reply, a pipeline stage change, a note, or the daily-agenda job) so
+    the UI can group and the engine can de-dupe.
+    """
+
+    __tablename__ = "reminders"
+    __table_args__ = (
+        Index("ix_reminders_due", "status", "remind_at"),
+        Index("ix_reminders_workspace_user", "workspace_id", "user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    # The person the reminder is FOR (whose calendar/inbox it lands in).
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Optional CRM linkage — who/what the reminder is about.
+    lead_id: Mapped[Optional[str]] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"))
+    task_id: Mapped[Optional[str]] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))
+
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(Text)
+    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Length in minutes of the calendar block written for this reminder.
+    duration_minutes: Mapped[int] = mapped_column(Integer, default=15)
+
+    channel: Mapped[str] = mapped_column(String(20), default="calendar")  # calendar | email
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|scheduled|sent|failed|cancelled|skipped
+    source: Mapped[str] = mapped_column(String(30), default="manual")
+    # manual | inbox_reply | stage_change | note | daily_agenda | booking
+
+    # The calendar account this lands on + the external (Google) event id once
+    # written, so we can update/delete it idempotently.
+    calendar_account_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connected_accounts.id", ondelete="SET NULL"))
+    external_event_id: Mapped[Optional[str]] = mapped_column(String(255))
+
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    error: Mapped[Optional[str]] = mapped_column(Text)
+
+
 class ExtensionJob(Base, TimestampMixin):
     __tablename__ = "extension_jobs"
     __table_args__ = (Index("ix_ext_jobs_workspace_status", "workspace_id", "status"),)

@@ -525,7 +525,8 @@ def update_lead(
         if k == "linkedin_url":
             v = normalize_linkedin(v)
         setattr(lead, k, v)
-    if "stage_id" in data:
+    stage_changed = "stage_id" in data
+    if stage_changed:
         db.add(
             Activity(
                 workspace_id=ctx.workspace_id,
@@ -537,6 +538,15 @@ def update_lead(
         )
     db.commit()
     db.refresh(lead)
+    # Best-effort: a stage change schedules a "plan the next touch" reminder on
+    # the acting user's calendar (no-op if they haven't connected one).
+    if stage_changed:
+        from app.services import reminders as _rsvc
+
+        stage_name = lead.stage.name if lead.stage else ""
+        _rsvc.on_stage_change(
+            db, workspace_id=ctx.workspace_id, user_id=ctx.user_id, lead=lead, stage_name=stage_name
+        )
     return _serialize(lead)
 
 
@@ -1200,6 +1210,12 @@ def add_note(
     )
     db.commit()
     db.refresh(note)
+    # Best-effort: adding a note schedules a follow-up reminder on the acting
+    # user's calendar (no-op if no calendar is connected).
+    from app.services import reminders as _rsvc
+
+    lead = db.get(Lead, lead_id)
+    _rsvc.on_note_added(db, workspace_id=ctx.workspace_id, user_id=ctx.user_id, lead=lead, note_body=text)
     return {"id": note.id, "body": note.body, "created_at": note.created_at}
 
 

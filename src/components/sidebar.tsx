@@ -21,6 +21,7 @@ import {
   Mail,
   MessageCircle,
   FolderOpen,
+  CalendarClock,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -32,6 +33,7 @@ const NAV = [
   { href: "/prospecting", label: "Prospecting", icon: Search },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/calendar", label: "Calendar", icon: CalendarClock },
   { href: "/playbooks", label: "Playbooks", icon: Send },
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/outreach", label: "Outreach", icon: Sparkles },
