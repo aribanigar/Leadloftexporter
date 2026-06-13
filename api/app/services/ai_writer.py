@@ -117,6 +117,162 @@ def generate_email_for_lead(
     }
 
 
+MARKETING_HTML_SYSTEM = """You are an elite email-marketing engineer who has shipped emails that
+render correctly in Gmail (desktop + iOS + Android), Apple Mail, Outlook 2016/2019/365,
+Yahoo, ProtonMail, and Spark. You ALWAYS:
+
+- Use a 600-px max-width table-based layout. NO flexbox, NO grid, NO position:absolute.
+- INLINE every style. No external <style> blocks except a single conditional <style> for
+  media queries that ALL clients silently ignore if unsupported.
+- Use mso-prefixed conditional comments for Outlook bullet-proof buttons.
+- Use system fonts (Inter, Helvetica, Arial, sans-serif) as fallbacks for any custom font.
+- Make every image responsive: width="100%" max-width attribute on the parent table cell.
+- Include role="presentation" on layout tables so screen readers skip them.
+- Include explicit alt text on every <img>.
+- Honour the brand color the user provides for hero, CTAs, and accents.
+- Replace `{first_name}`, `{full_name}`, `{company}`, `{title}`, `{email}` as merge tags so
+  the user can personalise per recipient.
+- Generate a short attention-grabbing preview_text (35-90 chars).
+
+If the user asks for AMP for Email, you ALSO produce an `amp_html` field that:
+- Starts with <!doctype html><html ⚡4email lang="en"><head><meta charset="utf-8">
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <style amp4email-boilerplate>body{visibility:hidden}</style>
+- Uses ONLY AMP-allowed tags (amp-img, amp-carousel, amp-list, amp-form, amp-anim for GIFs)
+- Includes the same hero/body/CTA structure as the html version
+- Uses inline <style amp-custom> for styling
+
+Return STRICT JSON ONLY:
+{
+  "subject": "<= 75 chars subject line",
+  "preview_text": "<= 90 chars preview",
+  "html": "<full responsive HTML email>",
+  "amp_html": "<AMP-for-Email version, OR empty string if user did not request AMP>"
+}
+"""
+
+
+def generate_marketing_html(
+    *,
+    brief: str,
+    brand_color: str = "#0a66c2",
+    tone: str = "professional",
+    include_amp: bool = False,
+    workspace: Optional[Workspace] = None,
+) -> dict:
+    """Generate a polished, marketing-grade HTML email from a brief.
+
+    Falls back to a clean hand-built template when no Anthropic key is set so the
+    UI keeps working in local/dev environments.
+    """
+    client = _client_or_none()
+    if not client:
+        return _fallback_marketing_html(brief=brief, brand_color=brand_color, include_amp=include_amp)
+
+    style_notes = ""
+    if workspace:
+        style_notes = (workspace.settings or {}).get("ai_style", "")
+
+    user_prompt = (
+        f"Tone: {tone}\n"
+        f"Brand color: {brand_color}\n"
+        f"Include AMP for Email version: {'yes' if include_amp else 'no'}\n"
+        f"Workspace style notes: {style_notes or '(none)'}\n\n"
+        f"Brief from the marketer:\n{brief.strip()}\n\n"
+        "Return ONLY the JSON object as specified."
+    )
+
+    response = client.messages.create(
+        model=_settings.anthropic_model,
+        max_tokens=4000,
+        system=[
+            {"type": "text", "text": MARKETING_HTML_SYSTEM, "cache_control": {"type": "ephemeral"}},
+        ],
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        data = json.loads(text[start : end + 1]) if start >= 0 and end > start else {}
+    return {
+        "subject": data.get("subject") or "",
+        "preview_text": data.get("preview_text") or "",
+        "html": data.get("html") or _fallback_marketing_html(brief=brief, brand_color=brand_color, include_amp=False)["html"],
+        "amp_html": data.get("amp_html") or "",
+    }
+
+
+def _fallback_marketing_html(*, brief: str, brand_color: str, include_amp: bool) -> dict:
+    """Render a hand-built responsive email when no AI key is present.
+
+    Still gives the user a real, polished starting point — table layout, inline
+    styles, mobile media query, dark-mode-friendly accent — that they can edit.
+    """
+    safe_brief = (brief or "Your message here.")[:300].replace("<", "&lt;").replace(">", "&gt;")
+    title = safe_brief.split("\n")[0][:80] or "A quick note"
+    html = f"""<!doctype html>
+<html lang=\"en\"><head><meta charset=\"utf-8\">
+<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<title>{title}</title>
+<style>@media (max-width:620px){{.lc-c{{width:100%!important}}.lc-p{{padding:24px!important}}.lc-h{{font-size:24px!important}}}}</style>
+</head>
+<body style=\"margin:0;padding:0;background:#f5f5f7;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;\">
+<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f5f5f7;padding:32px 16px;\">
+  <tr><td align=\"center\">
+    <table role=\"presentation\" width=\"600\" class=\"lc-c\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(16,24,40,.08);\">
+      <tr><td style=\"background:linear-gradient(135deg,{brand_color},{brand_color}cc);padding:36px 40px;text-align:left;\">
+        <h1 class=\"lc-h\" style=\"margin:0;color:#fff;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-0.01em;\">Hi {{first_name}},</h1>
+      </td></tr>
+      <tr><td class=\"lc-p\" style=\"padding:36px 40px 12px;color:#1f2937;font-size:16px;line-height:1.65;\">
+        <p style=\"margin:0 0 16px;\">{safe_brief}</p>
+        <p style=\"margin:0 0 24px;color:#475569;\">— sent from your campaign at {{company}}</p>
+      </td></tr>
+      <tr><td class=\"lc-p\" style=\"padding:0 40px 36px;\">
+        <a href=\"https://\" style=\"display:inline-block;background:{brand_color};color:#fff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;\">Take a look</a>
+      </td></tr>
+      <tr><td style=\"padding:24px 40px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center;\">
+        © {{company}} · You're receiving this because you opted in.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+    amp_html = ""
+    if include_amp:
+        amp_html = f"""<!doctype html>
+<html ⚡4email lang=\"en\"><head><meta charset=\"utf-8\">
+<script async src=\"https://cdn.ampproject.org/v0.js\"></script>
+<script async custom-element=\"amp-anim\" src=\"https://cdn.ampproject.org/v0/amp-anim-0.1.js\"></script>
+<style amp4email-boilerplate>body{{visibility:hidden}}</style>
+<style amp-custom>
+  body{{margin:0;padding:0;background:#f5f5f7;font-family:Inter,sans-serif;}}
+  .card{{max-width:600px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;}}
+  .hero{{background:linear-gradient(135deg,{brand_color},{brand_color}cc);padding:36px 40px;color:#fff;}}
+  .hero h1{{margin:0;font-size:28px;font-weight:700;letter-spacing:-0.01em;}}
+  .body{{padding:32px 40px;color:#1f2937;font-size:16px;line-height:1.65;}}
+  .cta{{display:inline-block;background:{brand_color};color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;}}
+</style></head>
+<body>
+<div class=\"card\">
+  <div class=\"hero\"><h1>Hi {{first_name}},</h1></div>
+  <div class=\"body\">
+    <p>{safe_brief}</p>
+    <amp-anim width=\"600\" height=\"360\" layout=\"responsive\" src=\"https://media.tenor.com/m/EW5N0gI2VJsAAAAd/celebrate-party.gif\" alt=\"celebrating\"></amp-anim>
+    <p style=\"margin-top:24px;\"><a class=\"cta\" href=\"https://\">Take a look</a></p>
+  </div>
+</div>
+</body></html>"""
+    return {
+        "subject": (brief[:75] or "A quick note from your team"),
+        "preview_text": (brief[:90] or "We thought you'd want to see this."),
+        "html": html,
+        "amp_html": amp_html,
+    }
+
+
 def classify_reply_sentiment(text: str) -> dict:
     client = _client_or_none()
     if not client:

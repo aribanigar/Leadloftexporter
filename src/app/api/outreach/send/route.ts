@@ -41,6 +41,8 @@ interface PreparedJob {
   subject: string;
   html: string;
   text: string;
+  amp_html?: string;       // AMP for Email — Gmail uses, others fall back.
+  preview_text?: string;   // Preheader hint.
   send_config: SendConfig;
 }
 
@@ -65,12 +67,20 @@ async function dispatch(job: PreparedJob): Promise<{ ok: boolean; error?: string
       socketTimeout: 20_000,
     });
     try {
+      const alternatives: Array<{ contentType: string; content: string }> = [];
+      if (job.amp_html) {
+        alternatives.push({ contentType: "text/x-amp-html", content: job.amp_html });
+      }
+      const headers: Record<string, string> = {};
+      if (job.preview_text) headers["X-Preheader"] = job.preview_text;
       await t.sendMail({
         from: fromHeader,
         to: job.to,
         subject: job.subject || "(no subject)",
         html: job.html || undefined,
         text: job.text || undefined,
+        alternatives: alternatives.length ? alternatives : undefined,
+        headers: Object.keys(headers).length ? headers : undefined,
       });
       return { ok: true };
     } catch (err) {

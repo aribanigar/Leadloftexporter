@@ -266,7 +266,10 @@ class CampaignCreateIn(BaseModel):
     subject: str = Field(default="", max_length=500)
     preheader: Optional[str] = Field(default=None, max_length=500)
     body_html: str = ""
+    body_amp: Optional[str] = None     # AMP for Email source. Gmail renders this.
     body_text: Optional[str] = None
+    preview_text: Optional[str] = Field(default=None, max_length=200)
+    brand_color: Optional[str] = Field(default=None, max_length=20)
     # Sender identity (display) + reply routing.
     from_name: Optional[str] = None
     from_email: Optional[str] = None
@@ -297,7 +300,10 @@ class CampaignUpdateIn(BaseModel):
     subject: Optional[str] = None
     preheader: Optional[str] = None
     body_html: Optional[str] = None
+    body_amp: Optional[str] = None
     body_text: Optional[str] = None
+    preview_text: Optional[str] = None
+    brand_color: Optional[str] = None
     from_name: Optional[str] = None
     from_email: Optional[str] = None
     reply_to: Optional[str] = None
@@ -499,7 +505,10 @@ def create_campaign(
         subject=(body.subject or "").strip(),
         preheader=(body.preheader or "").strip() or None,
         body_html=body.body_html or "",
+        body_amp=(body.body_amp or "").strip() or None,
         body_text=body.body_text,
+        preview_text=(body.preview_text or "").strip() or None,
+        brand_color=(body.brand_color or "").strip() or None,
         from_name=(body.from_name or "").strip() or None,
         from_email=(body.from_email or "").strip() or None,
         reply_to=(body.reply_to or "").strip() or None,
@@ -618,7 +627,10 @@ def _campaign_dict(c: Campaign) -> dict:
         "subject": c.subject,
         "preheader": c.preheader,
         "body_html": c.body_html,
+        "body_amp": c.body_amp,
         "body_text": c.body_text,
+        "preview_text": c.preview_text,
+        "brand_color": c.brand_color,
         "from_name": c.from_name,
         "from_email": c.from_email,
         "reply_to": c.reply_to,
@@ -671,6 +683,7 @@ def update_campaign(
         ]
     for field in (
         "name", "subject", "preheader", "body_html", "body_text",
+        "body_amp", "preview_text", "brand_color",
         "from_name", "from_email", "reply_to", "goal", "tags", "follow_ups",
         "sender_account_ids", "warmup_enabled",
     ):
@@ -1469,6 +1482,10 @@ def _prepare_tick_batch(
                 _render_token(campaign.body_text or "", lead)
                 if campaign.body_text else None
             )
+            body_amp = (
+                _render_token(campaign.body_amp or "", lead)
+                if campaign.body_amp else None
+            )
         else:
             merge = dict(r.merge_data or {})
             subject = _render_merge(campaign.subject or "", merge, r.email)
@@ -1476,6 +1493,10 @@ def _prepare_tick_batch(
             body_text = (
                 _render_merge(campaign.body_text or "", merge, r.email)
                 if campaign.body_text else None
+            )
+            body_amp = (
+                _render_merge(campaign.body_amp or "", merge, r.email)
+                if campaign.body_amp else None
             )
 
         thread = EmailThread(
@@ -1537,6 +1558,8 @@ def _prepare_tick_batch(
             "subject": subject,
             "html": tracked_html,
             "text": body_text or "",
+            "amp_html": body_amp or "",
+            "preview_text": campaign.preview_text or "",
             "send_config": send_config,
         })
 
