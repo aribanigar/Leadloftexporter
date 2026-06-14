@@ -198,28 +198,49 @@ def _warmup_for_account(
     return w
 
 
+def _all_workspace_senders(db: Session, workspace_id: str) -> list[ConnectedAccount]:
+    """Every active email-capable sender in the workspace. Used both for the
+    no-pool auto-select path and as the fallback when the user's explicitly
+    chosen senders are all at today's warmup cap."""
+    return (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == workspace_id,
+            ConnectedAccount.provider.in_(("smtp", "gmail", "resend", "sendgrid")),
+            ConnectedAccount.status == "active",
+        )
+        .all()
+    )
+
+
+def _filter_by_capacity(
+    db: Session, workspace_id: str, accts: list[ConnectedAccount]
+) -> list[tuple[ConnectedAccount, SenderWarmup]]:
+    out: list[tuple[ConnectedAccount, SenderWarmup]] = []
+    for a in accts:
+        w = _warmup_for_account(db, workspace_id, a.id)
+        cap = _warmup_daily_cap(w)
+        if w.sent_today < cap:
+            out.append((a, w))
+    return out
+
+
 def _eligible_senders(
     db: Session, campaign: Campaign
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
-    """Return (account, warmup) for every sender currently under its daily
-    cap. Ordered to start at campaign.rotation_index for round-robin
-    fairness across the pool."""
+    """Return (account, warmup) for every sender currently under its daily cap.
+
+    Ordered to start at campaign.rotation_index for round-robin fairness across
+    the pool. If the user explicitly picked senders but they're ALL at today's
+    warmup cap, gracefully fall back to any other active workspace sender that
+    still has capacity — so a single capped sender doesn't block the whole
+    campaign. (The warmup ramps on day 1 only allow 20/day; that's tight for
+    a casual user who picks one sender and tries to send back-to-back.)
+    """
     pool = campaign.sender_account_ids or []
-    if not pool:
-        # No explicit pool — auto-select every active SMTP/Resend/SendGrid/
-        # Gmail account in the workspace.
-        accts = (
-            db.query(ConnectedAccount)
-            .filter(
-                ConnectedAccount.workspace_id == campaign.workspace_id,
-                ConnectedAccount.provider.in_(
-                    ("smtp", "gmail", "resend", "sendgrid")
-                ),
-                ConnectedAccount.status == "active",
-            )
-            .all()
-        )
-    else:
+    explicit = bool(pool)
+
+    if explicit:
         accts = (
             db.query(ConnectedAccount)
             .filter(
@@ -229,18 +250,58 @@ def _eligible_senders(
             )
             .all()
         )
-    out: list[tuple[ConnectedAccount, SenderWarmup]] = []
-    for a in accts:
-        w = _warmup_for_account(db, campaign.workspace_id, a.id)
-        cap = _warmup_daily_cap(w)
-        if w.sent_today < cap:
-            out.append((a, w))
+    else:
+        accts = _all_workspace_senders(db, campaign.workspace_id)
+
+    out = _filter_by_capacity(db, campaign.workspace_id, accts)
+
+    # Auto-fallback: explicit pool was set but every sender in it is at cap.
+    # Try any other workspace sender that has capacity rather than failing the
+    # whole launch. Picked senders that are eligible stay first in the order
+    # (so the user's brand-preferred FROM is used while it has capacity).
+    if explicit and not out:
+        chosen_ids = {a.id for a in accts}
+        others = [a for a in _all_workspace_senders(db, campaign.workspace_id) if a.id not in chosen_ids]
+        out = _filter_by_capacity(db, campaign.workspace_id, others)
+
     # Rotate starting at the campaign's rotation_index so consecutive ticks
     # advance through the pool.
     if out:
         idx = campaign.rotation_index % len(out)
         out = out[idx:] + out[:idx]
     return out
+
+
+def _sender_capacity_report(db: Session, campaign: Campaign) -> str:
+    """Human-readable summary of why no senders are eligible — listing the
+    user's selected senders with their cap status and any other workspace
+    senders that DO have capacity. Used in the launch error so the user knows
+    exactly what to do instead of seeing 'no_eligible_senders'."""
+    chosen_ids = set(campaign.sender_account_ids or [])
+    all_active = _all_workspace_senders(db, campaign.workspace_id)
+    if not all_active:
+        return "No email senders are connected. Go to Settings → Integrations and connect an SMTP/Gmail/Resend/SendGrid account."
+    capped: list[str] = []
+    free: list[str] = []
+    for a in all_active:
+        w = _warmup_for_account(db, campaign.workspace_id, a.id)
+        cap = _warmup_daily_cap(w)
+        label = (a.external_id or a.label or a.id)
+        status = f"{label} ({w.sent_today}/{cap})"
+        is_chosen = (not chosen_ids) or (a.id in chosen_ids)
+        if w.sent_today >= cap:
+            if is_chosen:
+                capped.append(status)
+        else:
+            free.append(status)
+    parts: list[str] = []
+    if capped:
+        parts.append(f"Selected senders at today's cap: {', '.join(capped)}")
+    if free:
+        parts.append(f"Senders with capacity (tick them in 'Send From'): {', '.join(free)}")
+    else:
+        parts.append("Every sender has hit today's warmup cap — caps reset at midnight UTC.")
+    return " · ".join(parts)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -924,11 +985,14 @@ def start_campaign(
             status.HTTP_400_BAD_REQUEST,
             f"cannot_start_in_state:{c.status}",
         )
-    # Validate at least one sender is available.
+    # Validate at least one sender is available. _eligible_senders now
+    # auto-falls-back to any workspace sender with capacity when the user's
+    # picked senders are all capped, so reaching this branch means literally
+    # NO workspace sender can send today — give a specific explanation.
     if not _eligible_senders(db, c):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "no_eligible_senders — connect an SMTP / Resend / SendGrid / Gmail sender or wait for warmup cap to reset",
+            _sender_capacity_report(db, c),
         )
     c.status = "sending"
     if c.started_at is None:
