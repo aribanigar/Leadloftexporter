@@ -1,269 +1,145 @@
 #!/usr/bin/env python3
-"""Publish a day's Gifts Gulf assets straight to Postgres.
+"""
+publish_to_hub.py — push a day's Gifts Gulf content into the Content Hub DB.
 
-Used by the daily routine after ``content/gifts-gulf/<YYYY-MM-DD>/`` has been
-generated. Bypasses the HTTP API (no JWT, no CORS, no network egress quirks)
-and writes rows directly into ``content_businesses`` / ``content_assets``.
+Talks to Neon over its HTTPS SQL endpoint (port 443), NOT the Postgres wire
+protocol (5432), because routine runners and sandboxes usually allow only
+HTTPS egress. No psycopg, no pip install: standard library only.
 
-Reads:
-    content/gifts-gulf/<YYYY-MM-DD>/
-    ├── manifest.json
-    └── <CUR>/set-<n>/{email.html, email.amp.html, whatsapp.txt, linkedin.txt, meta.json}
+Reads files the routine wrote under:
+  content/gifts-gulf/<date>/<CUR>/set-<n>/{email.html,email.amp.html,whatsapp.txt,linkedin.txt,meta.json}
+and inserts rows into `content_businesses` + `content_assets`.
 
-For each set, inserts 3 ContentAsset rows:
-    - title=<campaign_name>             type=html_email   + amp_content
-    - title=<campaign_name> · WhatsApp  type=whatsapp
-    - title=<campaign_name> · LinkedIn  type=caption, platform=linkedin
-
-Idempotent: an asset whose title + campaign_code tag already exists is skipped,
-so re-running today is a no-op.
-
-Environment:
-    DATABASE_URL          Neon Postgres URL. Accepts the SQLAlchemy
-                          ``postgresql+psycopg://`` prefix; stripped before
-                          handing to psycopg.
-    HUB_WORKSPACE         Workspace UUID. Required.
-    HUB_BUSINESS_SLUG     Defaults to "gifts-gulf".
-    HUB_BUSINESS_NAME     Used only on first-run create. Defaults to "Gifts Gulf".
+Env:
+  DATABASE_URL   required. Neon URL (postgresql+psycopg://... accepted; +driver stripped).
+  HUB_WORKSPACE  required. Workspace UUID the business folder lives under.
+  HUB_BUSINESS_SLUG  optional, default "gifts-gulf".
+  HUB_BUSINESS_NAME  optional, default "Gifts Gulf".
 
 Usage:
-    python scripts/publish_to_hub.py --date 2026-06-13
-    python scripts/publish_to_hub.py --date 2026-06-13 --root content/gifts-gulf
+  python3 scripts/publish_to_hub.py --date 2026-06-13   # default: today UTC
+
+Idempotent: an asset whose (business_id, title) already exists is skipped.
+Prints one JSON object. Exits non-zero only on real DB errors.
 """
-from __future__ import annotations
-
-import argparse
-import json
-import os
-import sys
-import uuid
+import argparse, datetime as dt, json, os, re, sys, uuid
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
-import psycopg
-from psycopg.types.json import Jsonb
-
-
-def _conn_str() -> str:
-    raw = os.environ.get("DATABASE_URL")
-    if not raw:
-        raise SystemExit("DATABASE_URL is required")
-    # Strip the SQLAlchemy driver prefix if present; psycopg only wants
-    # the standard postgresql:// scheme.
-    return raw.replace("postgresql+psycopg://", "postgresql://", 1)
+BRAND, ACCENT = "#00a544", "#008138"
+LOGO = "https://www.giftsgulf.com/gglogo.svg"
+TONE = "minimal"
 
 
-def _read(p: Path) -> str:
-    return p.read_text(encoding="utf-8") if p.exists() else ""
+def normalize(url: str) -> str:
+    return re.sub(r"^(postgres(?:ql)?)\+[a-z0-9]+://", r"\1://", url.strip())
 
 
-def _resolve_or_create_business(cur, workspace_id: str, slug: str, name: str) -> str:
-    cur.execute(
-        "SELECT id FROM content_businesses WHERE workspace_id=%s AND slug=%s",
-        (workspace_id, slug),
-    )
-    row = cur.fetchone()
-    if row:
-        return row[0]
-    business_id = str(uuid.uuid4())
-    cur.execute(
-        """
-        INSERT INTO content_businesses (
-            id, workspace_id, name, slug, brand_color, accent_color,
-            tone, logo_url, description
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            business_id, workspace_id, name, slug,
-            "#00a544", "#008138", "minimal",
-            "https://www.giftsgulf.com/gglogo.svg",
-            "Corporate gifting in the Gulf - by QCKSERVE, part of the Jasani group.",
-        ),
-    )
-    return business_id
+class Neon:
+    def __init__(self, dsn: str):
+        self.conn = normalize(dsn)
+        host = urlparse(self.conn).hostname
+        if not host:
+            raise SystemExit("DATABASE_URL has no host")
+        self.url = "https://%s/sql" % host
+
+    def q(self, sql: str, params=None):
+        body = json.dumps({"query": sql, "params": params or []}).encode()
+        req = Request(self.url, data=body, method="POST", headers={
+            "Content-Type": "application/json",
+            "Neon-Connection-String": self.conn,
+            "Neon-Raw-Text-Output": "true",
+        })
+        try:
+            with urlopen(req, timeout=45) as r:
+                return json.loads(r.read())["rows"]
+        except HTTPError as e:
+            raise RuntimeError("DB %s: %s" % (e.code, e.read().decode()[:300]))
+        except URLError as e:
+            raise RuntimeError("DB unreachable: %s" % e)
 
 
-def _asset_exists(cur, workspace_id: str, business_id: str, title: str) -> bool:
-    """Skip if a row with this (workspace, business, title) already exists.
-    Titles encode date + currency + theme, so they are unique per day and a
-    re-run of the same day is a safe no-op."""
-    cur.execute(
-        """
-        SELECT 1 FROM content_assets
-        WHERE workspace_id = %s
-          AND business_id  = %s
-          AND title        = %s
-        LIMIT 1
-        """,
-        (workspace_id, business_id, title),
-    )
-    return cur.fetchone() is not None
+def repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
 
 
-def _insert_asset(
-    cur, *,
-    workspace_id: str,
-    business_id: str,
-    title: str,
-    type: str,
-    content: str,
-    amp_content: str | None = None,
-    subject: str | None = None,
-    platform: str | None = None,
-    tags: list[str] | None = None,
-    notes: str | None = None,
-) -> None:
-    cur.execute(
-        """
-        INSERT INTO content_assets (
-            id, workspace_id, business_id,
-            title, type, content, amp_content,
-            subject, platform, tags, notes
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            str(uuid.uuid4()), workspace_id, business_id,
-            title, type, content,
-            amp_content or None,
-            subject or None,
-            platform or None,
-            Jsonb(tags or []),
-            notes or None,
-        ),
-    )
+def read(p: Path):
+    try:
+        return p.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
 
 
-def publish_day(date: str, root: Path) -> dict:
-    day_dir = root / date
-    if not day_dir.is_dir():
-        raise SystemExit(f"no such day directory: {day_dir}")
-
-    workspace_id = os.environ.get("HUB_WORKSPACE")
-    if not workspace_id:
-        raise SystemExit("HUB_WORKSPACE is required")
-    biz_slug = os.environ.get("HUB_BUSINESS_SLUG", "gifts-gulf")
-    biz_name = os.environ.get("HUB_BUSINESS_NAME", "Gifts Gulf")
-
-    inserted = 0
-    skipped = 0
-    failures: list[tuple[str, str]] = []
-    created_business = False
-
-    with psycopg.connect(_conn_str()) as conn:
-        with conn.cursor() as cur:
-            # Probe first so we can flag whether we created the business.
-            cur.execute(
-                "SELECT id FROM content_businesses WHERE workspace_id=%s AND slug=%s",
-                (workspace_id, biz_slug),
-            )
-            biz_row = cur.fetchone()
-            if biz_row:
-                biz_id = biz_row[0]
-            else:
-                created_business = True
-                biz_id = _resolve_or_create_business(cur, workspace_id, biz_slug, biz_name)
-
-            # Iterate the currency directories, each holding 3 set-<n> dirs.
-            for cur_dir in sorted(day_dir.iterdir()):
-                if not cur_dir.is_dir() or cur_dir.name.startswith("_"):
-                    continue
-                for set_dir in sorted(cur_dir.glob("set-*")):
-                    meta_path = set_dir / "meta.json"
-                    if not meta_path.exists():
-                        failures.append((str(set_dir), "missing_meta.json"))
-                        continue
-                    try:
-                        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                    except json.JSONDecodeError as e:
-                        failures.append((str(meta_path), f"bad_meta_json: {e}"))
-                        continue
-
-                    code = meta.get("campaign_code") or ""
-                    subj = meta.get("subject") or ""
-                    currency = meta.get("currency") or cur_dir.name
-                    season = meta.get("season") or ""
-                    theme = meta.get("theme") or ""
-                    # Title: prefer an explicit campaign_name; otherwise build a
-                    # stable, unique-per-day label from date + currency + theme
-                    # (falling back to the set folder name). No campaign code
-                    # required — the simple meta.json schema works fine.
-                    name = (
-                        meta.get("campaign_name")
-                        or " ".join(p for p in (date, currency, theme) if p)
-                        or f"{date} {currency} {set_dir.name}"
-                    )
-                    tags = [t for t in (code or date, currency, (season or theme)) if t]
-
-                    html = _read(set_dir / "email.html")
-                    amp = _read(set_dir / "email.amp.html")
-                    wa = _read(set_dir / "whatsapp.txt")
-                    li = _read(set_dir / "linkedin.txt")
-
-                    specs = [
-                        {
-                            "title": name,
-                            "type": "html_email",
-                            "content": html,
-                            "amp_content": amp or None,
-                            "subject": subj,
-                            "tags": tags,
-                        },
-                        {
-                            "title": f"{name} - WhatsApp",
-                            "type": "whatsapp",
-                            "content": wa,
-                            "tags": [t for t in (code or date, currency) if t],
-                        },
-                        {
-                            "title": f"{name} - LinkedIn",
-                            "type": "caption",
-                            "platform": "linkedin",
-                            "content": li,
-                            "tags": [t for t in (code or date, currency) if t],
-                        },
-                    ]
-
-                    for spec in specs:
-                        if not (spec.get("content") or "").strip():
-                            failures.append((spec["title"], "empty_content"))
-                            continue
-                        if _asset_exists(cur, workspace_id, biz_id, spec["title"]):
-                            skipped += 1
-                            continue
-                        try:
-                            _insert_asset(
-                                cur,
-                                workspace_id=workspace_id,
-                                business_id=biz_id,
-                                **spec,
-                            )
-                            inserted += 1
-                        except Exception as e:
-                            failures.append((spec["title"], f"{type(e).__name__}: {e}"))
-
-        conn.commit()
-
-    return {
-        "date": date,
-        "business_id": biz_id,
-        "business_slug": biz_slug,
-        "created_business": created_business,
-        "inserted": inserted,
-        "skipped": skipped,
-        "failures": failures,
-    }
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Publish a Gifts Gulf day to Postgres.")
-    ap.add_argument("--date", required=True, help="YYYY-MM-DD")
-    ap.add_argument("--root", default="content/gifts-gulf", type=Path)
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--date", default=dt.date.today().isoformat())
     args = ap.parse_args()
 
-    report = publish_day(args.date, args.root)
-    print(json.dumps(report, indent=2))
-    if report["failures"]:
-        sys.exit(1)
+    db = os.environ.get("DATABASE_URL")
+    ws = os.environ.get("HUB_WORKSPACE")
+    slug = os.environ.get("HUB_BUSINESS_SLUG", "gifts-gulf")
+    biz_name = os.environ.get("HUB_BUSINESS_NAME", "Gifts Gulf")
+    if not db or not ws:
+        print(json.dumps({"date": args.date, "hub_publish": "skipped (no_secrets)"}))
+        return 0
+
+    day = repo_root() / "content" / "gifts-gulf" / args.date
+    if not day.is_dir():
+        print(json.dumps({"date": args.date, "error": "no content dir: %s" % day}))
+        return 4
+
+    n = Neon(db)
+    if not n.q("select id from workspaces where id=$1", [ws]):
+        print(json.dumps({"date": args.date, "error": "workspace not found: %s" % ws}))
+        return 4
+
+    rows = n.q("select id from content_businesses where workspace_id=$1 and slug=$2", [ws, slug])
+    if rows:
+        biz, created = rows[0]["id"], False
+    else:
+        biz, created = str(uuid.uuid4()), True
+        n.q("""insert into content_businesses
+                 (id,workspace_id,name,slug,brand_color,accent_color,tone,logo_url)
+               values ($1,$2,$3,$4,$5,$6,$7,$8)""",
+            [biz, ws, biz_name, slug, BRAND, ACCENT, TONE, LOGO])
+
+    rep = {"date": args.date, "business_id": biz, "created_business": created,
+           "inserted": 0, "skipped": 0, "failures": []}
+
+    for sd in sorted({p.parent for p in day.rglob("meta.json")}):
+        m = json.loads(read(sd / "meta.json"))
+        code = m.get("campaign_code", sd.name)
+        name = m.get("campaign_name", code)
+        subj = m.get("subject")
+        cur = m.get("currency", sd.parent.name)
+        seas = m.get("season", "")
+        eh, ea = read(sd / "email.html"), read(sd / "email.amp.html")
+        wa, li = read(sd / "whatsapp.txt"), read(sd / "linkedin.txt")
+        jobs = []
+        if eh:
+            jobs.append((name, "html_email", eh, subj, None, [code, cur] + ([seas] if seas else []), ea))
+        if wa:
+            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, cur], None))
+        if li:
+            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, cur], None))
+        for title, atype, content, s, plat, tags, amp in jobs:
+            try:
+                if n.q("select 1 from content_assets where business_id=$1 and title=$2 limit 1", [biz, title]):
+                    rep["skipped"] += 1
+                    continue
+                n.q("""insert into content_assets
+                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content)
+                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)""",
+                    [str(uuid.uuid4()), ws, biz, title, atype, content, s, plat, json.dumps(tags), amp])
+                rep["inserted"] += 1
+            except Exception as e:  # noqa: BLE001
+                rep["failures"].append([title, str(e)])
+
+    print(json.dumps(rep, indent=2))
+    return 1 if rep["failures"] else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
