@@ -219,6 +219,107 @@ def get_thread(
     }
 
 
+def _scoped_thread_ids(
+    db: Session,
+    ctx: AuthContext,
+    mailbox: Optional[str],
+    campaign_id: Optional[str],
+) -> Optional[list[str]]:
+    """Resolve the thread ids matching the inbox filters (mailbox / campaign).
+    Returns None when no filter is applied (= every thread in the workspace)."""
+    if not mailbox and not campaign_id:
+        return None
+    q = db.query(EmailThread.id).filter(EmailThread.workspace_id == ctx.workspace_id)
+    if mailbox:
+        addr = mailbox.strip().lower()
+        msg_thread_ids = (
+            db.query(func.distinct(EmailMessage.thread_id))
+            .filter(
+                EmailMessage.workspace_id == ctx.workspace_id,
+                EmailMessage.thread_id.isnot(None),
+                (func.lower(EmailMessage.from_address) == addr)
+                | (func.lower(EmailMessage.to_address) == addr),
+            )
+            .subquery()
+        )
+        q = q.filter(EmailThread.id.in_(msg_thread_ids))
+    if campaign_id:
+        recip_lead_ids = (
+            db.query(func.distinct(CampaignRecipient.lead_id))
+            .filter(
+                CampaignRecipient.campaign_id == campaign_id,
+                CampaignRecipient.lead_id.isnot(None),
+            )
+            .subquery()
+        )
+        q = q.filter(EmailThread.lead_id.in_(recip_lead_ids))
+    return [row[0] for row in q.all()]
+
+
+@router.delete("/threads/{thread_id}")
+def delete_thread(
+    thread_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Delete a single conversation (thread + all its messages)."""
+    thread = (
+        db.query(EmailThread)
+        .filter(EmailThread.id == thread_id, EmailThread.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not thread:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    db.query(EmailMessage).filter(
+        EmailMessage.workspace_id == ctx.workspace_id,
+        EmailMessage.thread_id == thread_id,
+    ).delete(synchronize_session=False)
+    db.delete(thread)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/threads")
+def clear_threads(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+    mailbox: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+):
+    """Clear conversations. With no filter, wipes every conversation in the
+    workspace; with ``mailbox`` / ``campaign_id`` it clears just that scope —
+    mirroring the same filters as ``GET /threads``."""
+    ids = _scoped_thread_ids(db, ctx, mailbox, campaign_id)
+    if ids is None:
+        # Whole workspace: drop all threads (messages cascade) + any stray
+        # threaded messages.
+        deleted = (
+            db.query(EmailThread)
+            .filter(EmailThread.workspace_id == ctx.workspace_id)
+            .count()
+        )
+        db.query(EmailMessage).filter(
+            EmailMessage.workspace_id == ctx.workspace_id,
+            EmailMessage.thread_id.isnot(None),
+        ).delete(synchronize_session=False)
+        db.query(EmailThread).filter(
+            EmailThread.workspace_id == ctx.workspace_id
+        ).delete(synchronize_session=False)
+    else:
+        deleted = len(ids)
+        if ids:
+            db.query(EmailMessage).filter(
+                EmailMessage.workspace_id == ctx.workspace_id,
+                EmailMessage.thread_id.in_(ids),
+            ).delete(synchronize_session=False)
+            db.query(EmailThread).filter(
+                EmailThread.workspace_id == ctx.workspace_id,
+                EmailThread.id.in_(ids),
+            ).delete(synchronize_session=False)
+    db.commit()
+    return {"ok": True, "deleted": deleted}
+
+
 @router.post("/send")
 def send_email(
     body: dict,
