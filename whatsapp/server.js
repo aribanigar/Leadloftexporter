@@ -44,6 +44,10 @@ const { Boom } = require('@hapi/boom');
 let pinoLogger;
 try { pinoLogger = require('pino')({ level: 'silent' }); } catch (_) { pinoLogger = undefined; }
 
+// Media upload limit — base64-encoded payloads inflate ~33%, so 24mb of
+// raw JSON gives ~17mb of binary, well above WhatsApp's per-message ceiling.
+const MAX_JSON_BYTES = '24mb';
+
 const app = express();
 app.use(express.json({ limit: MAX_JSON_BYTES }));
 
@@ -65,10 +69,6 @@ const AUTH_DIR = path.join(__dirname, '.baileys_auth');
 const DATA_DIR = path.join(AUTH_DIR, '_meta');
 fs.mkdirSync(AUTH_DIR, { recursive: true });
 fs.mkdirSync(DATA_DIR, { recursive: true });
-
-// Media upload limit — base64-encoded payloads inflate ~33%, so 24mb of
-// raw JSON gives ~17mb of binary, well above WhatsApp's per-message ceiling.
-const MAX_JSON_BYTES = '24mb';
 
 // Mime sniff map for sending media via JSON.
 const MEDIA_KIND_BY_MIME = (mt) => {
