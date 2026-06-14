@@ -48,6 +48,9 @@ const NAV = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ] as const;
 
+// Saved views hidden from the sidebar (matched case-insensitively by name).
+const HIDDEN_VIEWS = new Set(["new", "school connect"]);
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, workspace } = useAuth();
@@ -73,7 +76,7 @@ export function Sidebar() {
         <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />
       </div>
 
-      <nav className="px-2 pt-3">
+      <nav className="space-y-0.5 px-2 pt-3">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
@@ -81,11 +84,13 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "mb-0.5 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
-                active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50"
+                "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "text-slate-600 hover:bg-emerald-50/60 hover:text-emerald-700"
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-600")} />
               <span>{label}</span>
               {href === "/pipeline" && (
                 <button
@@ -115,43 +120,44 @@ export function Sidebar() {
       )}
 
       <div className="mt-4 px-2">
-        <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           Quick Views
         </div>
         <div className="space-y-0.5">
-          {(views || []).map((v) => {
-            const href = `/prospecting?view=${v.id}`;
-            return (
+          {(views || [])
+            .filter((v) => !HIDDEN_VIEWS.has((v.name || "").trim().toLowerCase()))
+            .map((v) => (
               <Link
                 key={v.id}
-                href={href}
-                className="block truncate rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                href={`/prospecting?view=${v.id}`}
+                className="block truncate rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700"
               >
                 {v.name}
               </Link>
-            );
-          })}
+            ))}
         </div>
       </div>
 
-      <div className="mt-auto border-t border-slate-100 px-2 py-3">
-        <Link href="/settings/billing" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-          <Gift className="h-4 w-4" />
+      <div className="mt-auto space-y-0.5 border-t border-slate-100 px-2 py-3">
+        <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700">
+          <Gift className="h-4 w-4 text-slate-400" />
           <span>Get LeadCaptura Free</span>
-          <span className="ml-auto h-2 w-2 rounded-full bg-brand-500" />
+          <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
         </Link>
-        <Link href="/help" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-          <Play className="h-4 w-4" />
+        <Link href="/help" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700">
+          <Play className="h-4 w-4 text-slate-400" />
           <span>Video Tutorials</span>
         </Link>
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
-            pathname?.startsWith("/settings") ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50"
+            "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            pathname?.startsWith("/settings")
+              ? "bg-emerald-50 text-emerald-700"
+              : "text-slate-600 hover:bg-emerald-50/60 hover:text-emerald-700"
           )}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className={cn("h-4 w-4", pathname?.startsWith("/settings") ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-600")} />
           <span>Settings</span>
         </Link>
       </div>
