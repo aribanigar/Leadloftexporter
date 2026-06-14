@@ -5,9 +5,10 @@ LIFECYCLE
 
 The send loop is /campaigns/{id}/tick. It claims pending CampaignRecipient
 rows in batches of `campaign.batch_size`, rotates across the configured
-sender pool (sender_account_ids), enforces per-sender warmup caps, skips
-addresses in the workspace's Suppression list, and dispatches the actual
-SMTP/HTTPS send via the existing email_sender.send_email_message path.
+sender pool (sender_account_ids), skips addresses in the workspace's
+Suppression list, and dispatches the actual SMTP/HTTPS send via the existing
+email_sender.send_email_message path. Campaign sending is DECOUPLED from
+warmup — warmup is a separate per-inbox concern and never throttles a send.
 
 WHY TICK + WORKER + FRONTEND POLL
 On Render's free tier no Celery worker runs, so we can't rely on a
@@ -163,22 +164,27 @@ def _inject_tracking(
 
 
 def _warmup_daily_cap(w: SenderWarmup) -> int:
-    """Per-sender daily send cap.
+    """Per-INBOX warmup cap for the WARMUP feature only.
 
-    DISABLED per the product owner's request — the warmup *ramp* (start ~20/day,
-    grow to the ceiling over 30 days) was the reason large campaigns stalled:
-    a sender could only push ~20 emails on day 1, so the rest of the queue sat
-    'pending' forever and looked like "mail isn't going". Sending now runs at
-    full speed with no throttle.
-
-    To re-introduce reputation-safe warmup later, restore the ramp:
-        if w.enabled:
-            day = (datetime.now(timezone.utc) - (w.started_at or now)).days + 1
-            if day < (w.ramp_days or 30):
-                return min(round(20 * 1.18 ** (day - 1)), w.daily_cap_ceiling)
-        return w.daily_cap_ceiling
+    IMPORTANT: this is NOT used to gate campaign sends — campaign sending is
+    decoupled from warmup (see _eligible_senders). Warmup is its own per-inbox
+    concern: each connected mailbox has its own SenderWarmup row with its own
+    started_at/ramp_days, so a brand-new inbox eases in gradually (≈20/day on
+    day 1, growing ~18%/day to the ceiling over ramp_days) while an older,
+    trusted inbox runs at full ceiling. This value drives the warmup settings
+    UI and any future warmup-seeding engine — it must stay per-inbox so one
+    inbox warming up never throttles another.
     """
-    return 10_000_000
+    if not w.enabled:
+        return int(w.daily_cap_ceiling)
+    started = w.started_at or datetime.now(timezone.utc)
+    day = (datetime.now(timezone.utc) - started).days + 1
+    if day <= 0:
+        day = 1
+    if day >= (w.ramp_days or 30):
+        return int(w.daily_cap_ceiling)
+    cap = round(20 * (1.18 ** (day - 1)))
+    return min(int(cap), int(w.daily_cap_ceiling))
 
 
 def _warmup_for_account(
@@ -204,9 +210,7 @@ def _warmup_for_account(
 
 
 def _all_workspace_senders(db: Session, workspace_id: str) -> list[ConnectedAccount]:
-    """Every active email-capable sender in the workspace. Used both for the
-    no-pool auto-select path and as the fallback when the user's explicitly
-    chosen senders are all at today's warmup cap."""
+    """Every active email-capable sender in the workspace."""
     return (
         db.query(ConnectedAccount)
         .filter(
@@ -218,34 +222,22 @@ def _all_workspace_senders(db: Session, workspace_id: str) -> list[ConnectedAcco
     )
 
 
-def _filter_by_capacity(
-    db: Session, workspace_id: str, accts: list[ConnectedAccount]
-) -> list[tuple[ConnectedAccount, SenderWarmup]]:
-    out: list[tuple[ConnectedAccount, SenderWarmup]] = []
-    for a in accts:
-        w = _warmup_for_account(db, workspace_id, a.id)
-        cap = _warmup_daily_cap(w)
-        if w.sent_today < cap:
-            out.append((a, w))
-    return out
-
-
 def _eligible_senders(
     db: Session, campaign: Campaign
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
-    """Return (account, warmup) for every sender currently under its daily cap.
+    """Senders this campaign can dispatch through, round-robin ordered.
 
-    Ordered to start at campaign.rotation_index for round-robin fairness across
-    the pool. If the user explicitly picked senders but they're ALL at today's
-    warmup cap, gracefully fall back to any other active workspace sender that
-    still has capacity — so a single capped sender doesn't block the whole
-    campaign. (The warmup ramps on day 1 only allow 20/day; that's tight for
-    a casual user who picks one sender and tries to send back-to-back.)
+    DECOUPLED FROM WARMUP — campaign sending is NOT throttled by any warmup cap.
+    Every active sender in the campaign's pool (or every active workspace sender
+    when no pool is set) is eligible. The paired SenderWarmup row is returned
+    only so the send loop can keep per-inbox counters (sent_today/total_sent)
+    up to date for the warmup UI; it never gates a send.
+
+    Ordered to start at campaign.rotation_index for round-robin fairness so the
+    volume spreads evenly across the connected mailboxes.
     """
     pool = campaign.sender_account_ids or []
-    explicit = bool(pool)
-
-    if explicit:
+    if pool:
         accts = (
             db.query(ConnectedAccount)
             .filter(
@@ -258,16 +250,7 @@ def _eligible_senders(
     else:
         accts = _all_workspace_senders(db, campaign.workspace_id)
 
-    out = _filter_by_capacity(db, campaign.workspace_id, accts)
-
-    # Auto-fallback: explicit pool was set but every sender in it is at cap.
-    # Try any other workspace sender that has capacity rather than failing the
-    # whole launch. Picked senders that are eligible stay first in the order
-    # (so the user's brand-preferred FROM is used while it has capacity).
-    if explicit and not out:
-        chosen_ids = {a.id for a in accts}
-        others = [a for a in _all_workspace_senders(db, campaign.workspace_id) if a.id not in chosen_ids]
-        out = _filter_by_capacity(db, campaign.workspace_id, others)
+    out = [(a, _warmup_for_account(db, campaign.workspace_id, a.id)) for a in accts]
 
     # Rotate starting at the campaign's rotation_index so consecutive ticks
     # advance through the pool.
@@ -277,36 +260,19 @@ def _eligible_senders(
     return out
 
 
-def _sender_capacity_report(db: Session, campaign: Campaign) -> str:
-    """Human-readable summary of why no senders are eligible — listing the
-    user's selected senders with their cap status and any other workspace
-    senders that DO have capacity. Used in the launch error so the user knows
-    exactly what to do instead of seeing 'no_eligible_senders'."""
-    chosen_ids = set(campaign.sender_account_ids or [])
-    all_active = _all_workspace_senders(db, campaign.workspace_id)
-    if not all_active:
-        return "No email senders are connected. Go to Settings → Integrations and connect an SMTP/Gmail/Resend/SendGrid account."
-    capped: list[str] = []
-    free: list[str] = []
-    for a in all_active:
-        w = _warmup_for_account(db, campaign.workspace_id, a.id)
-        cap = _warmup_daily_cap(w)
-        label = (a.external_id or a.label or a.id)
-        status = f"{label} ({w.sent_today}/{cap})"
-        is_chosen = (not chosen_ids) or (a.id in chosen_ids)
-        if w.sent_today >= cap:
-            if is_chosen:
-                capped.append(status)
-        else:
-            free.append(status)
-    parts: list[str] = []
-    if capped:
-        parts.append(f"Selected senders at today's cap: {', '.join(capped)}")
-    if free:
-        parts.append(f"Senders with capacity (tick them in 'Send From'): {', '.join(free)}")
-    else:
-        parts.append("Every sender has hit today's warmup cap — caps reset at midnight UTC.")
-    return " · ".join(parts)
+def _no_sender_reason(db: Session, campaign: Campaign) -> str:
+    """Why a campaign has no sender to dispatch through. Since sending is
+    decoupled from warmup, the only reasons are: no senders connected, or the
+    picked senders are inactive/disconnected."""
+    if _all_workspace_senders(db, campaign.workspace_id):
+        return (
+            "The sender(s) selected for this campaign are disconnected or inactive. "
+            "Pick an active mailbox in 'Send From', or connect one in Settings → Integrations."
+        )
+    return (
+        "No email senders are connected. Go to Settings → Integrations and connect "
+        "an SMTP / Gmail / Resend / SendGrid account, then launch."
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -990,14 +956,12 @@ def start_campaign(
             status.HTTP_400_BAD_REQUEST,
             f"cannot_start_in_state:{c.status}",
         )
-    # Validate at least one sender is available. _eligible_senders now
-    # auto-falls-back to any workspace sender with capacity when the user's
-    # picked senders are all capped, so reaching this branch means literally
-    # NO workspace sender can send today — give a specific explanation.
+    # Validate at least one ACTIVE sender exists. Sending is decoupled from
+    # warmup, so the only way this fails is no/inactive senders — explain which.
     if not _eligible_senders(db, c):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            _sender_capacity_report(db, c),
+            _no_sender_reason(db, c),
         )
     c.status = "sending"
     if c.started_at is None:
@@ -1335,13 +1299,12 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         db.commit()
         return _stats(campaign, sent=0, failed=0, skipped=0)
 
-    # Build (sender, warmup) eligible pool.
+    # Build the (sender, warmup) pool. Decoupled from warmup — this is empty
+    # only when there are no active senders to dispatch through.
     eligible = _eligible_senders(db, campaign)
     if not eligible:
-        # All senders capped — keep the campaign as "sending" but no-op
-        # this tick; next call will recheck after midnight UTC reset.
         db.commit()
-        return _stats(campaign, sent=0, failed=0, skipped=0, note="warmup_capped")
+        return _stats(campaign, sent=0, failed=0, skipped=0, note="no_active_senders")
 
     # Refresh suppressions for this tick.
     suppressed = {
@@ -1379,17 +1342,10 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             skipped += 1
             continue
 
-        # Pick the next sender that's still under its warmup cap.
-        sender = None
-        warmup = None
-        for i in range(len(eligible)):
-            cand_acct, cand_warm = eligible[(rotation_index + i) % len(eligible)]
-            if cand_warm.sent_today < _warmup_daily_cap(cand_warm):
-                sender, warmup = cand_acct, cand_warm
-                rotation_index = (rotation_index + i + 1) % len(eligible)
-                break
-        if not sender:
-            break  # all senders capped mid-batch
+        # Round-robin to the next sender. DECOUPLED from warmup — every active
+        # sender can dispatch; a warmup cap never blocks a campaign send.
+        sender, warmup = eligible[rotation_index % len(eligible)]
+        rotation_index = (rotation_index + 1) % len(eligible)
 
         # Materialise the EmailMessage row, render merge tags, dispatch.
         # Recipients may be CRM leads OR arbitrary pasted/CSV addresses. When
@@ -1530,7 +1486,7 @@ def _prepare_tick_batch(
     eligible = _eligible_senders(db, campaign)
     if not eligible:
         db.commit()
-        return {"jobs": [], "campaign_status": "sending", "note": "warmup_capped"}
+        return {"jobs": [], "campaign_status": "sending", "note": "no_active_senders"}
 
     suppressed = {
         s.email.lower()
@@ -1566,15 +1522,9 @@ def _prepare_tick_batch(
             campaign.skipped_count = (campaign.skipped_count or 0) + 1
             continue
 
-        sender = None
-        for i in range(len(eligible)):
-            cand_acct, cand_warm = eligible[(rotation_index + i) % len(eligible)]
-            if cand_warm.sent_today < _warmup_daily_cap(cand_warm):
-                sender = cand_acct
-                rotation_index = (rotation_index + i + 1) % len(eligible)
-                break
-        if not sender:
-            break
+        # Round-robin sender pick — DECOUPLED from warmup (no cap gate).
+        sender = eligible[rotation_index % len(eligible)][0]
+        rotation_index = (rotation_index + 1) % len(eligible)
 
         lead = db.get(Lead, r.lead_id) if r.lead_id else None
         if lead:
