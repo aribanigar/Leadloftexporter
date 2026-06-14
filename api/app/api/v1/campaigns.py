@@ -783,49 +783,82 @@ def campaign_stats(
     status_counts = {s: n for s, n in rows}
     total = sum(status_counts.values())
     pending = status_counts.get("pending", 0) + status_counts.get("sending", 0)
-    sent = total - pending
+    # Pre-suppressed recipients (status=failed with no delivery attempt) are
+    # intentional skips — they were on the workspace's suppression list at
+    # launch because they previously hard-bounced. Lumping them into the
+    # campaign's bounce rate is misleading: it makes a freshly-launched
+    # campaign of 200 emails read "100% bounced" the instant 10 addresses
+    # are skipped, and trips the "Critical Attention" badge before a single
+    # email has gone out. Skipped is its own bucket; bounces are only true
+    # post-delivery hard failures (status=bounced).
+    skipped = c.skipped_count or 0
+    delivered = status_counts.get("sent", 0) + status_counts.get("delivered", 0) + status_counts.get("opened", 0) + status_counts.get("clicked", 0)
+    bounced = status_counts.get("bounced", 0)
+    # `attempted` is what we actually tried to deliver — the only honest
+    # denominator for an open/click/bounce rate.
+    attempted = delivered + bounced
+    # Keep `sent` for backward-compat consumers but redefine it to mean
+    # "attempted delivery" rather than "anything that left pending".
+    sent = attempted
     opened = status_counts.get("opened", 0) + status_counts.get("clicked", 0)
     clicked = status_counts.get("clicked", 0)
-    bounced = status_counts.get("bounced", 0) + status_counts.get("failed", 0)
 
-    def pct(n: int) -> int:
-        return round((n / sent) * 100) if sent > 0 else 0
+    def pct(n: int, denom: int) -> int:
+        return round((n / denom) * 100) if denom > 0 else 0
 
-    open_rate, click_rate, bounce_rate = pct(opened), pct(clicked), pct(bounced)
-    delivery_rate = pct(sent - bounced)
+    open_rate = pct(opened, attempted)
+    click_rate = pct(clicked, attempted)
+    bounce_rate = pct(bounced, attempted)
+    delivery_rate = pct(delivered, attempted)
 
     open_t, click_t, label = _GOAL_BENCHMARKS.get(c.goal or "", (20, 3, "General"))
     went_well: list[str] = []
     needs_work: list[str] = []
-    performance = "good"
-    if open_rate >= open_t:
-        went_well.append(f"Open rate {open_rate}% beat the {open_t}% {label} target.")
-    elif open_rate >= open_t * 0.7:
-        performance = "average"
-        needs_work.append(f"Open rate {open_rate}% is close to the {open_t}% target — sharpen the subject line.")
+    # Don't render a verdict before there are real attempts to score against.
+    # A freshly-launched campaign with 0 delivery attempts (everything still
+    # pending, plus some pre-suppressed) shouldn't be flagged "critical" —
+    # there's literally nothing to measure yet.
+    SCORING_FLOOR = 10  # need at least 10 attempted deliveries for a verdict
+    if attempted < SCORING_FLOOR:
+        if pending > 0:
+            performance = "pending"
+            went_well.append(
+                f"Campaign is queued — {pending} email{'s' if pending != 1 else ''} waiting to send."
+                + (f" ({skipped} skipped from your suppression list — these previously hard-bounced and are auto-protected.)" if skipped else "")
+            )
+        else:
+            performance = "pending"
+            needs_work.append("Not enough delivery data yet — performance metrics will appear once sending finishes.")
+        goal_achieved = 0
     else:
-        performance = "critical"
-        needs_work.append(f"Open rate {open_rate}% is below the {open_t}% target — try a more compelling subject line.")
-    if click_rate >= click_t:
-        went_well.append(f"Click rate {click_rate}% met the {click_t}% target.")
-    else:
-        needs_work.append(f"Click rate {click_rate}% is below target — strengthen your CTA.")
-        if performance != "critical":
+        performance = "good"
+        if open_rate >= open_t:
+            went_well.append(f"Open rate {open_rate}% beat the {open_t}% {label} target.")
+        elif open_rate >= open_t * 0.7:
             performance = "average"
-    if bounce_rate > 10:
-        performance = "critical"
-        needs_work.append(f"High bounce rate {bounce_rate}% — clean your list.")
-    elif bounce_rate <= 2 and sent > 5:
-        went_well.append(f"Excellent list quality — only {bounce_rate}% bounced.")
-    goal_achieved = (
-        min(99, round((open_rate / open_t) * 50 + (click_rate / click_t) * 50))
-        if sent > 0 else 0
-    )
+            needs_work.append(f"Open rate {open_rate}% is close to the {open_t}% target — sharpen the subject line.")
+        else:
+            performance = "critical"
+            needs_work.append(f"Open rate {open_rate}% is below the {open_t}% target — try a more compelling subject line.")
+        if click_rate >= click_t:
+            went_well.append(f"Click rate {click_rate}% met the {click_t}% target.")
+        else:
+            needs_work.append(f"Click rate {click_rate}% is below target — strengthen your CTA.")
+            if performance != "critical":
+                performance = "average"
+        if bounce_rate > 10:
+            performance = "critical"
+            needs_work.append(f"High bounce rate {bounce_rate}% — clean your list.")
+        elif bounce_rate <= 2 and attempted > 5:
+            went_well.append(f"Excellent list quality — only {bounce_rate}% bounced.")
+        goal_achieved = min(99, round((open_rate / open_t) * 50 + (click_rate / click_t) * 50))
 
     return {
         "campaign": {"name": c.name, "subject": c.subject, "status": c.status, "goal": c.goal, "sent_at": c.started_at},
         "stats": {
-            "total": total, "sent": sent, "opened": opened, "clicked": clicked, "bounced": bounced,
+            "total": total, "sent": sent, "attempted": attempted, "delivered": delivered,
+            "opened": opened, "clicked": clicked, "bounced": bounced,
+            "skipped": skipped, "pending": pending,
             "open_rate": open_rate, "click_rate": click_rate, "bounce_rate": bounce_rate, "delivery_rate": delivery_rate,
         },
         "status_counts": status_counts,

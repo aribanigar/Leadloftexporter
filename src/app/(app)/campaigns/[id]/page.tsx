@@ -101,7 +101,7 @@ interface Campaign {
 
 // ── Normalised UI shapes (kept from the source module) ──
 
-type Perf = 'good' | 'average' | 'critical';
+type Perf = 'good' | 'average' | 'critical' | 'pending';
 
 interface UiRecipient {
   email: string;
@@ -300,6 +300,10 @@ function CampaignStatusBadge({ performance }: { performance?: Perf }) {
     good: { bg: 'rgba(0,54,26,0.08)', border: 'rgba(0,54,26,0.15)', icon: 'check_circle', color: T.primary, label: 'Good', iconColor: '#16a34a' },
     average: { bg: 'rgba(255,220,196,0.5)', border: 'rgba(146,64,14,0.2)', icon: 'warning', color: '#92400e', label: 'Average', iconColor: '#d97706' },
     critical: { bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.2)', icon: 'warning', color: '#dc2626', label: 'Critical Attention', iconColor: '#dc2626' },
+    // Backend now returns "pending" while a freshly-launched campaign is
+    // still draining its queue — show that as neutral "Sending" instead of
+    // smashing "Critical Attention" onto a 0-delivered campaign.
+    pending: { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.22)', icon: 'sync', color: '#4338ca', label: 'Sending', iconColor: '#6366f1' },
   }[performance];
   return (
     <div style={{
