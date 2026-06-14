@@ -157,11 +157,11 @@ export default function InboxPage() {
   const threadCount = threads?.length ?? 0;
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col lg:flex-row">
       {/* ── Pane 1: Mailbox → Campaigns tree ─────────────────────────── */}
       <div
         className={cn(
-          "w-full flex-col border-r border-slate-200 bg-slate-50 lg:flex lg:w-64",
+          "w-full flex-col border-slate-200 bg-slate-50 lg:flex lg:w-64 lg:border-r",
           active || mobilePane !== "boxes" ? "hidden lg:flex" : "flex"
         )}
       >
@@ -268,7 +268,7 @@ export default function InboxPage() {
       {/* ── Pane 2: Thread list ──────────────────────────────────────── */}
       <div
         className={cn(
-          "w-full flex-col border-r border-slate-200 bg-white lg:flex lg:w-80",
+          "w-full flex-col border-slate-200 bg-white lg:flex lg:w-80 lg:border-r",
           active ? "hidden lg:flex" : mobilePane === "threads" ? "flex" : "hidden lg:flex"
         )}
       >
