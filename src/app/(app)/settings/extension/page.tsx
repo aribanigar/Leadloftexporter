@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.247",
+    date: "Jun 15, 2026",
+    size: "234 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.247.zip",
+    latest: true,
+    changes: [
+      "Mass Apply Jobs now advances past the Contact-info step: Next/Review/Submit are found at document scope (they live in a footer outside the progress region, which the previous build missed).",
+      "Apply buttons clicked with the proven pointer-sequence-first method so Ember reliably advances the form.",
+      "Leftover apply modals are now properly discarded between jobs.",
+    ],
+  },
+  {
     version: "1.0.246",
     date: "Jun 15, 2026",
     size: "234 KB",
     file: "/extensions/leadcaptura-extension-v1.0.246.zip",
-    latest: true,
     changes: [
       "New “Mass Apply Jobs” button on the jobs results page (/jobs/search-results/ and /jobs/collections/).",
       "Walks every job card, opens the in-app LinkedIn Apply form, auto-fills it, and submits — skipping “Apply on company website” roles it can’t fill.",

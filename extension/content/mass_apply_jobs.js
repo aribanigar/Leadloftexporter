@@ -166,60 +166,89 @@
   }
 
   // ─────────────────── easy-apply modal ──────────────────────
-  function easyApplyModal() {
-    let m = document.querySelector(
-      '[data-test-modal-id="easy-apply-modal"],' +
-      'div[role="dialog"][aria-labelledby="jobs-apply-header"],' +
-      '.jobs-easy-apply-modal'
+  // The Next/Review/Submit buttons carry GLOBALLY-UNIQUE attributes that only
+  // ever exist inside the Easy Apply form, so we detect + click them at
+  // document scope. The Next button lives in a <footer> that is a SIBLING of
+  // (not inside) the progress "region", so scoping the search to that region —
+  // or to any single container — silently misses it. Document scope is the fix.
+  function applyFormPresent() {
+    return !!(
+      document.querySelector('[aria-label*="job application progress" i][role="region"]') ||
+      document.querySelector(
+        "button[data-easy-apply-next-button]," +
+        "button[data-live-test-easy-apply-next-button]," +
+        'button[aria-label="Continue to next step"],' +
+        "button[data-live-test-easy-apply-submit-button]," +
+        'button[aria-label="Submit application"],' +
+        "button[data-live-test-easy-apply-review-button]," +
+        'button[aria-label="Review your application"]'
+      )
     );
-    if (m && visible(m)) return m;
-    const region = document.querySelector('[aria-label*="job application progress" i][role="region"]');
-    if (region) return region.closest('div[role="dialog"]') || region;
-    if (/^\/jobs\/view\/\d+\/apply\//.test(location.pathname)) {
-      const f = document.querySelector("form");
-      if (f) return f.closest("main") || f;
-    }
-    return null;
   }
 
-  function qIn(scope, sels) {
+  // The container we autofill WITHIN (for select/input scoping only). Prefer the
+  // modal content; fall back to document so a class rename never blocks fill.
+  function applyFormScope() {
+    const modal = document.querySelector(
+      '[data-test-modal-id="easy-apply-modal"],' +
+      'div[role="dialog"][aria-labelledby="jobs-apply-header"],' +
+      ".jobs-easy-apply-modal,.jobs-easy-apply-modal__content,.jobs-easy-apply-content"
+    );
+    if (modal && visible(modal)) return modal;
+    const region = document.querySelector('[aria-label*="job application progress" i][role="region"]');
+    if (region) return region.closest("form, .artdeco-modal, div[role='dialog']") || document;
+    return document;
+  }
+
+  function qDoc(sels) {
     for (const s of sels) {
-      const e = (scope || document).querySelector(s);
+      const e = document.querySelector(s);
       if (e && visible(e) && !e.disabled) return e;
     }
     return null;
   }
 
-  function nextButton(scope) {
-    return qIn(scope, [
+  function nextButton() {
+    return qDoc([
       "button[data-easy-apply-next-button]",
       "button[data-live-test-easy-apply-next-button]",
       'button[aria-label="Continue to next step"]',
     ]);
   }
-  function reviewButton(scope) {
-    return qIn(scope, [
+  function reviewButton() {
+    return qDoc([
       "button[data-live-test-easy-apply-review-button]",
       'button[aria-label="Review your application"]',
     ]);
   }
-  function submitButton(scope) {
-    return qIn(scope, [
+  function submitButton() {
+    return qDoc([
       "button[data-live-test-easy-apply-submit-button]",
       'button[aria-label="Submit application"]',
     ]);
   }
 
+  // Click an advance/submit button the proven way: real pointer sequence FIRST
+  // (Ember/React honours it), then native .click() + inner <span> as fallbacks.
+  function advanceClick(btn) {
+    if (!btn) return;
+    humanClick(btn);
+    try { btn.click(); } catch (_) {}
+    const inner = btn.querySelector(".artdeco-button__text") || btn.firstElementChild;
+    if (inner) humanClick(inner);
+  }
+
   // Progress signature so we can tell when a Next click failed to advance
   // (= a validation error we couldn't satisfy → discard + skip).
-  function progressSig(modal) {
+  function progressSig() {
     let pct = "";
     const region = document.querySelector('[aria-label*="percent" i]');
     if (region) {
       const m = (region.getAttribute("aria-label") || "").match(/(\d+)\s*percent/i);
       if (m) pct = m[1];
     }
-    return pct + "|" + (modal ? textOf(modal).length : 0);
+    const scope = applyFormScope();
+    return pct + "|" + (scope ? textOf(scope).length : 0);
   }
 
   // ─────────────────── form autofill ─────────────────────────
@@ -317,8 +346,12 @@
 
   // ─────────────────── modal lifecycle ───────────────────────
   function dismissModal() {
-    const modal = easyApplyModal();
-    const x = (modal || document).querySelector('button[aria-label="Dismiss"]');
+    // The modal close control is EXACTLY aria-label="Dismiss" (job cards use
+    // "Dismiss <title> job", so the exact match never hits a card).
+    const x = document.querySelector(
+      'button[aria-label="Dismiss"][data-test-modal-close-btn],' +
+      'button[aria-label="Dismiss"]'
+    );
     if (x) forceClick(x);
   }
 
@@ -357,48 +390,45 @@
   // Walk the multi-step apply form. Returns "applied" | "skipped".
   async function runApplyModal() {
     // Wait for the form to mount (poll up to 12s — modal OR full-page).
-    let modal = null;
     const t0 = Date.now();
     while (Date.now() - t0 < 12000) {
-      modal = easyApplyModal();
-      if (modal) break;
+      if (applyFormPresent()) break;
       await sleep(300);
     }
-    if (!modal) return "skipped";
+    if (!applyFormPresent()) return "skipped";
 
     let stuck = 0;
     for (let step = 0; step < 14; step++) {
       if (state.cancel) { await discardAndClose(); return "skipped"; }
       if (isCheckpoint()) return "skipped";
+      if (!applyFormPresent()) return "skipped";
 
-      modal = easyApplyModal();
-      if (!modal) return "skipped";
-
-      autofill(modal);
+      const scope = applyFormScope();
+      autofill(scope);
       await sleep(rand(600, 1100));
 
-      const before = progressSig(modal);
+      const before = progressSig();
 
       // Terminal step → Submit.
-      const submit = submitButton(modal);
+      const submit = submitButton();
       if (submit) {
-        forceClick(submit);
+        advanceClick(submit);
         await closePostSubmit();
         return "applied";
       }
       // Otherwise Review → Next, in that order.
-      const advance = reviewButton(modal) || nextButton(modal);
+      const advance = reviewButton() || nextButton();
       if (!advance) {
         // No actionable control → can't proceed.
         await discardAndClose();
         return "skipped";
       }
-      forceClick(advance);
+      advanceClick(advance);
       await sleep(rand(1400, 2400));
 
       // Did the form move? If not, the current step has an error we couldn't
       // satisfy. Retry autofill once; if still stuck, discard + skip.
-      const after = progressSig(easyApplyModal());
+      const after = progressSig();
       if (after === before) {
         stuck++;
         if (stuck >= 2) { await discardAndClose(); return "skipped"; }
@@ -472,7 +502,7 @@
           else state.skipped++;
 
           // Make sure nothing is left open before the gap.
-          if (easyApplyModal()) { try { await discardAndClose(); } catch (_) {} }
+          if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
 
           if (i < cards.length - 1 && !state.cancel) {
             const wait = nextJobDelayMs();
