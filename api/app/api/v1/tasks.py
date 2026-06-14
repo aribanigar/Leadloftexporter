@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -112,6 +112,81 @@ def list_members(
         }
         for u in rows
     ]
+
+
+@router.get("/today")
+def today_board(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Live "notice board" feed: scheduled tasks + meetings (bookings) around now.
+
+    Returns a generous UTC window [-18h, +48h] with raw timestamps; the client
+    filters to its own local day and renders the live timings, so the board is
+    correct regardless of server timezone.
+    """
+    from app.models import Booking
+
+    ws = ctx.workspace_id
+    now = datetime.now(timezone.utc)
+    lo, hi = now - timedelta(hours=18), now + timedelta(hours=48)
+    items: list[dict] = []
+
+    # Scheduled tasks assigned to me (or unassigned), with a due time in window.
+    tq = (
+        db.query(Task)
+        .filter(
+            Task.workspace_id == ws,
+            Task.status.in_(ACTIVE_STATUSES),
+            Task.due_at.isnot(None),
+            Task.due_at >= lo,
+            Task.due_at <= hi,
+        )
+        .order_by(Task.due_at.asc())
+    )
+    for t in tq.all():
+        if t.assignee_id and t.assignee_id != ctx.user_id:
+            continue
+        items.append(
+            {
+                "kind": "task",
+                "id": t.id,
+                "title": t.title,
+                "at": t.due_at,
+                "end_at": None,
+                "type": t.type,
+                "status": t.status,
+                "href": f"/leads/{t.lead_id}" if t.lead_id else "/tasks",
+            }
+        )
+
+    # Meetings (bookings) in the same window.
+    bq = (
+        db.query(Booking)
+        .filter(
+            Booking.workspace_id == ws,
+            Booking.start_at >= lo,
+            Booking.start_at <= hi,
+            Booking.status != "cancelled",
+        )
+        .order_by(Booking.start_at.asc())
+    )
+    for b in bq.all():
+        items.append(
+            {
+                "kind": "meeting",
+                "id": b.id,
+                "title": b.invitee_name or "Meeting",
+                "sub": b.invitee_email,
+                "at": b.start_at,
+                "end_at": b.end_at,
+                "status": b.status,
+                "href": f"/leads/{b.lead_id}" if b.lead_id else "/scheduling",
+            }
+        )
+
+    items.sort(key=lambda x: x["at"])
+    return {"now": now, "items": items}
 
 
 @router.get("/office")

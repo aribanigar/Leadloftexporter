@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
+import { TaskAlerts } from "@/components/task-alerts";
+import { NoticeBoard } from "@/components/notice-board";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,6 +25,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <TopBar />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+      <TaskAlerts />
+      <NoticeBoard />
     </div>
   );
 }

@@ -29,6 +29,15 @@ const config: Config = {
         soft: "0 1px 2px rgba(0,0,0,0.04), 0 1px 1px rgba(0,0,0,0.02)",
         card: "0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(15,23,42,0.04)",
       },
+      keyframes: {
+        wiggle: {
+          "0%, 100%": { transform: "rotate(-12deg)" },
+          "50%": { transform: "rotate(12deg)" },
+        },
+      },
+      animation: {
+        wiggle: "wiggle 0.6s ease-in-out infinite",
+      },
     },
   },
   plugins: [],
