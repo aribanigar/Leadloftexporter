@@ -80,15 +80,15 @@ body {
   .gradient-heading {
     @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
   }
-  /* Warm sand canvas behind the whole app — a deeper earth tone with subtle
-     dune-wave ripples + a soft light highlight, so it reads as sand, not grey. */
+  /* Light warm-sand canvas behind the whole app — a soft sand tone with a fine
+     fractal-noise grain so it reads as real sand grains, not a flat block. */
   .app-canvas {
-    background-color: #efe5d1;
+    background-color: #f3eee2;
     background-image:
-      radial-gradient(150% 95% at 50% -25%, rgba(255, 252, 244, 0.7), rgba(255, 252, 244, 0) 55%),
-      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='90'%20viewBox='0%200%20240%2090'%3E%3Cg%20fill='none'%20stroke='%23c8b487'%20stroke-opacity='0.28'%20stroke-width='1.4'%3E%3Cpath%20d='M0%2015%20C60%205,180%2025,240%2015'/%3E%3Cpath%20d='M0%2045%20C60%2035,180%2055,240%2045'/%3E%3Cpath%20d='M0%2075%20C60%2065,180%2085,240%2075'/%3E%3C/g%3E%3C/svg%3E");
-    background-repeat: no-repeat, repeat;
-    background-size: cover, 260px 98px;
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20type='saturate'%20values='0'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'%20opacity='0.07'/%3E%3C/svg%3E"),
+      radial-gradient(150% 95% at 50% -25%, rgba(255, 253, 247, 0.55), rgba(255, 253, 247, 0) 55%);
+    background-repeat: repeat, no-repeat;
+    background-size: 180px 180px, cover;
   }
   .card {
     @apply rounded-lg border border-slate-200 bg-white shadow-card;
