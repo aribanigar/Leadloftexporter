@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Bags and travel",
+  "season": "Summer eco",
+  "angle": "Sustainable H2 Gifting",
+  "campaign_code": "GG-SAR-20260614-2",
+  "campaign_name": "KSA Travel Bags - 14 Jun 2026",
+  "subject": "Built to be carried",
+  "skus": [
+    "GG1061",
+    "GG1124",
+    "GG1605",
+    "GG1170"
+  ],
+  "products": [
+    {
+      "name": "Valley Backpack",
+      "sku": "GG1061",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2050-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1061",
+      "price": "SR 38.28"
+    },
+    {
+      "name": "Bai Backpack",
+      "sku": "GG1124",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2231-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1124",
+      "price": "SR 39.62"
+    },
+    {
+      "name": "Stockholm Bag",
+      "sku": "GG1605",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8958-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1605",
+      "price": "SR 83.29"
+    },
+    {
+      "name": "Onbag",
+      "sku": "GG1170",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2373-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1170",
+      "price": "SR 53.93"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Bags+and+travel+set+%28GG-SAR-20260614-2%29+for+KSA"
+}

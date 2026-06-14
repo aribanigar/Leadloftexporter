@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Event giveaways",
+  "season": "Summer eco",
+  "angle": "Sustainable H2 Gifting",
+  "campaign_code": "GG-SAR-20260614-3",
+  "campaign_name": "KSA Event Giveaways - 14 Jun 2026",
+  "subject": "Branding by the thousand",
+  "skus": [
+    "GG1166",
+    "GG1646",
+    "GG1686",
+    "GG1205"
+  ],
+  "products": [
+    {
+      "name": "Capnit",
+      "sku": "GG1166",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2359-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1166",
+      "price": "SR 15.30"
+    },
+    {
+      "name": "Illa Tote",
+      "sku": "GG1646",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9517-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1646",
+      "price": "SR 8.32"
+    },
+    {
+      "name": "Penlo",
+      "sku": "GG1686",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9819-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1686",
+      "price": "SR 4.43"
+    },
+    {
+      "name": "Keypop",
+      "sku": "GG1205",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2483-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1205",
+      "price": "SR 3.89"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Event+giveaways+set+%28GG-SAR-20260614-3%29+for+KSA"
+}

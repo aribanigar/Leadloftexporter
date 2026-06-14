@@ -6,24 +6,33 @@ Builds one full day of product-forward corporate-gifting marketing:
 3 markets (AED/SAR/QAR) x 3 themed sets = 9 sets, each rendered as
 email.html, email.amp.html, whatsapp.txt, linkedin.txt, meta.json.
 
-Catalogue note: the live catalogue (giftsgulf.com / cdn1.midocean.com) is
-sourced each run when reachable. When network egress blocks those hosts,
-this run falls back to a deterministic curated set built on real midocean
-product codes (the documented fallback path). Image URLs are still built
-as the optimized giftsgulf /_next/image proxy so tiles render in Gmail.
+Catalogue: real products are read from _state/catalogue.json, a snapshot
+parsed from https://www.giftsgulf.com/catalogues/full (sku, name, midocean
+image code, USD base price, material). Each tile's image is the wsrv JPEG
+proxy of the real midocean original, so it renders in Gmail and Outlook.
+Every selected image is HEAD-verified (HTTP 200 + image/jpeg) before it is
+allowed into an email; a product whose image does not verify is dropped.
+
+The day's curation lives in PLAN below (per-market angle/season + three
+themed sets of real SKUs, each with a short descriptor). Subjects are never
+reused (checked against _state/used-subjects.json) and SKUs are not reused
+within 14 days (checked against _state/used-skus.json).
 
 Usage: python3 generate.py YYYY-MM-DD
 """
 import json, os, sys, html
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # content/gifts-gulf
 STATE = os.path.join(ROOT, "_state")
 
-# ---- variables (never hardcode elsewhere) --------------------------------
+# ---- fixed values (never hardcode elsewhere) ------------------------------
 WHATSAPP_NUMBER = "916005001499"
 CONTACT_EMAIL = "contact@giftsgulf.com"
+LOGO_SVG = "https://www.giftsgulf.com/gglogo.svg"
 
 # ---- brand palette --------------------------------------------------------
 C = dict(
@@ -38,23 +47,32 @@ RADIUS = "3px"
 RATES = {"AED": 3.6725, "SAR": 3.75, "QAR": 3.64}
 SYM = {"AED": "AED", "SAR": "SR", "QAR": "QAR"}
 VAT = {
-    "AED": "before 5% UAE VAT",
-    "SAR": "before 15% KSA VAT",
-    "QAR": "VAT not applicable in Qatar",
+    "AED": "before 5% UAE VAT and branding setup",
+    "SAR": "before 15% KSA VAT and branding setup",
+    "QAR": "branding setup not included, VAT not applicable in Qatar",
 }
 MARKET = {"AED": "UAE", "SAR": "KSA", "QAR": "Qatar"}
 
 
 def vol_price(usd, cur):
-    """Convert USD base to local, apply 250+ tier -15%, round to 2dp."""
+    """USD base -> local currency, 250+ tier (-15%), 2 decimals."""
     return round(usd * RATES[cur] * 0.85, 2)
 
 
-def img_url(code, escape_amp=True):
-    """Optimized giftsgulf /_next/image proxy URL for a midocean code."""
-    original = "https://cdn1.midocean.com/image/original/%s.jpg" % code
-    u = "https://www.giftsgulf.com/_next/image?url=%s&w=640&q=75" % quote(original, safe="")
-    return u.replace("&", "&amp;") if escape_amp else u
+def fmt_price(cur, usd):
+    return "%s %.2f" % (SYM[cur], vol_price(usd, cur))
+
+
+def img_src(code, escaped=True):
+    """wsrv JPEG proxy of the real midocean original. Renders in Gmail+Outlook."""
+    u = ("https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/%s.jpg"
+         "&w=640&output=jpg&q=80" % code)
+    return u.replace("&", "&amp;") if escaped else u
+
+
+def logo_src(escaped=True):
+    u = "https://wsrv.nl/?url=%s&w=360&output=png" % LOGO_SVG
+    return u.replace("&", "&amp;") if escaped else u
 
 
 def product_url(sku):
@@ -65,344 +83,379 @@ def wa_url(prefill):
     return "https://wa.me/%s?text=%s" % (WHATSAPP_NUMBER, quote_plus(prefill))
 
 
-# ---- catalogue (curated deterministic fallback; real midocean codes) ------
-# Each product: sku (GG####), name, code (midocean image), usd, descriptor.
-P = {
-    # UAE summer hydration
-    "TAMPERE": dict(sku="GG6373", name="Tampere", code="MO6373", usd=17.85, desc="Double-wall steel, 12h cold"),
-    "STELVIO": dict(sku="GG9812", name="Stelvio", code="MO9812", usd=14.20, desc="Vacuum insulated, 500ml"),
-    "TURINB":  dict(sku="GG6750", name="Turin", code="MO6750", usd=12.90, desc="Powder-coat steel, 8h cold"),
-    "OREGON":  dict(sku="GG9356", name="Oregon", code="MO9356", usd=6.40, desc="Tritan, leakproof, 500ml"),
-    "MALMO":   dict(sku="GG6404", name="Malmo", code="MO6404", usd=9.60, desc="16L insulated, foldable"),
-    "ICEBERG": dict(sku="GG6709", name="Iceberg", code="MO6709", usd=18.40, desc="RPET cooler backpack, 600D"),
-    "FRESH":   dict(sku="GG6388", name="Fresh", code="MO6388", usd=6.20, desc="Cooler tote, leakproof lining"),
-    "TRACK":   dict(sku="GG9227", name="Track", code="MO9227", usd=3.80, desc="Squeeze sports, 700ml"),
-    "SONORA":  dict(sku="GG7011", name="Sonora", code="MO7011", usd=3.40, desc="6-panel brushed cotton cap"),
-    "RECACAP": dict(sku="GG6433", name="Recacap", code="MO6433", usd=4.10, desc="RPET cap, adjustable strap"),
-    "VENICE":  dict(sku="GG6210", name="Venice", code="MO6210", usd=7.30, desc="Borosilicate glass, 500ml"),
-    "PURE":    dict(sku="GG9910", name="Pure", code="MO9910", usd=4.95, desc="100% recycled PET, 500ml"),
-    # KSA tech + desk + premium drinkware
-    "STELLAR": dict(sku="GG6584", name="Stellar", code="MO6584", usd=19.50, desc="10000mAh, dual USB, LED"),
-    "FLAT":    dict(sku="GG6075", name="Flat", code="MO6075", usd=12.30, desc="Slim 5000mAh, pocket size"),
-    "PAD":     dict(sku="GG6395", name="Pad", code="MO6395", usd=11.80, desc="Qi 15W wireless desk pad"),
-    "DUO":     dict(sku="GG9843", name="Duo", code="MO9843", usd=3.95, desc="3-in-1 charging cable"),
-    "BAOBAB":  dict(sku="GG8200", name="Baobab", code="MO8200", usd=5.60, desc="Soft PU A5, 192 pages"),
-    "NIMBUS":  dict(sku="GG9479", name="Nimbus", code="MO9479", usd=1.85, desc="Aluminium twist pen"),
-    "CORK":    dict(sku="GG6555", name="Cork", code="MO6555", usd=8.90, desc="Cork + bamboo desk tray"),
-    "ECONOTE": dict(sku="GG6489", name="Econote", code="MO6489", usd=4.30, desc="RPET cover A5 notebook"),
-    "COPPER":  dict(sku="GG6371", name="Copper", code="MO6371", usd=21.40, desc="Copper-lined, 18h cold"),
-    "EXEC":    dict(sku="GG6044", name="Exec", code="MO6044", usd=13.60, desc="Travel mug, one-hand lid"),
-    "GRANDE":  dict(sku="GG6748", name="Grande", code="MO6748", usd=24.90, desc="1L flask, 24h hot/cold"),
-    "AROMA":   dict(sku="GG6612", name="Aroma", code="MO6612", usd=9.20, desc="Double-wall glass mug pair"),
-    # Qatar eco / RPET
-    "TURINBP": dict(sku="GG6701", name="Turin Pack", code="MO6701", usd=16.80, desc="RPET 600D, laptop slot"),
-    "COLUMBIA":dict(sku="GG6688", name="Columbia", code="MO6688", usd=4.60, desc="Recycled PET shopper tote"),
-    "CANVAS":  dict(sku="GG9846", name="Canvas", code="MO9846", usd=3.20, desc="240gsm organic cotton bag"),
-    "DUFFEL":  dict(sku="GG6710", name="Duffel", code="MO6710", usd=22.30, desc="RPET weekender, cabin size"),
-    "RECYCLE": dict(sku="GG6468", name="Recycle", code="MO6468", usd=5.40, desc="rPET 600ml, bamboo lid"),
-    "BAMBOO":  dict(sku="GG6390", name="Bamboo", code="MO6390", usd=4.80, desc="Bamboo-fibre cup + lid"),
-    "WHEAT":   dict(sku="GG6391", name="Wheat", code="MO6391", usd=3.60, desc="Wheat-straw tumbler"),
-    "OCEAN":   dict(sku="GG6492", name="Ocean", code="MO6492", usd=8.70, desc="Ocean-bound plastic bottle"),
-    "GROW":    dict(sku="GG6791", name="Grow", code="MO6791", usd=6.80, desc="Plantable seed-paper notebook"),
-    "STONE":   dict(sku="GG6792", name="Stone", code="MO6792", usd=5.90, desc="Tree-free stone-paper notebook"),
-    "BAMBOOPEN":dict(sku="GG6480", name="Bamboo Pen", code="MO6480", usd=1.60, desc="Bamboo barrel, blue ink"),
-    "SEEDSTICK":dict(sku="GG6793", name="Seedstick", code="MO6793", usd=2.90, desc="Plantable pencil set"),
-}
+def verify_image(code):
+    """HEAD the wsrv JPEG; True only on HTTP 200 + image/jpeg."""
+    url = img_src(code, escaped=False)
+    try:
+        req = Request(url, method="HEAD", headers={"User-Agent": "gifts-gulf/1.0"})
+        with urlopen(req, timeout=30) as r:
+            return r.status == 200 and "image/jpeg" in r.headers.get("Content-Type", "")
+    except (HTTPError, URLError, Exception):
+        return False
 
-# ---- day plan: per-market angle/season + 3 themed sets --------------------
-# angle/season set from each run's web research (mid-June = Gulf peak summer;
-# KSA mid-year H2 budget cycle; Qatar eco/utility gifting trend).
+
+# ===========================================================================
+# DAILY RESEARCH BRIEF (2026-06-14)
+# Season: peak Gulf summer (~45C), the week after Eid al-Adha, Islamic New
+# Year (1448 AH) approaching mid-month; the business gifting cycle has moved
+# to H2/Q3 planning and back-to-office onboarding. 2026 trend signal:
+# sustainable gifting and smart tech (wireless charging) lead corporate buys,
+# alongside curated executive sets. Markets are kept distinct from yesterday
+# (UAE hydration / KSA tech-desk / Qatar eco) so nothing repeats two days
+# running.
+#   UAE  -> Q3 executive onboarding: onboarding kits, branded notebooks, desk tech
+#   KSA  -> sustainable H2 gifting: eco gifts, travel bags, event giveaways
+#   QAR  -> smart workspace: desk tech, premium steel drinkware, travel carry
+# ===========================================================================
 PLAN = {
     "AED": dict(
-        angle="UAE Summer Hydration",
-        season="Summer",
-        categories=["drinkware", "cooler bags", "caps"],
-        headline_market="UAE",
+        angle="Q3 Executive Onboarding", season="Summer H2 onboarding",
         sets=[
-            dict(name="UAE Summer Hydration", subject="Beat the heat",
-                 theme="Insulated drinkware",
-                 headline="Branded bottles that keep the desert at bay.",
-                 items=["TAMPERE", "STELVIO", "TURINB", "OREGON"]),
-            dict(name="UAE Cooler Season", subject="Cold all day",
-                 theme="Cooler bags",
-                 headline="Cooler bags and bottles for off-site and on-site teams.",
-                 items=["MALMO", "ICEBERG", "FRESH", "TRACK"]),
-            dict(name="UAE Sun and Shade", subject="Made for shade",
-                 theme="Caps and light hydration",
-                 headline="Caps and easy carry for crews working in the heat.",
-                 items=["SONORA", "RECACAP", "VENICE", "PURE"]),
+            dict(name="UAE Onboarding Kits", theme="Executive onboarding",
+                 subject="Hired Monday, equipped Monday",
+                 headline="Onboarding kits ready before day one.",
+                 subline="Premium sets that put your logo on every new desk.",
+                 items=[("GG1145", "Recycled steel bottle and mug set"),
+                        ("GG1276", "Cork notebook and pen set"),
+                        ("GG1116", "A5 hardcover notebook"),
+                        ("GG1502", "Notebook and pen gift box")]),
+            dict(name="UAE Branded Notebooks", theme="Notebooks and writing",
+                 subject="Where good ideas land",
+                 headline="Notebooks worth filling, branded to you.",
+                 subline="Recycled covers and clean print, made to be kept.",
+                 items=[("GG1177", "A5 notebook, recycled paper"),
+                        ("GG1236", "Cork-cover A5 notebook"),
+                        ("GG1223", "Recycled card notebook"),
+                        ("GG1196", "Wheat-straw ballpoint pen")]),
+            dict(name="UAE Desk Tech", theme="Tech and desk",
+                 subject="Cut the cable clutter",
+                 headline="Branded power for every desk and bag.",
+                 subline="Chargers and cables your team keeps reaching for.",
+                 items=[("GG1159", "Slim 8000mAh power bank"),
+                        ("GG1536", "15W wireless charging pad"),
+                        ("GG1097", "Bamboo 4-port USB hub"),
+                        ("GG1068", "3-in-1 charging cable")]),
         ],
     ),
     "SAR": dict(
-        angle="KSA H2 Planning",
-        season="Mid-year",
-        categories=["tech", "desk", "premium drinkware"],
-        headline_market="KSA",
+        angle="Sustainable H2 Gifting", season="Summer eco",
         sets=[
-            dict(name="KSA Power Your H2", subject="Power your H2",
-                 theme="Tech carry",
-                 headline="Charge the second half: branded power for every desk.",
-                 items=["STELLAR", "FLAT", "PAD", "DUO"]),
-            dict(name="KSA Desk Done Right", subject="Desk done right",
-                 theme="Executive desk",
-                 headline="Onboarding desks worth showing up for.",
-                 items=["BAOBAB", "NIMBUS", "CORK", "ECONOTE"]),
-            dict(name="KSA Client Appreciation", subject="Pour the deal",
-                 theme="Premium drinkware",
-                 headline="Premium drinkware for the clients you want to keep.",
-                 items=["COPPER", "EXEC", "GRANDE", "AROMA"]),
+            dict(name="KSA Sustainable Gifting", theme="Eco and sustainable",
+                 subject="Gifts that give back",
+                 headline="Sustainable gifting, no greenwashing.",
+                 subline="Recycled, organic and bamboo, branded to your logo.",
+                 items=[("GG1530", "Recycled steel bottle, 500ml"),
+                        ("GG1117", "Organic cotton tote"),
+                        ("GG1239", "Recycled paper sticky set"),
+                        ("GG1470", "Bamboo desk accessory set")]),
+            dict(name="KSA Travel Bags", theme="Bags and travel",
+                 subject="Built to be carried",
+                 headline="Bags your team takes everywhere.",
+                 subline="RPET and travel ready, printed with your brand.",
+                 items=[("GG1061", "RPET laptop backpack"),
+                        ("GG1124", "PU city backpack"),
+                        ("GG1605", "Weekender travel holdall"),
+                        ("GG1170", "RPET sports duffel")]),
+            dict(name="KSA Event Giveaways", theme="Event giveaways",
+                 subject="Branding by the thousand",
+                 headline="Event giveaways that move in volume.",
+                 subline="Caps, totes and pens priced for the whole crowd.",
+                 items=[("GG1166", "RPET 6-panel cap"),
+                        ("GG1646", "Cotton event tote"),
+                        ("GG1686", "RPET ballpoint pen"),
+                        ("GG1205", "Metal keyring opener")]),
         ],
     ),
     "QAR": dict(
-        angle="Qatar Eco Gifting",
-        season="Eco / Summer",
-        categories=["RPET bags", "recycled drinkware", "eco desk"],
-        headline_market="Qatar",
+        angle="Smart Workspace Tech", season="Summer",
         sets=[
-            dict(name="Qatar Recycled Carry", subject="Recycled, never binned",
-                 theme="RPET bags",
-                 headline="Recycled bags your team actually keeps using.",
-                 items=["TURINBP", "COLUMBIA", "CANVAS", "DUFFEL"]),
-            dict(name="Qatar Refill Culture", subject="Sip, refill, repeat",
-                 theme="Recycled drinkware",
-                 headline="Recycled drinkware built to be refilled, not binned.",
-                 items=["RECYCLE", "BAMBOO", "WHEAT", "OCEAN"]),
-            dict(name="Qatar Green Desk", subject="Green at work",
-                 theme="Eco desk",
-                 headline="Desk kits that grow on people, literally.",
-                 items=["GROW", "STONE", "BAMBOOPEN", "SEEDSTICK"]),
+            dict(name="Qatar Smart Tech", theme="Tech and desk",
+                 subject="Power the whole desk",
+                 headline="Smart tech your clients actually use.",
+                 subline="Chargers, hubs and sound, branded to your logo.",
+                 items=[("GG1538", "Power bank with built-in cables"),
+                        ("GG1526", "Bamboo 3-in-1 cable"),
+                        ("GG1100", "Bamboo stand and USB hub"),
+                        ("GG1541", "Wireless mini speaker")]),
+            dict(name="Qatar Premium Drinkware", theme="Premium drinkware",
+                 subject="Pour something premium",
+                 headline="Steel drinkware that earns a place.",
+                 subline="Vacuum bottles and mugs, hot or cold for hours.",
+                 items=[("GG1370", "Vacuum steel cup, 12h cold"),
+                        ("GG1354", "Insulated coffee cup"),
+                        ("GG1680", "Steel water bottle, 500ml"),
+                        ("GG1531", "Recycled steel travel mug")]),
+            dict(name="Qatar Travel Carry", theme="Bags and travel",
+                 subject="Pack the brand along",
+                 headline="Travel bags that carry your name.",
+                 subline="Roll-tops, coolers and totes in recycled RPET.",
+                 items=[("GG1062", "Roll-top daypack"),
+                        ("GG1093", "RPET cooler backpack"),
+                        ("GG1391", "RPET foldable shopper"),
+                        ("GG1312", "RPET travel pouch")]),
         ],
     ),
 }
 
 
-def fmt_price(cur, usd):
-    return "%s %.2f" % (SYM[cur], vol_price(usd, cur))
-
-
 # ---- email.html -----------------------------------------------------------
-def render_email_html(cur, s, products, date_disp, cta):
+def render_email_html(cur, s, products, date_disp, cta, campaign_name):
     market = MARKET[cur]
-    kicker = "%s - %s" % (s["name"], date_disp)
-    preheader = "%s. %s sets, branded mock-up before you pay." % (s["subject"], market)
+    preheader = "%s. %s sets, free branded mock-up before you pay." % (s["subject"], market)
 
-    # product grid: 2 columns
     tiles = []
     for i in range(0, len(products), 2):
-        row = products[i:i + 2]
-        cells = []
+        row, cells = products[i:i + 2], []
         for p in row:
-            price = fmt_price(cur, p["usd"])
-            img = img_url(p["code"])
-            purl = product_url(p["sku"])
             cells.append(
                 '<td width="50%%" valign="top" style="padding:6px;">'
                 '<a href="%s" target="_blank" style="text-decoration:none;color:%s;display:block;background:%s;border:1px solid %s;border-radius:%s;padding:14px;">'
-                '<img src="%s" width="260" alt="%s" style="display:block;width:100%%;max-width:260px;height:auto;border:0;border-radius:%s;margin:0 0 10px 0;" />'
-                '<div style="font:11px %s;color:%s;letter-spacing:.04em;">%s</div>'
-                '<div style="font:bold 16px %s;color:%s;margin:2px 0 2px 0;">%s</div>'
-                '<div style="font:13px %s;color:%s;margin:0 0 8px 0;">%s</div>'
+                '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0"><tr><td style="background:%s;border-radius:%s;padding:0;">'
+                '<img src="%s" width="100%%" alt="%s" style="display:block;width:100%%;height:auto;border:0;border-radius:%s;">'
+                '</td></tr></table>'
+                '<div style="font:11px %s;color:%s;letter-spacing:.04em;margin-top:10px;">%s</div>'
+                '<div style="font:bold 16px %s;color:%s;margin:2px 0;">%s</div>'
+                '<div style="font:13px %s;color:%s;margin-bottom:8px;">%s</div>'
                 '<div style="font:bold 14px %s;color:%s;">from %s</div>'
                 '<div style="font:11px %s;color:%s;">per unit, 250+ pcs</div>'
                 '</a></td>' % (
-                    purl, C["heading"], C["tile"], C["border"], RADIUS,
-                    img, html.escape(p["name"]), RADIUS,
-                    FONT, C["muted"], p["sku"],
+                    product_url(p["sku"]), C["heading"], C["white"], C["border"], RADIUS,
+                    C["tile"], RADIUS,
+                    img_src(p["code"]), html.escape(p["name"]), RADIUS,
+                    FONT, C["fine"], p["sku"],
                     FONT, C["heading"], html.escape(p["name"]),
-                    FONT, C["body"], html.escape(p["desc"]),
-                    FONT, C["green"], price,
-                    FONT, C["fine"],
-                )
-            )
+                    FONT, C["muted"], html.escape(p["desc"]),
+                    FONT, C["hover"], fmt_price(cur, p["usd"]),
+                    FONT, C["fine"]))
         if len(cells) == 1:
             cells.append('<td width="50%" style="padding:6px;">&nbsp;</td>')
         tiles.append('<tr>%s</tr>' % "".join(cells))
     grid = "".join(tiles)
 
     return """<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="x-apple-disable-message-reformatting"/>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
 <title>%(subject)s</title></head>
 <body style="margin:0;padding:0;background:%(page)s;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:%(page)s;">%(preheader)s&#8203;&zwnj;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:%(page)s;">%(preheader)s&#8203;&zwnj;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
 <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:%(page)s;"><tr><td align="center" style="padding:20px 10px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:%(white)s;border:1px solid %(border)s;border-radius:%(radius)s;">
-<tr><td style="padding:22px 24px 14px 24px;border-top:4px solid %(green)s;border-radius:%(radius)s %(radius)s 0 0;">
-<span style="font:bold 22px %(font)s;color:%(heading)s;letter-spacing:-.02em;">giftsgulf</span>
-<span style="font:11px %(font)s;color:%(muted)s;"> by QCKSERVE</span>
-</td></tr>
-<tr><td style="padding:4px 24px 0 24px;"><div style="font:bold 12px %(font)s;color:%(green)s;letter-spacing:.06em;text-transform:uppercase;">%(kicker)s</div></td></tr>
-<tr><td style="padding:8px 24px 0 24px;"><div style="font:bold 22px %(font)s;color:%(heading)s;line-height:1.25;">%(headline)s</div></td></tr>
-<tr><td style="padding:14px 18px 4px 18px;">
-<table role="presentation" width="100%%" cellpadding="0" cellspacing="0">%(grid)s</table>
-</td></tr>
-<tr><td align="center" style="padding:18px 24px 6px 24px;">
-<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td bgcolor="%(green)s" style="border-radius:%(radius)s;">
-<a href="%(cta)s" target="_blank" style="display:inline-block;padding:14px 30px;font:bold 15px %(font)s;color:%(white)s;text-decoration:none;border-radius:%(radius)s;"><span style="color:%(white)s;">Request this set on WhatsApp</span></a>
-</td></tr></table>
-</td></tr>
-<tr><td align="center" style="padding:2px 24px 16px 24px;"><div style="font:12px %(font)s;color:%(muted)s;">Branded mock-up before you pay. Volume tiers: 250 -15%%, 500 -20%%, 1000+ -25%%.</div></td></tr>
+<tr><td style="padding:20px 24px 12px 24px;border-bottom:2px solid %(green)s;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" align="left"><img src="%(logo)s" width="150" alt="Gifts Gulf" style="display:block;width:150px;height:auto;border:0;"></td>
+<td valign="middle" align="right" style="font:bold 11px %(font)s;color:%(muted)s;letter-spacing:.08em;text-transform:uppercase;">%(theme)s</td>
+</tr></table></td></tr>
+<tr><td style="padding:18px 24px 0 24px;"><div style="font:bold 12px %(font)s;color:%(green)s;letter-spacing:.06em;text-transform:uppercase;">%(kicker)s</div></td></tr>
+<tr><td style="padding:8px 24px 0 24px;"><div style="font:bold 28px %(font)s;color:%(heading)s;line-height:1.2;letter-spacing:-.01em;">%(headline)s</div></td></tr>
+<tr><td style="padding:8px 24px 0 24px;"><div style="font:14px %(font)s;color:%(body)s;line-height:1.45;">%(subline)s</div></td></tr>
+<tr><td style="padding:12px 24px 0 24px;"><span style="display:inline-block;background:%(amber)s;color:%(heading)s;font:bold 11px %(font)s;letter-spacing:.03em;padding:5px 11px;border-radius:%(radius)s;">Save up to 25%% at volume</span></td></tr>
+<tr><td style="padding:12px 18px 4px 18px;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0">%(grid)s</table></td></tr>
+<tr><td align="center" style="padding:14px 24px 6px 24px;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0"><tr>
+<td bgcolor="%(green)s" align="center" style="border-radius:%(radius)s;">
+<a href="%(cta)s" target="_blank" style="display:block;padding:15px 24px;font:bold 15px %(font)s;color:%(white)s;text-decoration:none;border-radius:%(radius)s;"><span style="color:%(white)s;">Request this set on WhatsApp</span></a>
+</td></tr></table></td></tr>
 <tr><td style="padding:14px 24px 18px 24px;border-top:1px solid %(border)s;">
-<div style="font:11px %(font)s;color:%(fine)s;line-height:1.6;">
-Indicative volume pricing, %(vat)s. Production 7 to 10 working days.<br/>
-Questions? <a href="mailto:%(email)s" style="color:%(muted)s;text-decoration:underline;">%(email)s</a><br/>
+<div style="font:11px %(font)s;color:%(fine)s;line-height:1.7;">
+Indicative volume pricing, %(vat)s. Production 7 to 10 working days after artwork approval.<br>
+Questions? <a href="mailto:%(email)s" style="color:%(muted)s;text-decoration:underline;">%(email)s</a><br>
 <a href="%(cta)s" style="color:%(fine)s;text-decoration:underline;">Unsubscribe</a>
 </div></td></tr>
 </table></td></tr></table></body></html>""" % dict(
         subject=html.escape(s["subject"]), preheader=html.escape(preheader),
         page=C["page"], white=C["white"], border=C["border"], green=C["green"],
-        heading=C["heading"], muted=C["muted"], fine=C["fine"], font=FONT,
-        radius=RADIUS, kicker=html.escape(kicker), headline=html.escape(s["headline"]),
-        grid=grid, cta=cta, vat=VAT[cur], email=CONTACT_EMAIL,
-    )
+        amber=C["amber"], heading=C["heading"], body=C["body"], muted=C["muted"],
+        fine=C["fine"], font=FONT, radius=RADIUS, logo=logo_src(),
+        theme=html.escape(s["theme"]), kicker=html.escape(campaign_name),
+        headline=html.escape(s["headline"]), subline=html.escape(s["subline"]),
+        grid=grid, cta=cta, vat=VAT[cur], email=CONTACT_EMAIL)
 
 
 # ---- email.amp.html -------------------------------------------------------
-def render_email_amp(cur, s, products, date_disp, cta):
-    kicker = "%s - %s" % (s["name"], date_disp)
+def render_email_amp(cur, s, products, date_disp, cta, campaign_name):
     tiles = []
     for p in products:
-        price = fmt_price(cur, p["usd"])
-        img = img_url(p["code"])
-        purl = product_url(p["sku"])
         tiles.append(
             '<div class="tile"><a href="%s" target="_blank">'
-            '<amp-img src="%s" width="260" height="260" layout="responsive" alt="%s"></amp-img>'
+            '<div class="imgcell"><amp-img src="%s" width="640" height="640" layout="responsive" alt="%s"></amp-img></div>'
             '<div class="sku">%s</div><div class="name">%s</div>'
             '<div class="desc">%s</div><div class="price">from %s</div>'
             '<div class="unit">per unit, 250+ pcs</div></a></div>' % (
-                purl, img, html.escape(p["name"]), p["sku"],
-                html.escape(p["name"]), html.escape(p["desc"]), price)
-        )
+                product_url(p["sku"]), img_src(p["code"]), html.escape(p["name"]),
+                p["sku"], html.escape(p["name"]), html.escape(p["desc"]),
+                fmt_price(cur, p["usd"])))
     grid = "".join(tiles)
     return """<!doctype html>
-<html amp4email><head><meta charset="utf-8"/>
+<html amp4email><head><meta charset="utf-8">
 <script async src="https://cdn.ampproject.org/v0.js"></script>
 <style amp4email-boilerplate>body{visibility:hidden}</style>
 <style amp-custom>
 body{margin:0;background:%(page)s;font-family:%(font)s;color:%(body)s;}
 .wrap{max-width:600px;margin:0 auto;background:%(white)s;border:1px solid %(border)s;border-radius:%(radius)s;}
-.head{padding:22px 24px 14px;border-top:4px solid %(green)s;}
-.logo{font-size:22px;font-weight:bold;color:%(heading)s;letter-spacing:-.02em;}
-.by{font-size:11px;color:%(muted)s;}
-.kicker{padding:4px 24px 0;font-size:12px;font-weight:bold;color:%(green)s;letter-spacing:.06em;text-transform:uppercase;}
-.headline{padding:8px 24px 0;font-size:22px;font-weight:bold;color:%(heading)s;line-height:1.25;}
-.grid{padding:14px 18px 4px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.tile{background:%(tile)s;border:1px solid %(border)s;border-radius:%(radius)s;padding:14px;}
+.head{padding:20px 24px 12px;border-bottom:2px solid %(green)s;display:flex;align-items:center;justify-content:space-between;}
+.theme{font-size:11px;font-weight:bold;color:%(muted)s;letter-spacing:.08em;text-transform:uppercase;}
+.kicker{padding:18px 24px 0;font-size:12px;font-weight:bold;color:%(green)s;letter-spacing:.06em;text-transform:uppercase;}
+.headline{padding:8px 24px 0;font-size:28px;font-weight:bold;color:%(heading)s;line-height:1.2;letter-spacing:-.01em;}
+.subline{padding:8px 24px 0;font-size:14px;color:%(body)s;line-height:1.45;}
+.pillwrap{padding:12px 24px 0;}
+.pill{display:inline-block;background:%(amber)s;color:%(heading)s;font-size:11px;font-weight:bold;letter-spacing:.03em;padding:5px 11px;border-radius:%(radius)s;}
+.grid{padding:12px 18px 4px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tile{background:%(white)s;border:1px solid %(border)s;border-radius:%(radius)s;padding:14px;}
 .tile a{text-decoration:none;color:%(heading)s;display:block;}
-.sku{font-size:11px;color:%(muted)s;letter-spacing:.04em;margin-top:10px;}
+.imgcell{background:%(tile)s;border-radius:%(radius)s;overflow:hidden;}
+.sku{font-size:11px;color:%(fine)s;letter-spacing:.04em;margin-top:10px;}
 .name{font-size:16px;font-weight:bold;color:%(heading)s;margin:2px 0;}
-.desc{font-size:13px;color:%(body)s;margin-bottom:8px;}
-.price{font-size:14px;font-weight:bold;color:%(green)s;}
+.desc{font-size:13px;color:%(muted)s;margin-bottom:8px;}
+.price{font-size:14px;font-weight:bold;color:%(accent)s;}
 .unit{font-size:11px;color:%(fine)s;}
-.ctawrap{text-align:center;padding:18px 24px 6px;}
-a.cta,a.cta:visited{display:inline-block;padding:14px 30px;font-size:15px;font-weight:bold;color:%(white)s;background:%(green)s;border-radius:%(radius)s;text-decoration:none;}
-.note{text-align:center;padding:2px 24px 16px;font-size:12px;color:%(muted)s;}
-.foot{padding:14px 24px 18px;border-top:1px solid %(border)s;font-size:11px;color:%(fine)s;line-height:1.6;}
+.ctawrap{padding:14px 24px 6px;}
+a.cta,a.cta:visited{display:block;text-align:center;padding:15px 24px;font-size:15px;font-weight:bold;color:%(white)s;background:%(green)s;border-radius:%(radius)s;text-decoration:none;}
+.foot{padding:14px 24px 18px;border-top:1px solid %(border)s;font-size:11px;color:%(fine)s;line-height:1.7;}
 .foot a{color:%(muted)s;}
 </style></head>
 <body><div class="wrap">
-<div class="head"><span class="logo">giftsgulf</span><span class="by"> by QCKSERVE</span></div>
+<div class="head"><amp-img src="%(logo)s" width="150" height="45" alt="Gifts Gulf"></amp-img><span class="theme">%(theme)s</span></div>
 <div class="kicker">%(kicker)s</div>
 <div class="headline">%(headline)s</div>
+<div class="subline">%(subline)s</div>
+<div class="pillwrap"><span class="pill">Save up to 25%% at volume</span></div>
 <div class="grid">%(grid)s</div>
 <div class="ctawrap"><a class="cta" href="%(cta)s" target="_blank">Request this set on WhatsApp</a></div>
-<div class="note">Branded mock-up before you pay. Tiers: 250 -15%%, 500 -20%%, 1000+ -25%%.</div>
-<div class="foot">Indicative volume pricing, %(vat)s. Production 7 to 10 working days.<br/>
+<div class="foot">Indicative volume pricing, %(vat)s. Production 7 to 10 working days after artwork approval.<br>
 <a href="mailto:%(email)s">%(email)s</a></div>
 </div></body></html>""" % dict(
         page=C["page"], white=C["white"], border=C["border"], green=C["green"],
-        heading=C["heading"], body=C["body"], muted=C["muted"], fine=C["fine"],
-        tile=C["tile"], font=FONT, radius=RADIUS, kicker=html.escape(kicker),
-        headline=html.escape(s["headline"]), grid=grid, cta=cta, vat=VAT[cur],
-        email=CONTACT_EMAIL,
-    )
+        amber=C["amber"], heading=C["heading"], body=C["body"], muted=C["muted"],
+        fine=C["fine"], tile=C["tile"], accent=C["hover"], font=FONT, radius=RADIUS,
+        logo=logo_src(), theme=html.escape(s["theme"]), kicker=html.escape(campaign_name),
+        headline=html.escape(s["headline"]), subline=html.escape(s["subline"]),
+        grid=grid, cta=cta, vat=VAT[cur], email=CONTACT_EMAIL)
 
 
 # ---- whatsapp.txt ---------------------------------------------------------
-def render_whatsapp(cur, s, products, cta):
+def render_whatsapp(cur, s, products):
     lines = [s["headline"]]
     for p in products[:3]:
-        lines.append("%s - from %s/unit" % (p["name"], fmt_price(cur, p["usd"])))
-    lines.append("Branded mock-up first, then 7 to 10 working days to deliver.")
-    lines.append("Reply for your set: %s" % wa_url("Send me the %s set for %s" % (s["theme"], MARKET[cur])))
+        lines.append("%s, from %s/unit" % (p["name"], fmt_price(cur, p["usd"])))
+    lines.append("Free branded mock-up first, then production in 7 to 10 working days.")
+    lines.append("Send your set: %s" % wa_url("Send me the %s set for %s" % (s["theme"], MARKET[cur])))
     return "\n".join(lines) + "\n"
 
 
 # ---- linkedin.txt ---------------------------------------------------------
-def render_linkedin(cur, s, products, cta):
+def render_linkedin(cur, s, products):
     names = ", ".join(p["name"] for p in products[:3])
     return (
-        "%s We built the %s set for %s teams: %s and more, all branded to your logo. "
-        "You see a mock-up before you pay a thing, with volume pricing from 250 pieces and delivery in 7 to 10 working days. "
+        "%s We built the %s set for %s teams: %s and more, every piece branded to your logo. "
+        "You approve a free digital mock-up before you pay anything, with volume pricing from 250 pieces and delivery in 7 to 10 working days. "
         "Want it sized to your headcount? Message us on WhatsApp (%s) or %s.\n"
-    ) % (s["headline"], s["theme"].lower(), MARKET[cur], names, wa_url("LinkedIn: %s set for %s" % (s["theme"], MARKET[cur])), CONTACT_EMAIL)
+    ) % (s["headline"], s["theme"].lower(), MARKET[cur], names,
+         wa_url("LinkedIn: %s set for %s" % (s["theme"], MARKET[cur])), CONTACT_EMAIL)
 
 
 # ---- main -----------------------------------------------------------------
 def main():
     date = sys.argv[1] if len(sys.argv) > 1 else datetime.utcnow().strftime("%Y-%m-%d")
     d = datetime.strptime(date, "%Y-%m-%d")
-    date_disp = d.strftime("%d %b %Y")
-    ymd = d.strftime("%Y%m%d")
+    date_disp, ymd = d.strftime("%d %b %Y"), d.strftime("%Y%m%d")
 
+    catalogue = {p["sku"]: p for p in json.load(open(os.path.join(STATE, "catalogue.json")))}
     day_dir = os.path.join(ROOT, date)
     os.makedirs(day_dir, exist_ok=True)
 
-    hist_path = os.path.join(STATE, "history.json")
-    history = json.load(open(hist_path)) if os.path.exists(hist_path) else []
+    def load(name, default):
+        path = os.path.join(STATE, name)
+        return json.load(open(path)) if os.path.exists(path) else default
+
+    history = load("history.json", [])
+    used_subjects = set(load("used-subjects.json", []))
+    used_skus_log = load("used-skus.json", [])  # [{date, skus:[...]}]
+    recent_skus = set()
+    for e in used_skus_log:
+        try:
+            age = (d - datetime.strptime(e["date"], "%Y-%m-%d")).days
+        except Exception:
+            age = 99
+        if 0 <= age < 14:
+            recent_skus.update(e.get("skus", []))
 
     manifest = {"date": date, "generated_utc": datetime.utcnow().isoformat() + "Z", "sets": []}
+    day_skus, problems = [], []
 
     for cur in ("AED", "SAR", "QAR"):
         plan = PLAN[cur]
         for n, s in enumerate(plan["sets"], start=1):
             code = "GG-%s-%s-%d" % (cur, ymd, n)
-            products = [dict(P[k]) for k in s["items"]]
-            for p in products:
-                p["price"] = vol_price(p["usd"], cur)
-                p["image"] = img_url(p["code"], escape_amp=False)
-                p["product_url"] = product_url(p["sku"])
-            cta = wa_url("Send me the %s set (%s) for %s" % (s["theme"], code, MARKET[cur]))
+            campaign_name = "%s - %s" % (s["name"], date_disp)
 
+            if s["subject"] in used_subjects:
+                problems.append("subject reused: %r (%s)" % (s["subject"], code))
+
+            products = []
+            for sku, desc in s["items"]:
+                cp = catalogue.get(sku)
+                if not cp:
+                    problems.append("sku not in catalogue: %s (%s)" % (sku, code)); continue
+                if sku in recent_skus:
+                    problems.append("sku reused within 14d: %s (%s)" % (sku, code))
+                if not verify_image(cp["code"]):
+                    problems.append("image failed verify: %s/%s (%s)" % (sku, cp["code"], code)); continue
+                products.append(dict(sku=sku, name=cp["name"].title(), code=cp["code"],
+                                     usd=cp["usd"], desc=desc))
+            if len(products) < 4:
+                problems.append("set under 4 verified products: %s (%d)" % (code, len(products)))
+
+            cta = wa_url("Send me the %s set (%s) for %s" % (s["theme"], code, MARKET[cur]))
             set_dir = os.path.join(day_dir, cur, "set-%d" % n)
             os.makedirs(set_dir, exist_ok=True)
-
             open(os.path.join(set_dir, "email.html"), "w").write(
-                render_email_html(cur, s, products, date_disp, cta))
+                render_email_html(cur, s, products, date_disp, cta, campaign_name))
             open(os.path.join(set_dir, "email.amp.html"), "w").write(
-                render_email_amp(cur, s, products, date_disp, cta))
+                render_email_amp(cur, s, products, date_disp, cta, campaign_name))
             open(os.path.join(set_dir, "whatsapp.txt"), "w").write(
-                render_whatsapp(cur, s, products, cta))
+                render_whatsapp(cur, s, products))
             open(os.path.join(set_dir, "linkedin.txt"), "w").write(
-                render_linkedin(cur, s, products, cta))
+                render_linkedin(cur, s, products))
 
             skus = [p["sku"] for p in products]
             meta = dict(
-                date=date, market=MARKET[cur], currency=cur, campaign_code=code,
-                campaign_name="%s - %s" % (s["name"], date_disp), subject=s["subject"],
-                angle=plan["angle"], season=plan["season"], theme=s["theme"], skus=skus,
-                products=[dict(name=p["name"], sku=p["sku"], usd=p["usd"], price=p["price"],
-                               image=p["image"], product_url=p["product_url"]) for p in products],
-                cta_url=cta,
-            )
+                date=date, market=MARKET[cur], currency=cur, theme=s["theme"],
+                season=plan["season"], angle=plan["angle"], campaign_code=code,
+                campaign_name=campaign_name, subject=s["subject"], skus=skus,
+                products=[dict(name=p["name"], sku=p["sku"],
+                               image=img_src(p["code"], escaped=False),
+                               product_url=product_url(p["sku"]),
+                               price="%s %.2f" % (SYM[cur], vol_price(p["usd"], cur))) for p in products],
+                cta_url=cta)
             json.dump(meta, open(os.path.join(set_dir, "meta.json"), "w"), indent=2)
 
             manifest["sets"].append(dict(
-                campaign_code=code, campaign_name=meta["campaign_name"], subject=s["subject"],
-                market=MARKET[cur], currency=cur, angle=plan["angle"], season=plan["season"],
-                theme=s["theme"], skus=skus))
-
+                currency=cur, market=MARKET[cur], theme=s["theme"], angle=plan["angle"],
+                season=plan["season"], campaign_code=code, campaign_name=campaign_name,
+                subject=s["subject"], skus=skus))
             history.append(dict(
                 date=date, market=MARKET[cur], campaign_code=code,
-                campaign_name=meta["campaign_name"], subject=s["subject"],
-                theme=s["theme"], angle=plan["angle"], skus=skus))
+                campaign_name=campaign_name, subject=s["subject"], theme=s["theme"],
+                angle=plan["angle"], skus=skus))
+            used_subjects.add(s["subject"])
+            day_skus.extend(skus)
 
     json.dump(manifest, open(os.path.join(day_dir, "manifest.json"), "w"), indent=2)
-    json.dump(history, open(hist_path, "w"), indent=2)
+    json.dump(history, open(os.path.join(STATE, "history.json"), "w"), indent=2)
+    json.dump(sorted(used_subjects), open(os.path.join(STATE, "used-subjects.json"), "w"), indent=2)
+    used_skus_log = [e for e in used_skus_log if e.get("date") != date]
+    used_skus_log.append(dict(date=date, skus=day_skus))
+    json.dump(used_skus_log, open(os.path.join(STATE, "used-skus.json"), "w"), indent=2)
+
     print("Generated 9 sets for %s -> %s" % (date, day_dir))
+    print("Products placed: %d  Unique SKUs: %d" % (len(day_skus), len(set(day_skus))))
+    if problems:
+        print("PROBLEMS (%d):" % len(problems))
+        for p in problems:
+            print("  -", p)
+        sys.exit(3)
 
 
 if __name__ == "__main__":

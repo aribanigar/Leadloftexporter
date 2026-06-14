@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "UAE",
+  "currency": "AED",
+  "theme": "Tech and desk",
+  "season": "Summer H2 onboarding",
+  "angle": "Q3 Executive Onboarding",
+  "campaign_code": "GG-AED-20260614-3",
+  "campaign_name": "UAE Desk Tech - 14 Jun 2026",
+  "subject": "Cut the cable clutter",
+  "skus": [
+    "GG1159",
+    "GG1536",
+    "GG1097",
+    "GG1068"
+  ],
+  "products": [
+    {
+      "name": "Powerflat8C",
+      "sku": "GG1159",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2340-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1159",
+      "price": "AED 50.07"
+    },
+    {
+      "name": "Charge Up",
+      "sku": "GG1536",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6947-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1536",
+      "price": "AED 64.99"
+    },
+    {
+      "name": "Hubbam",
+      "sku": "GG1097",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2143-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1097",
+      "price": "AED 19.14"
+    },
+    {
+      "name": "Techmate Rabs",
+      "sku": "GG1068",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2080-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1068",
+      "price": "AED 26.13"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Tech+and+desk+set+%28GG-AED-20260614-3%29+for+UAE"
+}
