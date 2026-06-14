@@ -7,9 +7,111 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import EnrollmentStepRun, Lead, PipelineStage, Task
+from app.models import EnrollmentStepRun, Lead, Membership, PipelineStage, Task, User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+# Statuses that count as "still open / actionable" (board: To do + In progress).
+ACTIVE_STATUSES = ("open", "in_progress")
+DONE_STATUSES = ("done", "completed")
+
+
+def _parse_dt(v):
+    """Accept ISO strings (with or without trailing Z) or datetimes; return aware UTC or None."""
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        d = v
+    else:
+        try:
+            d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d
+
+
+def _sync_task_reminder(db: Session, ctx: AuthContext, task: Task, remind: bool, notify: bool = True) -> None:
+    """Create / refresh / clear the calendar reminder bound to a task.
+
+    A task "on the calendar" is backed by a Reminder row (task_id set). The
+    reminder engine writes it to Google Calendar when connected and always
+    emails the owner — so a due task lands on the calendar AND the inbox.
+    Re-syncing is idempotent: existing pending reminders for the task are
+    cleared first, then one is created at the task's due date.
+    """
+    from app.models import Reminder
+
+    # Drop any existing pending reminders for this task (reschedule / un-set).
+    existing = (
+        db.query(Reminder)
+        .filter(Reminder.task_id == task.id, Reminder.status == "pending")
+        .all()
+    )
+    for r in existing:
+        db.delete(r)
+
+    if not (remind and task.due_at and task.status in ACTIVE_STATUSES):
+        db.commit()
+        return
+
+    try:
+        from app.services import reminders as reminders_svc
+
+        reminders_svc.create_reminder(
+            db,
+            workspace_id=ctx.workspace_id,
+            user_id=task.assignee_id or ctx.user_id,
+            title=task.title,
+            remind_at=task.due_at,
+            body=task.notes or "",
+            source="task",
+            lead_id=task.lead_id,
+            task_id=task.id,
+            escalate=True,
+            commit=True,
+            notify=notify,
+        )
+    except Exception:  # noqa: BLE001 — never let calendar sync break task CRUD
+        db.rollback()
+
+
+def _task_json(t: Task) -> dict:
+    return {
+        "id": t.id,
+        "title": t.title,
+        "notes": t.notes,
+        "type": t.type,
+        "status": t.status,
+        "due_at": t.due_at,
+        "completed_at": t.completed_at,
+        "lead_id": t.lead_id,
+        "assignee_id": t.assignee_id,
+        "created_at": t.created_at,
+    }
+
+
+@router.get("/members")
+def list_members(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Workspace members for the assignee picker."""
+    rows = (
+        db.query(User)
+        .join(Membership, Membership.user_id == User.id)
+        .filter(Membership.workspace_id == ctx.workspace_id)
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "name": (f"{u.first_name or ''} {u.last_name or ''}".strip()) or u.email,
+            "email": u.email,
+        }
+        for u in rows
+    ]
 
 
 @router.get("/office")
@@ -39,10 +141,10 @@ def office_workload(
         ).all()
     ]
 
-    # 1) Due tasks — open + due now (or no due date).
+    # 1) Due tasks — open/in-progress + due now (or no due date).
     due_q = (
         db.query(Task)
-        .filter(Task.workspace_id == ws, Task.status == "open", or_(Task.due_at.is_(None), Task.due_at <= now))
+        .filter(Task.workspace_id == ws, Task.status.in_(ACTIVE_STATUSES), or_(Task.due_at.is_(None), Task.due_at <= now))
         .order_by(Task.due_at.asc().nullsfirst())
     )
     due_count = due_q.count()
@@ -185,21 +287,7 @@ def list_tasks(
     if assignee_id:
         q = q.filter(Task.assignee_id == assignee_id)
     rows = q.order_by(Task.due_at.asc().nullslast(), Task.created_at.desc()).all()
-    return [
-        {
-            "id": t.id,
-            "title": t.title,
-            "notes": t.notes,
-            "type": t.type,
-            "status": t.status,
-            "due_at": t.due_at,
-            "completed_at": t.completed_at,
-            "lead_id": t.lead_id,
-            "assignee_id": t.assignee_id,
-            "created_at": t.created_at,
-        }
-        for t in rows
-    ]
+    return [_task_json(t) for t in rows]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -208,19 +296,28 @@ def create_task(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    due_at = _parse_dt(body.get("due_at"))
     t = Task(
         workspace_id=ctx.workspace_id,
         title=body["title"],
         notes=body.get("notes"),
         type=body.get("type", "todo"),
+        status=body.get("status") or "open",
         lead_id=body.get("lead_id"),
         assignee_id=body.get("assignee_id") or ctx.user_id,
-        due_at=body.get("due_at"),
+        due_at=due_at,
     )
+    if t.status in DONE_STATUSES:
+        t.completed_at = datetime.now(timezone.utc)
     db.add(t)
     db.commit()
     db.refresh(t)
-    return {"id": t.id}
+    # "Add to calendar": when a due date is set and reminding is requested
+    # (default on), back the task with a calendar+email reminder.
+    if body.get("remind", True):
+        _sync_task_reminder(db, ctx, t, remind=True)
+        db.refresh(t)
+    return _task_json(t)
 
 
 @router.patch("/{task_id}")
@@ -233,13 +330,28 @@ def update_task(
     t = db.query(Task).filter(Task.id == task_id, Task.workspace_id == ctx.workspace_id).first()
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
-    for k in ("title", "notes", "type", "status", "due_at", "lead_id", "assignee_id"):
+    touched_schedule = False
+    for k in ("title", "notes", "type", "status", "lead_id", "assignee_id"):
         if k in body:
             setattr(t, k, body[k])
-    if body.get("status") == "done" and not t.completed_at:
-        t.completed_at = datetime.now(timezone.utc)
+    if "due_at" in body:
+        t.due_at = _parse_dt(body.get("due_at"))
+        touched_schedule = True
+    # completed_at tracks done state both directions.
+    if "status" in body:
+        if t.status in DONE_STATUSES and not t.completed_at:
+            t.completed_at = datetime.now(timezone.utc)
+        elif t.status not in DONE_STATUSES:
+            t.completed_at = None
+        touched_schedule = True
     db.commit()
-    return {"ok": True}
+    db.refresh(t)
+    # Reschedule / clear the calendar reminder when schedule, assignee or status moved.
+    # Only email a "reminder set" heads-up when the due date itself changed.
+    if touched_schedule or "assignee_id" in body or "remind" in body:
+        _sync_task_reminder(db, ctx, t, remind=bool(body.get("remind", True)), notify="due_at" in body)
+        db.refresh(t)
+    return _task_json(t)
 
 
 @router.delete("/{task_id}")
@@ -251,6 +363,10 @@ def delete_task(
     t = db.query(Task).filter(Task.id == task_id, Task.workspace_id == ctx.workspace_id).first()
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    from app.models import Reminder
+
+    for r in db.query(Reminder).filter(Reminder.task_id == t.id, Reminder.status == "pending").all():
+        db.delete(r)
     db.delete(t)
     db.commit()
     return {"ok": True}

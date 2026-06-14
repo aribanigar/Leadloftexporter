@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Circle,
+  CircleDot,
   Phone,
   Mail,
   Linkedin,
@@ -16,15 +17,28 @@ import {
   Send,
   MessageSquare,
   CalendarClock,
+  CalendarPlus,
   AlertTriangle,
   Inbox,
   ListChecks,
   LayoutGrid,
+  KanbanSquare,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  UserCircle2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Task } from "@/lib/types";
-import { fmtRelative } from "@/lib/utils";
+import { cn, fmtRelative, initials } from "@/lib/utils";
+
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+}
 
 // ── Office workload dashboard ───────────────────────────────────────────────
 
@@ -169,13 +183,406 @@ function OfficeWorkload() {
   );
 }
 
-// ── Interactive task list (preserved) ───────────────────────────────────────
+// ── ClickUp-style board ─────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   call: Phone,
   email: Mail,
   linkedin: Linkedin,
 };
+
+// Board columns (grouped by status). Legacy "done"/"completed" collapse to done.
+const COLUMNS: { key: string; label: string; color: string; bg: string; dot: string }[] = [
+  { key: "open", label: "To do", color: "#64748b", bg: "#f1f5f9", dot: "#94a3b8" },
+  { key: "in_progress", label: "In progress", color: "#1a73e8", bg: "#e8f0fe", dot: "#1a73e8" },
+  { key: "done", label: "Completed", color: "#137333", bg: "#e6f4ea", dot: "#34a853" },
+];
+const NEXT_STATUS: Record<string, string> = { open: "in_progress", in_progress: "done", done: "open" };
+
+function normStatus(s: string): string {
+  if (s === "completed") return "done";
+  if (s === "open" || s === "in_progress" || s === "done") return s;
+  return "open"; // "skipped" and anything unknown sit in To do on the board
+}
+
+// datetime-local helpers (value is local wall-clock; convert to/from ISO).
+function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function fromLocalInput(v: string): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function formatDue(iso?: string | null): { text: string; overdue: boolean } | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const text = d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return { text, overdue: d.getTime() < now.getTime() };
+}
+
+const AVATAR_COLORS = ["#2563eb", "#0d9488", "#9333ea", "#db2777", "#ea580c", "#65a30d", "#0891b2"];
+function avatarColor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function Avatar({ name, size = 22 }: { name?: string | null; size?: number }) {
+  if (!name) {
+    return <UserCircle2 className="text-slate-300" style={{ width: size, height: size }} />;
+  }
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+      style={{ width: size, height: size, backgroundColor: avatarColor(name) }}
+      title={name}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+function TaskRow({
+  t,
+  members,
+  onPatch,
+  onDelete,
+}: {
+  t: Task;
+  members: Member[];
+  onPatch: (patch: Partial<Task> & { remind?: boolean }) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(t.title);
+  const status = normStatus(t.status);
+  const TIcon = TYPE_ICON[t.type];
+  const due = formatDue(t.due_at);
+  const assignee = members.find((m) => m.id === t.assignee_id);
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  const commitTitle = () => {
+    const v = title.trim();
+    setEditing(false);
+    if (v && v !== t.title) onPatch({ title: v });
+    else setTitle(t.title);
+  };
+
+  return (
+    <div className="group grid grid-cols-[28px_1fr_auto] items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50/70 md:grid-cols-[28px_1fr_150px_180px_28px]">
+      {/* status dot — click to advance To do → In progress → Completed */}
+      <button
+        onClick={() => onPatch({ status: NEXT_STATUS[status] })}
+        title={`Mark ${status === "done" ? "to do" : status === "open" ? "in progress" : "completed"}`}
+        className="flex h-7 w-7 items-center justify-center"
+      >
+        {status === "done" ? (
+          <CheckCircle2 className="h-[18px] w-[18px] text-emerald-500" />
+        ) : status === "in_progress" ? (
+          <CircleDot className="h-[18px] w-[18px] text-blue-500" />
+        ) : (
+          <Circle className="h-[18px] w-[18px] text-slate-300 hover:text-slate-400" />
+        )}
+      </button>
+
+      {/* title (inline editable) */}
+      <div className="flex min-w-0 items-center gap-2">
+        {TIcon && <TIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+        {editing ? (
+          <input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitTitle();
+              if (e.key === "Escape") {
+                setTitle(t.title);
+                setEditing(false);
+              }
+            }}
+            className="w-full rounded border border-brand-300 px-1.5 py-0.5 text-sm outline-none focus:ring-2 focus:ring-brand-100"
+          />
+        ) : (
+          <span
+            onClick={() => setEditing(true)}
+            className={cn("min-w-0 cursor-text truncate text-sm", status === "done" ? "text-slate-400 line-through" : "text-slate-800")}
+          >
+            {t.title}
+          </span>
+        )}
+        {t.lead_id && (
+          <Link href={`/leads/${t.lead_id}`} className="shrink-0 text-[11px] text-brand-600 hover:underline" title="Open lead">
+            lead ↗
+          </Link>
+        )}
+      </div>
+
+      {/* assignee */}
+      <div className="hidden items-center md:flex">
+        <label className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-slate-100">
+          <Avatar name={assignee?.name} />
+          <select
+            value={t.assignee_id || ""}
+            onChange={(e) => onPatch({ assignee_id: e.target.value || null })}
+            className="w-full cursor-pointer truncate bg-transparent text-[12px] text-slate-600 outline-none"
+          >
+            <option value="">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* due date / calendar */}
+      <div className="hidden items-center md:flex">
+        <button
+          onClick={() => dateRef.current?.showPicker?.() ?? dateRef.current?.focus()}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px]",
+            due
+              ? due.overdue && status !== "done"
+                ? "border-rose-200 bg-rose-50 text-rose-600"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 text-slate-400 hover:border-slate-300"
+          )}
+          title={due ? "On your calendar — click to change" : "Set a due date (adds to calendar + emails you)"}
+        >
+          {due ? <CalendarClock className="h-3.5 w-3.5" /> : <CalendarPlus className="h-3.5 w-3.5" />}
+          <span className="truncate">{due ? due.text : "Schedule"}</span>
+        </button>
+        <input
+          ref={dateRef}
+          type="datetime-local"
+          value={toLocalInput(t.due_at)}
+          onChange={(e) => onPatch({ due_at: fromLocalInput(e.target.value), remind: true })}
+          className="sr-only"
+          tabIndex={-1}
+        />
+        {t.due_at && (
+          <button
+            onClick={() => onPatch({ due_at: null })}
+            className="ml-1 rounded p-0.5 text-slate-300 opacity-0 hover:text-rose-500 group-hover:opacity-100"
+            title="Clear due date"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* delete */}
+      <button
+        onClick={onDelete}
+        className="flex h-7 w-7 items-center justify-center rounded text-slate-300 opacity-0 hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
+        title="Delete task"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function AddTaskRow({ status, onCreate }: { status: string; onCreate: (title: string) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const submit = () => {
+    const v = title.trim();
+    if (v) onCreate(v);
+    setTitle("");
+    setAdding(false);
+  };
+  if (!adding) {
+    return (
+      <button
+        onClick={() => setAdding(true)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-slate-400 hover:bg-slate-50 hover:text-brand-600"
+      >
+        <Plus className="h-4 w-4" /> Add Task
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 px-3 py-2">
+      <Plus className="h-4 w-4 text-slate-300" />
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onBlur={submit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") {
+            setTitle("");
+            setAdding(false);
+          }
+        }}
+        placeholder="Task name, then Enter…"
+        className="w-full rounded border border-brand-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-brand-100"
+      />
+    </div>
+  );
+}
+
+function TaskBoard() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [owner, setOwner] = useState<"all" | "me">("all");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const { data: tasks, isLoading } = useQuery<Task[]>({
+    queryKey: ["tasks"],
+    queryFn: () => api("/tasks"),
+    refetchInterval: 15000,
+  });
+  const { data: members } = useQuery<Member[]>({
+    queryKey: ["task-members"],
+    queryFn: () => api("/tasks/members"),
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries({ queryKey: ["office-workload"] });
+    qc.invalidateQueries({ queryKey: ["calendar-reminders"] });
+  };
+
+  const createTask = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api("/tasks", { method: "POST", body }),
+    onSuccess: invalidate,
+  });
+  const patchTask = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>
+      api(`/tasks/${id}`, { method: "PATCH", body: patch }),
+    // Optimistic: update cache immediately so the row moves columns without a flash.
+    onMutate: async ({ id, patch }) => {
+      await qc.cancelQueries({ queryKey: ["tasks"] });
+      const prev = qc.getQueryData<Task[]>(["tasks"]);
+      qc.setQueryData<Task[]>(["tasks"], (old) => (old || []).map((t) => (t.id === id ? { ...t, ...patch } as Task : t)));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(["tasks"], ctx.prev),
+    onSettled: invalidate,
+  });
+  const deleteTask = useMutation({
+    mutationFn: (id: string) => api(`/tasks/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+
+  const list = (tasks || []).filter((t) => (owner === "me" ? t.assignee_id === user?.id : true));
+  const grouped = useMemo(() => {
+    const g: Record<string, Task[]> = { open: [], in_progress: [], done: [] };
+    for (const t of list) g[normStatus(t.status)].push(t);
+    // sort: due first (soonest), then newest created
+    for (const k of Object.keys(g)) {
+      g[k].sort((a, b) => {
+        const ad = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+        const bd = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+        if (ad !== bd) return ad - bd;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    }
+    return g;
+  }, [list]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <span>Owner:</span>
+          <div className="inline-flex gap-0.5 rounded-lg bg-slate-100 p-0.5">
+            {(["all", "me"] as const).map((o) => (
+              <button
+                key={o}
+                onClick={() => setOwner(o)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-[13px] font-medium capitalize transition-colors",
+                  owner === o ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="text-[12px] text-slate-400">{list.length} task{list.length === 1 ? "" : "s"}</span>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      ) : (
+        COLUMNS.map((col) => {
+          const rows = grouped[col.key];
+          const isCollapsed = collapsed[col.key];
+          return (
+            <div key={col.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <button
+                  onClick={() => setCollapsed((c) => ({ ...c, [col.key]: !c[col.key] }))}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide"
+                  style={{ backgroundColor: col.bg, color: col.color }}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: col.dot }} />
+                  {col.label}
+                </span>
+                <span className="text-[12px] font-medium text-slate-400">{rows.length}</span>
+              </div>
+
+              {!isCollapsed && (
+                <div>
+                  {rows.length > 0 && (
+                    <div className="hidden grid-cols-[28px_1fr_150px_180px_28px] gap-2 border-y border-slate-100 bg-slate-50/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
+                      <span />
+                      <span>Name</span>
+                      <span>Assignee</span>
+                      <span>Due / calendar</span>
+                      <span />
+                    </div>
+                  )}
+                  {rows.map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      t={t}
+                      members={members || []}
+                      onPatch={(patch) => patchTask.mutate({ id: t.id, patch })}
+                      onDelete={() => deleteTask.mutate(t.id)}
+                    />
+                  ))}
+                  <AddTaskRow status={col.key} onCreate={(title) => createTask.mutate({ title, status: col.key })} />
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ── Interactive task list (preserved) ───────────────────────────────────────
 
 type TabKey = "due" | "scheduled" | "completed" | "skipped";
 const TABS: { key: TabKey; label: string }[] = [
@@ -209,9 +616,9 @@ function TaskList() {
   const now = Date.now();
   const all = (tasks || []).filter((t) => (owner === "me" ? t.assignee_id === user?.id : true));
   const buckets: Record<TabKey, Task[]> = {
-    due: all.filter((t) => t.status === "open" && (!t.due_at || new Date(t.due_at).getTime() <= now)),
-    scheduled: all.filter((t) => t.status === "open" && t.due_at && new Date(t.due_at).getTime() > now),
-    completed: all.filter((t) => t.status === "done"),
+    due: all.filter((t) => (t.status === "open" || t.status === "in_progress") && (!t.due_at || new Date(t.due_at).getTime() <= now)),
+    scheduled: all.filter((t) => (t.status === "open" || t.status === "in_progress") && t.due_at && new Date(t.due_at).getTime() > now),
+    completed: all.filter((t) => t.status === "done" || t.status === "completed"),
     skipped: all.filter((t) => t.status === "skipped"),
   };
   const rows = [...buckets[tab]].sort((a, b) => {
@@ -262,9 +669,10 @@ function TaskList() {
           {rows.map((t) => {
             const Icon = TYPE_ICON[t.type] || Circle;
             const stamp = tab === "completed" ? t.completed_at : tab === "scheduled" ? t.due_at : t.due_at || t.created_at;
+            const done = t.status === "done" || t.status === "completed";
             return (
               <li key={t.id} className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
-                {t.status === "done" ? (
+                {done ? (
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
                 ) : t.status === "skipped" ? (
                   <SkipForward className="h-5 w-5 shrink-0 text-slate-400" />
@@ -274,9 +682,9 @@ function TaskList() {
                   </button>
                 )}
                 <Icon className="h-4 w-4 shrink-0 text-slate-500" />
-                <span className={"flex-1 truncate text-sm " + (t.status === "done" ? "text-slate-500 line-through" : "")}>{t.title}</span>
+                <span className={"flex-1 truncate text-sm " + (done ? "text-slate-500 line-through" : "")}>{t.title}</span>
                 <span className="shrink-0 text-xs text-slate-400">{fmtRelative(stamp)}</span>
-                {t.status === "open" && (
+                {!done && t.status !== "skipped" && (
                   <button onClick={() => setStatus.mutate({ id: t.id, status: "skipped" })} className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Skip task">
                     <SkipForward className="h-4 w-4" />
                   </button>
@@ -298,36 +706,45 @@ function TaskList() {
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
+type View = "board" | "workload" | "list";
+
 export default function TasksPage() {
-  const [view, setView] = useState<"workload" | "list">("workload");
+  const [view, setView] = useState<View>("board");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("view") === "list") setView("list");
+    const v = new URLSearchParams(window.location.search).get("view");
+    if (v === "list" || v === "workload" || v === "board") setView(v);
   }, []);
+
+  const TABS_VIEW: { key: View; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { key: "board", label: "Board", icon: KanbanSquare },
+    { key: "workload", label: "Workload", icon: LayoutGrid },
+    { key: "list", label: "List", icon: ListChecks },
+  ];
 
   return (
     <div className="p-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-normal tracking-tight text-slate-900">Task Office</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Everything that needs doing — and what needs YOUR attention.</p>
+          <p className="mt-0.5 text-sm text-slate-500">Plan, assign, and schedule your work — everything that needs doing in one place.</p>
         </div>
         <div className="inline-flex gap-0.5 rounded-lg bg-slate-100 p-0.5">
-          <button
-            onClick={() => setView("workload")}
-            className={"inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (view === "workload" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-          >
-            <LayoutGrid className="h-4 w-4" /> Workload
-          </button>
-          <button
-            onClick={() => setView("list")}
-            className={"inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (view === "list" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-          >
-            <ListChecks className="h-4 w-4" /> List
-          </button>
+          {TABS_VIEW.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              className={
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
+                (view === key ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700")
+              }
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {view === "workload" ? <OfficeWorkload /> : <TaskList />}
+      {view === "board" ? <TaskBoard /> : view === "workload" ? <OfficeWorkload /> : <TaskList />}
     </div>
   );
 }
