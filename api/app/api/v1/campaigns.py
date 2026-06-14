@@ -293,6 +293,49 @@ def _is_hard_bounce(error: str) -> bool:
     return any(s in e for s in recipient_bounce)
 
 
+_COOLDOWN_SECONDS = 90  # back-off window after a sender rate-limits us
+
+
+def _is_transient(error: str) -> bool:
+    """True for a TEMPORARY failure that should be retried later, not failed.
+
+    The Hostinger "451 4.7.1 Ratelimit ... exceeded" the user hit is the textbook
+    case: a 4.x.x SMTP reply / "rate limit" / greylist means "you're going too
+    fast, try again shortly" — NOT a bad recipient and NOT a permanent failure.
+    Marking these 'failed' loses the recipient forever; instead we keep them
+    'pending' and the next tick retries (after a cooldown).
+    """
+    e = (error or "").lower()
+    signals = (
+        "ratelimit", "rate limit", "rate-limit", "too many", "throttl",
+        "try again", "temporarily", "temporary", "greylist", "graylist",
+        "451", "421", "4.7.1", "4.2.1", "4.3.2", "quota", "slow down",
+        "deferred", "resources temporarily",
+    )
+    return any(s in e for s in signals)
+
+
+def _set_cooldown(campaign: Campaign, seconds: int = _COOLDOWN_SECONDS) -> None:
+    """Stash a back-off timestamp on the campaign (in recipient_sources JSONB so
+    no migration is needed). Until it passes, ticks skip sending to let the
+    sender's rate-limit window recover."""
+    src = dict(campaign.recipient_sources or {})
+    src["_cooldown_until"] = (
+        datetime.now(timezone.utc) + timedelta(seconds=seconds)
+    ).isoformat()
+    campaign.recipient_sources = src
+
+
+def _in_cooldown(campaign: Campaign) -> bool:
+    cu = (campaign.recipient_sources or {}).get("_cooldown_until")
+    if not cu:
+        return False
+    try:
+        return datetime.fromisoformat(cu) > datetime.now(timezone.utc)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _no_sender_reason(db: Session, campaign: Campaign) -> str:
     """Why a campaign has no sender to dispatch through. Since sending is
     decoupled from warmup, the only reasons are: no senders connected, or the
@@ -1332,6 +1375,12 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         db.commit()
         return _stats(campaign, sent=0, failed=0, skipped=0)
 
+    # Back-off: if a sender recently rate-limited us, skip this tick so the
+    # sender's limit window can recover instead of hammering it.
+    if _in_cooldown(campaign):
+        db.commit()
+        return _stats(campaign, sent=0, failed=0, skipped=0, note="cooling_down")
+
     # Reclaim ORPHANED rows stuck in status="sending" — see _prepare_tick_batch
     # for the full explanation. Anything older than 5 minutes is unambiguously
     # orphaned (a real in-flight send completes in seconds), so reset it back
@@ -1490,6 +1539,13 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                             },
                         )
                     )
+            elif _is_transient(result.error or ""):
+                # Temporary (rate limit / greylist / 4.x.x) — retry later. Keep
+                # the recipient pending and cool the campaign down so we stop
+                # hammering the sender's rate limit.
+                r.status = "pending"
+                r.error = (result.error or "rate_limited")[:500]
+                _set_cooldown(campaign)
             else:
                 # Distinguish a true recipient bounce from a SENDER/transport
                 # failure. Only a real bounce suppresses the address; a transport
@@ -1535,6 +1591,13 @@ def _prepare_tick_batch(
     if campaign.status != "sending":
         db.commit()
         return {"jobs": [], "campaign_status": campaign.status}
+
+    # Back-off: if a sender recently rate-limited us, hand back no jobs this
+    # tick so its rate-limit window can recover. The browser keeps polling; it
+    # simply gets empty batches until the cooldown passes.
+    if _in_cooldown(campaign):
+        db.commit()
+        return {"jobs": [], "campaign_status": "sending", "note": "cooling_down"}
 
     # Reclaim ORPHANED rows. _prepare_tick_batch claims pending rows by setting
     # status="sending" and returns jobs to the browser, which is expected to
@@ -1746,6 +1809,15 @@ def _commit_tick_results(
                             "subject": r.message_id,
                         },
                     ))
+        elif _is_transient(error):
+            # Temporary (rate limit / greylist / 4.x.x) — retry on a later tick.
+            # Keep pending, never fail/suppress, and cool the campaign down so we
+            # respect the sender's rate-limit window.
+            r.status = "pending"
+            r.error = error[:500]
+            if msg:
+                msg.status = "queued"
+            _set_cooldown(campaign)
         else:
             # Only a genuine recipient bounce suppresses the address; a
             # sender/transport failure stays "failed" and is never suppressed.
