@@ -24,6 +24,7 @@ const SECTIONS = [
     { href: "/settings/integrations", label: "Integrations" },
     { href: "/settings/whatsapp", label: "WhatsApp API" },
     { href: "/settings/api-keys", label: "API Keys" },
+    { href: "/settings/extension", label: "Browser Extension" },
     { href: "/settings/billing", label: "Subscription" },
   ]},
 ];
