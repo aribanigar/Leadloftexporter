@@ -825,6 +825,11 @@ class CampaignRecipient(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     # pending | sending | sent | opened | clicked | failed | skipped
     #          | bounced | unsubscribed
+    # Human-paced scheduling: the earliest time this recipient may be sent. The
+    # tick claims only rows whose send_after has passed, so a launch drips at
+    # the campaign's seconds_between_sends (jittered) instead of bursting.
+    # NULL = eligible immediately (back-compat for pre-0023 rows).
+    send_after: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     error: Mapped[Optional[str]] = mapped_column(Text)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     # Engagement tracking — written by the public open/click endpoints.

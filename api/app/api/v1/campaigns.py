@@ -35,6 +35,7 @@ day rollover by comparing `day_anchor` to today's YYYY-MM-DD.
 """
 from __future__ import annotations
 
+import random
 import re
 import secrets
 from datetime import date, datetime, timedelta, timezone
@@ -42,7 +43,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_ as sa_or
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -281,6 +282,52 @@ def _seconds_until_next_utc_day() -> int:
     now = datetime.now(timezone.utc)
     tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return max(60, int((tomorrow - now).total_seconds()))
+
+
+def _schedule_recipients(db: Session, campaign: Campaign) -> None:
+    """Assign each not-yet-scheduled pending recipient a human-jittered
+    send_after so the campaign DRIPS instead of bursting.
+
+    - Pace = campaign.seconds_between_sends (the "send delay" from the builder).
+    - Recipients are dealt round-robin across the campaign's active inboxes, and
+      each inbox advances its own cursor by a randomised gap in
+      [pace*0.6, pace*1.4]. So inboxes send in PARALLEL (one per inbox at a
+      time) while each inbox stays human-paced — and multiple campaigns each
+      drip on their own schedule, giving true concurrency.
+    - pace<=0 means "no delay" → everything is due now (legacy burst behaviour),
+      which we still allow but is not the default.
+    """
+    pace = max(0, int(campaign.seconds_between_sends or 0))
+    now = datetime.now(timezone.utc)
+    if pace == 0:
+        # No pacing requested — make everything immediately due.
+        db.query(CampaignRecipient).filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+            CampaignRecipient.send_after.is_(None),
+        ).update({"send_after": now}, synchronize_session=False)
+        return
+
+    senders = _campaign_sender_accounts(db, campaign)
+    n = max(1, len(senders))
+    pending = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+            CampaignRecipient.send_after.is_(None),
+        )
+        .order_by(CampaignRecipient.created_at.asc())
+        .all()
+    )
+    # Each inbox starts near-now (small randomised head-start so they don't all
+    # fire on the exact same instant) and advances independently.
+    cursors = [now + timedelta(seconds=random.uniform(0, min(pace, 20))) for _ in range(n)]
+    for i, r in enumerate(pending):
+        s = i % n
+        r.send_after = cursors[s]
+        cursors[s] = cursors[s] + timedelta(seconds=random.uniform(pace * 0.6, pace * 1.4))
+    db.commit()
 
 
 def _is_hard_bounce(error: str) -> bool:
@@ -1069,6 +1116,12 @@ def start_campaign(
     c.paused_at = None
     c.error = None
     db.commit()
+    # Human-paced drip: schedule each recipient's send_after across the inboxes
+    # so sending looks human and never bursts (anti-ban). Best-effort.
+    try:
+        _schedule_recipients(db, c)
+    except Exception:  # noqa: BLE001
+        db.rollback()
     # Process one tick inline so the UI sees immediate progress.
     return _process_tick(db, c, ctx_user_id=ctx.user_id)
 
@@ -1442,14 +1495,19 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         )
     }
 
-    # Claim a batch of pending recipients.
+    # Claim a batch of pending recipients that are DUE (human-paced schedule).
+    _now = datetime.now(timezone.utc)
     batch = (
         db.query(CampaignRecipient)
         .filter(
             CampaignRecipient.campaign_id == campaign.id,
             CampaignRecipient.status == "pending",
+            sa_or(
+                CampaignRecipient.send_after.is_(None),
+                CampaignRecipient.send_after <= _now,
+            ),
         )
-        .order_by(CampaignRecipient.created_at.asc())
+        .order_by(CampaignRecipient.send_after.asc().nullsfirst())
         .limit(int(campaign.batch_size or 8))
         .with_for_update(skip_locked=True)
         .all()
@@ -1667,13 +1725,18 @@ def _prepare_tick_batch(
         )
     }
 
+    _now = datetime.now(timezone.utc)
     batch = (
         db.query(CampaignRecipient)
         .filter(
             CampaignRecipient.campaign_id == campaign.id,
             CampaignRecipient.status == "pending",
+            sa_or(
+                CampaignRecipient.send_after.is_(None),
+                CampaignRecipient.send_after <= _now,
+            ),
         )
-        .order_by(CampaignRecipient.created_at.asc())
+        .order_by(CampaignRecipient.send_after.asc().nullsfirst())
         .limit(int(campaign.batch_size or 8))
         .with_for_update(skip_locked=True)
         .all()
