@@ -32,6 +32,9 @@ const { v4: uuidv4 } = require('uuid');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
+  initAuthCreds,
+  BufferJSON,
+  proto,
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers,
@@ -78,12 +81,140 @@ const MEDIA_KIND_BY_MIME = (mt) => {
 
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const CAMPAIGNS_FILE = path.join(DATA_DIR, 'campaigns.json');
-function readJson(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } }
-function writeJson(file, obj) { fs.writeFileSync(file, JSON.stringify(obj, null, 2)); }
-function readAccounts() { return readJson(ACCOUNTS_FILE, {}); }
-function writeAccounts(d) { writeJson(ACCOUNTS_FILE, d); }
-function listAccounts(ws) { const all = readAccounts(); return all[ws] || []; }
-function setAccounts(ws, list) { const all = readAccounts(); all[ws] = list; writeAccounts(all); }
+function _readJsonFile(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } }
+function _writeJsonFile(file, obj) { try { fs.writeFileSync(file, JSON.stringify(obj, null, 2)); } catch (e) { console.error('[wa] file write', file, e.message); } }
+
+// ─── Durable storage: Postgres (Neon) with on-disk fallback ───────────────────
+// The Baileys session credentials + the account registry + campaign history
+// used to live ONLY on a Render persistent disk. Setting WA_DB_URL (or reusing
+// the app's DATABASE_URL) moves all three into Postgres, so the sidecar needs
+// no disk and a paired phone survives on any host. If neither env is set we
+// transparently fall back to the on-disk JSON + multi-file auth store, so
+// nothing breaks without a database configured.
+const { Pool } = (() => { try { return require('pg'); } catch { return {}; } })();
+function _normalizeDbUrl(u) {
+  // The app stores DATABASE_URL with SQLAlchemy's `+psycopg` driver suffix;
+  // node-postgres wants a plain postgres:// scheme.
+  return String(u || '')
+    .replace(/^postgresql\+psycopg:\/\//, 'postgresql://')
+    .replace(/^postgres\+psycopg:\/\//, 'postgres://')
+    .trim();
+}
+const _DB_URL = _normalizeDbUrl(process.env.WA_DB_URL || process.env.DATABASE_URL || '');
+let pgPool = null;
+if (_DB_URL && Pool) {
+  const local = /localhost|127\.0\.0\.1/.test(_DB_URL);
+  pgPool = new Pool({
+    connectionString: _DB_URL,
+    ssl: local ? false : { rejectUnauthorized: false },  // Neon requires SSL
+    max: 4,
+  });
+  pgPool.on('error', (e) => console.error('[wa] pg pool error', e.message));
+}
+
+// In-memory cache of the two JSON blobs (account registry + campaign history),
+// loaded once at boot and written through to Postgres (or disk) on change. This
+// keeps every existing *synchronous* call site working unchanged.
+const _kv = { accounts: {}, campaigns: [] };
+async function _kvLoad() {
+  if (pgPool) {
+    const r = await pgPool.query('SELECT k, value FROM wa_kv WHERE k = ANY($1)', [['accounts', 'campaigns']]);
+    for (const row of r.rows) _kv[row.k] = row.value;
+    if (_kv.accounts == null || typeof _kv.accounts !== 'object') _kv.accounts = {};
+    if (!Array.isArray(_kv.campaigns)) _kv.campaigns = [];
+  } else {
+    _kv.accounts = _readJsonFile(ACCOUNTS_FILE, {});
+    _kv.campaigns = _readJsonFile(CAMPAIGNS_FILE, []);
+  }
+}
+function _kvSave(key) {
+  if (pgPool) {
+    // Fire-and-forget: the in-memory cache is authoritative for the live
+    // process; Postgres is the restart-recovery copy. Writes are infrequent
+    // (account add/remove, campaign progress).
+    pgPool.query(
+      'INSERT INTO wa_kv(k, value) VALUES($1, $2::jsonb) ON CONFLICT(k) DO UPDATE SET value = EXCLUDED.value',
+      [key, JSON.stringify(_kv[key])]
+    ).catch((e) => console.error('[wa] kv save', key, e.message));
+  } else {
+    _writeJsonFile(key === 'accounts' ? ACCOUNTS_FILE : CAMPAIGNS_FILE, _kv[key]);
+  }
+}
+
+function readAccounts() { return _kv.accounts; }
+function writeAccounts(d) { _kv.accounts = d; _kvSave('accounts'); }
+function listAccounts(ws) { return _kv.accounts[ws] || []; }
+function setAccounts(ws, list) { _kv.accounts[ws] = list; _kvSave('accounts'); }
+function readCampaigns() { return _kv.campaigns; }
+function writeCampaigns(arr) { _kv.campaigns = arr; _kvSave('campaigns'); }
+
+// Baileys auth store backed by Postgres — mirrors useMultiFileAuthState but
+// reads/writes the `wa_auth` table. Buffers inside the creds/keys are
+// (de)serialised with Baileys' BufferJSON so they round-trip through jsonb.
+async function usePostgresAuthState(pool, sessionId) {
+  async function read(dataKey) {
+    const r = await pool.query('SELECT value FROM wa_auth WHERE session_id=$1 AND data_key=$2', [sessionId, dataKey]);
+    if (!r.rows.length) return null;
+    return JSON.parse(JSON.stringify(r.rows[0].value), BufferJSON.reviver);
+  }
+  async function write(dataKey, value) {
+    const encoded = JSON.stringify(value, BufferJSON.replacer);
+    await pool.query(
+      'INSERT INTO wa_auth(session_id, data_key, value) VALUES($1, $2, $3::jsonb) ON CONFLICT(session_id, data_key) DO UPDATE SET value = EXCLUDED.value',
+      [sessionId, dataKey, encoded]
+    );
+  }
+  async function del(dataKey) {
+    await pool.query('DELETE FROM wa_auth WHERE session_id=$1 AND data_key=$2', [sessionId, dataKey]);
+  }
+  const creds = (await read('creds')) || initAuthCreds();
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type, ids) => {
+          const out = {};
+          await Promise.all(ids.map(async (id) => {
+            let value = await read(`${type}-${id}`);
+            if (type === 'app-state-sync-key' && value) {
+              value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            }
+            out[id] = value || undefined;
+          }));
+          return out;
+        },
+        set: async (data) => {
+          const tasks = [];
+          for (const category of Object.keys(data)) {
+            for (const id of Object.keys(data[category])) {
+              const value = data[category][id];
+              const dataKey = `${category}-${id}`;
+              tasks.push(value ? write(dataKey, value) : del(dataKey));
+            }
+          }
+          await Promise.all(tasks);
+        },
+      },
+    },
+    saveCreds: () => write('creds', creds),
+  };
+}
+
+// Remove a paired account's credentials from both Postgres and disk.
+async function _clearAuth(ws, accountId) {
+  if (pgPool) {
+    try { await pgPool.query('DELETE FROM wa_auth WHERE session_id=$1', [`${ws}:${accountId}`]); }
+    catch (e) { console.error('[wa] clearAuth', e.message); }
+  }
+  const p = path.join(AUTH_DIR, ws, accountId);
+  try { if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true }); } catch (_) {}
+}
+
+async function _initDb() {
+  if (!pgPool) return;
+  await pgPool.query('CREATE TABLE IF NOT EXISTS wa_auth (session_id text NOT NULL, data_key text NOT NULL, value jsonb NOT NULL, PRIMARY KEY (session_id, data_key))');
+  await pgPool.query('CREATE TABLE IF NOT EXISTS wa_kv (k text PRIMARY KEY, value jsonb NOT NULL)');
+}
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 // Every endpoint requires the shared sidecar token AND a workspace_id (so one
@@ -158,9 +289,14 @@ async function initAccount(workspaceId, accountId, label) {
   session.clientState.qrDataUrl = null;
 
   try {
-    const authDir = path.join(AUTH_DIR, workspaceId, accountId);
-    fs.mkdirSync(authDir, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    let state, saveCreds;
+    if (pgPool) {
+      ({ state, saveCreds } = await usePostgresAuthState(pgPool, `${workspaceId}:${accountId}`));
+    } else {
+      const authDir = path.join(AUTH_DIR, workspaceId, accountId);
+      fs.mkdirSync(authDir, { recursive: true });
+      ({ state, saveCreds } = await useMultiFileAuthState(authDir));
+    }
 
     if (!_waVersion) {
       const { version } = await fetchLatestBaileysVersion();
@@ -316,8 +452,17 @@ async function initAccount(workspaceId, accountId, label) {
 
 // ─── Restore on boot ──────────────────────────────────────────────────────────
 // Every previously-paired account gets re-initialised so reconnects survive a
-// container restart on Render (Baileys credentials live on disk).
+// container restart (credentials live in Postgres, or on disk as a fallback).
 (async () => {
+  try {
+    await _initDb();
+    await _kvLoad();
+    console.log(`[wa-sidecar] storage: ${pgPool ? 'Postgres (disk-free)' : 'on-disk JSON'}`);
+  } catch (e) {
+    console.error('[wa] DB init failed — falling back to disk:', e.message);
+    pgPool = null;
+    await _kvLoad();
+  }
   const all = readAccounts();
   for (const [ws, list] of Object.entries(all)) {
     for (const acc of list) await initAccount(ws, acc.id, acc.label);
@@ -372,8 +517,7 @@ app.delete('/accounts/:id', async (req, res) => {
     try { s.sock?.end(undefined); } catch (_) {}
     sessions.delete(sKey(ws, req.params.id));
   }
-  const authPath = path.join(AUTH_DIR, ws, req.params.id);
-  if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+  await _clearAuth(ws, req.params.id);
   setAccounts(ws, list.filter(a => a.id !== req.params.id));
   res.json({ ok: true });
 });
@@ -407,8 +551,7 @@ app.post('/accounts/:id/logout', async (req, res) => {
   try { await s.sock?.logout(); } catch (_) {}
   try { s.sock?.end(undefined); } catch (_) {}
   s.sock = null;
-  const authPath = path.join(AUTH_DIR, ws, req.params.id);
-  if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+  await _clearAuth(ws, req.params.id);
   res.json({ ok: true });
 });
 
@@ -601,7 +744,7 @@ async function runCampaign(campaign) {
 
 function persistHistory(c) {
   try {
-    const all = readJson(CAMPAIGNS_FILE, []);
+    const all = readCampaigns();
     const entry = {
       id: c.id, workspaceId: c.workspaceId, accountId: c.accountId,
       message: c.message, status: c.status, stats: c.stats,
@@ -610,7 +753,7 @@ function persistHistory(c) {
     };
     const idx = all.findIndex(h => h.id === c.id);
     if (idx !== -1) all[idx] = entry; else all.unshift(entry);
-    writeJson(CAMPAIGNS_FILE, all.slice(0, 200));
+    writeCampaigns(all.slice(0, 200));
   } catch (e) { console.error('[wa] history persist failed', e.message); }
 }
 
@@ -666,7 +809,7 @@ app.get('/campaigns', (req, res) => {
       results: c.contacts.map(({ phone, name, result }) => ({ phone, name: name || '', result })),
       createdAt: c.createdAt, startedAt: c.startedAt, completedAt: c.completedAt || null,
     }));
-  const history = readJson(CAMPAIGNS_FILE, []).filter(h => h.workspaceId === ws);
+  const history = readCampaigns().filter(h => h.workspaceId === ws);
   const activeIds = new Set(active.map(c => c.id));
   const merged = [...active, ...history.filter(h => !activeIds.has(h.id))];
   merged.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -676,7 +819,7 @@ app.get('/campaigns', (req, res) => {
 app.get('/campaigns/:id', (req, res) => {
   const c = activeCampaigns[req.params.id];
   if (!c || c.workspaceId !== req.workspaceId) {
-    const h = readJson(CAMPAIGNS_FILE, []).find(x => x.id === req.params.id && x.workspaceId === req.workspaceId);
+    const h = readCampaigns().find(x => x.id === req.params.id && x.workspaceId === req.workspaceId);
     if (!h) return res.status(404).json({ error: 'not_found' });
     return res.json(h);
   }

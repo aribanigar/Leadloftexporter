@@ -67,8 +67,13 @@ services:
   # ── WhatsApp sidecar ─────────────────────────────────────────────────────
   # Node/Baileys service that owns the actual WhatsApp Web connection.
   # The main API proxies /whatsapp-web/* to this service.
-  # The persistent disk MUST live at /app/.baileys_auth so paired phones
-  # survive container restarts.
+  #
+  # Storage: set WA_DB_URL (below) to the same Postgres (Neon) URL as the API's
+  # DATABASE_URL — the sidecar stores Baileys sessions + the account registry in
+  # the `wa_auth` / `wa_kv` tables, so paired phones survive restarts WITHOUT a
+  # disk. The disk below is kept only as a fallback for when WA_DB_URL is unset;
+  # once Postgres storage is confirmed you can remove the disk and drop to a
+  # cheaper plan.
   - type: web
     name: leadcaptura-whatsapp
     runtime: docker
@@ -85,6 +90,10 @@ services:
     envVars:
       - key: PORT
         value: "8001"
+      # Same value as the API service's DATABASE_URL (Neon). Enables disk-free,
+      # Postgres-backed session storage. Leave unset to fall back to the disk.
+      - key: WA_DB_URL
+        sync: false
       - key: WA_SIDECAR_TOKEN
         sync: false
 
