@@ -129,6 +129,7 @@ interface UiStats {
   clickRate: number;
   bounceRate: number;
   performance: Perf;
+  statusCounts: Record<string, number>;
   analysis: string[];
   whatWentWell: string[];
   whatNeedsWork: string[];
@@ -511,6 +512,10 @@ export default function CampaignDetailPage() {
   const [stats, setStats] = useState<UiStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
+  // Live heartbeat for the Integrity Report: when stats last refreshed + a 1s
+  // ticker so the "updated Ns ago" label counts up in real time.
+  const [lastStatsAt, setLastStatsAt] = useState<number | null>(null);
+  const [, setNowTick] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -560,6 +565,7 @@ export default function CampaignDetailPage() {
         clickRate: s.stats.click_rate,
         bounceRate: s.stats.bounce_rate,
         performance: s.performance,
+        statusCounts: s.status_counts ?? {},
         analysis: s.analysis ?? [],
         whatWentWell: s.what_went_well ?? [],
         whatNeedsWork: s.what_needs_work ?? [],
@@ -571,12 +577,19 @@ export default function CampaignDetailPage() {
         links,
         recipients: (recips ?? []).map(normaliseRecipient),
       });
+      setLastStatsAt(Date.now());
     } catch {
       // silent — stats may 404 transiently before first tick
     } finally {
       if (!quiet) setStatsLoading(false);
     }
   }, [id]);
+
+  // 1s ticker so "updated Ns ago" stays live between refreshes.
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((n) => (n + 1) % 1000000), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // ── The poll-driven send tick. Calls the Next.js /api/campaigns/{id}/tick
   // route which sends from Vercel's network (no SMTP port block) then commits
@@ -766,6 +779,20 @@ export default function CampaignDetailPage() {
 
   const bouncedRecipients = (stats?.recipients ?? []).filter(r => r.status === 'bounced');
   const maxLinkClicks = stats ? Math.max(...(stats.links.map(l => l.clicks)), 1) : 1;
+
+  // ── Live integrity figures (full-population, from server status_counts) ──
+  const sc = stats?.statusCounts ?? {};
+  const intTotal = stats?.totalRecipients ?? 0;
+  const intBounced = sc.bounced ?? stats?.bounced ?? 0;
+  const intFailed = sc.failed ?? 0;
+  const intSkipped = sc.skipped ?? 0;
+  const intDelivered = stats?.sent ?? 0; // sent successfully (bounced/failed are separate buckets)
+  const intQueued = Math.max(intTotal - intDelivered - intBounced - intFailed - intSkipped, 0);
+  const intIssues = intBounced + intFailed;
+  const deliveryPct = stats ? stats.deliveryRate : 0;
+  // Live "updated Ns ago" — recomputed every second via the ticker.
+  const statsAgeSec = lastStatsAt ? Math.max(0, Math.floor((Date.now() - lastStatsAt) / 1000)) : null;
+  const liveStream = campaign.status === 'sending';
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: T.surface, minHeight: '100vh', paddingBottom: '60px' }}>
@@ -1165,7 +1192,18 @@ export default function CampaignDetailPage() {
           </div>
         </div>
 
-        {/* ═══ Integrity Report ══════════════════════════════ */}
+        {/* ═══ Integrity Report (real-time) ══════════════════════════════ */}
+        {(() => {
+          const healthColor = !stats ? '#6b7280' : stats.bounceRate > 5 ? '#dc2626' : stats.bounceRate > 2 ? '#b45309' : '#16a34a';
+          const healthBg = !stats ? 'rgba(107,114,128,0.1)' : stats.bounceRate > 5 ? 'rgba(220,38,38,0.1)' : stats.bounceRate > 2 ? 'rgba(217,119,6,0.12)' : 'rgba(22,163,74,0.1)';
+          const updatedLabel = statsAgeSec === null ? 'syncing…' : statsAgeSec < 2 ? 'just now' : statsAgeSec < 60 ? `${statsAgeSec}s ago` : `${Math.floor(statsAgeSec / 60)}m ago`;
+          const tiles = [
+            { key: 'delivered', label: 'Delivered', value: intDelivered, color: '#13677b', bg: 'rgba(19,103,123,0.08)', icon: 'mark_email_read' },
+            { key: 'queued', label: 'Queued', value: intQueued, color: '#6b7280', bg: 'rgba(107,114,128,0.08)', icon: 'schedule_send' },
+            { key: 'bounced', label: 'Bounced', value: intBounced, color: '#dc2626', bg: 'rgba(220,38,38,0.07)', icon: 'error' },
+            { key: 'failed', label: 'Failed', value: intFailed, color: '#b45309', bg: 'rgba(217,119,6,0.1)', icon: 'warning' },
+          ];
+          return (
         <div style={{
           backgroundColor: T.surfaceContainerLowest,
           borderRadius: '12px',
@@ -1173,74 +1211,104 @@ export default function CampaignDetailPage() {
           boxShadow: T.shadow,
           marginBottom: '20px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px', flexWrap: 'wrap' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: T.onSurface, margin: 0, fontFamily: 'Manrope, sans-serif' }}>
               Integrity Report
             </h2>
-            {bouncedRecipients.length > 0 && (
+            {/* live heartbeat pill */}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em',
+              color: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)',
+              borderRadius: '6px', padding: '3px 8px', fontFamily: 'Inter, sans-serif',
+            }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#16a34a', animation: 'liveDot 1.4s ease-in-out infinite' }} />
+              LIVE
+            </span>
+            {intIssues > 0 && (
               <span style={{
                 fontSize: '11px', fontWeight: 700, color: '#fff',
                 backgroundColor: '#dc2626', borderRadius: '6px',
                 padding: '2px 8px', fontFamily: 'Inter, sans-serif',
               }}>
-                {bouncedRecipients.length} issue{bouncedRecipients.length !== 1 ? 's' : ''}
+                {intIssues} issue{intIssues !== 1 ? 's' : ''}
               </span>
             )}
+            <span style={{ marginLeft: 'auto', fontSize: '11px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+              {statsLoading ? 'refreshing…' : `updated ${updatedLabel}`}
+            </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: '12px',
-              backgroundColor: 'rgba(220,38,38,0.05)',
-              borderRadius: '10px', padding: '14px',
-            }}>
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                backgroundColor: 'rgba(220,38,38,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#dc2626', fontVariationSettings: "'FILL' 1" }}>
-                  error
-                </span>
-              </div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
-                  Bounced / Failed
-                </div>
-                <div style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
-                  {bouncedRecipients.length > 0
-                    ? `${bouncedRecipients.slice(0, 2).map(r => r.email).join(', ')}${bouncedRecipients.length > 2 ? ` +${bouncedRecipients.length - 2} more` : ''} — auto-suppressed on hard failure.`
-                    : 'No bounced or failed addresses detected.'}
-                </div>
-              </div>
+          {/* ── live deliverability gauge ── */}
+          <div style={{ backgroundColor: healthBg, borderRadius: '10px', padding: '16px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, fontFamily: 'Inter, sans-serif' }}>
+                Deliverability
+              </span>
+              <span style={{ fontSize: '22px', fontWeight: 900, color: healthColor, fontFamily: 'Manrope, sans-serif', fontVariantNumeric: 'tabular-nums' }}>
+                {stats ? `${deliveryPct.toFixed(1)}%` : '—'}
+              </span>
             </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: '12px',
-              backgroundColor: 'rgba(255,220,196,0.3)',
-              borderRadius: '10px', padding: '14px',
-            }}>
+            <div style={{ height: '8px', borderRadius: '999px', backgroundColor: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
               <div style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                backgroundColor: 'rgba(255,220,196,0.6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#92400e', fontVariationSettings: "'FILL' 1" }}>
-                  warning
-                </span>
+                height: '100%', borderRadius: '999px',
+                width: `${Math.min(Math.max(deliveryPct, 0), 100)}%`,
+                backgroundColor: healthColor,
+                transition: 'width 0.6s ease, background-color 0.4s ease',
+              }} />
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
+              Bounce rate {stats ? `${stats.bounceRate.toFixed(1)}%` : '—'}
+              {stats && stats.bounceRate > 5 ? ' — above safe threshold, review your list.' : ' — within safe parameters.'}
+            </div>
+          </div>
+
+          {/* ── live count tiles ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '12px' }}>
+            {tiles.map(t => (
+              <div key={t.key} style={{ backgroundColor: t.bg, borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '15px', color: t.color, fontVariationSettings: "'FILL' 1" }}>{t.icon}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>{t.label}</span>
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: 800, color: t.color, fontFamily: 'Manrope, sans-serif', fontVariantNumeric: 'tabular-nums' }}>
+                  {t.value.toLocaleString()}
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
-                  Deliverability
-                </div>
-                <div style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
-                  Bounce rate {stats ? `${stats.bounceRate.toFixed(1)}%` : '—'}
-                  {stats && stats.bounceRate > 5 ? ' — above safe threshold, review your list.' : ' — within safe parameters.'}
-                </div>
+            ))}
+          </div>
+
+          {/* ── bounced/failed detail ── */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '12px',
+            backgroundColor: intIssues > 0 ? 'rgba(220,38,38,0.05)' : 'rgba(22,163,74,0.05)',
+            borderRadius: '10px', padding: '14px',
+          }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              backgroundColor: intIssues > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: intIssues > 0 ? '#dc2626' : '#16a34a', fontVariationSettings: "'FILL' 1" }}>
+                {intIssues > 0 ? 'error' : 'verified'}
+              </span>
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: T.onSurface, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
+                Bounced / Failed
+              </div>
+              <div style={{ fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
+                {bouncedRecipients.length > 0
+                  ? `${bouncedRecipients.slice(0, 2).map(r => r.email).join(', ')}${bouncedRecipients.length > 2 ? ` +${bouncedRecipients.length - 2} more` : ''} — auto-suppressed on hard failure.`
+                  : intIssues > 0
+                    ? `${intIssues} address${intIssues !== 1 ? 'es' : ''} bounced or failed — auto-suppressed.`
+                    : 'No bounced or failed addresses detected.'}
               </div>
             </div>
           </div>
         </div>
+          );
+        })()}
 
         {/* ═══ Performance Analysis ══════════════════════════════ */}
         {stats && (stats.whatWentWell.length > 0 || stats.whatNeedsWork.length > 0 || stats.goalAchieved !== undefined) && (
