@@ -74,24 +74,25 @@ services:
   # disk. The disk below is kept only as a fallback for when WA_DB_URL is unset;
   # once Postgres storage is confirmed you can remove the disk and drop to a
   # cheaper plan.
+  # Runs on the FREE plan with NO disk: WA_DB_URL points at the same Neon
+  # Postgres as the API, so Baileys sessions + the account registry live in the
+  # wa_auth / wa_kv tables and a paired phone survives restarts. A free web
+  # service sleeps when idle; a cron-job.org ping to /health keeps it warm, and
+  # on any wake it reconnects from the stored creds with no new QR scan.
   - type: web
     name: leadcaptura-whatsapp
     runtime: docker
     repo: https://github.com/aribanigar/Leadloftexporter
     branch: main
     rootDir: whatsapp
-    plan: starter
+    plan: free
     healthCheckPath: /health
     autoDeploy: true
-    disk:
-      name: wa-sessions
-      mountPath: /app/.baileys_auth
-      sizeGB: 1
     envVars:
       - key: PORT
         value: "8001"
-      # Same value as the API service's DATABASE_URL (Neon). Enables disk-free,
-      # Postgres-backed session storage. Leave unset to fall back to the disk.
+      # Same value as the API service's DATABASE_URL (Neon) — enables disk-free,
+      # Postgres-backed session storage.
       - key: WA_DB_URL
         sync: false
       - key: WA_SIDECAR_TOKEN
