@@ -873,6 +873,10 @@ function NewCampaignPageInner() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [senders, setSenders] = useState<Sender[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
+  // Actual leads (with emails) for the selected pipeline stage, so the user can
+  // VALIDATE the recipient list before launching — not just see a count.
+  const [stageLeads, setStageLeads] = useState<{ email: string; name: string }[]>([]);
+  const [stageLeadsLoading, setStageLeadsLoading] = useState(false);
   type EmailResult = { email: string; valid: boolean; reason: string; tag: 'valid' | 'invalid_format' };
   const [validationResult, setValidationResult] = useState<{ valid: number; invalid: number; results: EmailResult[] } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -942,7 +946,12 @@ function NewCampaignPageInner() {
     return emails.length;
   })();
   const selectedStage = stages.find(s => s.id === form.stageId) || null;
-  const stageCount = selectedStage ? selectedStage.lead_count : 0;
+  // Real sendable count = stage leads that actually have an email (fetched in
+  // the effect below). While loading, fall back to the stage's total lead_count
+  // so the number doesn't flicker to 0.
+  const stageCount = form.stageId
+    ? (stageLeadsLoading ? (selectedStage?.lead_count ?? 0) : stageLeads.length)
+    : 0;
   const recipientCount = form.includeAllLeads
     ? Math.max(manualCount + stageCount, 1)
     : manualCount + stageCount;
@@ -978,6 +987,30 @@ function NewCampaignPageInner() {
     fetchSenders();
     fetchStages();
   }, [fetchSenders, fetchStages]);
+
+  // ── Pull the actual leads (with emails) for the selected pipeline stage so
+  //    the user can VALIDATE the recipient list before launching. Reads live
+  //    from the pipeline each time the stage changes; the campaign itself also
+  //    re-resolves stage_id server-side at launch, so it always targets the
+  //    stage's current members.
+  useEffect(() => {
+    if (!form.stageId) { setStageLeads([]); return; }
+    let cancelled = false;
+    setStageLeadsLoading(true);
+    api<{ items: Array<{ email?: string | null; full_name?: string | null }>; total: number }>(
+      `/leads?stage_id=${encodeURIComponent(form.stageId)}&page_size=500`
+    )
+      .then(res => {
+        if (cancelled) return;
+        const withEmail = (res.items || [])
+          .map(l => ({ email: (l.email || '').trim(), name: l.full_name || '' }))
+          .filter(l => l.email.includes('@'));
+        setStageLeads(withEmail);
+      })
+      .catch(() => { if (!cancelled) setStageLeads([]); })
+      .finally(() => { if (!cancelled) setStageLeadsLoading(false); });
+    return () => { cancelled = true; };
+  }, [form.stageId]);
 
   // ── Load existing campaign for editing (when ?id= is in URL)
   useEffect(() => {
@@ -1945,6 +1978,51 @@ function NewCampaignPageInner() {
                 </div>
               </div>
 
+              {/* Validate the recipient list — the actual emails pulled live
+                  from the selected stage, so you can review before launching. */}
+              {form.stageId && (
+                <div style={{ marginTop: '2px' }}>
+                  {stageLeadsLoading ? (
+                    <div style={{ fontSize: '11px', color: T.onSurfaceVariant, padding: '6px 2px' }}>
+                      Loading recipients from “{selectedStage?.name}”…
+                    </div>
+                  ) : stageLeads.length > 0 ? (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: T.primary }}>
+                          {stageLeads.length} email{stageLeads.length !== 1 ? 's' : ''} to validate
+                        </span>
+                        {selectedStage && (selectedStage.lead_count - stageLeads.length) > 0 && (
+                          <span style={{ fontSize: '10px', color: T.onSurfaceVariant }}>
+                            {selectedStage.lead_count - stageLeads.length} skipped (no email)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        maxHeight: '150px', overflowY: 'auto',
+                        border: '1px solid rgba(65,73,66,0.16)', borderRadius: '8px',
+                        background: T.surfaceContainerLowest, padding: '4px 0',
+                      }}>
+                        {stageLeads.map((l, i) => (
+                          <div key={`${l.email}-${i}`} style={{
+                            display: 'flex', justifyContent: 'space-between', gap: '8px',
+                            padding: '4px 10px', fontSize: '11px',
+                            borderTop: i === 0 ? 'none' : '1px solid rgba(65,73,66,0.06)',
+                          }}>
+                            <span style={{ color: T.onSurface, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.email}</span>
+                            {l.name ? <span style={{ color: T.onSurfaceVariant, flexShrink: 0, maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '11px', color: '#b54708', padding: '6px 2px' }}>
+                      No leads in “{selectedStage?.name}” have an email address yet — nothing to send to.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* CSV Upload button */}
               <button
                 onClick={() => csvInputRef.current?.click()}
@@ -2109,8 +2187,8 @@ function NewCampaignPageInner() {
                 <Icon name={'people'} size={14} color={T.primary} />
                 <span style={{ fontSize: '12px', fontWeight: 700, color: T.primary }}>
                   {form.includeAllLeads
-                    ? `All CRM leads${manualCount > 0 ? ` + ${manualCount.toLocaleString()}` : ''}`
-                    : `${manualCount.toLocaleString()} recipients`}
+                    ? `All CRM leads${(manualCount + stageCount) > 0 ? ` + ${(manualCount + stageCount).toLocaleString()}` : ''}`
+                    : `${recipientCount.toLocaleString()} recipient${recipientCount !== 1 ? 's' : ''}`}
                 </span>
               </div>
             )}
