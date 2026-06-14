@@ -55,7 +55,10 @@
   }
 
   function onSearchPeoplePage() {
-    return /^\/search\/results\/people\//.test(location.pathname);
+    // Mount on the dedicated People search AND on the "All" tab — the All tab
+    // renders a People section with Connect buttons that the user expects to
+    // be bulk-actionable too.
+    return /^\/search\/results\/(people|all)\//.test(location.pathname);
   }
 
   function isCheckpoint() {

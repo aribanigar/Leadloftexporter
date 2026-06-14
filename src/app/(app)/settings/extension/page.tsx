@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.245",
+    date: "Jun 14, 2026",
+    size: "226 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.245.zip",
+    latest: true,
+    changes: [
+      "“Connect All On Page” button now also appears on /search/results/all/ (the “All” tab), not just the dedicated People search.",
+      "Same button, same shadow-DOM-aware invite flow — no other behaviour change.",
+    ],
+  },
+  {
     version: "1.0.244",
     date: "Jun 14, 2026",
     size: "226 KB",
     file: "/extensions/leadcaptura-extension-v1.0.244.zip",
-    latest: true,
     changes: [
       "Connections page: “Message everyone” + “Start after N” now appear in the Message All composer (they were only wired into the people-search composer before).",
       "Connections-page run auto-clicks “Show more results”, waits 2s, re-decorates the new batch, and continues until the list ends.",
