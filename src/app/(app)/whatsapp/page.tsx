@@ -204,17 +204,26 @@ export default function WhatsAppOutreachPage() {
   const [assetNotice, setAssetNotice] = useState<string>("");
   const prefilledRef = useRef<string>("");
 
-  const { data: fromAsset } = useQuery<{ id: string; title: string; type: string; content: string }>({
+  const { data: fromAsset } = useQuery<{ id: string; title: string; type: string; content: string; image_url?: string }>({
     queryKey: ["wa-from-asset", fromAssetId],
     queryFn: () => api(`/content-hub/assets/${fromAssetId}`),
     enabled: !!fromAssetId,
   });
 
   useEffect(() => {
-    if (fromAsset?.content && prefilledRef.current !== fromAsset.id) {
+    if (fromAsset && (fromAsset.content || fromAsset.image_url) && prefilledRef.current !== fromAsset.id) {
       prefilledRef.current = fromAsset.id;
-      setMessage(fromAsset.content);
-      setAssetNotice(`Message loaded from Content Hub: "${fromAsset.title}"`);
+      if (fromAsset.content) setMessage(fromAsset.content);
+      // Carry the asset's photo over as the attachment (the message rides as
+      // its caption), so "Send on WhatsApp" arrives ready to send.
+      const img = fromAsset.image_url || "";
+      const m = /^data:([^;]+);base64,(.+)$/.exec(img);
+      if (m) {
+        setMedia({ base64: m[2], mimetype: m[1], filename: `${fromAsset.title.replace(/[^a-z0-9]/gi, "-").toLowerCase() || "image"}` });
+      }
+      setAssetNotice(
+        `Loaded from Content Hub: "${fromAsset.title}"${m ? " — photo attached, message set as caption." : ""}`
+      );
     }
   }, [fromAsset]);
 

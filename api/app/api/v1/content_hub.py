@@ -125,6 +125,7 @@ def _asset_dict(a: ContentAsset) -> dict:
         "amp_content": a.amp_content or "",
         "subject": a.subject or "",
         "platform": a.platform or "",
+        "image_url": a.image_url or "",
         "tags": a.tags or [],
         "notes": a.notes or "",
         "createdAt": a.created_at.isoformat() if a.created_at else None,
@@ -191,6 +192,7 @@ class AssetIn(BaseModel):
     amp_content: Optional[str] = None
     subject: Optional[str] = None
     platform: Optional[str] = None
+    image_url: Optional[str] = None
     tags: Optional[object] = None
     notes: Optional[str] = None
 
@@ -202,6 +204,7 @@ class AssetUpdate(BaseModel):
     amp_content: Optional[str] = None
     subject: Optional[str] = None
     platform: Optional[str] = None
+    image_url: Optional[str] = None
     tags: Optional[object] = None
     notes: Optional[str] = None
 
@@ -353,17 +356,19 @@ def create_asset(
     biz = _own_business(db, ctx, business_id)
     if (body.type or "") not in ASSET_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_type")
-    if not body.title.strip() or not (body.content or "").strip():
+    # Need a title and *something* — a message body or an attached image.
+    if not body.title.strip() or (not (body.content or "").strip() and not (body.image_url or "").strip()):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "title_and_content_required")
     a = ContentAsset(
         workspace_id=ctx.workspace_id,
         business_id=biz.id,
         title=body.title.strip(),
         type=body.type,
-        content=body.content,
+        content=body.content or "",
         amp_content=(body.amp_content or None),
         subject=(body.subject or None),
         platform=(body.platform or None),
+        image_url=(body.image_url or None),
         tags=_norm_tags(body.tags),
         notes=(body.notes or None),
     )
@@ -437,7 +442,7 @@ def update_asset(
         if not data["title"]:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "title_required")
     # Empty-string optional fields become NULL for cleanliness.
-    for k in ("subject", "platform", "notes", "amp_content"):
+    for k in ("subject", "platform", "notes", "amp_content", "image_url"):
         if k in data and data[k] == "":
             data[k] = None
     for k, v in data.items():

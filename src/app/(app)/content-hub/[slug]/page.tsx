@@ -43,6 +43,7 @@ interface Asset {
   title: string; type: AssetType; content: string;
   amp_content: string;
   subject: string; platform: string; tags: string[]; notes: string;
+  image_url: string;
   createdAt: string | null; updatedAt: string | null;
 }
 interface Business { id: string; name: string; slug: string; brand_color: string; description: string; }
@@ -263,6 +264,10 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCamp
       </div>
 
       <div style={{ padding: "12px 18px", flex: 1 }}>
+        {asset.image_url && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={asset.image_url} alt={asset.title} style={{ width: "100%", maxHeight: 150, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb", marginBottom: 10 }} />
+        )}
         <p style={{ fontSize: 12.5, color: "#6b7280", lineHeight: 1.6, margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }}>
           {preview160}{asset.content.length > 160 ? "…" : ""}
         </p>
@@ -296,6 +301,12 @@ function AssetCard({ asset, onEdit, onDelete, onPreview, onSendTest, onStartCamp
           <>
             <ActionBtn Icon={Copy} label={copied ? "Copied!" : "Copy"} color={cfg.color} onClick={copy} />
             <ActionBtn Icon={Download} label="Download .txt" color={BRAND} onClick={() => download("txt", "text/plain")} />
+            {asset.image_url && (
+              <a href={asset.image_url} download={asset.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, border: "1.5px solid #16a34a20", background: "#16a34a0d", fontSize: 11, fontWeight: 700, color: "#16a34a", textDecoration: "none" }}>
+                <Download size={13} /> Photo
+              </a>
+            )}
           </>
         )}
         <div style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
@@ -347,10 +358,23 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
   const [platform, setPlatform] = useState(initial?.platform || "");
   const [tags, setTags] = useState((initial?.tags || []).join(", "));
   const [notes, setNotes] = useState(initial?.notes || "");
+  const [imageUrl, setImageUrl] = useState(initial?.image_url || "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const ampFileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
+
+  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setErr("Please choose an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { setErr("Image too large (max 5MB)."); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => { setImageUrl((ev.target?.result as string) || ""); setErr(""); };
+    reader.readAsDataURL(file); // stored as a data: URL on the asset
+  };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -369,14 +393,17 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
   };
 
   const save = async () => {
-    if (!title.trim() || !content.trim()) { setErr("Title and content are required."); return; }
+    // Title always required; need a message OR an attached image.
+    if (!title.trim() || (!content.trim() && !imageUrl)) { setErr("Add a title and a message (or an image)."); return; }
     setSaving(true); setErr("");
     try {
       // AMP is only meaningful on html_email assets; ignore the field for
-      // other types and clear it server-side via empty string.
+      // other types and clear it server-side via empty string. The image is
+      // only relevant for non-email assets (WhatsApp/SMS/caption/other).
       const payload = {
         title, type, content, subject, platform, tags, notes,
         amp_content: type === "html_email" ? ampContent : "",
+        image_url: type === "html_email" ? "" : imageUrl,
       };
       if (isEdit) await api(`/content-hub/assets/${initial!.id}`, { method: "PATCH", body: payload });
       else await api(`/content-hub/businesses/${businessId}/assets`, { method: "POST", body: payload });
@@ -453,6 +480,38 @@ function AssetModal({ businessId, initial, onClose, onSaved }: {
               placeholder={type === "html_email" ? "Paste your HTML email code here, or upload a .html file above…" : "Paste your content here…"}
               style={{ ...input, height: type === "html_email" ? 220 : 130, resize: "vertical", fontFamily: type === "html_email" ? "monospace" : "inherit", fontSize: type === "html_email" ? 12 : 14, lineHeight: 1.6 }} />
           </div>
+
+          {/* Photo — for WhatsApp/SMS/caption/other. Rides along as the WhatsApp
+              media (the message becomes its caption) when "Send on WhatsApp". */}
+          {type !== "html_email" && (
+            <div>
+              <span style={label}>Photo {type === "whatsapp" ? "(sent with the message as its caption)" : "(optional)"}</span>
+              {imageUrl ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 10, border: "1.5px solid #e5e7eb", borderRadius: 10, background: "#fafafa" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageUrl} alt="attachment" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "#6b7280" }}>
+                    Image attached
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>~{Math.round((imageUrl.length * 0.75) / 1024)} KB</div>
+                  </div>
+                  <a href={imageUrl} download={`${(title || "image").replace(/[^a-z0-9]/gi, "-").toLowerCase()}`}
+                    style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: BRAND, background: BRAND_LIGHT, borderRadius: 6, padding: "5px 10px", textDecoration: "none" }}>
+                    <Download size={13} /> Download
+                  </a>
+                  <button type="button" onClick={() => setImageUrl("")}
+                    style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fee2e2", border: "none", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>
+                    <X size={13} /> Remove
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => imageRef.current?.click()}
+                  style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 14px", border: "1.5px dashed #cbd5e1", borderRadius: 10, background: "#fff", fontSize: 12.5, fontWeight: 700, color: "#16a34a", cursor: "pointer", width: "100%", justifyContent: "center" }}>
+                  <Upload size={15} /> Upload photo
+                </button>
+              )}
+              <input ref={imageRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }} />
+            </div>
+          )}
 
           {/* AMP-for-Email body — optional second-channel alternative for HTML
               emails. Gmail renders this version (carousels, GIFs, forms);

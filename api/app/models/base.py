@@ -703,6 +703,9 @@ class ContentAsset(Base, TimestampMixin):
     platform: Mapped[Optional[str]] = mapped_column(String(40))   # caption platform
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Optional attached image (data: URL or remote URL). For whatsapp/sms assets
+    # this is the product photo that rides along as the WhatsApp media caption.
+    image_url: Mapped[Optional[str]] = mapped_column(Text)
 
     business: Mapped["ContentBusiness"] = relationship(back_populates="assets")
 
