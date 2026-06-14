@@ -2363,6 +2363,18 @@
     return byText || null;
   }
 
+  // LinkedIn's "Show more results" infinite-scroll load button (connections /
+  // people-search list). Used by "Message Everyone" to pull the next batch.
+  function _findShowMoreResultsButton() {
+    let b = document.querySelector("button.scaffold-finite-scroll__load-button");
+    if (b && !b.disabled && _isVisible(b)) return b;
+    b = Array.from(document.querySelectorAll("button")).find((x) => {
+      const t = (x.textContent || "").replace(/\s+/g, " ").trim();
+      return /^show more results$/i.test(t) && !x.disabled && _isVisible(x);
+    });
+    return b || null;
+  }
+
   // A signature of the current results page — changes when we paginate.
   function _pageSignature() {
     let pageParam = "";
@@ -7365,6 +7377,44 @@
     aiRow.appendChild(aiLabel);
     wrap.appendChild(aiRow);
 
+    // "Message Everyone" — auto-load more pages via "Show more results".
+    const everyoneRow = document.createElement("div");
+    everyoneRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
+    const everyoneCheck = document.createElement("input");
+    everyoneCheck.type = "checkbox";
+    everyoneCheck.id = "lc-msg-everyone";
+    everyoneCheck.style.cssText = "cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;";
+    const everyoneLabel = document.createElement("label");
+    everyoneLabel.htmlFor = "lc-msg-everyone";
+    everyoneLabel.style.cssText = "font-size:12px;color:#475569;cursor:pointer;user-select:none;";
+    everyoneLabel.textContent = "Message everyone — keep clicking “Show more results” until done";
+    everyoneRow.appendChild(everyoneCheck);
+    everyoneRow.appendChild(everyoneLabel);
+    wrap.appendChild(everyoneRow);
+
+    // "Start after N people" — skip the first N of the visible list.
+    const startAfterRow = document.createElement("div");
+    startAfterRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
+    const startAfterLabel = document.createElement("label");
+    startAfterLabel.htmlFor = "lc-msg-start-after";
+    startAfterLabel.style.cssText = "font-size:12px;color:#475569;user-select:none;";
+    startAfterLabel.textContent = "Start after (skip first):";
+    const startAfterInput = document.createElement("input");
+    startAfterInput.type = "number";
+    startAfterInput.id = "lc-msg-start-after";
+    startAfterInput.min = "0";
+    startAfterInput.value = "0";
+    startAfterInput.style.cssText =
+      "width:64px;border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px;" +
+      "font-size:13px;font-family:inherit;color:#1e293b;outline:none;";
+    const startAfterSuffix = document.createElement("span");
+    startAfterSuffix.style.cssText = "font-size:12px;color:#94a3b8;";
+    startAfterSuffix.textContent = "people";
+    startAfterRow.appendChild(startAfterLabel);
+    startAfterRow.appendChild(startAfterInput);
+    startAfterRow.appendChild(startAfterSuffix);
+    wrap.appendChild(startAfterRow);
+
     const footer = document.createElement("div");
     footer.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:10px;";
 
@@ -7387,9 +7437,11 @@
       const msg = ta.value.trim();
       if (!msg) { ta.focus(); return; }
       const useAI = aiCheck.checked;
+      const loadMore = everyoneCheck.checked;
+      const startAfter = Math.max(0, parseInt(startAfterInput.value, 10) || 0);
       wrap.remove();
       _msgComposerEl = null;
-      await _startMessageAll(msg, useAI);
+      await _startMessageAll(msg, useAI, { loadMore, startAfter });
     };
 
     footer.appendChild(cancelBtn);
@@ -7507,13 +7559,19 @@
     return profile;
   }
 
-  async function _startMessageAll(message, useAI = false) {
+  async function _startMessageAll(message, useAI = false, opts = {}) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+
+    const startAfter = Math.max(0, parseInt(opts.startAfter, 10) || 0);
+    const loadMore = !!opts.loadMore;   // "Message Everyone" — auto "Show more results" pagination
 
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
+    // "Start after N people": skip the first N of the visible list. Only applies
+    // to the full visible list (not an explicit checkbox selection).
+    if (startAfter > 0 && !userSelected) urls = urls.slice(startAfter);
     if (!urls.length) { flashStatus("No profiles to message", "warn"); return; }
 
     state.messageActive = true;
@@ -7521,14 +7579,22 @@
     try { renderToolbar(); } catch {}
 
     let sent = 0, skipped = 0, failed = 0;
-    const total = urls.length;
-    flashStatus(`Message All started — ${total} profile${total === 1 ? "" : "s"}`, "ok");
-    _lcToast(`⚡ Message All — ${total} card${total === 1 ? "" : "s"}`, 2500);
+    const processedUrls = new Set();   // dedup across "Show more results" page loads
+    flashStatus(`Message All started — ${urls.length} profile${urls.length === 1 ? "" : "s"}`, "ok");
+    _lcToast(`⚡ Message All — ${urls.length} card${urls.length === 1 ? "" : "s"}`, 2500);
 
     try {
+      let pageGuard = 0;
+      // Outer loop: message the current batch, then — when "Message Everyone"
+      // is on — click "Show more results", wait, re-decorate, and message the
+      // newly loaded cards. Repeats until no more button / nothing new / Stop.
+      while (true) {
+      const total = urls.length;
       for (let i = 0; i < urls.length; i++) {
         if (state.messageCancel) break;
         const url = urls[i];
+        if (processedUrls.has(url)) continue;   // already handled on a prior page
+        processedUrls.add(url);
         const idx = i + 1;
 
         // Wrap each iteration so a thrown error in any helper counts as a
@@ -7795,6 +7861,23 @@
           _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
           try { _closeMsgOverlay(); } catch {}
         }
+      }
+
+      // ── "Message Everyone": load the next batch via "Show more results" ──
+      if (!loadMore || userSelected || state.messageCancel) break;
+      const moreBtn = _findShowMoreResultsButton();
+      if (!moreBtn) break;                       // no more pages → done
+      _lcToast("⏭ Loading more results…", 1800);
+      try { moreBtn.scrollIntoView({ block: "center" }); } catch {}
+      await sleep(400 + Math.random() * 300);
+      try { await dispatchHumanClick(moreBtn); } catch { try { moreBtn.click(); } catch {} }
+      await sleep(2000);                         // wait ~2s for the new results to load
+      try { decorateSearchCards(); } catch {}    // chip the freshly loaded cards
+      await sleep(700 + Math.random() * 400);
+      const fresh = _allChipUrls().filter((u) => u && u.includes("/in/") && !processedUrls.has(u));
+      if (!fresh.length) break;                  // nothing new appeared → stop
+      urls = fresh;
+      if (++pageGuard > 200) break;              // hard safety cap
       }
     } finally {
       state.messageActive = false;
@@ -8779,9 +8862,10 @@
   const CASE2_SENT_KEY = "lcCase2SentUrls";
   const CASE2_CB_CLASS = "lc-case2-cb";
   const CASE2_LI_DECORATED = "lc-case2-li-decorated";
-  // Rolling window: anyone messaged more than 2h ago becomes messageable
-  // again. Storage shape: { "/in/<handle>": timestampMs, ... }.
-  const CASE2_SENT_TTL_MS = 2 * 60 * 60 * 1000;
+  // Rolling window: anyone messaged more than 24h ago becomes messageable
+  // again. Storage shape: { "/in/<handle>": timestampMs, ... }. (24h so the
+  // same person isn't re-messaged within a day across repeated runs.)
+  const CASE2_SENT_TTL_MS = 24 * 60 * 60 * 1000;
 
   // Case #2 is active on the connections list AND on /search/results/people/
   // (filtered network search). Both surfaces have the same <li> + Message
@@ -8867,7 +8951,7 @@
     });
   }
 
-  // Filter to URLs sent within the last 2 hours; auto-prune expired ones.
+  // Filter to URLs sent within the last 24 hours; auto-prune expired ones.
   async function _loadSentSet() {
     const map = await _loadSentMapRaw();
     const now = Date.now();
@@ -9031,7 +9115,7 @@
 
     wrap.innerHTML =
       '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 2 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 24 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
       '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
       '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
       '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
@@ -9061,7 +9145,7 @@
         const totalCards = _findConnectionCards().length;
         statsEl.textContent =
           "📊 " + totalCards + " visible · " +
-          sent.size + " messaged in last 2h · " +
+          sent.size + " messaged in last 24h · " +
           selected.size + " selected via checkbox";
       } catch (e) {}
     };
@@ -9069,7 +9153,7 @@
     const statsTimer = setInterval(refreshStats, 1500);
 
     resetBtn.onclick = async () => {
-      if (!confirm("Clear the 2-hour sent-history? All cards (including ones messaged in the last 2h) will become selectable again.")) return;
+      if (!confirm("Clear the 24-hour sent-history? All cards (including ones messaged in the last 24h) will become selectable again.")) return;
       await _clearSentHistory();
       _decorateCase2Cards();
       refreshStats();
@@ -9248,7 +9332,7 @@
     const total = buttons.length;
     if (!total) {
       statusEl.textContent =
-        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 2h" +
+        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 24h" +
         (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
       return;
     }
