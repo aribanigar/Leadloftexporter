@@ -141,13 +141,24 @@ export default function WhatsAppOutreachPage() {
     refetchInterval: 3000, // poll so the QR refreshes + status flips on pair
   });
 
+  // Any sidecar failure (not configured = 503, host down = 404/502, gateway
+  // errors) means QR pairing can't work — surface the diagnostic banner rather
+  // than the misleading "click Add number" empty state.
   const sidecarUnavailable =
-    accountsError instanceof ApiError && accountsError.status === 503;
+    accountsError instanceof ApiError && [404, 500, 502, 503].includes(accountsError.status);
+  const sidecarErrorDetail =
+    accountsError instanceof ApiError ? accountsError.message : "";
 
   const addAccount = useMutation({
     mutationFn: (label: string) =>
       api("/whatsapp-web/accounts", { method: "POST", body: { label } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-accounts"] }),
+    onError: (e) =>
+      alert(
+        e instanceof ApiError
+          ? `Couldn't start pairing: ${e.message}\n\nThe WhatsApp sidecar service must be deployed and reachable.`
+          : "Couldn't start pairing — the WhatsApp service is unavailable."
+      ),
   });
 
   const reconnect = useMutation({
@@ -354,11 +365,15 @@ export default function WhatsAppOutreachPage() {
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
               <p>
                 <span className="font-semibold">QR pairing unavailable.</span>{" "}
-                The WhatsApp sidecar service isn&apos;t reachable yet. Deploy
-                the <code className="rounded bg-amber-100 px-1">/whatsapp</code>{" "}
-                service on Render and set{" "}
-                <code className="rounded bg-amber-100 px-1">WA_SIDECAR_URL</code>{" "}
-                on the main API.
+                The WhatsApp sidecar service isn&apos;t running/reachable. Deploy
+                the <code className="rounded bg-amber-100 px-1">leadcaptura-whatsapp</code>{" "}
+                service on Render, then set{" "}
+                <code className="rounded bg-amber-100 px-1">WA_SIDECAR_URL</code> +{" "}
+                <code className="rounded bg-amber-100 px-1">WA_SIDECAR_TOKEN</code>{" "}
+                on the API (token must match the sidecar).
+                {sidecarErrorDetail ? (
+                  <span className="mt-1 block text-amber-700">Detail: {sidecarErrorDetail}</span>
+                ) : null}
               </p>
             </div>
           </div>
