@@ -372,6 +372,24 @@ def tick_email_campaigns() -> dict:
                 processed += 1
             except Exception as exc:  # noqa: BLE001
                 log.exception("campaign tick failed for %s: %s", c.id, exc)
+                # CRITICAL: roll back so this campaign's partial writes don't
+                # leave the SHARED session in an aborted-transaction state —
+                # otherwise EVERY subsequent campaign in this run also fails and
+                # multiple campaigns appear "stuck".
+                try:
+                    db.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+                # Bump last_tick_at so a persistently-failing campaign sorts to
+                # the BACK of the queue next run instead of being picked first
+                # (least-recently-ticked) and starving the healthy ones again.
+                try:
+                    fresh = db.get(Campaign, c.id)
+                    if fresh is not None:
+                        fresh.last_tick_at = datetime.now(timezone.utc)
+                        db.commit()
+                except Exception:  # noqa: BLE001
+                    db.rollback()
     return {"processed": processed}
 
 
