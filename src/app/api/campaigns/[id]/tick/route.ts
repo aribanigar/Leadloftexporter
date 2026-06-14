@@ -23,6 +23,50 @@ export const maxDuration = 60;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * Best-effort copy of a just-sent SMTP message into the mailbox's Sent folder
+ * via IMAP. Pure SMTP send does NOT file to Sent (only the user's own webmail
+ * client does), so without this, campaign mail never appears in the user's
+ * "Sent" — which looks like it wasn't sent at all. We derive the IMAP host
+ * from the SMTP host (smtp.x → imap.x), reuse the same credentials, find the
+ * \Sent special-use folder (or a name matching /sent/), and APPEND the raw
+ * RFC822 message. Always best-effort: any failure here NEVER affects the send.
+ */
+async function appendToSentFolder(
+  smtp: SmtpConfig,
+  rawMessage: Buffer,
+): Promise<void> {
+  try {
+    const { ImapFlow } = await import("imapflow");
+    const imapHost = smtp.host.replace(/^smtp\./i, "imap.");
+    const client = new ImapFlow({
+      host: imapHost,
+      port: 993,
+      secure: true,
+      auth: { user: smtp.username, pass: smtp.password },
+      logger: false,
+      // Hostinger/Zoho/etc. self-signed or hostname-mismatched certs.
+      tls: { rejectUnauthorized: false },
+    });
+    await client.connect();
+    try {
+      let sentPath = "Sent";
+      try {
+        const boxes = await client.list();
+        const match =
+          boxes.find((b) => b.specialUse === "\\Sent") ||
+          boxes.find((b) => /(^|[./])sent($|[ ._])/i.test(b.path));
+        if (match) sentPath = match.path;
+      } catch { /* fall back to "Sent" */ }
+      await client.append(sentPath, rawMessage, ["\\Seen"]);
+    } finally {
+      await client.logout().catch(() => {});
+    }
+  } catch {
+    /* best-effort — never affect the send result */
+  }
+}
+
 interface SmtpConfig {
   host: string;
   port: number;
@@ -89,7 +133,7 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
       // hidden preheader span injected into the HTML body itself is what
       // actually fills the inbox preview pane — this header is a hint.
       if (job.preview_text) headers["X-Preheader"] = job.preview_text;
-      await t.sendMail({
+      const mailOptions = {
         from: fromHeader,
         to: job.to,
         subject: job.subject,
@@ -97,7 +141,24 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
         text: job.text || undefined,
         alternatives: alternatives.length ? alternatives : undefined,
         headers: Object.keys(headers).length ? headers : undefined,
-      });
+      };
+      await t.sendMail(mailOptions);
+      // Copy the message into the mailbox's Sent folder via IMAP so it shows
+      // up in the user's webmail "Sent". Compose the raw RFC822 separately
+      // (SMTP transport doesn't hand back its raw bytes), append best-effort,
+      // bounded so a slow IMAP server can't stall the tick.
+      try {
+        const MailComposer = (await import("nodemailer/lib/mail-composer")).default;
+        const raw: Buffer = await new Promise((resolve, reject) => {
+          new MailComposer(mailOptions).compile().build((err, message) =>
+            err ? reject(err) : resolve(message),
+          );
+        });
+        await Promise.race([
+          appendToSentFolder(send_config.smtp, raw),
+          new Promise<void>((resolve) => setTimeout(resolve, 9000)),
+        ]);
+      } catch { /* best-effort copy to Sent */ }
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
