@@ -1459,13 +1459,33 @@ function NewCampaignPageInner() {
 
   const validateNow = useCallback(() => {
     if (validateDebounceRef.current) clearTimeout(validateDebounceRef.current);
-    const all = parseEmails(form.manualEmails);
-    if (all.length === 0) { setToast({ msg: 'Add email addresses first', type: 'error' }); return; }
-    runValidation(form.manualEmails);
-    const valid = all.filter(e => EMAIL_RE.test(e)).length;
-    const invalid = all.length - valid;
+    // Validate the union of all recipient sources — manually pasted, CSV
+    // upload, AND pipeline-stage. Previously this only read manualEmails, so
+    // a campaign sourced entirely from a pipeline stage looked empty and the
+    // button errored with "Add email addresses first" even with 228 stage
+    // leads queued up.
+    const manual = parseEmails(form.manualEmails);
+    const csvEmails = form.csvRecipients.map(r => r.email);
+    const stageEmails = stageLeads.map(l => l.email);
+    const seen = new Set<string>();
+    const allEmails: string[] = [];
+    for (const e of [...manual, ...csvEmails, ...stageEmails]) {
+      const k = e.trim().toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      allEmails.push(e.trim());
+    }
+    if (allEmails.length === 0) {
+      setToast({ msg: 'Add recipients first — paste emails, upload a CSV, or pick a pipeline stage.', type: 'error' });
+      return;
+    }
+    // Run validation against the combined list (so the result panel reflects
+    // all sources, not just the paste box).
+    runValidation(allEmails.join('\n'));
+    const valid = allEmails.filter(e => EMAIL_RE.test(e)).length;
+    const invalid = allEmails.length - valid;
     setToast({ msg: `${valid} valid, ${invalid} invalid`, type: invalid > 0 ? 'error' : 'success' });
-  }, [form.manualEmails, runValidation]);
+  }, [form.manualEmails, form.csvRecipients, stageLeads, runValidation]);
 
   // ── Remove bad emails
   const removeBadEmails = () => {
@@ -2005,12 +2025,12 @@ function NewCampaignPageInner() {
                       }}>
                         {stageLeads.map((l, i) => (
                           <div key={`${l.email}-${i}`} style={{
-                            display: 'flex', justifyContent: 'space-between', gap: '8px',
                             padding: '4px 10px', fontSize: '11px',
                             borderTop: i === 0 ? 'none' : '1px solid rgba(65,73,66,0.06)',
-                          }}>
-                            <span style={{ color: T.onSurface, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.email}</span>
-                            {l.name ? <span style={{ color: T.onSurfaceVariant, flexShrink: 0, maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span> : null}
+                            color: T.onSurface,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }} title={l.name || undefined}>
+                            {l.email}
                           </div>
                         ))}
                       </div>
