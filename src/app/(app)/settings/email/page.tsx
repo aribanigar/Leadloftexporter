@@ -23,6 +23,17 @@ interface ConnectedAccount {
   config?: Record<string, unknown>;
 }
 
+interface SenderWarmup {
+  enabled: boolean;
+  daily_cap_today: number;
+  sent_today: number;
+  day: number;
+}
+interface SenderListItem {
+  id: string;
+  warmup: SenderWarmup;
+}
+
 type Tab = "smtp" | "gmail" | "resend" | "sendgrid";
 
 export default function EmailSendersPage() {
@@ -33,6 +44,13 @@ export default function EmailSendersPage() {
     queryKey: ["connected-accounts"],
     queryFn: () => api("/integrations/accounts"),
   });
+
+  // Warmup state per sender (separate endpoint that includes the ramp info).
+  const { data: senderList } = useQuery<SenderListItem[]>({
+    queryKey: ["senders-warmup"],
+    queryFn: () => api("/campaigns/senders/list"),
+  });
+  const warmupById = new Map((senderList || []).map((s) => [s.id, s.warmup]));
 
   const emailAccounts = (accounts || []).filter((a) =>
     ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider)
@@ -84,6 +102,7 @@ export default function EmailSendersPage() {
             <SenderRow
               key={a.id}
               account={a}
+              warmup={warmupById.get(a.id)}
               onDisconnect={() => {
                 if (window.confirm(`Disconnect ${a.external_id || a.label || a.provider}?`)) {
                   disconnect.mutate(a.id);
@@ -133,15 +152,25 @@ export default function EmailSendersPage() {
 
 function SenderRow({
   account: a,
+  warmup,
   onDisconnect,
 }: {
   account: ConnectedAccount;
+  warmup?: SenderWarmup;
   onDisconnect: () => void;
 }) {
+  const qc = useQueryClient();
   const test = useMutation<{ ok: boolean; to: string }, Error, void>({
     mutationFn: () =>
       api(`/integrations/accounts/${a.id}/test`, { method: "POST", body: {} }),
   });
+
+  const toggleWarmup = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api(`/campaigns/senders/${a.id}/warmup`, { method: "PATCH", body: { enabled } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["senders-warmup"] }),
+  });
+  const warmOn = !!warmup?.enabled;
 
   const providerColors: Record<string, string> = {
     smtp: "bg-slate-100 text-slate-700",
@@ -175,6 +204,12 @@ function SenderRow({
               <span className="text-emerald-600">✓ test sent to {test.data.to}</span>
             </>
           )}
+          {warmOn && warmup && (
+            <>
+              <span>·</span>
+              <span className="text-amber-600">warmup {warmup.sent_today}/{warmup.daily_cap_today} today</span>
+            </>
+          )}
         </div>
         {/* Full-width, wrappable error so the real transport reason is readable
             (e.g. "test_send_failed: smtp_relay: 535 5.7.8 auth failed"). */}
@@ -184,6 +219,23 @@ function SenderRow({
           </div>
         )}
       </div>
+      <button
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium disabled:opacity-40 ${
+          warmOn
+            ? "border-amber-300 bg-amber-50 text-amber-700"
+            : "border-slate-200 text-slate-500 hover:bg-slate-50"
+        }`}
+        onClick={() => toggleWarmup.mutate(!warmOn)}
+        disabled={toggleWarmup.isPending}
+        title={
+          warmOn
+            ? "Warmup ON — this inbox gradually ramps daily campaign volume; overflow sends the next day (never blocks or fails)."
+            : "Warmup OFF — this inbox sends campaigns at full speed. Turn on to gradually ramp a new inbox and protect deliverability."
+        }
+      >
+        {toggleWarmup.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+        Warmup {warmOn ? "On" : "Off"}
+      </button>
       <button
         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
         onClick={() => test.mutate()}

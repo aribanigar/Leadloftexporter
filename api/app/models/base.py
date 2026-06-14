@@ -862,7 +862,10 @@ class SenderWarmup(Base, TimestampMixin):
         ForeignKey("connected_accounts.id", ondelete="CASCADE"),
         index=True,
     )
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Warmup is OPT-IN: default OFF so campaigns send freely; a user turns it
+    # on per inbox to gradually ramp daily volume (overflow defers to the next
+    # day, never fails).
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

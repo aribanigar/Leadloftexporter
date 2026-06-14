@@ -227,18 +227,40 @@ def _eligible_senders(
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
     """Senders this campaign can dispatch through, round-robin ordered.
 
-    DECOUPLED FROM WARMUP — campaign sending is NOT throttled by any warmup cap.
-    Every active sender in the campaign's pool (or every active workspace sender
-    when no pool is set) is eligible. The paired SenderWarmup row is returned
-    only so the send loop can keep per-inbox counters (sent_today/total_sent)
-    up to date for the warmup UI; it never gates a send.
+    WARMUP IS OPT-IN PER INBOX. By default (warmup OFF) a sender has NO cap and
+    is always eligible — campaigns send freely. When a user turns warmup ON for
+    an inbox, that inbox respects today's ramp cap: once it's hit, the inbox is
+    skipped for the rest of the day and its overflow DEFERS to tomorrow (the
+    recipients stay pending and resume after the UTC day rolls over) — it is
+    never failed. Senders with warmup OFF are unaffected.
 
     Ordered to start at campaign.rotation_index for round-robin fairness so the
     volume spreads evenly across the connected mailboxes.
     """
+    accts = _campaign_sender_accounts(db, campaign)
+
+    out: list[tuple[ConnectedAccount, SenderWarmup]] = []
+    for a in accts:
+        w = _warmup_for_account(db, campaign.workspace_id, a.id)
+        # Opt-in: only a warmup-ENABLED inbox is capped; default (disabled) = no cap.
+        if w.enabled and w.sent_today >= _warmup_daily_cap(w):
+            continue
+        out.append((a, w))
+
+    # Rotate starting at the campaign's rotation_index so consecutive ticks
+    # advance through the pool.
+    if out:
+        idx = campaign.rotation_index % len(out)
+        out = out[idx:] + out[:idx]
+    return out
+
+
+def _campaign_sender_accounts(db: Session, campaign: Campaign) -> list[ConnectedAccount]:
+    """The active sender accounts available to a campaign (its explicit pool, or
+    every active workspace sender when no pool is set) — IGNORING warmup caps."""
     pool = campaign.sender_account_ids or []
     if pool:
-        accts = (
+        return (
             db.query(ConnectedAccount)
             .filter(
                 ConnectedAccount.id.in_(pool),
@@ -247,17 +269,18 @@ def _eligible_senders(
             )
             .all()
         )
-    else:
-        accts = _all_workspace_senders(db, campaign.workspace_id)
+    return _all_workspace_senders(db, campaign.workspace_id)
 
-    out = [(a, _warmup_for_account(db, campaign.workspace_id, a.id)) for a in accts]
 
-    # Rotate starting at the campaign's rotation_index so consecutive ticks
-    # advance through the pool.
-    if out:
-        idx = campaign.rotation_index % len(out)
-        out = out[idx:] + out[:idx]
-    return out
+def _has_active_senders(db: Session, campaign: Campaign) -> bool:
+    """Any active sender at all for this campaign (regardless of warmup cap)."""
+    return len(_campaign_sender_accounts(db, campaign)) > 0
+
+
+def _seconds_until_next_utc_day() -> int:
+    now = datetime.now(timezone.utc)
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(60, int((tomorrow - now).total_seconds()))
 
 
 def _is_hard_bounce(error: str) -> bool:
@@ -1032,9 +1055,10 @@ def start_campaign(
             status.HTTP_400_BAD_REQUEST,
             f"cannot_start_in_state:{c.status}",
         )
-    # Validate at least one ACTIVE sender exists. Sending is decoupled from
-    # warmup, so the only way this fails is no/inactive senders — explain which.
-    if not _eligible_senders(db, c):
+    # Validate at least one ACTIVE sender exists. Block launch ONLY when there
+    # are no/inactive senders. If senders exist but are all warmup-capped for
+    # today, launch is allowed — the campaign defers and resumes tomorrow.
+    if not _has_active_senders(db, c):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             _no_sender_reason(db, c),
@@ -1400,6 +1424,13 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
     # only when there are no active senders to dispatch through.
     eligible = _eligible_senders(db, campaign)
     if not eligible:
+        # No sender can send right now. If active senders exist but are all
+        # warmup-capped for today, DEFER to tomorrow (cooldown until next UTC
+        # day) — nothing fails. Otherwise it's a genuine no-sender no-op.
+        if _has_active_senders(db, campaign):
+            _set_cooldown(campaign, _seconds_until_next_utc_day())
+            db.commit()
+            return _stats(campaign, sent=0, failed=0, skipped=0, note="warmup_deferred")
         db.commit()
         return _stats(campaign, sent=0, failed=0, skipped=0, note="no_active_senders")
 
@@ -1621,6 +1652,11 @@ def _prepare_tick_batch(
 
     eligible = _eligible_senders(db, campaign)
     if not eligible:
+        # All warmup-capped today → defer to tomorrow (no fail). Else no sender.
+        if _has_active_senders(db, campaign):
+            _set_cooldown(campaign, _seconds_until_next_utc_day())
+            db.commit()
+            return {"jobs": [], "campaign_status": "sending", "note": "warmup_deferred"}
         db.commit()
         return {"jobs": [], "campaign_status": "sending", "note": "no_active_senders"}
 
