@@ -126,8 +126,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      <aside className="w-[380px] shrink-0 overflow-auto border-r border-slate-200 bg-white">
+    <div className="flex h-full flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <aside className="w-full shrink-0 border-b border-slate-200 bg-white lg:w-[380px] lg:overflow-auto lg:border-b-0 lg:border-r">
         <div className="border-b border-slate-200 px-4 py-3">
           <Link
             href="/prospecting"

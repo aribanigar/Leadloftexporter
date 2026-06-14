@@ -184,12 +184,12 @@ export default function ProspectingPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">Prospecting</h1>
         <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
           {leads?.total ?? 0} leads
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button className="btn-secondary" onClick={() => setPickingColumns(true)}>
             <Columns3 className="h-4 w-4" /> Columns
           </button>

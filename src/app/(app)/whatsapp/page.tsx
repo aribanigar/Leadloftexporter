@@ -567,7 +567,7 @@ export default function WhatsAppOutreachPage() {
               )}
             </label>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-sm">
                 <span className="text-xs font-medium text-slate-700">
                   Country code

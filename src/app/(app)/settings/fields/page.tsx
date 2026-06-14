@@ -41,7 +41,7 @@ export default function FieldsPage() {
       </div>
 
       {adding && (
-        <div className="mb-4 grid grid-cols-3 gap-2 rounded-md border border-slate-200 p-3">
+        <div className="mb-4 grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-3">
           <input className="input" placeholder="Key (e.g. industry)" value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} />
           <input className="input" placeholder="Label" value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
           <select className="input" value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
