@@ -3,6 +3,7 @@ services:
     name: leadcaptura-api
     runtime: docker
     repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
     rootDir: api
     plan: starter
     healthCheckPath: /health
@@ -72,6 +73,7 @@ services:
     name: leadcaptura-whatsapp
     runtime: docker
     repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
     rootDir: whatsapp
     plan: starter
     healthCheckPath: /health
@@ -90,6 +92,7 @@ services:
     name: leadcaptura-worker
     runtime: docker
     repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
     rootDir: api
     plan: starter
     dockerCommand: celery -A app.workers.celery_app worker --loglevel=info
@@ -101,6 +104,7 @@ services:
     name: leadcaptura-beat
     runtime: docker
     repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
     rootDir: api
     plan: starter
     dockerCommand: celery -A app.workers.celery_app beat --loglevel=info
