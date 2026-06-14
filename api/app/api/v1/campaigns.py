@@ -163,17 +163,22 @@ def _inject_tracking(
 
 
 def _warmup_daily_cap(w: SenderWarmup) -> int:
-    """Calc today's permitted cap for this sender (curve described above)."""
-    if not w.enabled:
+    """Per-sender daily send cap.
+
+    DISABLED per the product owner's request — the warmup *ramp* (start ~20/day,
+    grow to the ceiling over 30 days) was the reason large campaigns stalled:
+    a sender could only push ~20 emails on day 1, so the rest of the queue sat
+    'pending' forever and looked like "mail isn't going". Sending now runs at
+    full speed with no throttle.
+
+    To re-introduce reputation-safe warmup later, restore the ramp:
+        if w.enabled:
+            day = (datetime.now(timezone.utc) - (w.started_at or now)).days + 1
+            if day < (w.ramp_days or 30):
+                return min(round(20 * 1.18 ** (day - 1)), w.daily_cap_ceiling)
         return w.daily_cap_ceiling
-    started = w.started_at or datetime.now(timezone.utc)
-    day = (datetime.now(timezone.utc) - started).days + 1
-    if day <= 0:
-        day = 1
-    if day >= (w.ramp_days or 30):
-        return w.daily_cap_ceiling
-    cap = round(20 * (1.18 ** (day - 1)))
-    return min(int(cap), int(w.daily_cap_ceiling))
+    """
+    return 10_000_000
 
 
 def _warmup_for_account(
