@@ -9117,6 +9117,17 @@
       '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
       '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 24 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
       '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
+      // "Message Everyone" — auto-click "Show more results" until the page runs out.
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
+      '<input data-role="everyone" type="checkbox" id="lc-c2-everyone" style="cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;">' +
+      '<label for="lc-c2-everyone" style="font-size:12px;color:#475569;cursor:pointer;user-select:none;">Message everyone — keep clicking “Show more results” until done</label>' +
+      '</div>' +
+      // "Start after N people" — skip the first N entries of the list.
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
+      '<label for="lc-c2-start-after" style="font-size:12px;color:#475569;user-select:none;">Start after (skip first):</label>' +
+      '<input data-role="startAfter" type="number" id="lc-c2-start-after" min="0" value="0" style="width:64px;border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;color:#1e293b;outline:none;">' +
+      '<span style="font-size:12px;color:#94a3b8;">people</span>' +
+      '</div>' +
       '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
       '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">' +
@@ -9136,6 +9147,8 @@
     const cancelBtn = wrap.querySelector("[data-role='cancel']");
     const startBtn = wrap.querySelector("[data-role='start']");
     const resetBtn = wrap.querySelector("[data-role='reset']");
+    const everyoneCheck = wrap.querySelector("[data-role='everyone']");
+    const startAfterInput = wrap.querySelector("[data-role='startAfter']");
 
     // Refresh stats periodically.
     const refreshStats = async () => {
@@ -9178,8 +9191,10 @@
       cancelBtn.textContent = "Stop";
       _case2State.running = true;
       _case2State.cancelled = false;
+      const loadMore = !!everyoneCheck?.checked;
+      const startAfter = Math.max(0, parseInt(startAfterInput?.value, 10) || 0);
       try {
-        await _case2Run(msg, statusEl, progressEl);
+        await _case2Run(msg, statusEl, progressEl, { loadMore, startAfter });
       } catch (e) {
         statusEl.textContent = "❌ " + (e.message || e);
       } finally {
@@ -9297,53 +9312,88 @@
     return buttons;
   }
 
-  async function _case2Run(messageText, statusEl, progressEl) {
+  async function _case2Run(messageText, statusEl, progressEl, opts) {
+    opts = opts || {};
+    const loadMore = !!opts.loadMore;       // "Message Everyone" — auto-page via "Show more results"
+    const startAfter = Math.max(0, parseInt(opts.startAfter, 10) || 0);
+
     statusEl.textContent = "Looking for Message buttons...";
     try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
     await sleep(400);
 
-    const allButtons = _findCase2MessageButtons();
-    if (!allButtons.length) {
-      statusEl.textContent = "❌ No Message buttons found on the page";
-      return;
-    }
-
-    // Load sent set + selected set.
-    const sentSet = await _loadSentSet();
-    const selectedSet = _selectedUrlsFromCheckboxes();
-    const hasSelection = selectedSet.size > 0;
-
-    // Build {btn, url, name, li} list and filter.
-    const allCands = allButtons.map((btn) => {
-      const li = btn.closest("li");
-      const url = _getProfileUrlFromLi(li);
-      return { btn, url, li };
-    });
+    // Cross-batch state for "Message Everyone".
+    const processedUrls = new Set();
+    let sent = 0, failed = 0;
+    let totalAttempted = 0;        // running denominator across pages
     let skippedAlreadySent = 0;
     let skippedNotSelected = 0;
-    const buttons = [];
-    for (const c of allCands) {
-      if (!c.url) { buttons.push(c.btn); continue; } // no URL → can't dedupe, still try
-      if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
-      if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
-      buttons.push(c.btn);
-    }
+    let skippedStartAfter = 0;
+    progressEl.textContent = "0 sent · 0 failed · 0/0";
 
-    const total = buttons.length;
-    if (!total) {
-      statusEl.textContent =
-        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 24h" +
-        (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
-      return;
-    }
-    if (skippedAlreadySent || skippedNotSelected) {
-      statusEl.textContent =
-        "Starting (" + total + " to send · " + skippedAlreadySent + " skipped as already-messaged" +
-        (hasSelection ? " · " + skippedNotSelected + " not selected" : "") + ")";
-      await sleep(800);
-    }
-    let sent = 0, failed = 0;
-    progressEl.textContent = "0 sent · 0 failed · 0/" + total;
+    // Outer loop: process the current batch, then (if Message Everyone is on)
+    // click "Show more results", wait, re-scan, and continue with the new tail.
+    while (true) {
+      if (_case2State.cancelled) break;
+
+      const allButtons = _findCase2MessageButtons();
+      if (!allButtons.length) {
+        if (totalAttempted === 0) {
+          statusEl.textContent = "❌ No Message buttons found on the page";
+          return;
+        }
+        break;
+      }
+
+      const sentSet = await _loadSentSet();
+      const selectedSet = _selectedUrlsFromCheckboxes();
+      const hasSelection = selectedSet.size > 0;
+
+      // Build {btn,url,li} list — and skip rows already processed this run.
+      const allCands = allButtons.map((btn) => {
+        const li = btn.closest("li");
+        const url = _getProfileUrlFromLi(li);
+        return { btn, url, li };
+      });
+      const buttons = [];
+      const urls = [];
+      for (const c of allCands) {
+        if (c.url && processedUrls.has(c.url)) continue;       // already done in a previous batch
+        if (!c.url) { buttons.push(c.btn); urls.push(""); continue; }
+        if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
+        if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
+        buttons.push(c.btn);
+        urls.push(c.url);
+      }
+
+      // Honour "Start after N" — only on the very first batch and only when the
+      // user hasn't ticked specific cards via checkbox.
+      if (totalAttempted === 0 && startAfter > 0 && !hasSelection && buttons.length > startAfter) {
+        skippedStartAfter = startAfter;
+        buttons.splice(0, startAfter);
+        urls.splice(0, startAfter);
+      }
+
+      const batchTotal = buttons.length;
+      if (!batchTotal) {
+        if (!loadMore) {
+          if (totalAttempted === 0) {
+            statusEl.textContent =
+              "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 24h" +
+              (hasSelection ? " · " + skippedNotSelected + " not selected" : "") +
+              (skippedStartAfter ? " · " + skippedStartAfter + " skipped via start-after" : "");
+          }
+          break;
+        }
+        // Else fall through to the "Show more results" step.
+      }
+      if (batchTotal && totalAttempted === 0 && (skippedAlreadySent || skippedNotSelected || skippedStartAfter)) {
+        statusEl.textContent =
+          "Starting (" + batchTotal + " in this batch · " + skippedAlreadySent + " messaged in last 24h" +
+          (hasSelection ? " · " + skippedNotSelected + " not selected" : "") +
+          (skippedStartAfter ? " · skipped first " + skippedStartAfter : "") + ")";
+        await sleep(800);
+      }
+      totalAttempted += batchTotal;
 
     for (let i = 0; i < buttons.length; i++) {
       if (_case2State.cancelled) break;
@@ -9360,13 +9410,17 @@
         if (nameEl) name = (nameEl.textContent || "").trim();
       }
       if (!name) name = "Unknown";
-      statusEl.textContent = "[" + (i + 1) + "/" + total + "] Messaging " + name + "...";
+      // Mark this URL as processed up-front so a "Show more results" page
+      // that still includes it won't re-attempt the same person.
+      const curUrl = urls[i];
+      if (curUrl) processedUrls.add(curUrl);
+      statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] Messaging " + name + "...";
 
       try {
         // STEP 1: Scroll button into view + click.
         if (!document.body.contains(btn)) {
           failed++;
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
           continue;
         }
         try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
@@ -9397,7 +9451,7 @@
         // STEP 4: Find the NEW editor (one that wasn't in editorsBefore).
         // This avoids the false-positive where my code finds a cached/preload
         // editor in shadow DOM that isn't connected to the visible dialog.
-        statusEl.textContent = "[" + (i + 1) + "/" + total + "] Waiting for textbox to mount...";
+        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] Waiting for textbox to mount...";
         const findNewEditor = () => {
           const editors = _queryAllAcrossShadows(
             "div.msg-form__contenteditable[contenteditable='true']"
@@ -9411,10 +9465,10 @@
         const editor = await _waitForObserver(findNewEditor, 25000);
         if (!editor) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Textbox not found for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
           continue;
         }
 
@@ -9422,10 +9476,10 @@
         const typed = await _typeIntoEditor(editor, messageText);
         if (!typed) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Could not type for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Could not type for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
           continue;
         }
 
@@ -9433,10 +9487,10 @@
         const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
         if (!sendBtn) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Send disabled for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Send disabled for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
           continue;
         }
 
@@ -9446,7 +9500,7 @@
 
         // Success.
         sent++;
-        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ✅ Sent to " + name;
+        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ✅ Sent to " + name;
 
         // Persist: mark this profile URL as messaged so future runs skip it.
         try {
@@ -9476,7 +9530,7 @@
         _closeMsgDialog();
         await sleep(800);
 
-        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
 
         // STEP 9: Random 15-30s gap between messages (skip if last or cancelled).
         if (i < buttons.length - 1 && !_case2State.cancelled) {
@@ -9490,14 +9544,36 @@
         }
       } catch (e) {
         failed++;
-        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Error: " + (e.message || e);
+        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Error: " + (e.message || e);
         try { _closeMsgDialog(); } catch (err) {}
         await sleep(1000);
-        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
       }
     }
 
-    statusEl.textContent = "Done. " + sent + " sent, " + failed + " failed.";
+      // ── "Message Everyone": load the next batch via "Show more results" ──
+      if (!loadMore || _case2State.cancelled) break;
+      const moreBtn = _findShowMoreResultsButton();
+      if (!moreBtn) {
+        statusEl.textContent = "No more results to load — finishing.";
+        await sleep(800);
+        break;
+      }
+      statusEl.textContent = "Loading more results…";
+      try { moreBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+      await sleep(400);
+      try { moreBtn.click(); } catch (e) { _pointerClick(moreBtn); }
+      // Per user spec: wait 2s after the click, then give cards time to render.
+      await sleep(2000);
+      await sleep(1500);
+      // Trigger fresh decoration so newly mounted cards get checkboxes/chips.
+      try { _decorateCase2Cards(); } catch (e) {}
+      await sleep(400);
+    }
+
+    statusEl.textContent =
+      "Done. " + sent + " sent, " + failed + " failed" +
+      (loadMore ? " (across all pages)" : "") + ".";
   }
 
   // —— Self-mounting watcher ——————————————————————————————————————

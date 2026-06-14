@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.244",
+    date: "Jun 14, 2026",
+    size: "226 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.244.zip",
+    latest: true,
+    changes: [
+      "Connections page: “Message everyone” + “Start after N” now appear in the Message All composer (they were only wired into the people-search composer before).",
+      "Connections-page run auto-clicks “Show more results”, waits 2s, re-decorates the new batch, and continues until the list ends.",
+      "Cross-page dedup so a profile that reappears in a later batch is never messaged twice in the same run.",
+    ],
+  },
+  {
     version: "1.0.243",
     date: "Jun 14, 2026",
     size: "224 KB",
     file: "/extensions/leadcaptura-extension-v1.0.243.zip",
-    latest: true,
     changes: [
       "Message All: new “Message everyone” mode that pages through every result.",
       "Auto-clicks “Show more results” and waits for the next batch to load.",
