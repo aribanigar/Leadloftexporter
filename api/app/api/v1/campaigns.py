@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -1332,6 +1332,21 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         db.commit()
         return _stats(campaign, sent=0, failed=0, skipped=0)
 
+    # Reclaim ORPHANED rows stuck in status="sending" — see _prepare_tick_batch
+    # for the full explanation. Anything older than 5 minutes is unambiguously
+    # orphaned (a real in-flight send completes in seconds), so reset it back
+    # to "pending" before claiming the next batch.
+    reclaim_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "sending",
+            CampaignRecipient.updated_at < reclaim_cutoff,
+        )
+        .update({"status": "pending"}, synchronize_session=False)
+    )
+
     # Build the (sender, warmup) pool. Decoupled from warmup — this is empty
     # only when there are no active senders to dispatch through.
     eligible = _eligible_senders(db, campaign)
@@ -1520,6 +1535,26 @@ def _prepare_tick_batch(
     if campaign.status != "sending":
         db.commit()
         return {"jobs": [], "campaign_status": campaign.status}
+
+    # Reclaim ORPHANED rows. _prepare_tick_batch claims pending rows by setting
+    # status="sending" and returns jobs to the browser, which is expected to
+    # post results back to /commit-tick. If the browser dies, the user closes
+    # the tab, the request times out, or anything else interrupts that
+    # round-trip, those rows are stuck at "sending" forever — they're not
+    # picked up again (next tick filters status=="pending") and the campaign
+    # silently stalls with all remaining recipients perpetually "Queued".
+    # Anything older than 5 minutes in "sending" is unambiguously stuck → reset
+    # to pending so the next tick retries it.
+    reclaim_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "sending",
+            CampaignRecipient.updated_at < reclaim_cutoff,
+        )
+        .update({"status": "pending"}, synchronize_session=False)
+    )
 
     eligible = _eligible_senders(db, campaign)
     if not eligible:
