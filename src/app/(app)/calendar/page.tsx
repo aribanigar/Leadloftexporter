@@ -39,6 +39,7 @@ interface AutoReminders {
   stage_change: boolean;
   note: boolean;
   default_offset_minutes: number;
+  notify_on_create: boolean;
 }
 interface CalConn {
   id: string;
@@ -524,6 +525,16 @@ function ReminderSettings({
           />
           <span className="text-slate-500">min later</span>
         </div>
+        <label className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={auto.notify_on_create}
+            onChange={(e) => setAuto({ ...auto, notify_on_create: e.target.checked })}
+          />
+          <span className="flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 text-slate-400" /> Email me the moment a reminder is created
+          </span>
+        </label>
       </div>
 
       <button

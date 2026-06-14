@@ -32,6 +32,7 @@ except Exception:  # pragma: no cover
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     Activity,
     ConnectedAccount,
@@ -44,6 +45,7 @@ from app.models import (
 from app.services import google_calendar as gcal
 
 log = logging.getLogger(__name__)
+_settings = get_settings()
 
 
 # --------------------------------------------------------------------------- #
@@ -85,7 +87,7 @@ def conflict_calendar_ids(account: ConnectedAccount) -> list[str]:
 # email/SMTP even when no calendar is connected. The calendar account only
 # holds calendar-specific roles (write/conflict calendars).
 DEFAULT_AGENDA = {"enabled": True, "hour": 8, "channels": ["email"]}
-DEFAULT_AUTO = {"inbox_reply": True, "stage_change": True, "note": True, "default_offset_minutes": 60}
+DEFAULT_AUTO = {"inbox_reply": True, "stage_change": True, "note": True, "default_offset_minutes": 60, "notify_on_create": True}
 
 
 def _prefs_root(workspace: Workspace) -> dict:
@@ -115,6 +117,7 @@ def auto_reminder_config(workspace: Workspace, user_id: str) -> dict:
         "stage_change": bool(stored.get("stage_change", DEFAULT_AUTO["stage_change"])),
         "note": bool(stored.get("note", DEFAULT_AUTO["note"])),
         "default_offset_minutes": int(stored.get("default_offset_minutes", DEFAULT_AUTO["default_offset_minutes"])),
+        "notify_on_create": bool(stored.get("notify_on_create", DEFAULT_AUTO["notify_on_create"])),
     }
 
 
@@ -203,6 +206,7 @@ def create_reminder(
     recipient_email: Optional[str] = None,
     booking_id: Optional[str] = None,
     commit: bool = True,
+    notify: bool = True,
 ) -> Reminder:
     if remind_at.tzinfo is None:
         remind_at = remind_at.replace(tzinfo=timezone.utc)
@@ -226,7 +230,112 @@ def create_reminder(
     if commit:
         db.commit()
         db.refresh(rem)
+    # Real-time heads-up: the moment an owner-facing reminder is created, email
+    # the owner's connected inbox a nicely-formatted notification.
+    if notify:
+        notify_reminder_created(db, rem)
     return rem
+
+
+def notify_reminder_created(db: Session, reminder: Reminder) -> None:
+    """Best-effort: email the owner's connected inbox a nice HTML 'reminder set'
+    notification immediately on creation. Skips invitee-facing reminders and
+    respects the per-user notify_on_create preference."""
+    try:
+        # Invitee-facing reminders (recipient_email set) aren't "to your inbox".
+        if reminder.recipient_email:
+            return
+        workspace = db.get(Workspace, reminder.workspace_id)
+        if not workspace:
+            return
+        if not auto_reminder_config(workspace, reminder.user_id).get("notify_on_create", True):
+            return
+        account = email_account_for(db, reminder.workspace_id, reminder.user_id)
+        if not account:
+            return
+        to_addr = account.external_id or (account.config or {}).get("from_email")
+        if not to_addr:
+            return
+        from app.services.email_sender import send_via_account
+
+        subject, html, text = _render_created_email(reminder)
+        send_via_account(account, to_addr, subject, text, html)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("reminder-created notification skipped for %s: %s", reminder.id, exc)
+
+
+_SOURCE_LABELS = {
+    "manual": "Manual reminder",
+    "inbox_reply": "Lead reply follow-up",
+    "stage_change": "Pipeline stage change",
+    "note": "Note follow-up",
+    "daily_agenda": "Daily agenda",
+    "booking": "Meeting booked",
+    "pre_meeting_brief": "Pre-meeting brief",
+}
+
+
+def _render_created_email(reminder: Reminder) -> tuple[str, str, str]:
+    """Return (subject, html, text) for the 'reminder set' notification."""
+    when_utc = reminder.remind_at
+    if when_utc.tzinfo is None:
+        when_utc = when_utc.replace(tzinfo=timezone.utc)
+    when_abs = when_utc.strftime("%A, %b %d · %H:%M UTC")
+    label = _SOURCE_LABELS.get(reminder.source, "Reminder")
+    title = reminder.title
+    body = (reminder.body or "").strip()
+    channel = "Calendar event" if reminder.channel == "calendar" else "Email"
+
+    subject = f"🔔 Reminder set — {title}"
+    body_html = ""
+    if body:
+        body_html = (
+            '<tr><td style="padding:0 28px 8px;color:#475569;font-size:14px;line-height:1.6;">'
+            + body.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")
+            + "</td></tr>"
+        )
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 16px;">
+  <tr><td align="center">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08);">
+      <tr><td style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);padding:22px 28px;">
+        <div style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#dbeafe;">🔔 {label}</div>
+        <div style="margin-top:4px;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:-.01em;">Reminder set</div>
+      </td></tr>
+      <tr><td style="padding:24px 28px 6px;">
+        <div style="font-size:17px;font-weight:700;color:#0f172a;line-height:1.35;">{title}</div>
+      </td></tr>
+      {body_html}
+      <tr><td style="padding:14px 28px 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;">
+          <tr><td style="padding:12px 14px;color:#334155;font-size:14px;">
+            <span style="display:inline-block;width:64px;color:#94a3b8;">When</span>
+            <strong style="color:#0f172a;">{when_abs}</strong>
+          </td></tr>
+          <tr><td style="padding:0 14px 12px;color:#334155;font-size:14px;">
+            <span style="display:inline-block;width:64px;color:#94a3b8;">Via</span>
+            <strong style="color:#0f172a;">{channel}</strong>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:18px 28px 26px;">
+        <a href="{_calendar_link()}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;box-shadow:0 6px 16px rgba(37,99,235,.35);">View in LeadCaptura →</a>
+      </td></tr>
+      <tr><td style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center;">
+        You're getting this because reminder notifications are on. Turn them off in Calendar → Auto-reminders.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+    text = f"Reminder set: {title}\nWhen: {when_abs}\nVia: {channel}" + (f"\n\n{body}" if body else "")
+    return subject, html, text
+
+
+def _calendar_link() -> str:
+    return f"{_settings.primary_frontend_origin}/calendar"
 
 
 def _has_recent_reminder(db: Session, workspace_id: str, user_id: str, source: str, lead_id: Optional[str], within_hours: int = 12) -> bool:
