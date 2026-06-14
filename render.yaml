@@ -33,6 +33,26 @@ services:
         sync: false
       - key: GMAIL_REDIRECT_URI
         sync: false
+      # Google Calendar OAuth (scheduling / reminders calendar sync). The
+      # consent screen must have the Calendar API enabled and register the
+      # redirect URI: <PUBLIC_API_URL>/api/v1/calendar/oauth/google/callback.
+      # Optional — users can also paste a Client ID/Secret in the UI instead.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      # Public, internet-reachable base URL of THIS backend. Drives the Google
+      # OAuth redirect URI + email tracking links. Set to the real API origin.
+      - key: PUBLIC_API_URL
+        sync: false
+      # Meeting Notetaker audio transcription (OpenAI Whisper). Without it the
+      # notetaker still works from a pasted transcript.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: WHISPER_MODEL
+        value: whisper-1
       - key: SENTRY_DSN
         sync: false
       # WhatsApp sidecar — set these to point at the Node service below.
