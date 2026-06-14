@@ -966,6 +966,31 @@ export default function CampaignDetailPage() {
                   <div style={{ fontSize: '28px', fontWeight: 900, color: T.onSurfaceVariant, fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>
                     {Math.max(0, campaign.total_recipients - campaign.sent_count - campaign.failed_count - campaign.skipped_count).toLocaleString()}
                   </div>
+                  {/* Pace estimate — human-paced drip across inboxes. The send
+                      loop deals each recipient a send_after stamp dealt round-
+                      robin across active inboxes, advancing each by ~pace
+                      seconds (with ±40% jitter). So effective throughput per
+                      minute = 60 * inboxes / pace, and the queue drains in
+                      roughly queued / (per-min) minutes. */}
+                  {campaign.status === 'sending' && (() => {
+                    const queued = Math.max(0, campaign.total_recipients - campaign.sent_count - campaign.failed_count - campaign.skipped_count);
+                    const pace = Math.max(1, campaign.seconds_between_sends || 30);
+                    const inboxes = Math.max(1, (campaign.sender_account_ids || []).length);
+                    const perMin = Math.max(1, Math.round((60 / pace) * inboxes));
+                    if (queued <= 0) return null;
+                    const minsLeft = Math.ceil(queued / perMin);
+                    const fmt = minsLeft >= 60
+                      ? `~${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`
+                      : `~${minsLeft}m`;
+                    return (
+                      <div style={{
+                        marginTop: '6px', fontSize: '11px',
+                        color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif',
+                      }}>
+                        {fmt} left · ~{perMin}/min across {inboxes} inbox{inboxes !== 1 ? 'es' : ''}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.onSurfaceVariant, marginBottom: '2px', fontFamily: 'Inter, sans-serif' }}>
