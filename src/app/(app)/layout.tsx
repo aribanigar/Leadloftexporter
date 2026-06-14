@@ -28,7 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   if (!user) return null;
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+    <div className="app-canvas flex h-screen w-screen overflow-hidden">
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenu={() => setNavOpen(true)} />

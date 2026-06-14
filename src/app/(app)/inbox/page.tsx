@@ -375,7 +375,7 @@ export default function InboxPage() {
                 <span className="hidden sm:inline">Delete</span>
               </button>
             </div>
-            <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-3 sm:p-6">
+            <div className="app-canvas flex-1 space-y-4 overflow-y-auto p-3 sm:p-6">
               {detail.messages.map((m) => (
                 <div
                   key={m.id}

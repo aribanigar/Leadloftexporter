@@ -566,7 +566,7 @@ export default function OutreachPage() {
   }, [bulkMode]);
 
   return (
-    <div className="flex h-full overflow-hidden bg-slate-50">
+    <div className="app-canvas flex h-full overflow-hidden">
       <ConnectSmtpModal
         open={smtpModalOpen}
         onClose={() => setSmtpModalOpen(false)}
@@ -1077,7 +1077,7 @@ function ConversationStream({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto bg-slate-50 px-6 py-5">
+    <div ref={scrollRef} className="app-canvas flex-1 overflow-y-auto px-6 py-5">
       {messages.length === 0 ? (
         <div className="grid h-full place-items-center text-xs text-slate-400">
           No {channel === "email" ? "emails" : "WhatsApp messages"} with this lead yet — send the first one below.

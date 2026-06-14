@@ -80,6 +80,10 @@ body {
   .gradient-heading {
     @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
   }
+  /* Warm "earth" canvas used behind the whole app (replaces the flat grey). */
+  .app-canvas {
+    @apply bg-gradient-to-br from-[#f7f4ee] via-[#f5f1e8] to-[#efe9dc];
+  }
   .card {
     @apply rounded-lg border border-slate-200 bg-white shadow-card;
   }

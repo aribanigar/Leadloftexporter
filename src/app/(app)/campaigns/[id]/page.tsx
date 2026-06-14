@@ -145,7 +145,7 @@ interface UiStats {
 const T = {
   primary: '#00361a',
   primaryContainer: '#1a4d2e',
-  surface: '#f8f9fa',
+  surface: '#f5f1e8',
   surfaceContainerLow: '#f3f4f5',
   surfaceContainer: '#edeeef',
   surfaceContainerLowest: '#ffffff',
