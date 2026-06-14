@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mic, Upload, Trash2, FileText, AlertTriangle, ListChecks } from "lucide-react";
+import { Mic, Upload, Trash2, FileText, CheckCircle2, ListChecks, Loader2 } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import { fmtRelative } from "@/lib/utils";
 import { PageHeader, Pill } from "@/components/scheduling-ui";
@@ -20,18 +20,74 @@ interface MeetingNote {
   created_at: string;
 }
 
+// Transcribe audio entirely in the browser — free, private, no API key.
+// Loads Whisper (transformers.js) from a CDN at runtime (so nothing is bundled,
+// no build/webpack config), decodes the audio to 16 kHz mono, and runs the
+// model locally. The audio never leaves the user's machine.
+let _transformersPromise: Promise<unknown> | null = null;
+function loadTransformers(): Promise<{ pipeline: (...a: unknown[]) => Promise<unknown>; env: { allowLocalModels: boolean } }> {
+  if (!_transformersPromise) {
+    // `new Function` keeps webpack/TS from touching the URL import.
+    const dynImport = new Function("u", "return import(u)") as (u: string) => Promise<unknown>;
+    _transformersPromise = dynImport("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2");
+  }
+  return _transformersPromise as Promise<{ pipeline: (...a: unknown[]) => Promise<unknown>; env: { allowLocalModels: boolean } }>;
+}
+
+let _transcriber: unknown = null;
+
+async function transcribeInBrowser(file: File, onProgress: (msg: string) => void): Promise<string> {
+  // 1) Decode + resample to 16 kHz mono.
+  onProgress("Reading audio…");
+  const buf = await file.arrayBuffer();
+  const AC: typeof AudioContext =
+    (window as unknown as { AudioContext: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ac = new AC();
+  let decoded: AudioBuffer;
+  try {
+    decoded = await ac.decodeAudioData(buf.slice(0));
+  } finally {
+    ac.close();
+  }
+  const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * 16000)), 16000);
+  const src = offline.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offline.destination);
+  src.start();
+  const rendered = await offline.startRendering();
+  const audio = rendered.getChannelData(0);
+
+  // 2) Load model (cached after first use).
+  const TJS = await loadTransformers();
+  TJS.env.allowLocalModels = false;
+  if (!_transcriber) {
+    onProgress("Loading transcription model (first time only)…");
+    _transcriber = await TJS.pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
+      progress_callback: (p: { status?: string; progress?: number; file?: string }) => {
+        if (p?.status === "progress" && typeof p.progress === "number" && p.file?.endsWith?.(".onnx")) {
+          onProgress(`Downloading model ${Math.round(p.progress)}%`);
+        }
+      },
+    });
+  }
+
+  // 3) Transcribe (chunked so long meetings work).
+  onProgress("Transcribing in your browser…");
+  const transcriber = _transcriber as (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text?: string }>;
+  const out = await transcriber(audio, { chunk_length_s: 30, stride_length_s: 5 });
+  return (out.text || "").trim();
+}
+
 export default function NotetakerPage() {
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
   const [transcript, setTranscript] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data: status } = useQuery<{ transcription_enabled: boolean }>({
-    queryKey: ["notetaker-status"],
-    queryFn: () => api("/notetaker/status"),
-  });
   const { data } = useQuery<{ notes: MeetingNote[] }>({
     queryKey: ["notetaker"],
     queryFn: () => api("/notetaker"),
@@ -40,10 +96,19 @@ export default function NotetakerPage() {
 
   const submit = useMutation({
     mutationFn: async () => {
+      setErr(null);
+      // Audio is transcribed in the browser (no API). If a transcript is
+      // pasted, use it directly. Then only the TEXT goes to the backend, which
+      // turns it into a summary + action items.
+      let transcriptText = transcript.trim();
+      if (!transcriptText && file) {
+        transcriptText = await transcribeInBrowser(file, setProgress);
+        if (!transcriptText) throw new Error("No speech detected in the audio.");
+      }
+      setProgress("Summarizing…");
       const fd = new FormData();
-      fd.append("title", title.trim() || (file ? file.name : "Meeting"));
-      if (transcript.trim()) fd.append("transcript", transcript.trim());
-      if (file) fd.append("file", file);
+      fd.append("title", title.trim() || (file ? file.name.replace(/\.[^.]+$/, "") : "Meeting"));
+      fd.append("transcript", transcriptText);
       const headers: Record<string, string> = {};
       const t = getToken();
       const w = getWorkspaceId();
@@ -61,9 +126,17 @@ export default function NotetakerPage() {
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
       setErr(null);
+      setProgress("");
       qc.invalidateQueries({ queryKey: ["notetaker"] });
     },
-    onError: (e: unknown) => setErr((e as Error).message),
+    onError: (e: unknown) => {
+      setProgress("");
+      setErr(
+        (e as Error).message?.includes("decodeAudioData")
+          ? "Couldn't read that audio format in this browser. Try MP3/WAV/M4A, or paste a transcript."
+          : (e as Error).message || "Failed to generate notes."
+      );
+    },
   });
 
   const del = useMutation({
@@ -82,13 +155,11 @@ export default function NotetakerPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Upload */}
         <div className="card space-y-3 p-5">
-          {status && !status.transcription_enabled && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/10">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Audio transcription isn&apos;t configured (set <code>OPENAI_API_KEY</code> on the backend). You can still
-              paste a transcript below.
-            </div>
-          )}
+          <div className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            Audio is transcribed <strong>privately in your browser</strong> — no upload, no API key. (First run downloads
+            a small model once.)
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Title</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Discovery call — Acme" className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
@@ -154,11 +225,13 @@ export default function NotetakerPage() {
             disabled={!canSubmit}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:brightness-110 disabled:opacity-60"
           >
-            <Upload className="h-4 w-4" />
-            {submit.isPending ? "Processing…" : "Generate notes"}
+            {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {submit.isPending ? progress || "Processing…" : "Generate notes"}
           </button>
           {submit.isPending && file && (
-            <p className="text-center text-xs text-slate-400">Transcribing audio can take a minute…</p>
+            <p className="text-center text-xs text-slate-400">
+              Transcribing locally — longer recordings take a few minutes (and the model downloads once).
+            </p>
           )}
         </div>
 
