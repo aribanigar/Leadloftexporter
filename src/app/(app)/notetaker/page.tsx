@@ -157,8 +157,10 @@ export default function NotetakerPage() {
         <div className="card space-y-3 p-5">
           <div className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            Audio is transcribed <strong>privately in your browser</strong> — no upload, no API key. (First run downloads
-            a small model once.)
+            <span className="min-w-0 flex-1">
+              Audio is transcribed <strong>privately in your browser</strong> — no upload, no API key. (First run downloads
+              a small model once.)
+            </span>
           </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Title</span>

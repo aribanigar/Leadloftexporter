@@ -566,7 +566,7 @@ export default function OutreachPage() {
   }, [bulkMode]);
 
   return (
-    <div className="app-canvas flex h-full overflow-hidden">
+    <div className="app-canvas flex h-full flex-col overflow-hidden md:flex-row">
       <ConnectSmtpModal
         open={smtpModalOpen}
         onClose={() => setSmtpModalOpen(false)}
@@ -589,7 +589,7 @@ export default function OutreachPage() {
         }}
       />
       {/* ───────── LEFT: lead picker ───────── */}
-      <aside className="flex w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white">
+      <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:w-[320px] md:border-b-0 md:border-r">
         <div className="border-b border-slate-100 px-4 py-3">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-indigo-600" />
@@ -770,7 +770,7 @@ export default function OutreachPage() {
       </aside>
 
       {/* ───────── RIGHT: bulk compose OR per-lead conversation ───────── */}
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="hidden flex-1 flex-col overflow-hidden md:flex">
         {/* Resend-domain-block banner. Surfaces ABOVE both bulk and single
             modes because the failure mode is identical either way: Resend
             refuses the send before any of our code can do anything about

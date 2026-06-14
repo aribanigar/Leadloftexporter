@@ -130,9 +130,8 @@ function KpiCard({ label, value, trend, trendUp, trendNeutral }: KpiCardProps) {
     <div style={{
       background: T.surfaceLowest,
       borderRadius: T.rXl,
-      padding: '20px 24px',
+      padding: '16px 18px',
       boxShadow: T.shadow,
-      flex: '1 1 0',
       minWidth: 0,
     }}>
       <p style={{
@@ -148,12 +147,14 @@ function KpiCard({ label, value, trend, trendUp, trendNeutral }: KpiCardProps) {
       </p>
       <p style={{
         margin: '0 0 10px',
-        fontSize: 28,
+        fontSize: 'clamp(22px, 5vw, 28px)',
         fontWeight: 700,
         color: T.onSurface,
         fontFamily: 'Manrope, Inter, system-ui, sans-serif',
         letterSpacing: '-0.5px',
         lineHeight: 1.1,
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
       }}>
         {value}
       </p>
@@ -347,9 +348,9 @@ export default function EmailCampaignsPage() {
 
           {/* ── KPI Cards Row ────────────────────────────────────────────── */}
           <div style={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: 16,
-            flexWrap: 'wrap',
             marginBottom: 28,
           }}>
             <KpiCard
