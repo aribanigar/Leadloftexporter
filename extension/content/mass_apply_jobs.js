@@ -78,19 +78,41 @@
   function humanClick(el) {
     if (!el) return false;
     try {
+      try { el.focus({ preventScroll: true }); } catch (_) {}
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2 + (Math.random() * 6 - 3);
       const cy = r.top + r.height / 2 + (Math.random() * 4 - 2);
-      const init = { bubbles: true, cancelable: true, view: window,
-                     clientX: cx, clientY: cy, button: 0 };
-      el.dispatchEvent(new PointerEvent("pointerover", init));
-      el.dispatchEvent(new PointerEvent("pointerdown", init));
-      el.dispatchEvent(new MouseEvent("mousedown", init));
-      el.dispatchEvent(new PointerEvent("pointerup", init));
-      el.dispatchEvent(new MouseEvent("mouseup", init));
-      el.dispatchEvent(new MouseEvent("click", init));
+      // The 2026 SDUI apply flow is React-driven. React's synthetic event system
+      // drops PointerEvents that lack pointerId / pointerType / isPrimary, so a
+      // bare-options PointerEvent never registers the click. Set them.
+      const down = { bubbles: true, cancelable: true, view: window,
+                     clientX: cx, clientY: cy, button: 0, buttons: 1,
+                     pointerId: 1, pointerType: "mouse", isPrimary: true,
+                     width: 1, height: 1, pressure: 0.5 };
+      const up = Object.assign({}, down, { buttons: 0, pressure: 0 });
+      el.dispatchEvent(new PointerEvent("pointerover", down));
+      el.dispatchEvent(new PointerEvent("pointerenter", down));
+      el.dispatchEvent(new PointerEvent("pointerdown", down));
+      el.dispatchEvent(new MouseEvent("mousedown", down));
+      el.dispatchEvent(new PointerEvent("pointerup", up));
+      el.dispatchEvent(new MouseEvent("mouseup", up));
+      el.dispatchEvent(new MouseEvent("click", up));
     } catch (_) {}
     return true;
+  }
+
+  // Keyboard advance — focus the button and press Enter. Used ONLY as a retry
+  // when a pointer click failed to move the form (so the happy path never
+  // double-advances and skips a step).
+  function keyboardAdvance(btn) {
+    if (!btn) return;
+    try {
+      btn.focus({ preventScroll: true });
+      const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      btn.dispatchEvent(new KeyboardEvent("keydown", k));
+      btn.dispatchEvent(new KeyboardEvent("keypress", k));
+      btn.dispatchEvent(new KeyboardEvent("keyup", k));
+    } catch (_) {}
   }
 
   // Click-of-last-resort for modal primary buttons (Ember binds handlers late).
@@ -137,7 +159,7 @@
                  || (btn.getAttribute("aria-label") || "");
         if (!key || seen.has(key)) return;
         seen.add(key);
-        cards.push({ key, title: (btn.getAttribute("aria-label") || "")
+        cards.push({ key, el: card, title: (btn.getAttribute("aria-label") || "")
           .replace(/^Dismiss\s+/i, "").replace(/\s+job$/i, "").trim() });
       });
     return cards;
@@ -147,6 +169,29 @@
     let el = null;
     try { el = document.querySelector('div[role="button"][componentkey="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]'); } catch (_) {}
     return el;
+  }
+
+  // The left job list is VIRTUALISED — only a handful of cards exist in the DOM
+  // at once. We must scroll the list's own scroll container (not the window) to
+  // render the rest. Find that container by climbing from a card to the first
+  // scrollable ancestor.
+  function listScroller() {
+    const btn = document.querySelector('button[aria-label^="Dismiss "][aria-label$=" job"]');
+    let el = btn ? btn.closest('div[role="button"]') : null;
+    while (el && el !== document.body) {
+      try {
+        const s = getComputedStyle(el);
+        if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 24) return el;
+      } catch (_) {}
+      el = el.parentElement;
+    }
+    return null;
+  }
+  function listScrollTop() { const s = listScroller(); return s ? Math.round(s.scrollTop) : Math.round(window.scrollY); }
+  function scrollListDown() {
+    const s = listScroller();
+    if (s) s.scrollBy(0, Math.round(s.clientHeight * 0.8));
+    else window.scrollBy(0, Math.round(window.innerHeight * 0.8));
   }
 
   // The in-app apply control inside the right detail pane. The external
@@ -426,9 +471,16 @@
       advanceClick(advance);
       await sleep(rand(1400, 2400));
 
-      // Did the form move? If not, the current step has an error we couldn't
-      // satisfy. Retry autofill once; if still stuck, discard + skip.
-      const after = progressSig();
+      // Did the form move? If not, first retry with a focused Enter (React
+      // sometimes only advances on keyboard); if STILL stuck, it's a validation
+      // we couldn't satisfy → discard + skip.
+      let after = progressSig();
+      if (after === before) {
+        const btn = reviewButton() || nextButton() || submitButton();
+        keyboardAdvance(btn);
+        await sleep(rand(1200, 2000));
+        after = progressSig();
+      }
       if (after === before) {
         stuck++;
         if (stuck >= 2) { await discardAndClose(); return "skipped"; }
@@ -445,7 +497,7 @@
   // Returns "applied" | "skipped" | "challenge".
   async function applyToCard(card) {
     if (isCheckpoint()) return "challenge";
-    const el = cardElForKey(card.key);
+    const el = (card.el && document.contains(card.el)) ? card.el : cardElForKey(card.key);
     if (!el) return "skipped";
 
     // Click the card body to load the right detail pane.
@@ -479,56 +531,67 @@
     state.applied = state.skipped = 0;
     setLabel("Scanning jobs…");
 
+    // Process ONE freshly-rendered card per iteration, then scroll the
+    // virtualised list to reveal more. This survives cards unmounting as the
+    // list scrolls — we never hold a stale list, we re-collect every loop.
+    const processed = new Set();
+    let idle = 0;
+
     try {
-      let page = 0;
-      while (!state.cancel && page < 20) {
-        const cards = collectJobCards();
-        if (!cards.length) {
-          if (page === 0) { setLabel("No job cards on page"); setTimeout(resetLabel, 4000); }
-          break;
-        }
+      while (!state.cancel) {
+        if (isCheckpoint()) { banner("LinkedIn challenge detected — stopping."); break; }
 
-        for (let i = 0; i < cards.length; i++) {
-          if (state.cancel) break;
-          if (isCheckpoint()) { banner("LinkedIn challenge detected — stopping."); state.cancel = true; break; }
+        const fresh = collectJobCards().filter(c => !processed.has(c.key));
 
-          setLabel("Applying " + (i + 1) + "/" + cards.length + (page ? " · p" + (page + 1) : ""));
-          let result = "skipped";
-          try { result = await applyToCard(cards[i]); }
-          catch (e) { console.warn(TAG, "job error:", e); result = "skipped"; }
-
-          if (result === "applied") state.applied++;
-          else if (result === "challenge") { banner("Challenge — stopping."); state.cancel = true; break; }
-          else state.skipped++;
-
-          // Make sure nothing is left open before the gap.
-          if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
-
-          if (i < cards.length - 1 && !state.cancel) {
-            const wait = nextJobDelayMs();
-            const start = Date.now();
-            while (Date.now() - start < wait) {
-              if (state.cancel) break;
-              const left = Math.max(0, Math.round((wait - (Date.now() - start)) / 1000));
-              setLabel("Next in " + left + "s · " + state.applied + " applied");
-              await sleep(250);
+        if (!fresh.length) {
+          // Nothing new rendered → scroll to load more.
+          const before = listScrollTop();
+          scrollListDown();
+          await sleep(rand(900, 1500));
+          if (listScrollTop() === before) {
+            // List can't scroll further → try the next results page.
+            const nextPage = document.querySelector(
+              'button[data-testid="pagination-controls-next-button-visible"]'
+            );
+            if (nextPage && !nextPage.disabled && visible(nextPage)) {
+              setLabel("Loading next page…");
+              humanClick(nextPage);
+              await sleep(rand(2600, 4200));
+              processed.clear();
+              idle = 0;
+              continue;
             }
+            break;                       // no more cards, no more pages
           }
+          if (++idle > 60) break;        // safety valve
+          continue;
         }
 
-        if (state.cancel) break;
+        idle = 0;
+        const card = fresh[0];
+        processed.add(card.key);
+        setLabel("Applying #" + processed.size + " · " + state.applied + " applied");
 
-        // Advance to the next results page, if any.
-        const nextPage = document.querySelector(
-          'button[data-testid="pagination-controls-next-button-visible"]'
-        );
-        if (nextPage && !nextPage.disabled && visible(nextPage)) {
-          setLabel("Loading next page…");
-          forceClick(nextPage);
-          page++;
-          await sleep(rand(2600, 4200));
-        } else {
-          break;
+        let result = "skipped";
+        try { result = await applyToCard(card); }
+        catch (e) { console.warn(TAG, "job error:", e); result = "skipped"; }
+
+        if (result === "applied") state.applied++;
+        else if (result === "challenge") { banner("Challenge — stopping."); break; }
+        else state.skipped++;
+
+        // Make sure nothing is left open before the gap.
+        if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
+
+        if (!state.cancel) {
+          const wait = nextJobDelayMs();
+          const start = Date.now();
+          while (Date.now() - start < wait) {
+            if (state.cancel) break;
+            const left = Math.max(0, Math.round((wait - (Date.now() - start)) / 1000));
+            setLabel("Next in " + left + "s · " + state.applied + " applied");
+            await sleep(250);
+          }
         }
       }
     } finally {

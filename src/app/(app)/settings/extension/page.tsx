@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.248",
+    date: "Jun 15, 2026",
+    size: "235 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.248.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now drives LinkedIn’s new SDUI apply flow: clicks carry React-required pointer properties (pointerId/pointerType/isPrimary) so Next/Submit actually advance, with a focused-Enter retry if a step won’t move.",
+      "Walks the virtualised job list by scrolling and applying one card at a time, instead of seeing only the first rendered card.",
+      "Paginates to further results pages automatically.",
+    ],
+  },
+  {
     version: "1.0.247",
     date: "Jun 15, 2026",
     size: "234 KB",
     file: "/extensions/leadcaptura-extension-v1.0.247.zip",
-    latest: true,
     changes: [
       "Mass Apply Jobs now advances past the Contact-info step: Next/Review/Submit are found at document scope (they live in a footer outside the progress region, which the previous build missed).",
       "Apply buttons clicked with the proven pointer-sequence-first method so Ember reliably advances the form.",
