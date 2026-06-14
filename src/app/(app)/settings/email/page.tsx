@@ -94,6 +94,9 @@ export default function EmailSendersPage() {
         )}
       </div>
 
+      {/* Suppressed addresses */}
+      <SuppressionsPanel />
+
       {/* Add sender form */}
       <div className="card p-5">
         <h2 className="text-sm font-semibold mb-4">Add a sender</h2>
@@ -172,13 +175,14 @@ function SenderRow({
               <span className="text-emerald-600">✓ test sent to {test.data.to}</span>
             </>
           )}
-          {test.isError && (
-            <>
-              <span>·</span>
-              <span className="text-red-500">{test.error?.message || "test failed"}</span>
-            </>
-          )}
         </div>
+        {/* Full-width, wrappable error so the real transport reason is readable
+            (e.g. "test_send_failed: smtp_relay: 535 5.7.8 auth failed"). */}
+        {test.isError && (
+          <div className="mt-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-[11px] leading-snug text-red-700 break-words">
+            {test.error?.message || "test failed"}
+          </div>
+        )}
       </div>
       <button
         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
@@ -525,6 +529,84 @@ function SendGridForm({ onSaved }: FormProps) {
         {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         {save.isPending ? "Verifying…" : "Connect SendGrid"}
       </button>
+    </div>
+  );
+}
+
+interface Suppression {
+  id: string;
+  email: string;
+  reason: string;
+  created_at: string | null;
+}
+
+/**
+ * Suppressed addresses — emails the system will skip on every campaign because
+ * they previously bounced (or were added manually). A sender-config bug used to
+ * wrongly suppress valid addresses on transport failures; this panel lets the
+ * user see and remove any address so it can receive mail again.
+ */
+function SuppressionsPanel() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<Suppression[]>({
+    queryKey: ["suppressions"],
+    queryFn: () => api("/campaigns/suppressions/list"),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/campaigns/suppressions/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["suppressions"] }),
+  });
+  const rows = data || [];
+
+  return (
+    <div className="card divide-y divide-slate-100">
+      <div className="px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-500" />
+          <h2 className="text-sm font-semibold">Suppressed addresses</h2>
+        </div>
+        {rows.length > 0 && <span className="text-xs text-slate-400">{rows.length} blocked</span>}
+      </div>
+
+      <div className="px-4 py-2.5">
+        <p className="text-xs text-slate-500">
+          These addresses are skipped on every campaign (they previously bounced or were
+          added manually). If one was suppressed by mistake, remove it here to let it
+          receive mail again.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="px-4 py-6 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="px-4 py-6 text-center text-sm text-slate-400">
+          <CheckCircle2 className="h-6 w-6 text-emerald-300 mx-auto mb-1.5" />
+          No suppressed addresses — every address can receive mail.
+        </div>
+      ) : (
+        rows.map((s) => (
+          <div key={s.id} className="px-4 py-2.5 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium text-slate-700">{s.email}</div>
+              <div className="text-xs text-slate-400">
+                {s.reason === "bounce" ? "Hard bounce" : s.reason}
+                {s.created_at ? ` · ${new Date(s.created_at).toLocaleDateString()}` : ""}
+              </div>
+            </div>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
+              onClick={() => remove.mutate(s.id)}
+              disabled={remove.isPending}
+              title="Remove from suppression list — this address can receive mail again"
+            >
+              {remove.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+              Unblock
+            </button>
+          </div>
+        ))
+      )}
     </div>
   );
 }
