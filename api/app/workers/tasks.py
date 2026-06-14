@@ -377,31 +377,13 @@ def tick_email_campaigns() -> dict:
 
 @celery_app.task
 def tick_reminders() -> dict:
-    """Deliver due reminders — write the calendar block (or send the email) for
-    every pending/failed reminder whose remind_at has passed. Mirrors
-    tick_outreach_scheduler: claim due rows, deliver, flip status."""
-    from app.models import Reminder
+    """Deliver due reminders + escalation nudges. First delivery hits email AND
+    calendar; owner reminders then keep re-emailing with rising urgency until
+    marked done (process_due_reminders owns the loop)."""
     from app.services import reminders as rsvc
 
-    processed = 0
-    delivered = 0
     with session_scope() as db:
-        now = datetime.now(timezone.utc)
-        rows = (
-            db.query(Reminder)
-            .filter(Reminder.status.in_(["pending", "failed"]), Reminder.remind_at <= now)
-            .order_by(Reminder.remind_at.asc())
-            .limit(200)
-            .all()
-        )
-        for r in rows:
-            processed += 1
-            try:
-                if rsvc.deliver_reminder(db, r):
-                    delivered += 1
-            except Exception as exc:  # noqa: BLE001
-                log.exception("reminder delivery failed for %s: %s", r.id, exc)
-    return {"processed": processed, "delivered": delivered}
+        return rsvc.process_due_reminders(db)
 
 
 @celery_app.task

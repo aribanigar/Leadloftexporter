@@ -466,6 +466,7 @@ def _schedule_pre_meeting_brief(db: Session, event_type: EventType, booking: Boo
             lead_id=booking.lead_id,
             booking_id=booking.id,
             duration_minutes=10,
+            escalate=False,
             commit=False,
         )
         db.commit()
@@ -589,6 +590,7 @@ def _owner_reminder(db: Session, event_type: EventType, booking: Booking) -> Non
             source="booking",
             lead_id=booking.lead_id,
             duration_minutes=event_type.duration_minutes or 30,
+            escalate=False,
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("owner reminder failed for booking %s: %s", booking.id, exc)

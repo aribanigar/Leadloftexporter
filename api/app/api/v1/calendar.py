@@ -49,6 +49,9 @@ def _serialize_reminder(r: Reminder) -> dict:
         "sent_at": r.sent_at,
         "error": r.error,
         "created_at": r.created_at,
+        "done_at": r.done_at,
+        "escalate": r.escalate,
+        "nudge_count": r.nudge_count,
     }
 
 
@@ -369,6 +372,7 @@ class ReminderIn(BaseModel):
     lead_id: Optional[str] = None
     duration_minutes: int = 15
     target_calendar_id: Optional[str] = None
+    escalate: bool = True
 
 
 @router.post("/reminders")
@@ -395,6 +399,7 @@ def create_reminder_endpoint(
         lead_id=body.lead_id,
         duration_minutes=body.duration_minutes,
         target_calendar_id=body.target_calendar_id,
+        escalate=body.escalate,
     )
     return _serialize_reminder(rem)
 
@@ -405,6 +410,8 @@ class ReminderPatch(BaseModel):
     remind_at: Optional[datetime] = None
     status: Optional[str] = None  # allow "cancelled"
     duration_minutes: Optional[int] = None
+    escalate: Optional[bool] = None
+    done: Optional[bool] = None  # mark complete → stops escalation nudges
 
 
 @router.patch("/reminders/{reminder_id}")
@@ -424,6 +431,16 @@ def update_reminder(
     data = body.model_dump(exclude_unset=True)
     if "status" in data and data["status"] not in {"pending", "cancelled"}:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_status")
+    # Mark done → stop the relentless nudges.
+    if "done" in data:
+        done = data.pop("done")
+        if done:
+            from datetime import timezone as _tz
+
+            rem.done_at = datetime.now(_tz.utc)
+            rem.next_nudge_at = None
+        else:
+            rem.done_at = None
     for k, v in data.items():
         setattr(rem, k, v)
     # If it was already written to the calendar and got rescheduled, push the

@@ -206,6 +206,7 @@ def create_reminder(
     recipient_email: Optional[str] = None,
     booking_id: Optional[str] = None,
     target_calendar_id: Optional[str] = None,
+    escalate: bool = True,
     commit: bool = True,
     notify: bool = True,
 ) -> Reminder:
@@ -226,6 +227,8 @@ def create_reminder(
         recipient_email=recipient_email,
         booking_id=booking_id,
         target_calendar_id=target_calendar_id,
+        # Invitee-facing reminders never escalate (they fire at fixed offsets).
+        escalate=bool(escalate) and not recipient_email,
         status="pending",
     )
     db.add(rem)
@@ -447,50 +450,131 @@ def on_note_added(db: Session, *, workspace_id: str, user_id: str, lead: Optiona
 # Delivery
 # --------------------------------------------------------------------------- #
 
+# Escalation backoff (minutes after the previous nudge) — rising urgency so a
+# procrastinated task can't be missed. After the last step it keeps nudging at
+# the final interval until the user marks it done.
+ESCALATION_MINUTES = [20, 45, 90, 180, 360, 720]
+
+
+def process_due_reminders(db: Session) -> dict:
+    """Drive every due reminder + escalation nudge. Called each minute (cron or
+    Celery beat). First delivery hits ALL available channels (email + calendar);
+    after that, an owner reminder keeps re-emailing with rising urgency until it
+    is marked done."""
+    now = datetime.now(timezone.utc)
+    delivered = nudged = 0
+
+    # 1) First delivery — due, not yet sent, not done.
+    due = (
+        db.query(Reminder)
+        .filter(
+            Reminder.status.in_(["pending", "failed"]),
+            Reminder.remind_at <= now,
+            Reminder.done_at.is_(None),
+        )
+        .order_by(Reminder.remind_at.asc())
+        .limit(300)
+        .all()
+    )
+    for r in due:
+        ok = _send_reminder(db, r, urgency=0, write_calendar=True)
+        if ok:
+            r.status = "sent"
+            r.sent_at = now
+            r.error = None
+            # Owner-facing + escalate → schedule the first nudge.
+            if r.escalate and not r.recipient_email:
+                r.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[0])
+            delivered += 1
+        db.commit()
+
+    # 2) Escalation nudges — owner reminders that fired but aren't done.
+    nudge_due = (
+        db.query(Reminder)
+        .filter(
+            Reminder.status == "sent",
+            Reminder.done_at.is_(None),
+            Reminder.escalate.is_(True),
+            Reminder.recipient_email.is_(None),
+            Reminder.next_nudge_at.isnot(None),
+            Reminder.next_nudge_at <= now,
+        )
+        .order_by(Reminder.next_nudge_at.asc())
+        .limit(300)
+        .all()
+    )
+    for r in nudge_due:
+        r.nudge_count = (r.nudge_count or 0) + 1
+        _send_reminder(db, r, urgency=r.nudge_count, write_calendar=False)
+        idx = min(r.nudge_count, len(ESCALATION_MINUTES) - 1)
+        r.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[idx])
+        nudged += 1
+        db.commit()
+
+    return {"delivered": delivered, "nudged": nudged}
+
+
+# Back-compat: single-reminder delivery used elsewhere.
 def deliver_reminder(db: Session, reminder: Reminder) -> bool:
-    """Deliver one reminder. Returns True on success. Sets status + error."""
     if reminder.status not in {"pending", "failed", "scheduled"}:
         return False
-    try:
-        # Reminders addressed to an external recipient (booking invitees) always
-        # go by email. Otherwise a calendar reminder uses the calendar when one
-        # is connected, else falls back to email so SMTP-only users still get it.
-        use_calendar = (
-            reminder.channel == "calendar"
-            and not reminder.recipient_email
-            and calendar_account_for(db, reminder.workspace_id, reminder.user_id) is not None
-        )
-        if use_calendar:
-            ok = _deliver_calendar(db, reminder)
-        else:
-            ok = _deliver_email(db, reminder)
-    except Exception as exc:  # noqa: BLE001
-        reminder.status = "failed"
-        reminder.error = str(exc)[:500]
-        db.commit()
-        log.warning("reminder %s delivery failed: %s", reminder.id, exc)
-        return False
+    ok = _send_reminder(db, reminder, urgency=0, write_calendar=True)
+    now = datetime.now(timezone.utc)
     if ok:
         reminder.status = "sent"
-        reminder.sent_at = datetime.now(timezone.utc)
+        reminder.sent_at = now
         reminder.error = None
+        if reminder.escalate and not reminder.recipient_email:
+            reminder.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[0])
     db.commit()
     return ok
 
 
-def _deliver_calendar(db: Session, reminder: Reminder) -> bool:
+def _urgency_subject(reminder: Reminder, urgency: int) -> str:
+    t = reminder.title
+    if urgency <= 0:
+        return f"🔔 {t}"
+    if urgency == 1:
+        return f"⏰ Reminder: {t}"
+    if urgency == 2:
+        return f"⚠️ Still pending: {t}"
+    return f"🚨 OVERDUE — {t}"
+
+
+def _send_reminder(db: Session, reminder: Reminder, *, urgency: int, write_calendar: bool) -> bool:
+    """Send the reminder on every available channel. For an owner reminder that
+    means email AND (on first delivery) a calendar event; an invitee reminder is
+    email-only. Returns True if at least one channel delivered."""
+    try:
+        # Invitee-facing reminder — email the external recipient only.
+        if reminder.recipient_email:
+            return _email_reminder(db, reminder, urgency=urgency)
+
+        any_ok = False
+        # Email the owner (the relentless channel).
+        if email_account_for(db, reminder.workspace_id, reminder.user_id):
+            any_ok = _email_reminder(db, reminder, urgency=urgency) or any_ok
+        # Write/refresh the calendar block on the first delivery (not on nudges,
+        # so we don't clutter the calendar with duplicates).
+        if write_calendar and calendar_account_for(db, reminder.workspace_id, reminder.user_id):
+            any_ok = _calendar_reminder(db, reminder) or any_ok
+
+        if not any_ok:
+            reminder.error = "no_delivery_channel"
+        return any_ok
+    except Exception as exc:  # noqa: BLE001
+        reminder.error = str(exc)[:500]
+        log.warning("reminder %s send failed: %s", reminder.id, exc)
+        return False
+
+
+def _calendar_reminder(db: Session, reminder: Reminder) -> bool:
     account = calendar_account_for(db, reminder.workspace_id, reminder.user_id)
     if not account:
-        reminder.status = "failed"
-        reminder.error = "no_calendar_connected"
         return False
     creds = gcal.ensure_credentials(db, account)
     if not creds:
-        reminder.status = "failed"
-        reminder.error = "calendar_auth_failed"
         return False
-    # Honour the reminder's assigned calendar (multi-calendar), else the
-    # account's default write calendar.
     cal_id = reminder.target_calendar_id or _write_calendar_id(account)
     start = reminder.remind_at
     end = start + timedelta(minutes=reminder.duration_minutes or 15)
@@ -509,30 +593,61 @@ def _deliver_calendar(db: Session, reminder: Reminder) -> bool:
     return True
 
 
-def _deliver_email(db: Session, reminder: Reminder) -> bool:
-    # Lazy import avoids a circular import at module load (email_sender →
-    # outreach → models, all fine, but keep the dependency edge explicit).
+def _email_reminder(db: Session, reminder: Reminder, *, urgency: int) -> bool:
     from app.services.email_sender import _pick_account, send_via_account
 
     account = _pick_account(db, reminder.workspace_id, reminder.user_id)
     if not account:
-        reminder.status = "failed"
-        reminder.error = "no_email_account_connected"
         return False
-    # Invitee reminders go to recipient_email; personal reminders to the owner.
     to_addr = reminder.recipient_email or account.external_id or (account.config or {}).get("from_email")
     if not to_addr:
-        reminder.status = "failed"
-        reminder.error = "no_recipient_address"
         return False
-    body_text = reminder.body or reminder.title
-    html = "<p>" + (body_text.replace("\n", "<br/>")) + "</p>"
-    result = send_via_account(account, to_addr, f"⏰ {reminder.title}", body_text, html)
-    if not result.ok:
-        reminder.status = "failed"
-        reminder.error = result.error
-        return False
-    return True
+    subject = _urgency_subject(reminder, urgency)
+    html, text = _render_due_email(reminder, urgency)
+    result = send_via_account(account, to_addr, subject, text, html)
+    return bool(result.ok)
+
+
+def _render_due_email(reminder: Reminder, urgency: int) -> tuple[str, str]:
+    when = reminder.remind_at
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    when_abs = when.strftime("%A, %b %d · %H:%M UTC")
+    overdue = urgency >= 1
+    accent = "#dc2626" if urgency >= 3 else "#d97706" if urgency >= 1 else "#2563eb"
+    heading = "OVERDUE — please act" if urgency >= 3 else ("Still pending" if urgency >= 1 else "Reminder")
+    body = (reminder.body or "").strip().replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")
+    body_html = f'<tr><td style="padding:0 28px 8px;color:#475569;font-size:14px;line-height:1.6;">{body}</td></tr>' if body else ""
+    nudge_note = (
+        '<tr><td style="padding:4px 28px 0;color:#94a3b8;font-size:12px;">'
+        "This will keep reminding you until you mark it done in LeadCaptura."
+        "</td></tr>"
+        if reminder.escalate and not reminder.recipient_email
+        else ""
+    )
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 16px;"><tr><td align="center">
+  <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08);">
+    <tr><td style="background:{accent};padding:20px 28px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;opacity:.85;">{heading}</div>
+      <div style="margin-top:3px;color:#fff;font-size:19px;font-weight:800;">{reminder.title}</div>
+    </td></tr>
+    {body_html}
+    <tr><td style="padding:14px 28px 4px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;"><tr>
+        <td style="padding:12px 14px;color:#334155;font-size:14px;"><span style="color:#94a3b8;">Due</span> &nbsp;<strong style="color:#0f172a;">{when_abs}</strong>{' &nbsp;·&nbsp; <span style="color:'+accent+';font-weight:700;">overdue</span>' if overdue else ''}</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:18px 28px 8px;">
+      <a href="{_calendar_link()}" style="display:inline-block;background:{accent};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;">Open &amp; mark done →</a>
+    </td></tr>
+    {nudge_note}
+    <tr><td style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center;">LeadCaptura reminder</td></tr>
+  </table>
+</td></tr></table></body></html>"""
+    text = f"{heading}: {reminder.title}\nDue: {when_abs}" + (f"\n\n{reminder.body}" if reminder.body else "")
+    return html, text
 
 
 # --------------------------------------------------------------------------- #

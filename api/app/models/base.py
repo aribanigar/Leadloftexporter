@@ -498,6 +498,13 @@ class Reminder(Base, TimestampMixin):
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     error: Mapped[Optional[str]] = mapped_column(Text)
 
+    # Relentless delivery: keep nudging (email) until the user marks it done, so
+    # a procrastinated task isn't missed after the first fire.
+    done_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    escalate: Mapped[bool] = mapped_column(Boolean, default=True)
+    nudge_count: Mapped[int] = mapped_column(Integer, default=0)
+    next_nudge_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
 
 class ExtensionJob(Base, TimestampMixin):
     __tablename__ = "extension_jobs"

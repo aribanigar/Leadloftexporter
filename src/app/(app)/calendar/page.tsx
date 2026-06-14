@@ -75,6 +75,9 @@ interface Reminder {
   sent_at: string | null;
   error: string | null;
   created_at: string;
+  done_at: string | null;
+  escalate: boolean;
+  nudge_count: number;
 }
 
 type Banner = { kind: "ok" | "err"; msg: string } | null;
@@ -576,6 +579,7 @@ function RemindersPanel({
   const [when, setWhen] = useState(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
   const [channel, setChannel] = useState("email");
   const [calId, setCalId] = useState(defaultCalendarId);
+  const [escalate, setEscalate] = useState(true);
 
   const create = useMutation({
     mutationFn: () =>
@@ -586,6 +590,7 @@ function RemindersPanel({
           remind_at: new Date(when).toISOString(),
           channel,
           target_calendar_id: channel === "calendar" && calId ? calId : null,
+          escalate,
         },
       }),
     onSuccess: () => {
@@ -594,6 +599,22 @@ function RemindersPanel({
       qc.invalidateQueries({ queryKey: ["reminders"] });
     },
     onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
+  });
+
+  const markDone = useMutation({
+    mutationFn: (id: string) => api(`/calendar/reminders/${id}`, { method: "PATCH", body: { done: true } }),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["reminders"] });
+      const prev = qc.getQueryData<{ reminders: Reminder[] }>(["reminders"]);
+      qc.setQueryData<{ reminders: Reminder[] }>(["reminders"], (old) =>
+        old ? { reminders: old.reminders.map((r) => (r.id === id ? { ...r, done_at: new Date().toISOString() } : r)) } : old
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["reminders"], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["reminders"] }),
   });
 
   // Optimistic delete for an instant, dynamic feel.
@@ -613,22 +634,30 @@ function RemindersPanel({
     onSettled: () => qc.invalidateQueries({ queryKey: ["reminders"] }),
   });
 
-  const upcoming = useMemo(
-    () => reminders.filter((r) => r.status === "pending" || r.status === "scheduled").sort((a, b) => +new Date(a.remind_at) - +new Date(b.remind_at)),
+  // "Open" = still needs you (not done, not cancelled) — includes escalating
+  // overdue ones so they stay front-and-centre. "Closed" = done/cancelled.
+  const open = useMemo(
+    () =>
+      reminders
+        .filter((r) => !r.done_at && r.status !== "cancelled" && r.status !== "skipped")
+        .sort((a, b) => +new Date(a.remind_at) - +new Date(b.remind_at)),
     [reminders]
   );
-  const past = useMemo(
-    () => reminders.filter((r) => r.status !== "pending" && r.status !== "scheduled").sort((a, b) => +new Date(b.remind_at) - +new Date(a.remind_at)),
+  const closed = useMemo(
+    () =>
+      reminders
+        .filter((r) => r.done_at || r.status === "cancelled" || r.status === "skipped")
+        .sort((a, b) => +new Date(b.remind_at) - +new Date(a.remind_at)),
     [reminders]
   );
-  const next = upcoming[0];
+  const next = open.find((r) => +new Date(r.remind_at) > now) || open[0];
 
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-slate-900">Reminders</h3>
-          <Pill tone="amber">{upcoming.length} upcoming</Pill>
+          <Pill tone="amber">{open.length} open</Pill>
           {isFetching && <RefreshCw className="h-3 w-3 animate-spin text-slate-300" />}
         </div>
         <button
@@ -686,18 +715,22 @@ function RemindersPanel({
           >
             Add
           </button>
+          <label className="flex w-full items-center gap-1.5 text-xs text-slate-500" title="Re-emails you with rising urgency until you mark it done">
+            <input type="checkbox" checked={escalate} onChange={(e) => setEscalate(e.target.checked)} />
+            Keep nudging me until it&apos;s done (won&apos;t let you miss it)
+          </label>
         </div>
       )}
 
       <ul className="divide-y divide-slate-100">
-        {upcoming.map((r) => (
-          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} />
+        {open.map((r) => (
+          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} onDone={() => markDone.mutate(r.id)} />
         ))}
-        {past.length > 0 && (
-          <li className="bg-slate-50/60 px-5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">Delivered</li>
+        {closed.length > 0 && (
+          <li className="bg-slate-50/60 px-5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">Done &amp; closed</li>
         )}
-        {past.map((r) => (
-          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} muted />
+        {closed.map((r) => (
+          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} onDone={() => markDone.mutate(r.id)} muted />
         ))}
         {reminders.length === 0 && (
           <li className="flex flex-col items-center gap-2 px-5 py-12 text-center">
@@ -713,27 +746,57 @@ function RemindersPanel({
   );
 }
 
-function ReminderRow({ r, now, onDelete, muted }: { r: Reminder; now: number; onDelete: () => void; muted?: boolean }) {
+function ReminderRow({
+  r,
+  now,
+  onDelete,
+  onDone,
+  muted,
+}: {
+  r: Reminder;
+  now: number;
+  onDelete: () => void;
+  onDone: () => void;
+  muted?: boolean;
+}) {
   const meta = SOURCE_META[r.source] || SOURCE_META.manual;
   const Icon = meta.icon;
   const rel = liveRelative(r.remind_at, now);
+  const done = !!r.done_at;
+  const overdue = !done && rel.isPast && r.status !== "cancelled";
   return (
-    <li className={"group flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-slate-50/70 " + (muted ? "opacity-70" : "")}>
-      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${muted ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-600"}`}>
-        <Icon className="h-4 w-4" />
-      </div>
+    <li className={"group flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-slate-50/70 " + (muted ? "opacity-60" : "")}>
+      {/* Done checkbox — stops the nudges */}
+      {!muted ? (
+        <button
+          onClick={onDone}
+          title="Mark done (stops reminders)"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-300 transition-colors hover:border-emerald-400 hover:text-emerald-500"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${done ? "bg-emerald-50 text-emerald-500" : "bg-slate-100 text-slate-400"}`}>
+          <CheckCircle2 className="h-4 w-4" />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-slate-800">{r.title}</span>
-          <Pill tone={STATUS_TONE[r.status] || "slate"} dot>
-            {r.status}
-          </Pill>
+          <span className={"truncate text-sm font-medium " + (done ? "text-slate-400 line-through" : "text-slate-800")}>{r.title}</span>
+          {done ? (
+            <Pill tone="emerald" dot>done</Pill>
+          ) : overdue ? (
+            <Pill tone="rose" dot>overdue</Pill>
+          ) : (
+            <Pill tone={STATUS_TONE[r.status] || "slate"} dot>{r.status}</Pill>
+          )}
+          {!done && r.escalate && r.nudge_count > 0 && <Pill tone="rose">nudged ×{r.nudge_count}</Pill>}
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           <Pill tone={meta.tone}>{meta.label}</Pill>
           {r.channel === "calendar" ? <CalendarClock className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
           <span>·</span>
-          <span className={!rel.isPast && (r.status === "pending" || r.status === "scheduled") ? "font-medium text-brand-600" : ""}>{rel.text}</span>
+          <span className={overdue ? "font-semibold text-rose-600" : !rel.isPast ? "font-medium text-brand-600" : ""}>{rel.text}</span>
           {r.error ? <span className="truncate text-rose-500">· {r.error}</span> : null}
         </div>
       </div>
