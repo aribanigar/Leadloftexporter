@@ -551,16 +551,25 @@ def _send_reminder(db: Session, reminder: Reminder, *, urgency: int, write_calen
             return _email_reminder(db, reminder, urgency=urgency)
 
         any_ok = False
+        attempted = False
         # Email the owner (the relentless channel).
         if email_account_for(db, reminder.workspace_id, reminder.user_id):
+            attempted = True
             any_ok = _email_reminder(db, reminder, urgency=urgency) or any_ok
         # Write/refresh the calendar block on the first delivery (not on nudges,
         # so we don't clutter the calendar with duplicates).
         if write_calendar and calendar_account_for(db, reminder.workspace_id, reminder.user_id):
+            attempted = True
             any_ok = _calendar_reminder(db, reminder) or any_ok
 
         if not any_ok:
-            reminder.error = "no_delivery_channel"
+            # Distinguish "nothing connected" from "we tried and the send failed".
+            # _email_reminder records the real transport error on the reminder;
+            # only fall back to no_delivery_channel when no channel even exists.
+            if not attempted:
+                reminder.error = "no_delivery_channel"
+            elif not reminder.error:
+                reminder.error = "send_failed"
         return any_ok
     except Exception as exc:  # noqa: BLE001
         reminder.error = str(exc)[:500]
@@ -601,10 +610,17 @@ def _email_reminder(db: Session, reminder: Reminder, *, urgency: int) -> bool:
         return False
     to_addr = reminder.recipient_email or account.external_id or (account.config or {}).get("from_email")
     if not to_addr:
+        reminder.error = "no_recipient_address"
         return False
     subject = _urgency_subject(reminder, urgency)
     html, text = _render_due_email(reminder, urgency)
     result = send_via_account(account, to_addr, subject, text, html)
+    if not result.ok:
+        # Surface the real transport error (e.g. "smtp_relay: 535 auth failed",
+        # "resend_http_401") so the user can see WHICH sender is broken instead
+        # of a generic "no_delivery_channel".
+        who = account.external_id or account.id
+        reminder.error = f"email via {account.provider} ({who}) failed: {result.error}"[:500]
     return bool(result.ok)
 
 

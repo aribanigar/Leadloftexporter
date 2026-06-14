@@ -260,6 +260,39 @@ def _eligible_senders(
     return out
 
 
+def _is_hard_bounce(error: str) -> bool:
+    """True only for a genuine RECIPIENT rejection (mailbox doesn't exist /
+    permanently undeliverable) — the only case where auto-suppressing the
+    address is correct.
+
+    The previous heuristic suppressed on any error containing "rejected", which
+    also matches TRANSPORT/AUTH failures ("authentication rejected", "relay
+    access denied", "connection refused/rejected") — so a misconfigured SMTP
+    password would poison every recipient as a fake "hard bounce", including
+    perfectly valid addresses. Those are SENDER problems, not bad recipients:
+    keep them as plain failures and never suppress.
+    """
+    e = (error or "").lower()
+    # Sender/transport problems — NEVER a recipient bounce.
+    sender_side = (
+        "auth", "535", "534", "credential", "password", "login",
+        "relay", "connection", "timeout", "timed out", "tls", "ssl",
+        "not_configured", "request_failed", "api key", "api_key",
+        "unauthorized", "401", "403", "429", "quota", "rate limit",
+    )
+    if any(s in e for s in sender_side):
+        return False
+    # Genuine recipient-not-found / permanently-undeliverable signals.
+    recipient_bounce = (
+        "550 5.1.1", "5.1.1", "user unknown", "no such user", "no such mailbox",
+        "mailbox unavailable", "mailbox not found", "does not exist",
+        "recipient address rejected", "address rejected", "user not found",
+        "invalid recipient", "unknown recipient", "recipient not found",
+        "550-5.1.1", "552 5.2.2", "mailbox full", "5.2.1",
+    )
+    return any(s in e for s in recipient_bounce)
+
+
 def _no_sender_reason(db: Session, campaign: Campaign) -> str:
     """Why a campaign has no sender to dispatch through. Since sending is
     decoupled from warmup, the only reasons are: no senders connected, or the
@@ -1443,14 +1476,14 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                         )
                     )
             else:
-                r.status = "failed"
-                r.error = (result.error or "send_failed")[:500]
-                campaign.failed_count = (campaign.failed_count or 0) + 1
-                failed += 1
-                # Auto-suppress on hard auth/permanent failures so we don't
-                # keep hammering a known-bad address.
-                low_err = (result.error or "").lower()
-                if any(s in low_err for s in ("550", "bounce", "rejected", "invalid recipient")):
+                # Distinguish a true recipient bounce from a SENDER/transport
+                # failure. Only a real bounce suppresses the address; a transport
+                # failure (bad SMTP password, relay/API error) stays "failed" and
+                # never poisons the recipient.
+                if _is_hard_bounce(result.error or ""):
+                    r.status = "bounced"
+                    r.error = (result.error or "bounced")[:500]
+                    campaign.bounced_count = (campaign.bounced_count or 0) + 1
                     db.add(
                         Suppression(
                             workspace_id=campaign.workspace_id,
@@ -1459,6 +1492,11 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                             source_campaign_id=campaign.id,
                         )
                     )
+                else:
+                    r.status = "failed"
+                    r.error = (result.error or "send_failed")[:500]
+                campaign.failed_count = (campaign.failed_count or 0) + 1
+                failed += 1
         except Exception as exc:  # noqa: BLE001
             r.status = "failed"
             r.error = str(exc)[:500]
@@ -1674,21 +1712,29 @@ def _commit_tick_results(
                         },
                     ))
         else:
-            r.status = "failed"
-            r.error = error[:500]
-            if msg:
-                msg.status = "failed"
-                msg.error = r.error
-            campaign.failed_count = (campaign.failed_count or 0) + 1
-            failed += 1
-            low_err = error.lower()
-            if any(s in low_err for s in ("550", "bounce", "rejected", "invalid recipient")):
+            # Only a genuine recipient bounce suppresses the address; a
+            # sender/transport failure stays "failed" and is never suppressed.
+            if _is_hard_bounce(error):
+                r.status = "bounced"
+                r.error = error[:500]
+                if msg:
+                    msg.status = "bounced"
+                    msg.error = r.error
+                campaign.bounced_count = (campaign.bounced_count or 0) + 1
                 db.add(Suppression(
                     workspace_id=campaign.workspace_id,
                     email=(r.email or "").lower(),
                     reason="bounce",
                     source_campaign_id=campaign.id,
                 ))
+            else:
+                r.status = "failed"
+                r.error = error[:500]
+                if msg:
+                    msg.status = "failed"
+                    msg.error = r.error
+            campaign.failed_count = (campaign.failed_count or 0) + 1
+            failed += 1
 
     _maybe_finalize(db, campaign)
     db.commit()

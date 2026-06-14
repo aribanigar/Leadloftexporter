@@ -105,10 +105,11 @@ type Perf = 'good' | 'average' | 'critical' | 'pending';
 
 interface UiRecipient {
   email: string;
-  status: 'pending' | 'sent' | 'opened' | 'clicked' | 'bounced';
+  status: 'pending' | 'sent' | 'opened' | 'clicked' | 'bounced' | 'failed' | 'skipped';
   opened: boolean;
   clicks: number;
   bouncedAt?: string;
+  error?: string;
 }
 
 interface UiLink {
@@ -164,6 +165,10 @@ const RECIPIENT_STATUS_CFG: Record<UiRecipient['status'], { bg: string; color: s
   opened: { bg: 'rgba(255,220,196,0.45)', color: '#92400e', label: 'Opened' },
   clicked: { bg: 'rgba(0,54,26,0.1)', color: '#00361a', label: 'Clicked' },
   bounced: { bg: 'rgba(220,38,38,0.1)', color: '#dc2626', label: 'Bounced' },
+  // Transport/sender failure — NOT a bad recipient. Amber, not red, so it's
+  // visibly distinct from a real bounce, and the row shows the actual error.
+  failed: { bg: 'rgba(217,119,6,0.12)', color: '#b45309', label: 'Send failed' },
+  skipped: { bg: 'rgba(65,73,66,0.06)', color: '#6b7280', label: 'Skipped' },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -198,7 +203,9 @@ function normaliseRecipient(r: RecipientRow): UiRecipient {
   let status: UiRecipient['status'] = 'pending';
   if (r.status === 'clicked') status = 'clicked';
   else if (r.status === 'opened') status = 'opened';
-  else if (r.status === 'bounced' || r.status === 'failed') status = 'bounced';
+  else if (r.status === 'bounced') status = 'bounced';
+  else if (r.status === 'failed') status = 'failed';   // transport/sender error — distinct from a real bounce
+  else if (r.status === 'skipped') status = 'skipped';
   else if (r.status === 'sent') status = 'sent';
   return {
     email: r.email,
@@ -206,6 +213,7 @@ function normaliseRecipient(r: RecipientRow): UiRecipient {
     opened,
     clicks,
     bouncedAt: r.status === 'bounced' || r.status === 'failed' ? r.sent_at ?? undefined : undefined,
+    error: r.error ?? undefined,
   };
 }
 
@@ -1377,6 +1385,11 @@ export default function CampaignDetailPage() {
                         >
                           <td style={{ padding: '11px 12px', fontSize: '13px', color: T.onSurface, fontFamily: 'monospace', borderBottom: `1px solid ${T.ghost}` }}>
                             {recipient.email}
+                            {(recipient.status === 'failed' || recipient.status === 'bounced') && recipient.error && (
+                              <div style={{ marginTop: '3px', fontSize: '11px', color: recipient.status === 'failed' ? '#b45309' : '#dc2626', fontFamily: 'Inter, sans-serif', wordBreak: 'break-word' }}>
+                                {recipient.error}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: `1px solid ${T.ghost}` }}>
                             <span style={{
