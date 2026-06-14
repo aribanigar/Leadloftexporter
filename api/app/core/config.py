@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     whisper_model: str = "whisper-1"
 
+    # Shared secret for the external-cron trigger endpoint (/api/v1/cron/run).
+    # Lets a free HTTP cron service (e.g. cron-job.org) drive the periodic
+    # tasks (deliver reminders, daily agendas, drain emails) without a paid
+    # Celery worker. The ping also keeps a free web service awake.
+    cron_secret: str = ""
+
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
 
