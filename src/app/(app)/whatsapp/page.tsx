@@ -142,10 +142,13 @@ export default function WhatsAppOutreachPage() {
   });
 
   // Any sidecar failure (not configured = 503, host down = 404/502, gateway
-  // errors) means QR pairing can't work — surface the diagnostic banner rather
-  // than the misleading "click Add number" empty state.
+  // errors, or a 401/403 when the two WA_SIDECAR_TOKEN secrets don't match)
+  // means QR pairing can't work — surface the diagnostic banner rather than
+  // the misleading "click Add number" empty state. 401/403 in particular is
+  // the common deploy mistake: the token on the API and on the sidecar differ.
   const sidecarUnavailable =
-    accountsError instanceof ApiError && [404, 500, 502, 503].includes(accountsError.status);
+    accountsError instanceof ApiError &&
+    [401, 403, 404, 500, 502, 503].includes(accountsError.status);
   const sidecarErrorDetail =
     accountsError instanceof ApiError ? accountsError.message : "";
 
