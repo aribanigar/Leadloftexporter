@@ -82,8 +82,8 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-      <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-4">
-        <div className="grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-xs font-semibold uppercase">
+      <div className="flex h-14 items-center gap-2 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white px-4">
+        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-semibold uppercase text-white shadow-sm">
           {initials(workspace?.name || user?.email)}
         </div>
         <span className="truncate text-sm font-semibold">{workspace?.name || "Workspace"}</span>
@@ -100,7 +100,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
               className={cn(
                 "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-emerald-50 text-emerald-700"
+                  ? "bg-gradient-to-r from-emerald-100 to-teal-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100"
                   : "text-slate-600 hover:bg-emerald-50/60 hover:text-emerald-700"
               )}
             >
@@ -153,10 +153,10 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       </div>
 
       <div className="mt-auto space-y-0.5 border-t border-slate-100 px-2 py-3">
-        <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700">
-          <Gift className="h-4 w-4 text-slate-400" />
+        <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-100 transition-colors hover:from-amber-100 hover:to-orange-100">
+          <Gift className="h-4 w-4 text-amber-500" />
           <span>Get LeadCaptura Free</span>
-          <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
         </Link>
         <Link href="/help" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700">
           <Play className="h-4 w-4 text-slate-400" />
@@ -167,7 +167,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           className={cn(
             "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
             pathname?.startsWith("/settings")
-              ? "bg-emerald-50 text-emerald-700"
+              ? "bg-gradient-to-r from-emerald-100 to-teal-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100"
               : "text-slate-600 hover:bg-emerald-50/60 hover:text-emerald-700"
           )}
         >

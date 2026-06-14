@@ -33,8 +33,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-card">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-slate-50 to-indigo-50 px-4">
+      <div className="w-full max-w-md rounded-xl border border-white/60 bg-white/90 p-8 shadow-card backdrop-blur">
         <div className="mb-6 flex items-center justify-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-brand-500 to-pink-500 text-white font-bold">L</div>
           <span className="text-xl font-semibold tracking-tight">LeadCaptura</span>

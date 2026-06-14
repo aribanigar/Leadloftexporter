@@ -37,7 +37,7 @@ export function TopBar({ onMenu }: { onMenu?: () => void } = {}) {
   }
 
   return (
-    <header className="flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-3 sm:gap-3 sm:px-4">
+    <header className="flex h-14 items-center gap-2 border-b border-slate-200 bg-gradient-to-r from-white via-emerald-50/30 to-white px-3 sm:gap-3 sm:px-4">
       <button
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:text-slate-800 lg:hidden"
         onClick={onMenu}

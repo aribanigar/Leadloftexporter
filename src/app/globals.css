@@ -56,7 +56,7 @@ body {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply btn bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm hover:from-brand-700 hover:to-indigo-700;
   }
   .btn-secondary {
     @apply btn border border-slate-200 bg-white text-slate-700 hover:border-slate-300;
@@ -65,7 +65,20 @@ body {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50;
+    @apply btn bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-sm hover:from-rose-600 hover:to-red-700 disabled:opacity-50;
+  }
+  .btn-success {
+    @apply btn bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm hover:from-emerald-600 hover:to-teal-700;
+  }
+  /* Reusable gradient helpers for page chrome (cards, headers, hero strips). */
+  .gradient-brand {
+    @apply bg-gradient-to-r from-brand-600 to-indigo-600;
+  }
+  .gradient-emerald {
+    @apply bg-gradient-to-br from-emerald-500 to-teal-600;
+  }
+  .gradient-heading {
+    @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
   }
   .card {
     @apply rounded-lg border border-slate-200 bg-white shadow-card;
