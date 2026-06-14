@@ -16,7 +16,6 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models import ConnectedAccount, EmailMessage, Workspace
-from app.services.outreach import emails_sent_today, outreach_settings
 
 
 class SendResult:
@@ -314,9 +313,10 @@ def send_email_message(
 ) -> SendResult:
     if message.status not in {"queued", "failed"}:
         return SendResult(False, error="not_sendable")
-    settings = outreach_settings(workspace)
-    if emails_sent_today(db, workspace.id) >= settings["email_limit_per_day"]:
-        return SendResult(False, error="daily_limit_reached")
+    # NOTE: no daily-limit gate here. Campaign + composer sends are explicit,
+    # user-initiated, and the user controls volume via batch size / send delay —
+    # a hidden workspace "email_limit_per_day" must never silently block them.
+    # (The setting still exists for the optional automated-outreach drip.)
 
     # An explicit account (campaign sender rotation) skips auto-pick so bulk
     # sends actually fan out across the connected mailboxes instead of

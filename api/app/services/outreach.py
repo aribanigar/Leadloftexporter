@@ -34,7 +34,9 @@ def outreach_settings(workspace: Workspace) -> dict:
         "time_frame_start": "07:00",
         "time_frame_end": "19:00",
         "timezone": "Asia/Calcutta",
-        "email_limit_per_day": 80,
+        # Effectively unlimited by default — no hidden daily cap on sending.
+        # Users who actually want a guardrail can set one in Settings → Outreach.
+        "email_limit_per_day": 1_000_000,
         "linkedin_connect_limit": 15,
         "linkedin_message_limit": 30,
         "whatsapp_limit_per_day": 50,
