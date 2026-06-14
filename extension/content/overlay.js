@@ -1915,6 +1915,25 @@
         : _findConnectButtonInCard(card);
     if (!connectBtn) return { ok: false, reason: "no_connect_button" };
     console.log("[LeadCaptura] step 1 → click Connect");
+    // LinkedIn's new search UI renders Connect as an
+    // <a href="/preload/search-custom-invite/…"> rather than a <button>. If
+    // React hasn't re-bound the in-page onClick yet (common right after the
+    // list re-renders when the PREVIOUS invite flipped to "Pending"), a normal
+    // click FOLLOWS the href and navigates the whole page away — killing the
+    // Connect All run after the first invite. Guard the anchor so the click can
+    // only open the in-page invitation modal, never navigate. Profile #1 proved
+    // LinkedIn opens the modal via JS (it didn't navigate), so blocking the
+    // href fallback is safe. Guard auto-removes after 2.5s.
+    const _navAnchor =
+      (connectBtn.tagName === "A" && connectBtn.getAttribute("href"))
+        ? connectBtn
+        : (connectBtn.closest?.("a[href]") || null);
+    let _navGuard = null;
+    if (_navAnchor) {
+      _navGuard = (e) => { try { e.preventDefault(); } catch {} };
+      _navAnchor.addEventListener("click", _navGuard, true);
+      setTimeout(() => { try { _navAnchor.removeEventListener("click", _navGuard, true); } catch {} }, 2500);
+    }
     await dispatchHumanClick(connectBtn);
 
     // ---- STEP 2: wait for the invitation dialog (up to 8s) ----------------
@@ -2521,57 +2540,75 @@
         for (const url of urls) {
           if (state.connectCancel) break outer;
 
-          if (state.avoidDuplicates && _isContacted(url)) {
-            skipped++;
-            _setChipState(url, "saved", "Already contacted");
-            continue;
-          }
-
-          const card = _cardForUrl(url);
-          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
-          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
-
-          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
-          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
-          if (cls === "unknown" || !card) { skipped++; continue; }
-
-          processed++;
-          _setChipState(url, "saving", "Connecting…");
-
-          let result;
-          if (cls === "follow") {
-            // Follow-only cards: try Connect via overflow first, fall back to Follow.
-            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
-            if (_overflowResult.ok) {
-              result = _overflowResult;
-            } else if (
-              _overflowResult.reason === "no_more_btn" ||
-              _overflowResult.reason === "no_connect_in_dropdown" ||
-              _overflowResult.reason === "dropdown_did_not_open"
-            ) {
-              result = await _sendFollowOnCard(card, presetBtn);
-            } else {
-              result = _overflowResult;
+          // Per-card error isolation: a single bad card (a classify/lookup/chip
+          // call throwing on a node LinkedIn re-rendered after the previous
+          // invite) must NOT kill the whole run. Without this, the loop sent
+          // invite #1 then threw on #2 and silently ended — looking like "it
+          // stops after the first connect". One bad card → "failed" → continue.
+          try {
+            if (state.avoidDuplicates && _isContacted(url)) {
+              skipped++;
+              _setChipState(url, "saved", "Already contacted");
+              continue;
             }
-          } else if (cls === "salesnav-connectable") {
-            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
-            await sleep(300 + Math.random() * 400);
-            result = await _sendConnectViaSalesNavDropdown(card);
-          } else {
-            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
-            await sleep(300 + Math.random() * 300);
-            result = await _sendConnectOnCard(card, presetBtn);
-          }
 
-          if (result.ok) {
-            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
-            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
-            _markContacted(url);
-            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
-          } else {
+            // Clear any leftover invitation dialog / backdrop from the previous
+            // send before touching the next card — a lingering modal scrim
+            // intercepts the next Connect click.
+            if (_invitationModalOpen()) { _closeAnyDialog(); await sleep(500); }
+
+            const card = _cardForUrl(url);
+            const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+            const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+
+            if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+            if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+            if (cls === "unknown" || !card) { skipped++; continue; }
+
+            processed++;
+            _setChipState(url, "saving", "Connecting…");
+
+            let result;
+            if (cls === "follow") {
+              // Follow-only cards: try Connect via overflow first, fall back to Follow.
+              const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
+              if (_overflowResult.ok) {
+                result = _overflowResult;
+              } else if (
+                _overflowResult.reason === "no_more_btn" ||
+                _overflowResult.reason === "no_connect_in_dropdown" ||
+                _overflowResult.reason === "dropdown_did_not_open"
+              ) {
+                result = await _sendFollowOnCard(card, presetBtn);
+              } else {
+                result = _overflowResult;
+              }
+            } else if (cls === "salesnav-connectable") {
+              try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+              await sleep(300 + Math.random() * 400);
+              result = await _sendConnectViaSalesNavDropdown(card);
+            } else {
+              try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+              await sleep(300 + Math.random() * 300);
+              result = await _sendConnectOnCard(card, presetBtn);
+            }
+
+            if (result.ok) {
+              if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+              else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+              _markContacted(url);
+              try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+            } else {
+              failed++;
+              _setChipState(url, "error", "Skipped");
+              if (_invitationModalOpen()) _closeAnyDialog();
+            }
+          } catch (err) {
+            // One card blew up — record it and move on; never end the run.
             failed++;
-            _setChipState(url, "error", "Skipped");
-            if (_invitationModalOpen()) _closeAnyDialog();
+            try { _setChipState(url, "error", "Skipped"); } catch {}
+            try { if (_invitationModalOpen()) _closeAnyDialog(); } catch {}
+            try { console.log("[LeadCaptura] connect: card error, continuing →", err?.message || err); } catch {}
           }
 
           flashStatus(`${summarise()} (${processed})`);
