@@ -14,6 +14,14 @@ must include the Calendar scope below.
 from __future__ import annotations
 
 import logging
+import os
+
+# Google returns scopes in a normalized order and may include scopes the account
+# previously granted to this OAuth client (e.g. business.manage). oauthlib then
+# raises "Scope has changed" and the token exchange fails. Relaxing this check is
+# the documented, correct way to accept Google's returned scope set. Must be set
+# before google-auth-oauthlib / oauthlib validate the token response.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -75,7 +83,9 @@ def build_consent_url(state: str, *, client_id: str, client_secret: str) -> str:
     )
     auth_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
+        # Do NOT include previously-granted scopes — that pulls unrelated scopes
+        # (e.g. business.manage) into the token and trips oauthlib's scope check.
+        include_granted_scopes="false",
         prompt="consent",
         state=state,
     )
