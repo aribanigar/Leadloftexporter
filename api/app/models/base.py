@@ -48,6 +48,10 @@ class User(Base, TimestampMixin):
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Password reset — SHA-256 of the one-time token (raw token only leaves
+    # the server in the reset email). Cleared once consumed.
+    password_reset_token_hash: Mapped[Optional[str]] = mapped_column(String(128), index=True)
+    password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 

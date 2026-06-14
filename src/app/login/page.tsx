@@ -21,7 +21,16 @@ export default function LoginPage() {
       await login(email, password);
       router.replace("/prospecting");
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Sign in failed";
+      // Surface a friendlier message for the most common cases instead of
+      // showing the raw browser error verbatim.
+      let message = e instanceof Error ? e.message : "Sign in failed";
+      if (/Failed to fetch|NetworkError|TypeError/i.test(message)) {
+        message = "Can't reach the LeadCaptura service. It may be starting up — retry in ~30s. If this keeps happening, the service is down.";
+      } else if (/invalid_credentials/i.test(message)) {
+        message = "Wrong email or password.";
+      } else if (/inactive_user/i.test(message)) {
+        message = "This account is disabled. Contact support.";
+      }
       setErr(message);
     } finally {
       setPending(false);
@@ -49,7 +58,15 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="label">Password</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="label mb-0">Password</label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-brand-600 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input
               className="input"
               type="password"
