@@ -786,12 +786,35 @@ function RingDial({ value, label, color, sublabel }: { value: number; label: str
 }
 
 // ─── Left Panel Section wrapper ───────────────────────────────────────────────
+// Each top-level group in the left rail (Campaign Details / Target Audience /
+// Send From / Sending Options) renders as a compact card. The cards used to
+// share a single tall scrolling pane and felt scattered. Now they're spaced,
+// rounded, and each title gets a tinted icon chip so the sections are easy to
+// scan and feel like a polished form rather than a list of fields.
+//
+// The icon tint is a function of the section's icon name — purely cosmetic,
+// keeps the API the same so every existing <PanelSection> picks up the new
+// look automatically.
 
-function PanelSection({ children, noBorder }: { children: React.ReactNode; noBorder?: boolean }) {
+const SECTION_TINTS: Record<string, { bg: string; fg: string; ring: string }> = {
+  campaign:         { bg: 'rgba(0,54,26,0.10)',     fg: '#00361a',  ring: 'rgba(0,54,26,0.18)'  },
+  group:            { bg: 'rgba(99,102,241,0.12)',  fg: '#4338ca',  ring: 'rgba(99,102,241,0.22)' },
+  alternate_email:  { bg: 'rgba(14,165,233,0.12)',  fg: '#0369a1',  ring: 'rgba(14,165,233,0.22)' },
+  tune:             { bg: 'rgba(245,158,11,0.12)',  fg: '#b45309',  ring: 'rgba(245,158,11,0.22)' },
+};
+function _tintFor(icon: string) {
+  return SECTION_TINTS[icon] || { bg: 'rgba(200,168,75,0.12)', fg: T.saffron, ring: 'rgba(200,168,75,0.22)' };
+}
+
+function PanelSection({ children, noBorder: _noBorder }: { children: React.ReactNode; noBorder?: boolean }) {
   return (
     <div style={{
-      padding: '20px 20px',
-      borderBottom: noBorder ? 'none' : `1px solid ${T.surfaceContainer}`,
+      margin: '12px 14px',
+      padding: '14px 16px 16px',
+      background: T.surfaceContainerLowest,
+      borderRadius: T.radiusXl,
+      border: `1px solid ${T.surfaceContainer}`,
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
     }}>
       {children}
     </div>
@@ -799,9 +822,19 @@ function PanelSection({ children, noBorder }: { children: React.ReactNode; noBor
 }
 
 function PanelSectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
+  const tint = _tintFor(icon);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-      <Icon name={icon} size={16} color={T.saffron} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '26px', height: '26px',
+        borderRadius: '8px',
+        background: tint.bg,
+        boxShadow: `inset 0 0 0 1px ${tint.ring}`,
+        flexShrink: 0,
+      }}>
+        <Icon name={icon} size={15} color={tint.fg} />
+      </span>
       <span style={{
         fontSize: '13px', fontWeight: 700, color: T.onSurface,
         fontFamily: 'Manrope, Inter, sans-serif', letterSpacing: '-0.01em',
@@ -1785,16 +1818,19 @@ function NewCampaignPageInner() {
       {/* ═══ BODY: split layout ═══════════════════════════════════════════════ */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
 
-        {/* ─── LEFT PANEL (~320px) ─────────────────────────────────────────── */}
+        {/* ─── LEFT PANEL (~340px) ─────────────────────────────────────────── */}
+        {/* Soft tinted backdrop so the white PanelSection cards float on top
+            instead of being slabs glued to the rail — far less scattered. */}
         <div style={{
-          width: '320px',
+          width: '340px',
           flexShrink: 0,
-          backgroundColor: T.surfaceContainerLowest,
+          background: 'linear-gradient(180deg, #f7f9f7 0%, #f3f5f4 100%)',
           borderRight: `1px solid ${T.surfaceContainer}`,
           overflowY: 'auto',
           height: 'calc(100vh - 60px)',
           position: 'sticky',
           top: '60px',
+          padding: '6px 0 24px',
         }}>
 
           {/* ── Campaign Details ── */}
