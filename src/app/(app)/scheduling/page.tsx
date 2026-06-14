@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, Plus, Trash2, Copy, ExternalLink, Check, Code } from "lucide-react";
 import { api } from "@/lib/api";
+import { PageHeader } from "@/components/scheduling-ui";
 
 interface Window {
   start: string;
@@ -102,21 +103,16 @@ export default function SchedulingPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <CalendarRange className="h-5 w-5 text-brand-600" />
-        <h1 className="text-lg font-semibold">Scheduling</h1>
-      </div>
+      <PageHeader icon={CalendarRange} title="Scheduling" subtitle="Booking pages, automations, and routing — your meeting engine" />
 
-      <div className="mb-4 flex gap-1 border-b border-slate-200">
+      <div className="mb-5 inline-flex gap-0.5 rounded-lg bg-slate-100 p-0.5">
         {(["events", "workflows", "routing"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={
-              "relative px-4 py-2 text-sm font-medium capitalize " +
-              (tab === t
-                ? "text-brand-700 after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:bg-brand-600"
-                : "text-slate-500 hover:text-slate-700")
+              "rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors " +
+              (tab === t ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700")
             }
           >
             {t === "events" ? "Event types" : t}

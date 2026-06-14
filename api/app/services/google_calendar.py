@@ -40,15 +40,23 @@ SCOPES = [
 PROVIDER = "google_calendar"
 
 
-def is_configured() -> bool:
-    return bool(_settings.google_client_id and _settings.google_client_secret)
+def resolve_client(client_id: Optional[str] = None, client_secret: Optional[str] = None) -> tuple[str, str]:
+    """Pick the OAuth client to use: an explicit (per-workspace, BYO) pair, else
+    the server env vars. Lets users self-configure Google from the UI without
+    any backend env vars."""
+    return (client_id or _settings.google_client_id or "", client_secret or _settings.google_client_secret or "")
 
 
-def _client_config() -> dict:
+def is_configured(client_id: Optional[str] = None, client_secret: Optional[str] = None) -> bool:
+    cid, csec = resolve_client(client_id, client_secret)
+    return bool(cid and csec)
+
+
+def _client_config(client_id: str, client_secret: str) -> dict:
     return {
         "web": {
-            "client_id": _settings.google_client_id,
-            "client_secret": _settings.google_client_secret,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "redirect_uris": [_settings.resolved_google_redirect_uri],
@@ -56,14 +64,14 @@ def _client_config() -> dict:
     }
 
 
-def build_consent_url(state: str) -> str:
+def build_consent_url(state: str, *, client_id: str, client_secret: str) -> str:
     """Return the Google consent-screen URL to send the user to.
 
     ``access_type=offline`` + ``prompt=consent`` guarantees a refresh_token even
     on re-auth, which the background jobs depend on.
     """
     flow = Flow.from_client_config(
-        _client_config(), scopes=SCOPES, redirect_uri=_settings.resolved_google_redirect_uri
+        _client_config(client_id, client_secret), scopes=SCOPES, redirect_uri=_settings.resolved_google_redirect_uri
     )
     auth_url, _ = flow.authorization_url(
         access_type="offline",
@@ -74,11 +82,11 @@ def build_consent_url(state: str) -> str:
     return auth_url
 
 
-def exchange_code(code: str) -> dict:
+def exchange_code(code: str, *, client_id: str, client_secret: str) -> dict:
     """Trade the authorization code for tokens. Returns a dict with
     access_token / refresh_token / expiry (aware UTC) / email."""
     flow = Flow.from_client_config(
-        _client_config(), scopes=SCOPES, redirect_uri=_settings.resolved_google_redirect_uri
+        _client_config(client_id, client_secret), scopes=SCOPES, redirect_uri=_settings.resolved_google_redirect_uri
     )
     flow.fetch_token(code=code)
     creds = flow.credentials
@@ -108,16 +116,20 @@ def ensure_credentials(db: Session, account: ConnectedAccount) -> Optional[Crede
     """Build live Google Credentials for an account, refreshing + persisting the
     access token if it has expired. Returns None if the account can't be used
     (no refresh token / not configured)."""
-    if not is_configured():
-        return None
     if account.provider != PROVIDER or not account.refresh_token:
+        return None
+    # Use the OAuth client this account was connected with (BYO per-workspace),
+    # falling back to server env vars.
+    cfg = account.config or {}
+    client_id, client_secret = resolve_client(cfg.get("oauth_client_id"), cfg.get("oauth_client_secret"))
+    if not (client_id and client_secret):
         return None
     creds = Credentials(
         token=account.access_token,
         refresh_token=account.refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=_settings.google_client_id,
-        client_secret=_settings.google_client_secret,
+        client_id=client_id,
+        client_secret=client_secret,
         scopes=SCOPES,
     )
     expired = account.token_expires_at is None or _aware(account.token_expires_at) <= datetime.now(timezone.utc)

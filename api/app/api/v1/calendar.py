@@ -55,6 +55,13 @@ def _serialize_reminder(r: Reminder) -> dict:
 # Connection status + OAuth
 # --------------------------------------------------------------------------- #
 
+def _ws_google_creds(workspace) -> tuple[str, str]:
+    """Resolve the Google OAuth client for a workspace: a UI-saved (BYO) pair in
+    workspace.settings['google_oauth'], else the server env vars."""
+    g = (workspace.settings or {}).get("google_oauth") or {}
+    return gcal.resolve_client(g.get("client_id"), g.get("client_secret"))
+
+
 @router.get("/status")
 def calendar_status(
     ctx: AuthContext = Depends(get_workspace_context),
@@ -62,8 +69,12 @@ def calendar_status(
 ):
     account = rsvc.calendar_account_for(db, ctx.workspace_id, ctx.user_id)
     connected = account is not None
+    cid, csec = _ws_google_creds(ctx.workspace)
+    has_ws_creds = bool(((ctx.workspace.settings or {}).get("google_oauth") or {}).get("client_id"))
     return {
-        "configured": gcal.is_configured(),
+        "configured": bool(cid and csec),
+        "server_configured": gcal.is_configured(),
+        "has_workspace_credentials": has_ws_creds,
         "connected": connected,
         "provider": "google_calendar" if connected else None,
         # Reminder prefs live per-user and work over email/SMTP even with no
@@ -90,21 +101,52 @@ def calendar_status(
     }
 
 
+class GoogleCredsIn(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+@router.post("/google-credentials")
+def save_google_credentials(
+    body: GoogleCredsIn,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Save a per-workspace Google OAuth client (BYO) so the Connect button works
+    with no backend env vars. Admin/owner only."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    if ctx.membership.role not in {"owner", "admin"}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
+    cid = (body.client_id or "").strip()
+    csec = (body.client_secret or "").strip()
+    if not cid or not csec:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "client_id_and_secret_required")
+    settings = dict(ctx.workspace.settings or {})
+    settings["google_oauth"] = {"client_id": cid, "client_secret": csec}
+    ctx.workspace.settings = settings
+    flag_modified(ctx.workspace, "settings")
+    db.commit()
+    return {"ok": True, "redirect_uri": _settings.resolved_google_redirect_uri}
+
+
 @router.get("/connect/google")
 def connect_google(ctx: AuthContext = Depends(get_workspace_context)):
     """Return the Google consent URL. The frontend opens it; Google redirects
     back to the callback below with a signed state we minted here."""
-    if not gcal.is_configured():
+    cid, csec = _ws_google_creds(ctx.workspace)
+    if not (cid and csec):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "google_calendar_not_configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the backend.",
+            "google_calendar_not_configured: add a Google OAuth client (Client ID + Secret) here, or set "
+            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET on the backend.",
         )
     state = create_access_token(
         subject=ctx.user_id,
         extra={"ws": ctx.workspace_id, "purpose": "gcal_oauth"},
         expires_minutes=15,
     )
-    return {"url": gcal.build_consent_url(state)}
+    return {"url": gcal.build_consent_url(state, client_id=cid, client_secret=csec)}
 
 
 @router.get("/oauth/google/callback")
@@ -129,8 +171,15 @@ def google_callback(
     except Exception:  # noqa: BLE001
         return RedirectResponse(f"{frontend}/calendar?connected=error&reason=invalid_state")
 
+    workspace = db.get(Workspace, workspace_id)
+    if not workspace:
+        return RedirectResponse(f"{frontend}/calendar?connected=error&reason=workspace_not_found")
+    client_id, client_secret = _ws_google_creds(workspace)
+    if not (client_id and client_secret):
+        return RedirectResponse(f"{frontend}/calendar?connected=error&reason=not_configured")
+
     try:
-        tokens = gcal.exchange_code(code)
+        tokens = gcal.exchange_code(code, client_id=client_id, client_secret=client_secret)
     except Exception as exc:  # noqa: BLE001
         log.warning("google oauth exchange failed: %s", exc)
         return RedirectResponse(f"{frontend}/calendar?connected=error&reason=exchange_failed")
@@ -172,6 +221,10 @@ def google_callback(
     primary_id = next((c["id"] for c in cals if c.get("primary")), (cals[0]["id"] if cals else "primary"))
     cfg = dict(account.config or {})
     cfg["calendars"] = cals
+    # Persist the OAuth client this account was connected with so background
+    # token refresh works even when creds live only in workspace settings.
+    cfg["oauth_client_id"] = client_id
+    cfg["oauth_client_secret"] = client_secret
     cfg.setdefault("write_calendar_id", primary_id)
     cfg.setdefault("conflict_calendar_ids", [primary_id])
     cfg.setdefault("agenda", {"enabled": True, "hour": 8, "channels": ["calendar"]})

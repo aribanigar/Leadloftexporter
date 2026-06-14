@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mic, Upload, Trash2, FileText, AlertTriangle, ListChecks } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import { fmtRelative } from "@/lib/utils";
+import { PageHeader, Pill } from "@/components/scheduling-ui";
 
 interface MeetingNote {
   id: string;
@@ -74,16 +75,15 @@ export default function NotetakerPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <Mic className="h-5 w-5 text-brand-600" />
-        <h1 className="text-lg font-semibold">Meeting Notetaker</h1>
-      </div>
+      <PageHeader icon={Mic} title="Meeting Notetaker" subtitle="Upload a recording or paste a transcript → summary + action items">
+        {notes.length > 0 && <Pill tone="brand">{notes.length} saved</Pill>}
+      </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Upload */}
         <div className="card space-y-3 p-5">
           {status && !status.transcription_enabled && (
-            <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/10">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               Audio transcription isn&apos;t configured (set <code>OPENAI_API_KEY</code> on the backend). You can still
               paste a transcript below.
@@ -94,16 +94,46 @@ export default function NotetakerPage() {
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Discovery call — Acme" className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
           </label>
 
-          <label className="block">
+          <div>
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Recording (mp3 / m4a / wav)</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="audio/*,.mp3,.m4a,.wav,.mp4"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
-            />
-          </label>
+            <label
+              className={
+                "flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-3 text-sm transition-colors " +
+                (file ? "border-brand-300 bg-brand-50/50" : "border-slate-300 hover:border-brand-400 hover:bg-slate-50")
+              }
+            >
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-brand-600 shadow-sm">
+                <Mic className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                {file ? (
+                  <span className="truncate font-medium text-slate-800">{file.name}</span>
+                ) : (
+                  <span className="text-slate-500">Click to choose an audio file…</span>
+                )}
+              </div>
+              {file && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setFile(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="rounded p-1 text-slate-400 hover:text-rose-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="audio/*,.mp3,.m4a,.wav,.mp4"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           <div className="text-center text-xs text-slate-400">— or —</div>
 
@@ -122,7 +152,7 @@ export default function NotetakerPage() {
           <button
             onClick={() => submit.mutate()}
             disabled={!canSubmit}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:brightness-110 disabled:opacity-60"
           >
             <Upload className="h-4 w-4" />
             {submit.isPending ? "Processing…" : "Generate notes"}
@@ -153,11 +183,12 @@ function NoteCard({ note, onDelete }: { note: MeetingNote; onDelete: () => void 
   return (
     <div className="card p-5">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-slate-800">{note.title}</h3>
-          <p className="text-xs text-slate-400">
-            {fmtRelative(note.created_at)} · {note.source}
-            {note.lead_id ? " · attached to lead" : ""}
+        <div className="min-w-0">
+          <h3 className="truncate font-semibold text-slate-800">{note.title}</h3>
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+            <Pill tone={note.source === "audio" ? "brand" : "slate"}>{note.source}</Pill>
+            <span>{fmtRelative(note.created_at)}</span>
+            {note.lead_id ? <Pill tone="emerald">attached to lead</Pill> : null}
           </p>
         </div>
         <button onClick={onDelete} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Delete">

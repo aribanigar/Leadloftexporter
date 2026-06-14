@@ -13,9 +13,14 @@ import {
   RefreshCw,
   Link2,
   X,
+  Bell,
+  Inbox,
+  ArrowRightLeft,
+  StickyNote,
+  CalendarCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { fmtRelative } from "@/lib/utils";
+import { PageHeader, Pill, LiveDot, Skeleton, useNow, liveRelative, type Tone } from "@/components/scheduling-ui";
 
 interface CalendarInfo {
   id: string;
@@ -46,6 +51,8 @@ interface CalConn {
 }
 interface CalStatus {
   configured: boolean;
+  server_configured: boolean;
+  has_workspace_credentials: boolean;
   connected: boolean;
   provider: string | null;
   delivery: { calendar: boolean; email: boolean };
@@ -71,21 +78,23 @@ interface Reminder {
 
 type Banner = { kind: "ok" | "err"; msg: string } | null;
 
-const SOURCE_LABEL: Record<string, string> = {
-  manual: "Manual",
-  inbox_reply: "Inbox reply",
-  stage_change: "Stage change",
-  note: "Note",
-  daily_agenda: "Daily agenda",
-  booking: "Booking",
+const SOURCE_META: Record<string, { label: string; tone: Tone; icon: React.ComponentType<{ className?: string }> }> = {
+  manual: { label: "Manual", tone: "slate", icon: Bell },
+  inbox_reply: { label: "Reply", tone: "brand", icon: Inbox },
+  stage_change: { label: "Stage", tone: "violet", icon: ArrowRightLeft },
+  note: { label: "Note", tone: "amber", icon: StickyNote },
+  daily_agenda: { label: "Agenda", tone: "emerald", icon: Sparkles },
+  booking: { label: "Booking", tone: "brand", icon: CalendarCheck },
+  booking_reminder: { label: "Meeting", tone: "brand", icon: CalendarCheck },
+  pre_meeting_brief: { label: "Brief", tone: "violet", icon: Sparkles },
 };
-const STATUS_STYLE: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700",
-  scheduled: "bg-amber-50 text-amber-700",
-  sent: "bg-emerald-50 text-emerald-700",
-  failed: "bg-rose-50 text-rose-700",
-  cancelled: "bg-slate-100 text-slate-500",
-  skipped: "bg-slate-100 text-slate-500",
+const STATUS_TONE: Record<string, Tone> = {
+  pending: "amber",
+  scheduled: "amber",
+  sent: "emerald",
+  failed: "rose",
+  cancelled: "slate",
+  skipped: "slate",
 };
 
 function localInputValue(d: Date): string {
@@ -109,43 +118,55 @@ export default function CalendarPage() {
   const { data: status, isLoading } = useQuery<CalStatus>({
     queryKey: ["calendar-status"],
     queryFn: () => api("/calendar/status"),
-    refetchInterval: 30000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   if (isLoading || !status) {
-    return <div className="p-6 text-sm text-slate-500">Loading calendar…</div>;
+    return (
+      <div className="p-6">
+        <PageHeader icon={CalendarClock} title="Calendar & Reminders" subtitle="Loading…" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-3">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
   }
 
   const noDelivery = !status.delivery.calendar && !status.delivery.email;
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <CalendarClock className="h-5 w-5 text-brand-600" />
-        <h1 className="text-lg font-semibold">Calendar &amp; Reminders</h1>
-      </div>
+      <PageHeader icon={CalendarClock} title="Calendar & Reminders" subtitle="Your nudges, briefings, and synced calendar — in real time">
+        <LiveDot />
+      </PageHeader>
 
       {banner && (
         <div
           className={
-            "mb-4 flex items-center justify-between rounded-md px-4 py-2.5 text-sm " +
+            "mb-4 flex items-center justify-between rounded-lg px-4 py-2.5 text-sm shadow-sm " +
             (banner.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")
           }
         >
           <span>{banner.msg}</span>
-          <button onClick={() => setBanner(null)}>
+          <button onClick={() => setBanner(null)} className="opacity-60 hover:opacity-100">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
       {noDelivery && (
-        <div className="mb-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/10">
           Reminders need somewhere to go. Connect an email account in{" "}
           <Link href="/settings/integrations" className="font-medium underline">
             Settings → Integrations
           </Link>{" "}
-          (any SMTP/Gmail inbox works), or connect Google Calendar below.
+          (any SMTP/Gmail inbox works), or connect Google Calendar.
         </div>
       )}
 
@@ -154,16 +175,8 @@ export default function CalendarPage() {
           <RemindersPanel setBanner={setBanner} />
         </div>
         <div className="space-y-6">
-          <DeliveryCard
-            status={status}
-            onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })}
-            setBanner={setBanner}
-          />
-          <ReminderSettings
-            status={status}
-            onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })}
-            setBanner={setBanner}
-          />
+          <DeliveryCard status={status} onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })} setBanner={setBanner} />
+          <ReminderSettings status={status} onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })} setBanner={setBanner} />
         </div>
       </div>
     </div>
@@ -187,6 +200,17 @@ function DeliveryCard({
     onSuccess: (d) => {
       window.location.href = d.url;
     },
+    onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
+  });
+
+  // Bring-your-own Google OAuth client so connect works with no backend env vars.
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [copiedUri, setCopiedUri] = useState(false);
+  const saveCreds = useMutation({
+    mutationFn: () => api("/calendar/google-credentials", { method: "POST", body: { client_id: clientId.trim(), client_secret: clientSecret.trim() } }),
+    onSuccess: () => connect.mutate(),
     onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
   });
   const disconnect = useMutation({
@@ -217,15 +241,18 @@ function DeliveryCard({
 
   return (
     <div className="card p-5">
-      <h3 className="mb-3 font-semibold">Delivery</h3>
+      <h3 className="mb-3 text-sm font-semibold text-slate-900">Delivery</h3>
 
-      {/* Email/SMTP delivery — the simple default */}
-      <div className="mb-4 flex items-start gap-2 text-sm">
-        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
-        <div>
+      <div className="mb-4 flex items-start gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-sm">
+          <Mail className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
           <div className="font-medium text-slate-800">Email / SMTP</div>
           {status.delivery.email ? (
-            <div className="text-emerald-600">Connected — reminders can be emailed.</div>
+            <div className="flex items-center gap-1 text-emerald-600">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Connected — reminders can be emailed.
+            </div>
           ) : (
             <div className="text-slate-500">
               No email account.{" "}
@@ -238,82 +265,135 @@ function DeliveryCard({
         </div>
       </div>
 
-      {/* Google Calendar — optional upgrade */}
-      <div className="border-t border-slate-100 pt-4">
-        <div className="mb-1 flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-800">Google Calendar</span>
-          {cal && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+      <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-sm">
+          <CalendarClock className="h-4 w-4" />
         </div>
-
-        {!cal ? (
-          status.configured ? (
-            <button
-              onClick={() => connect.mutate()}
-              disabled={connect.isPending}
-              className="mt-1 inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-            >
-              <Link2 className="h-4 w-4" />
-              {connect.isPending ? "Redirecting…" : "Connect (optional)"}
-            </button>
-          ) : (
-            <p className="text-xs text-slate-500">Not configured on the server. Email reminders work without it.</p>
-          )
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="truncate text-sm text-slate-600">{cal.email || cal.label}</span>
-              <button onClick={() => disconnect.mutate()} className="text-xs text-slate-400 hover:text-rose-600">
-                Disconnect
-              </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Add events to</label>
-              <button
-                onClick={() => refreshCals.mutate()}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600"
-              >
-                <RefreshCw className={"h-3.5 w-3.5 " + (refreshCals.isPending ? "animate-spin" : "")} /> Refresh
-              </button>
-            </div>
-            <select
-              value={writeId}
-              onChange={(e) => setWriteId(e.target.value)}
-              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-            >
-              {cal.calendars.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.primary ? " (primary)" : ""}
-                </option>
-              ))}
-            </select>
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                Check for conflicts
-              </label>
-              <div className="space-y-1">
-                {cal.calendars.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={conflictIds.includes(c.id)}
-                      onChange={() => toggleConflict(c.id)}
-                    />
-                    <span className="truncate">{c.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => saveRoles.mutate()}
-              disabled={saveRoles.isPending}
-              className="w-full rounded-md border border-brand-600 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
-            >
-              {saveRoles.isPending ? "Saving…" : "Save calendar roles"}
-            </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+            Google Calendar
+            {cal && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
           </div>
-        )}
+
+          {!cal ? (
+            <div className="mt-2 space-y-2">
+              <button
+                onClick={() => (status.configured ? connect.mutate() : setSetupOpen((v) => !v))}
+                disabled={connect.isPending || saveCreds.isPending}
+                className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                <Link2 className="h-4 w-4" />
+                {connect.isPending ? "Redirecting…" : "Connect Google Calendar"}
+              </button>
+              {status.configured && (
+                <button onClick={() => setSetupOpen((v) => !v)} className="block text-[11px] text-slate-400 hover:text-slate-600">
+                  Use your own Google app
+                </button>
+              )}
+              {(setupOpen || (!status.configured && false)) && (
+                <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-xs ring-1 ring-inset ring-slate-200/70">
+                  <p className="text-slate-600">
+                    Paste a Google OAuth <strong>Web</strong> client (Cloud Console → Credentials, Calendar API enabled).
+                    Add this redirect URI to it:
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1 text-[11px] text-slate-700 ring-1 ring-inset ring-slate-200">
+                      {status.redirect_uri}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(status.redirect_uri);
+                        setCopiedUri(true);
+                        setTimeout(() => setCopiedUri(false), 1500);
+                      }}
+                      className="rounded border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50"
+                    >
+                      {copiedUri ? "✓" : "Copy"}
+                    </button>
+                  </div>
+                  <input
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="Client ID"
+                    className="w-full rounded-md border border-slate-200 px-2 py-1.5"
+                  />
+                  <input
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    placeholder="Client Secret"
+                    type="password"
+                    className="w-full rounded-md border border-slate-200 px-2 py-1.5"
+                  />
+                  <button
+                    onClick={() => saveCreds.mutate()}
+                    disabled={saveCreds.isPending || connect.isPending || !clientId.trim() || !clientSecret.trim()}
+                    className="w-full rounded-md bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+                  >
+                    {saveCreds.isPending || connect.isPending ? "Connecting…" : "Save & connect"}
+                  </button>
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-brand-700 hover:underline"
+                  >
+                    Open Google Cloud Console →
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="truncate text-sm text-slate-600">{cal.email || cal.label}</span>
+                <button onClick={() => disconnect.mutate()} className="text-xs text-slate-400 hover:text-rose-600">
+                  Disconnect
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Add events to</label>
+                <button
+                  onClick={() => refreshCals.mutate()}
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600"
+                >
+                  <RefreshCw className={"h-3.5 w-3.5 " + (refreshCals.isPending ? "animate-spin" : "")} /> Refresh
+                </button>
+              </div>
+              <select
+                value={writeId}
+                onChange={(e) => setWriteId(e.target.value)}
+                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+              >
+                {cal.calendars.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.primary ? " (primary)" : ""}
+                  </option>
+                ))}
+              </select>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Check for conflicts
+                </label>
+                <div className="space-y-1">
+                  {cal.calendars.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input type="checkbox" checked={conflictIds.includes(c.id)} onChange={() => toggleConflict(c.id)} />
+                      <span className="truncate">{c.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => saveRoles.mutate()}
+                disabled={saveRoles.isPending}
+                className="w-full rounded-md border border-brand-600 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+              >
+                {saveRoles.isPending ? "Saving…" : "Save calendar roles"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -353,7 +433,6 @@ function ReminderSettings({
   });
 
   const calendarAvailable = status.delivery.calendar;
-
   const toggleChannel = (ch: string, on: boolean) =>
     setAgenda({
       ...agenda,
@@ -363,13 +442,12 @@ function ReminderSettings({
   return (
     <>
       <div className="card p-5">
-        <h3 className="mb-3 font-semibold">Daily agenda</h3>
+        <div className="mb-3 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-brand-600" />
+          <h3 className="text-sm font-semibold text-slate-900">Daily agenda</h3>
+        </div>
         <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={agenda.enabled}
-            onChange={(e) => setAgenda({ ...agenda, enabled: e.target.checked })}
-          />
+          <input type="checkbox" checked={agenda.enabled} onChange={(e) => setAgenda({ ...agenda, enabled: e.target.checked })} />
           Deliver a daily &quot;your day&quot; briefing
         </label>
         <div className="mb-3 flex items-center gap-2 text-sm">
@@ -389,11 +467,7 @@ function ReminderSettings({
         </div>
         <div className="mb-4 flex gap-3 text-sm">
           <label className="flex items-center gap-1.5 text-slate-700">
-            <input
-              type="checkbox"
-              checked={agenda.channels.includes("email")}
-              onChange={(e) => toggleChannel("email", e.target.checked)}
-            />
+            <input type="checkbox" checked={agenda.channels.includes("email")} onChange={(e) => toggleChannel("email", e.target.checked)} />
             Email
           </label>
           <label className={"flex items-center gap-1.5 " + (calendarAvailable ? "text-slate-700" : "text-slate-300")}>
@@ -409,20 +483,23 @@ function ReminderSettings({
         <button
           onClick={() => generate.mutate()}
           disabled={generate.isPending}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-br from-brand-500 to-brand-700 px-3 py-2 text-sm font-medium text-white shadow-sm hover:brightness-110 disabled:opacity-60"
         >
           <Sparkles className="h-4 w-4" />
           {generate.isPending ? "Generating…" : "Generate today's agenda now"}
         </button>
         {agendaPreview && (
-          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs text-slate-700">
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700 ring-1 ring-inset ring-slate-200/60">
             {agendaPreview.body}
           </pre>
         )}
       </div>
 
       <div className="card p-5">
-        <h3 className="mb-3 font-semibold">Auto-reminders from CRM</h3>
+        <div className="mb-1 flex items-center gap-2">
+          <Bell className="h-4 w-4 text-brand-600" />
+          <h3 className="text-sm font-semibold text-slate-900">Auto-reminders from CRM</h3>
+        </div>
         <p className="mb-3 text-xs text-slate-500">Create a reminder automatically when these happen.</p>
         {(
           [
@@ -462,10 +539,12 @@ function ReminderSettings({
 
 function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
   const qc = useQueryClient();
-  const { data } = useQuery<{ reminders: Reminder[] }>({
+  const now = useNow(1000);
+  const { data, isFetching } = useQuery<{ reminders: Reminder[] }>({
     queryKey: ["reminders"],
     queryFn: () => api("/calendar/reminders"),
-    refetchInterval: 20000,
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
   });
   const reminders = useMemo(() => data?.reminders || [], [data]);
 
@@ -488,31 +567,59 @@ function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
     onError: (e: unknown) => setBanner({ kind: "err", msg: (e as Error).message }),
   });
 
+  // Optimistic delete for an instant, dynamic feel.
   const remove = useMutation({
     mutationFn: (id: string) => api(`/calendar/reminders/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reminders"] }),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["reminders"] });
+      const prev = qc.getQueryData<{ reminders: Reminder[] }>(["reminders"]);
+      qc.setQueryData<{ reminders: Reminder[] }>(["reminders"], (old) =>
+        old ? { reminders: old.reminders.filter((r) => r.id !== id) } : old
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["reminders"], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["reminders"] }),
   });
 
   const upcoming = useMemo(
-    () => reminders.filter((r) => r.status === "pending" || r.status === "scheduled"),
+    () => reminders.filter((r) => r.status === "pending" || r.status === "scheduled").sort((a, b) => +new Date(a.remind_at) - +new Date(b.remind_at)),
     [reminders]
   );
   const past = useMemo(
-    () => reminders.filter((r) => r.status !== "pending" && r.status !== "scheduled"),
+    () => reminders.filter((r) => r.status !== "pending" && r.status !== "scheduled").sort((a, b) => +new Date(b.remind_at) - +new Date(a.remind_at)),
     [reminders]
   );
+  const next = upcoming[0];
 
   return (
-    <div className="card">
+    <div className="card overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-        <h3 className="font-semibold">Reminders</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">Reminders</h3>
+          <Pill tone="amber">{upcoming.length} upcoming</Pill>
+          {isFetching && <RefreshCw className="h-3 w-3 animate-spin text-slate-300" />}
+        </div>
         <button
           onClick={() => setAdding((v) => !v)}
-          className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50"
         >
           <Plus className="h-4 w-4" /> New
         </button>
       </div>
+
+      {/* Next-up strip */}
+      {next && (
+        <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/60 to-transparent px-5 py-2.5">
+          <Bell className="h-4 w-4 shrink-0 text-brand-600" />
+          <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
+            Next: <span className="font-medium">{next.title}</span>
+          </span>
+          <span className="shrink-0 font-mono text-xs font-semibold text-brand-700">{liveRelative(next.remind_at, now).text}</span>
+        </div>
+      )}
 
       {adding && (
         <div className="flex flex-wrap items-end gap-2 border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -523,17 +630,8 @@ function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
             onChange={(e) => setTitle(e.target.value)}
             className="min-w-[12rem] flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
           />
-          <input
-            type="datetime-local"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
-            className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-          />
-          <select
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-          >
+          <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="rounded-md border border-slate-200 px-2 py-1.5 text-sm" />
+          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded-md border border-slate-200 px-2 py-1.5 text-sm">
             <option value="email">Email</option>
             <option value="calendar">Calendar</option>
           </select>
@@ -547,42 +645,61 @@ function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
         </div>
       )}
 
-      <ul>
-        {[...upcoming, ...past].map((r) => (
-          <li key={r.id} className="flex items-center gap-3 border-b border-slate-100 px-5 py-2.5 last:border-0">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium text-slate-800">{r.title}</span>
-                <span
-                  className={
-                    "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium " +
-                    (STATUS_STYLE[r.status] || "bg-slate-100 text-slate-500")
-                  }
-                >
-                  {r.status}
-                </span>
-              </div>
-              <div className="text-xs text-slate-400">
-                {SOURCE_LABEL[r.source] || r.source} · {r.channel} · {fmtRelative(r.remind_at)}
-                {r.error ? ` · ${r.error}` : ""}
-              </div>
-            </div>
-            <button
-              onClick={() => remove.mutate(r.id)}
-              className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-              title="Delete reminder"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </li>
+      <ul className="divide-y divide-slate-100">
+        {upcoming.map((r) => (
+          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} />
+        ))}
+        {past.length > 0 && (
+          <li className="bg-slate-50/60 px-5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">Delivered</li>
+        )}
+        {past.map((r) => (
+          <ReminderRow key={r.id} r={r} now={now} onDelete={() => remove.mutate(r.id)} muted />
         ))}
         {reminders.length === 0 && (
-          <li className="px-5 py-6 text-sm text-slate-500">
-            No reminders yet. Add one above, or they&apos;ll appear automatically from replies, stage changes, and
-            notes.
+          <li className="flex flex-col items-center gap-2 px-5 py-12 text-center">
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-400">
+              <Bell className="h-5 w-5" />
+            </div>
+            <p className="text-sm text-slate-500">No reminders yet.</p>
+            <p className="max-w-xs text-xs text-slate-400">Add one above, or they&apos;ll appear automatically from replies, stage changes, and notes.</p>
           </li>
         )}
       </ul>
     </div>
+  );
+}
+
+function ReminderRow({ r, now, onDelete, muted }: { r: Reminder; now: number; onDelete: () => void; muted?: boolean }) {
+  const meta = SOURCE_META[r.source] || SOURCE_META.manual;
+  const Icon = meta.icon;
+  const rel = liveRelative(r.remind_at, now);
+  return (
+    <li className={"group flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-slate-50/70 " + (muted ? "opacity-70" : "")}>
+      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${muted ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-600"}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-slate-800">{r.title}</span>
+          <Pill tone={STATUS_TONE[r.status] || "slate"} dot>
+            {r.status}
+          </Pill>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <Pill tone={meta.tone}>{meta.label}</Pill>
+          {r.channel === "calendar" ? <CalendarClock className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+          <span>·</span>
+          <span className={!rel.isPast && (r.status === "pending" || r.status === "scheduled") ? "font-medium text-brand-600" : ""}>{rel.text}</span>
+          {r.error ? <span className="truncate text-rose-500">· {r.error}</span> : null}
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        className="shrink-0 rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+        title="Delete reminder"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </li>
   );
 }
