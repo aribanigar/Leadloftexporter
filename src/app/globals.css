@@ -80,9 +80,15 @@ body {
   .gradient-heading {
     @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
   }
-  /* Warm "earth" canvas used behind the whole app (replaces the flat grey). */
+  /* Warm sand canvas behind the whole app — a deeper earth tone with subtle
+     dune-wave ripples + a soft light highlight, so it reads as sand, not grey. */
   .app-canvas {
-    @apply bg-gradient-to-br from-[#f7f4ee] via-[#f5f1e8] to-[#efe9dc];
+    background-color: #efe5d1;
+    background-image:
+      radial-gradient(150% 95% at 50% -25%, rgba(255, 252, 244, 0.7), rgba(255, 252, 244, 0) 55%),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='90'%20viewBox='0%200%20240%2090'%3E%3Cg%20fill='none'%20stroke='%23c8b487'%20stroke-opacity='0.28'%20stroke-width='1.4'%3E%3Cpath%20d='M0%2015%20C60%205,180%2025,240%2015'/%3E%3Cpath%20d='M0%2045%20C60%2035,180%2055,240%2045'/%3E%3Cpath%20d='M0%2075%20C60%2065,180%2085,240%2075'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: no-repeat, repeat;
+    background-size: cover, 260px 98px;
   }
   .card {
     @apply rounded-lg border border-slate-200 bg-white shadow-card;
