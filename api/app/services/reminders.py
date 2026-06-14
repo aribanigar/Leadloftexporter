@@ -473,7 +473,7 @@ def process_due_reminders(db: Session) -> dict:
             Reminder.done_at.is_(None),
         )
         .order_by(Reminder.remind_at.asc())
-        .limit(300)
+        .limit(25)
         .all()
     )
     for r in due:
@@ -500,7 +500,7 @@ def process_due_reminders(db: Session) -> dict:
             Reminder.next_nudge_at <= now,
         )
         .order_by(Reminder.next_nudge_at.asc())
-        .limit(300)
+        .limit(25)
         .all()
     )
     for r in nudge_due:
