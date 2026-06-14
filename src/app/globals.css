@@ -7,11 +7,31 @@
   --foreground: #0f172a;
 }
 
+/* App-wide base size bumped ~5% so content reads larger & clearer. All
+   rem-based Tailwind sizing scales with it. */
+html {
+  font-size: 105%;
+}
+
 html,
 body {
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  line-height: 1.55;
+}
+
+/* Headings use Manrope for an elegant, confident display look. */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
+  letter-spacing: -0.018em;
 }
 
 * {
