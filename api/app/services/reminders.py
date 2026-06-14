@@ -205,6 +205,7 @@ def create_reminder(
     payload: Optional[dict] = None,
     recipient_email: Optional[str] = None,
     booking_id: Optional[str] = None,
+    target_calendar_id: Optional[str] = None,
     commit: bool = True,
     notify: bool = True,
 ) -> Reminder:
@@ -224,6 +225,7 @@ def create_reminder(
         payload=payload or {},
         recipient_email=recipient_email,
         booking_id=booking_id,
+        target_calendar_id=target_calendar_id,
         status="pending",
     )
     db.add(rem)
@@ -487,7 +489,9 @@ def _deliver_calendar(db: Session, reminder: Reminder) -> bool:
         reminder.status = "failed"
         reminder.error = "calendar_auth_failed"
         return False
-    cal_id = _write_calendar_id(account)
+    # Honour the reminder's assigned calendar (multi-calendar), else the
+    # account's default write calendar.
+    cal_id = reminder.target_calendar_id or _write_calendar_id(account)
     start = reminder.remind_at
     end = start + timedelta(minutes=reminder.duration_minutes or 15)
     if reminder.external_event_id:

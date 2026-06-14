@@ -489,6 +489,10 @@ class Reminder(Base, TimestampMixin):
     # written, so we can update/delete it idempotently.
     calendar_account_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connected_accounts.id", ondelete="SET NULL"))
     external_event_id: Mapped[Optional[str]] = mapped_column(String(255))
+    # Which Google calendar this reminder/task is written to (when channel is
+    # calendar). Null → the account's default write calendar. Lets a user sync
+    # several calendars and assign each reminder to a specific one.
+    target_calendar_id: Mapped[Optional[str]] = mapped_column(String(255))
 
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

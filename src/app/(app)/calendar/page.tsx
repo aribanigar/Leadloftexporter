@@ -173,7 +173,11 @@ export default function CalendarPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <RemindersPanel setBanner={setBanner} />
+          <RemindersPanel
+            setBanner={setBanner}
+            calendars={status.calendar?.calendars || []}
+            defaultCalendarId={status.calendar?.write_calendar_id || ""}
+          />
         </div>
         <div className="space-y-6">
           <DeliveryCard status={status} onChanged={() => qc.invalidateQueries({ queryKey: ["calendar-status"] })} setBanner={setBanner} />
@@ -548,7 +552,15 @@ function ReminderSettings({
   );
 }
 
-function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
+function RemindersPanel({
+  setBanner,
+  calendars,
+  defaultCalendarId,
+}: {
+  setBanner: (b: Banner) => void;
+  calendars: CalendarInfo[];
+  defaultCalendarId: string;
+}) {
   const qc = useQueryClient();
   const now = useNow(1000);
   const { data, isFetching } = useQuery<{ reminders: Reminder[] }>({
@@ -563,12 +575,18 @@ function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState(localInputValue(new Date(Date.now() + 60 * 60 * 1000)));
   const [channel, setChannel] = useState("email");
+  const [calId, setCalId] = useState(defaultCalendarId);
 
   const create = useMutation({
     mutationFn: () =>
       api("/calendar/reminders", {
         method: "POST",
-        body: { title, remind_at: new Date(when).toISOString(), channel },
+        body: {
+          title,
+          remind_at: new Date(when).toISOString(),
+          channel,
+          target_calendar_id: channel === "calendar" && calId ? calId : null,
+        },
       }),
     onSuccess: () => {
       setTitle("");
@@ -646,6 +664,21 @@ function RemindersPanel({ setBanner }: { setBanner: (b: Banner) => void }) {
             <option value="email">Email</option>
             <option value="calendar">Calendar</option>
           </select>
+          {channel === "calendar" && calendars.length > 0 && (
+            <select
+              value={calId}
+              onChange={(e) => setCalId(e.target.value)}
+              className="max-w-[12rem] rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+              title="Which calendar to add this to"
+            >
+              {calendars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.primary ? " (primary)" : ""}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={() => title.trim() && create.mutate()}
             disabled={create.isPending || !title.trim()}

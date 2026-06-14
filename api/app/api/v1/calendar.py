@@ -44,6 +44,7 @@ def _serialize_reminder(r: Reminder) -> dict:
         "source": r.source,
         "lead_id": r.lead_id,
         "external_event_id": r.external_event_id,
+        "target_calendar_id": r.target_calendar_id,
         "payload": r.payload or {},
         "sent_at": r.sent_at,
         "error": r.error,
@@ -367,6 +368,7 @@ class ReminderIn(BaseModel):
     channel: str = "calendar"
     lead_id: Optional[str] = None
     duration_minutes: int = 15
+    target_calendar_id: Optional[str] = None
 
 
 @router.post("/reminders")
@@ -392,6 +394,7 @@ def create_reminder_endpoint(
         source="manual",
         lead_id=body.lead_id,
         duration_minutes=body.duration_minutes,
+        target_calendar_id=body.target_calendar_id,
     )
     return _serialize_reminder(rem)
 
