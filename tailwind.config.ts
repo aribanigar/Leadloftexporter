@@ -21,6 +21,25 @@ const config: Config = {
           500: "#ec4899",
           600: "#db2777",
         },
+        // Dark teal green — deep, premium accent.
+        dteal: {
+          50: "#e6f2f0",
+          100: "#c2ded9",
+          400: "#1f8a7d",
+          500: "#0f766e",
+          600: "#0c5d52",
+          700: "#0a4a42",
+          800: "#073a34",
+        },
+        // McDonald's golden yellow.
+        mcyellow: {
+          50: "#fff8e6",
+          100: "#ffefbf",
+          400: "#ffd24d",
+          500: "#ffc72c",
+          600: "#e6ab1f",
+          700: "#bd8a16",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],

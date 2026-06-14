@@ -47,7 +47,7 @@ export function TopBar({ onMenu }: { onMenu?: () => void } = {}) {
         <Menu className="h-5 w-5" />
       </button>
       <button
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-slate-800"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-dteal-600 hover:border-dteal-300 hover:bg-dteal-50 hover:text-dteal-700"
         onClick={refresh}
         title="Refresh"
       >

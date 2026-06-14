@@ -90,12 +90,21 @@ h5 {
   .btn-success {
     @apply btn bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm hover:from-emerald-600 hover:to-teal-700;
   }
+  .btn-teal {
+    @apply btn bg-gradient-to-r from-dteal-500 to-dteal-700 text-white shadow-sm hover:from-dteal-600 hover:to-dteal-800;
+  }
+  .btn-yellow {
+    @apply btn bg-gradient-to-r from-mcyellow-400 to-mcyellow-500 font-semibold text-dteal-800 shadow-sm hover:from-mcyellow-500 hover:to-mcyellow-600;
+  }
   /* Reusable gradient helpers for page chrome (cards, headers, hero strips). */
   .gradient-brand {
     @apply bg-gradient-to-r from-brand-600 to-indigo-600;
   }
   .gradient-emerald {
     @apply bg-gradient-to-br from-emerald-500 to-teal-600;
+  }
+  .gradient-teal {
+    @apply bg-gradient-to-br from-dteal-500 to-dteal-700;
   }
   .gradient-heading {
     @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
