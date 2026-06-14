@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.246",
+    date: "Jun 15, 2026",
+    size: "234 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.246.zip",
+    latest: true,
+    changes: [
+      "New “Mass Apply Jobs” button on the jobs results page (/jobs/search-results/ and /jobs/collections/).",
+      "Walks every job card, opens the in-app LinkedIn Apply form, auto-fills it, and submits — skipping “Apply on company website” roles it can’t fill.",
+      "Auto-answers selects/Yes-No/experience questions, unticks “Follow company”, declines post-apply upsells, paginates, and paces ~30s+ between applications.",
+      "Fully isolated new script — no change to any existing extension feature.",
+    ],
+  },
+  {
     version: "1.0.245",
     date: "Jun 14, 2026",
     size: "226 KB",
     file: "/extensions/leadcaptura-extension-v1.0.245.zip",
-    latest: true,
     changes: [
       "“Connect All On Page” button now also appears on /search/results/all/ (the “All” tab), not just the dedicated People search.",
       "Same button, same shadow-DOM-aware invite flow — no other behaviour change.",
