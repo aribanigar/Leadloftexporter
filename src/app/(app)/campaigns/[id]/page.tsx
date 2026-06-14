@@ -649,9 +649,11 @@ export default function CampaignDetailPage() {
   // refresh while status === 'sending', so we skip it then to avoid double work.)
   useEffect(() => {
     if (campaign?.status === 'sending') return;
-    const t = setInterval(() => { fetchStats(true); }, 15000);
+    // Refresh BOTH the campaign counters (which back the Integrity Report +
+    // Real-time Delivery) and engagement stats, so every panel stays live.
+    const t = setInterval(() => { fetchCampaign(); fetchStats(true); }, 15000);
     return () => clearInterval(t);
-  }, [campaign?.status, fetchStats]);
+  }, [campaign?.status, fetchCampaign, fetchStats]);
 
   // ── Start campaign
   const handleStart = async () => {
@@ -780,19 +782,23 @@ export default function CampaignDetailPage() {
   const bouncedRecipients = (stats?.recipients ?? []).filter(r => r.status === 'bounced');
   const maxLinkClicks = stats ? Math.max(...(stats.links.map(l => l.clicks)), 1) : 1;
 
-  // ── Live integrity figures (full-population, from server status_counts) ──
-  const sc = stats?.statusCounts ?? {};
-  const intTotal = stats?.totalRecipients ?? 0;
-  const intBounced = sc.bounced ?? stats?.bounced ?? 0;
-  const intFailed = sc.failed ?? 0;
-  const intSkipped = sc.skipped ?? 0;
-  const intDelivered = stats?.sent ?? 0; // sent successfully (bounced/failed are separate buckets)
-  const intQueued = Math.max(intTotal - intDelivered - intBounced - intFailed - intSkipped, 0);
+  // ── Live integrity figures ──
+  // Sourced from the SAME live campaign counters the "Real-time Delivery" panel
+  // uses (campaign.*_count, refreshed every tick) so the two never disagree.
+  const intTotal = campaign.total_recipients;
+  const intDelivered = campaign.sent_count;
+  const intBounced = campaign.bounced_count;
+  const intFailed = campaign.failed_count;
+  const intSkipped = campaign.skipped_count;
+  const intQueued = Math.max(intTotal - intDelivered - intFailed - intSkipped, 0);
   const intIssues = intBounced + intFailed;
-  const deliveryPct = stats ? stats.deliveryRate : 0;
+  // Deliverability = quality of what's been attempted (delivered vs bounced),
+  // from the same counters so the gauge agrees with the tiles.
+  const intAttempted = intDelivered + intBounced;
+  const intBounceRate = intAttempted > 0 ? (intBounced / intAttempted) * 100 : 0;
+  const intDeliveryPct = intAttempted > 0 ? 100 - intBounceRate : 0;
   // Live "updated Ns ago" — recomputed every second via the ticker.
   const statsAgeSec = lastStatsAt ? Math.max(0, Math.floor((Date.now() - lastStatsAt) / 1000)) : null;
-  const liveStream = campaign.status === 'sending';
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: T.surface, minHeight: '100vh', paddingBottom: '60px' }}>
@@ -1194,8 +1200,8 @@ export default function CampaignDetailPage() {
 
         {/* ═══ Integrity Report (real-time) ══════════════════════════════ */}
         {(() => {
-          const healthColor = !stats ? '#6b7280' : stats.bounceRate > 5 ? '#dc2626' : stats.bounceRate > 2 ? '#b45309' : '#16a34a';
-          const healthBg = !stats ? 'rgba(107,114,128,0.1)' : stats.bounceRate > 5 ? 'rgba(220,38,38,0.1)' : stats.bounceRate > 2 ? 'rgba(217,119,6,0.12)' : 'rgba(22,163,74,0.1)';
+          const healthColor = intBounceRate > 5 ? '#dc2626' : intBounceRate > 2 ? '#b45309' : '#16a34a';
+          const healthBg = intBounceRate > 5 ? 'rgba(220,38,38,0.1)' : intBounceRate > 2 ? 'rgba(217,119,6,0.12)' : 'rgba(22,163,74,0.1)';
           const updatedLabel = statsAgeSec === null ? 'syncing…' : statsAgeSec < 2 ? 'just now' : statsAgeSec < 60 ? `${statsAgeSec}s ago` : `${Math.floor(statsAgeSec / 60)}m ago`;
           const tiles = [
             { key: 'delivered', label: 'Delivered', value: intDelivered, color: '#13677b', bg: 'rgba(19,103,123,0.08)', icon: 'mark_email_read' },
@@ -1246,20 +1252,20 @@ export default function CampaignDetailPage() {
                 Deliverability
               </span>
               <span style={{ fontSize: '22px', fontWeight: 900, color: healthColor, fontFamily: 'Manrope, sans-serif', fontVariantNumeric: 'tabular-nums' }}>
-                {stats ? `${deliveryPct.toFixed(1)}%` : '—'}
+                {`${intDeliveryPct.toFixed(1)}%`}
               </span>
             </div>
             <div style={{ height: '8px', borderRadius: '999px', backgroundColor: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
               <div style={{
                 height: '100%', borderRadius: '999px',
-                width: `${Math.min(Math.max(deliveryPct, 0), 100)}%`,
+                width: `${Math.min(Math.max(intDeliveryPct, 0), 100)}%`,
                 backgroundColor: healthColor,
                 transition: 'width 0.6s ease, background-color 0.4s ease',
               }} />
             </div>
             <div style={{ marginTop: '8px', fontSize: '12px', color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif', lineHeight: 1.5 }}>
-              Bounce rate {stats ? `${stats.bounceRate.toFixed(1)}%` : '—'}
-              {stats && stats.bounceRate > 5 ? ' — above safe threshold, review your list.' : ' — within safe parameters.'}
+              Bounce rate {`${intBounceRate.toFixed(1)}%`}
+              {intBounceRate > 5 ? ' — above safe threshold, review your list.' : ' — within safe parameters.'}
             </div>
           </div>
 

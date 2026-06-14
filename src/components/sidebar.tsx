@@ -51,7 +51,7 @@ const NAV = [
 // Saved views hidden from the sidebar (matched case-insensitively by name).
 const HIDDEN_VIEWS = new Set(["new", "school connect"]);
 
-export function Sidebar() {
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void } = {}) {
   const pathname = usePathname();
   const { user, workspace } = useAuth();
   const { data: views } = useQuery<SavedView[]>({
@@ -67,7 +67,21 @@ export function Sidebar() {
   const [creatingLead, setCreatingLead] = useState(false);
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-slate-200 bg-white">
+    <>
+      {/* mobile backdrop */}
+      <div
+        onClick={onClose}
+        className={cn(
+          "fixed inset-0 z-[140] bg-slate-900/40 transition-opacity lg:hidden",
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+      />
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-[150] flex h-full w-60 flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
       <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-4">
         <div className="grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-xs font-semibold uppercase">
           {initials(workspace?.name || user?.email)}
@@ -161,6 +175,7 @@ export function Sidebar() {
           <span>Settings</span>
         </Link>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

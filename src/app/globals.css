@@ -83,3 +83,26 @@ body {
     @apply inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-brand-300 hover:text-brand-700;
   }
 }
+
+/* ── Mobile ergonomics ─────────────────────────────────────────────────── */
+/* Prevent iOS from zooming the page when focusing a small input. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+/* No accidental horizontal page scroll from a stray wide element. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+/* Honour the notch / home-indicator safe areas in standalone (installed) mode. */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: 0;
+  }
+}
