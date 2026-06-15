@@ -42,6 +42,13 @@ export function clearSession() {
   localStorage.removeItem("lc_workspace_id");
 }
 
+// Default request timeout — prevents the UI from hanging forever if Render
+// is cold-starting or Neon is suspended. 25s is comfortably longer than a
+// typical cold start (~30s worst case for the API + DB warm-up combined we
+// hit elsewhere, but most calls complete in <2s; this catches the pathological
+// hang). Callers can pass their own `signal` to override.
+const DEFAULT_TIMEOUT_MS = 25_000;
+
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const token = getToken();
   const workspaceId = getWorkspaceId();
@@ -52,12 +59,32 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
 
-  const res = await fetch(`${API_URL}/api/v1${path}`, {
-    method: opts.method || "GET",
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    signal: opts.signal,
-  });
+  // Fall back to our own AbortController if the caller didn't supply a signal,
+  // so the request always has a hard ceiling.
+  let signal = opts.signal;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  if (!signal) {
+    const ctrl = new AbortController();
+    signal = ctrl.signal;
+    timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1${path}`, {
+      method: opts.method || "GET",
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal,
+    });
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") {
+      throw new ApiError(0, null, "Request timed out — please try again.");
+    }
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (opts.raw) return res as unknown as T;
   const text = await res.text();
   const data = text ? safeParse(text) : null;

@@ -33,8 +33,16 @@ export const useAuth = create<AuthState>((set, get) => ({
       const ws = me.workspaces.find((w) => w.id === wsId) || me.workspaces[0] || null;
       if (ws) localStorage.setItem("lc_workspace_id", ws.id);
       set({ user: me.user, workspaces: me.workspaces, workspace: ws, loading: false });
-    } catch {
-      clearSession();
+    } catch (e) {
+      // Only LOG THE USER OUT on a real auth failure (401/403). Network
+      // timeouts, 5xx, cold-start blips, and Neon-suspended errors are
+      // TRANSIENT — keep the token and just stop the loading spinner so the
+      // user can retry. The previous always-clear behaviour was the root
+      // cause of "the website logs me out and hangs" complaints.
+      const status = (e as { status?: number } | null)?.status;
+      if (status === 401 || status === 403) {
+        clearSession();
+      }
       set({ loading: false });
     }
   },
