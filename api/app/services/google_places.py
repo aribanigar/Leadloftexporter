@@ -117,7 +117,9 @@ def search_text(
     }
     results: list[dict] = []
     page_token = ""
-    pages = max(1, min(int(max_pages or 1), 5))
+    # Text Search returns at most 60 results = 3 pages of 20; Google never
+    # issues a 4th nextPageToken, so capping at 3 avoids a wasted round-trip.
+    pages = max(1, min(int(max_pages or 1), 3))
 
     for i in range(pages):
         body: dict[str, Any] = {"textQuery": query, "pageSize": 20, "languageCode": language_code}
