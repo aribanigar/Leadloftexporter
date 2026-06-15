@@ -271,6 +271,13 @@
   // (not inside) the progress "region", so scoping the search to that region —
   // or to any single container — silently misses it. Document scope is the fix.
   function applyFormPresent() {
+    // Structural check first: any visible dialog that passes the structural
+    // Easy Apply test (Apply to <Company> heading, jobs-apply-header,
+    // data-test-modal-id, progress region, or contains a data-easy-apply-*
+    // button). Robust even on steps with no action button rendered yet.
+    const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
+    for (const d of dialogs) if (visible(d) && isEasyApplyDialog(d)) return true;
+    // Fallbacks — progress region or any apply-button selector visible.
     return !!(
       document.querySelector('[aria-label*="job application progress" i][role="region"]') ||
       document.querySelector(
@@ -329,24 +336,52 @@
     return null;
   }
 
+  // Helper — find the Easy Apply dialog itself so the action-button finders
+  // can scope to it. Falls back to document if no dialog node is found.
+  function easyApplyDialogEl() {
+    const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
+    for (const d of dialogs) {
+      if (visible(d) && isEasyApplyDialog(d)) return d;
+    }
+    return document;
+  }
+
+  // Text/aria matcher — used as a last-resort fallback when LinkedIn changes
+  // the data-attributes. Looks only at buttons inside the Easy Apply dialog.
+  function findActionByText(re) {
+    const scope = easyApplyDialogEl();
+    const btns = Array.from(scope.querySelectorAll("button, [role='button']"));
+    for (const b of btns) {
+      if (!visible(b)) continue;
+      if (b.disabled || b.getAttribute("aria-disabled") === "true") continue;
+      const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+      const a = b.getAttribute("aria-label") || "";
+      if (re.test(t) || re.test(a)) return b;
+    }
+    return null;
+  }
+
   function nextButton() {
     return qDoc([
       "button[data-easy-apply-next-button]",
       "button[data-live-test-easy-apply-next-button]",
       'button[aria-label="Continue to next step"]',
-    ]);
+      'button[aria-label*="Continue to next" i]',
+    ]) || findActionByText(/^(next|continue to next step|continue|next step)$/i);
   }
   function reviewButton() {
     return qDoc([
       "button[data-live-test-easy-apply-review-button]",
       'button[aria-label="Review your application"]',
-    ]);
+      'button[aria-label*="Review your" i]',
+    ]) || findActionByText(/^(review|review your application|review application)$/i);
   }
   function submitButton() {
     return qDoc([
       "button[data-live-test-easy-apply-submit-button]",
       'button[aria-label="Submit application"]',
-    ]);
+      'button[aria-label*="Submit application" i]',
+    ]) || findActionByText(/^(submit|submit application|send|send application)$/i);
   }
 
   // ─── proven click sequence, mirrored from overlay.js's working engine ───
@@ -585,19 +620,52 @@
     try { untickFollowCompany(scope); } catch (_) {}
   }
 
+  // Is THIS dialog node the Easy Apply modal? Detected STRUCTURALLY so we
+  // never accidentally close it on a step whose visible text doesn't happen
+  // to contain one of our keep-keywords. The bug v1.0.257 was: step 1 says
+  // "Contact info" (matched the keep-list) but steps 2-6 say "Home address",
+  // "Resume", "Additional questions" etc. — none matched, so the background
+  // watcher closed the Easy Apply modal itself the moment it advanced.
+  function isEasyApplyDialog(d) {
+    if (!d) return false;
+    // Strongest structural signals — present on every step of the modal.
+    if (d.getAttribute("aria-labelledby") === "jobs-apply-header") return true;
+    if (d.getAttribute("data-test-modal-id") === "easy-apply-modal") return true;
+    if (d.querySelector(
+      "button[data-easy-apply-next-button]," +
+      "button[data-live-test-easy-apply-next-button]," +
+      "button[data-live-test-easy-apply-submit-button]," +
+      "button[data-live-test-easy-apply-review-button]," +
+      ".jobs-easy-apply-content,.jobs-easy-apply-form,.jobs-easy-apply-modal__content," +
+      "[aria-label*='job application progress' i][role='region']"
+    )) return true;
+    // Title text always starts with "Apply to <Company>" on every step.
+    const header = d.querySelector("h2, h3, [role='heading']");
+    if (header) {
+      const ht = (header.textContent || "").trim();
+      if (/^apply to /i.test(ht)) return true;
+    }
+    return false;
+  }
+
   // Close any LinkedIn popup that ISN'T the Easy Apply modal (feedback,
   // preferences-match, premium upsells). Use forceClick so dismiss never
-  // fails silently on a React handler (synthetic .click() can be no-op on
-  // SDUI dialogs); the React-fiber strategy inside forceClick fires the
-  // close handler directly.
+  // fails silently on a React handler.
   function closeStrayModals() {
     const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
     let closed = 0;
     for (const d of dialogs) {
       if (!visible(d)) continue;
-      const txt = (d.innerText || "").toLowerCase();
-      // Real Easy Apply modal — leave it alone (runApplyModal handles it).
-      if (/contact info|job application progress|next step|review your application|submit application/i.test(txt)) continue;
+      // NEVER close the Easy Apply modal, regardless of step content.
+      if (isEasyApplyDialog(d)) continue;
+      // If this dialog contains the Easy Apply modal as a descendant
+      // (shouldn't happen but defensively), skip it.
+      if (d.querySelector(
+        "[aria-labelledby='jobs-apply-header']," +
+        "[data-test-modal-id='easy-apply-modal']," +
+        "button[data-easy-apply-next-button]," +
+        "button[data-live-test-easy-apply-submit-button]"
+      )) continue;
       const x = d.querySelector(
         'button[aria-label="Dismiss"][data-test-modal-close-btn],' +
         'button[aria-label="Dismiss"],' +

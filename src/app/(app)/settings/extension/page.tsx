@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.258",
+    date: "Jun 15, 2026",
+    size: "242 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.258.zip",
+    latest: true,
+    changes: [
+      "ROOT CAUSE FIX. The background popup-killer was closing the Easy Apply modal itself on every step past page 1 — because it kept the modal alive only when its text matched “Contact info / next step / review / submit”, but steps 2-6 say “Home address”, “Resume”, “Additional questions”, “Education”, etc. So at step 2 the modal got dismissed; my code skipped; the click bled to the On-site chip.",
+      "Easy Apply detection is now STRUCTURAL: dialog has aria-labelledby=\"jobs-apply-header\", or data-test-modal-id=\"easy-apply-modal\", or contains a data-easy-apply-* button, or its heading starts with “Apply to ”, or it contains the progress region. None of those depend on step content.",
+      "Next / Review / Submit finders now fall back to text/aria matching scoped to the Easy Apply dialog if LinkedIn changes data-attributes.",
+      "applyFormPresent() uses the same structural check so it stays true on every step.",
+    ],
+  },
+  {
     version: "1.0.257",
     date: "Jun 15, 2026",
     size: "241 KB",
     file: "/extensions/leadcaptura-extension-v1.0.257.zip",
-    latest: true,
     changes: [
       "Mass Apply now hides the per-card Auto Apply chips while it's running, so no stray chip floats next to the LinkedIn modals.",
       "A background watcher dismisses the Preferences-match / feedback / premium upsell popups every 250ms — they can't linger anymore.",
