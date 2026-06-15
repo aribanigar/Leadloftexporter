@@ -33,8 +33,6 @@ from urllib.error import HTTPError, URLError
 BRANDING = {
     "gifts-gulf": {"name": "Gifts Gulf", "brand": "#00a544", "accent": "#008138",
                    "logo": "https://www.giftsgulf.com/gglogo.svg", "tone": "minimal"},
-    "via-kashmir": {"name": "Via Kashmir", "brand": "#e0452c", "accent": "#0e6b53",
-                    "logo": "https://viakashmir.in/logo-colour.svg?v=3", "tone": "vibrant"},
 }
 
 
