@@ -133,11 +133,25 @@ export default function CompanyFinderPage() {
     qc.invalidateQueries({ queryKey: ["cf-hierarchy"] });
   };
 
+  // Import in batches so big files (e.g. a 100k-row OSM extract) don't exceed
+  // the request body limit or time out in one giant POST.
   const importMut = useMutation({
-    mutationFn: (businesses: Record<string, unknown>[]) =>
-      api<{ inserted: number; updated: number }>("/company-finder/import", { method: "POST", body: { businesses } }),
+    mutationFn: async (rows: Record<string, unknown>[]) => {
+      const BATCH = 1000;
+      let inserted = 0, updated = 0;
+      for (let i = 0; i < rows.length; i += BATCH) {
+        const businesses = rows.slice(i, i + BATCH);
+        const r = await api<{ inserted: number; updated: number }>(
+          "/company-finder/import", { method: "POST", body: { businesses } }
+        );
+        inserted += r.inserted; updated += r.updated;
+        setNotice(`Importing… ${Math.min(i + BATCH, rows.length).toLocaleString()}/${rows.length.toLocaleString()} (${inserted.toLocaleString()} new)`);
+        invalidate();
+      }
+      return { inserted, updated };
+    },
     onSuccess: (r) => {
-      setNotice(`Imported ${r.inserted} new + ${r.updated} updated.`);
+      setNotice(`Imported ${r.inserted.toLocaleString()} new + ${r.updated.toLocaleString()} updated.`);
       invalidate();
     },
     onError: () => setNotice("Import failed — check the file format."),
