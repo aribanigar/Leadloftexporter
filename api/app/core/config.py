@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = ""
 
+    # ---- Company Finder (Google Places API New) ----
+    # Server-wide fallback key for Company Finder's business discovery. A
+    # workspace can also set its own key in the UI (Workspace.settings
+    # ["company_finder"]["google_api_key"]), which takes precedence. The key
+    # needs "Places API (New)" enabled with billing on.
+    google_places_api_key: str = ""
+
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-7"
     anthropic_fast_model: str = "claude-haiku-4-5"

@@ -22,7 +22,9 @@ import {
   Loader2,
   Radio,
   Info,
-  PlayCircle,
+  KeyRound,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -94,9 +96,17 @@ export default function CompanyFinderPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [treeOpen, setTreeOpen] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
 
   const filterStr = qs(filters);
+
+  const { data: config } = useQuery<{ configured: boolean; source: string; masked: string }>({
+    queryKey: ["cf-config"],
+    queryFn: () => api("/company-finder/config"),
+  });
 
   const { data: facets } = useQuery<Facets>({
     queryKey: ["cf-facets"],
@@ -136,6 +146,49 @@ export default function CompanyFinderPage() {
       setSelected(new Set());
     },
   });
+
+  // Server-side Google Places search — the backend fetches the businesses.
+  const searchMut = useMutation({
+    mutationFn: (query: string) =>
+      api<{ found: number; inserted: number; updated: number; query: string }>(
+        "/company-finder/search",
+        { method: "POST", body: { query, max_pages: 3 } }
+      ),
+    onSuccess: (r) => {
+      setNotice(
+        r.found === 0
+          ? `No businesses found for "${r.query}". Try a different niche or area.`
+          : `Found ${r.found} for "${r.query}" — ${r.inserted} new, ${r.updated} updated.`
+      );
+      invalidate();
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Search failed.";
+      setNotice(msg);
+      if (/api key/i.test(msg)) setShowKeyModal(true);
+    },
+  });
+
+  const saveKey = useMutation({
+    mutationFn: (google_api_key: string) =>
+      api<{ ok: boolean; configured: boolean }>("/company-finder/config", {
+        method: "POST",
+        body: { google_api_key },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cf-config"] });
+      setShowKeyModal(false);
+      setKeyInput("");
+      setNotice("Google API key saved. You can search now.");
+    },
+  });
+
+  function runSearch() {
+    const q = searchQuery.trim();
+    if (!q) return;
+    if (!config?.configured) { setShowKeyModal(true); return; }
+    searchMut.mutate(q);
+  }
 
   const items = list?.items ?? [];
 
@@ -196,19 +249,94 @@ export default function CompanyFinderPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* how-to banner — completely separate from LinkedIn capture */}
-      <div className="flex items-start gap-3 border-b border-dteal-100 bg-dteal-50/60 px-4 py-3">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-dteal-600" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-dteal-800">How to capture businesses</p>
-          <ol className="mt-1 list-decimal list-inside space-y-0.5 text-xs text-dteal-700">
-            <li>Open <strong>Google Maps</strong> in your browser and search for a niche + location (e.g. "restaurants Dubai").</li>
-            <li>Look for the <strong className="inline-flex items-center gap-1 rounded bg-dteal-700 px-1 py-0.5 text-white"><PlayCircle className="h-3 w-3" />▶ Start</strong> button that appears in the bottom-left corner of the Maps page.</li>
-            <li>Click <strong>▶ Start</strong> — the extension will scroll through all results and send them here automatically.</li>
-            <li>Click <strong>■ Stop</strong> at any time to pause. This is <em>completely separate</em> from LinkedIn work.</li>
-          </ol>
+      {/* Search bar — the backend fetches businesses from Google for you. */}
+      <div className="border-b border-dteal-100 bg-gradient-to-r from-dteal-50 via-emerald-50/40 to-white px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Sparkles className="h-5 w-5 shrink-0 text-dteal-600" />
+          <div className="relative min-w-[260px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runSearch()}
+              placeholder='Find businesses — e.g. "restaurants in Dubai", "dentists in Abu Dhabi"'
+              className="w-full rounded-lg border border-dteal-200 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm focus:border-dteal-400 focus:outline-none focus:ring-2 focus:ring-dteal-100"
+            />
+          </div>
+          <button
+            onClick={runSearch}
+            disabled={searchMut.isPending || !searchQuery.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-dteal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-dteal-700 disabled:opacity-50"
+          >
+            {searchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {searchMut.isPending ? "Searching Google…" : "Find businesses"}
+          </button>
+          <button
+            onClick={() => { setKeyInput(""); setShowKeyModal(true); }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dteal-200 bg-white px-3 py-2.5 text-sm font-medium text-dteal-700 hover:bg-dteal-50"
+            title="Google API key"
+          >
+            <KeyRound className="h-4 w-4" />
+            {config?.configured ? "API key ✓" : "Set API key"}
+          </button>
         </div>
+        <p className="mt-1.5 flex items-center gap-1.5 pl-7 text-xs text-dteal-700/80">
+          <Info className="h-3 w-3" />
+          The system fetches businesses straight from Google — no manual scraping. This feature is fully separate from LinkedIn.
+          {!config?.configured && <span className="font-semibold text-amber-700"> Add your Google Places API key to start.</span>}
+        </p>
       </div>
+
+      {/* API key modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowKeyModal(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-dteal-600" />
+              <h2 className="text-base font-semibold">Google Places API key</h2>
+              <button onClick={() => setShowKeyModal(false)} className="ml-auto rounded p-1 text-slate-400 hover:bg-slate-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs leading-relaxed text-slate-600">
+              Paste a Google Maps Platform key with <strong>“Places API (New)”</strong> enabled.
+              Get one at{" "}
+              <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noreferrer" className="font-medium text-dteal-700 underline">
+                console.cloud.google.com
+              </a>
+              {" "}→ Credentials → Create API key, then enable “Places API (New)”.
+            </p>
+            <input
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="AIza…"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-dteal-400 focus:outline-none focus:ring-2 focus:ring-dteal-100"
+            />
+            {config?.configured && (
+              <p className="mt-1.5 text-xs text-slate-500">Current: {config.masked} ({config.source})</p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              {config?.configured && (
+                <button
+                  onClick={() => saveKey.mutate("")}
+                  disabled={saveKey.isPending}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  Remove key
+                </button>
+              )}
+              <button
+                onClick={() => keyInput.trim() && saveKey.mutate(keyInput.trim())}
+                disabled={saveKey.isPending || !keyInput.trim()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-dteal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-dteal-700 disabled:opacity-50"
+              >
+                {saveKey.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* header */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">

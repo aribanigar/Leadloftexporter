@@ -11,16 +11,26 @@ import csv
 import io
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_extension_context, get_workspace_context
 from app.models import CompanyFinderBusiness
 from app.services import company_finder as svc
+from app.services import google_places
 
 router = APIRouter(prefix="/company-finder", tags=["company-finder"])
+_settings = get_settings()
+
+
+def _resolved_api_key(ctx: AuthContext) -> str:
+    """Per-workspace Google key (set in the UI) wins; else the server env var."""
+    ws_key = ((ctx.workspace.settings or {}).get("company_finder") or {}).get("google_api_key")
+    return (ws_key or _settings.google_places_api_key or "").strip()
 
 
 def _serialize(b: CompanyFinderBusiness) -> dict:
@@ -57,6 +67,74 @@ def import_web(
 ):
     items = body.get("businesses") or body.get("rows") or []
     return svc.ingest(db, ctx.workspace_id, items, source="import")
+
+
+# ── Google API key config (web app, JWT) ────────────────────────────────────
+@router.get("/config")
+def get_config(ctx: AuthContext = Depends(get_workspace_context)):
+    """Report whether a Google Places key is configured (never returns the key
+    itself — just a masked hint + whether search is ready)."""
+    ws_key = ((ctx.workspace.settings or {}).get("company_finder") or {}).get("google_api_key") or ""
+    env_key = _settings.google_places_api_key or ""
+    key = ws_key or env_key
+    masked = (key[:4] + "…" + key[-4:]) if len(key) >= 8 else ("set" if key else "")
+    return {
+        "configured": bool(key),
+        "source": "workspace" if ws_key else ("server" if env_key else "none"),
+        "masked": masked,
+    }
+
+
+@router.post("/config")
+def set_config(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Save (or clear) the workspace's own Google Places API key."""
+    key = (body.get("google_api_key") or "").strip()
+    settings = dict(ctx.workspace.settings or {})
+    cf = dict(settings.get("company_finder") or {})
+    if key:
+        cf["google_api_key"] = key
+    else:
+        cf.pop("google_api_key", None)
+    settings["company_finder"] = cf
+    ctx.workspace.settings = settings
+    flag_modified(ctx.workspace, "settings")
+    db.commit()
+    return {"ok": True, "configured": bool(key)}
+
+
+# ── Search Google directly (web app, JWT) — the main "find for me" path ──────
+@router.post("/search")
+def search(
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Query Google Places for businesses matching a text query (e.g.
+    "dentists in Abu Dhabi") and ingest them into Company Finder. No browser
+    scraping — the backend fetches everything itself."""
+    api_key = _resolved_api_key(ctx)
+    if not api_key:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No Google API key set. Add your Google Places API key in Company Finder settings first.",
+        )
+    query = (body.get("query") or body.get("q") or "").strip()
+    max_pages = int(body.get("max_pages") or 3)
+    region = (body.get("region_code") or "").strip()
+    try:
+        businesses = google_places.search_text(
+            api_key, query, max_pages=max_pages, region_code=region
+        )
+    except google_places.PlacesError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    result = svc.ingest(db, ctx.workspace_id, businesses, source="google_places")
+    result["found"] = len(businesses)
+    result["query"] = query
+    return result
 
 
 def _filtered(db: Session, ws: str, q, category, country, area, zone, building_key, has_email):
