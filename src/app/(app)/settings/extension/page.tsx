@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.255",
+    date: "Jun 15, 2026",
+    size: "239 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.255.zip",
+    latest: true,
+    changes: [
+      "Mass Apply skips “No longer accepting applications” jobs immediately, before LinkedIn can swap the apply form for the Preferences-match modal.",
+      "Stray LinkedIn popups (Preferences match / feedback / premium upsell) are dismissed continuously — at the start of each job, while waiting for the apply form to mount, and again between jobs.",
+      "Smarter autofill: a built-in Apply Profile maps question labels (years of experience, notice period, expected/current salary, willingness to relocate, work authorisation, sponsorship, LinkedIn/portfolio URLs, etc.) to sensible answers. Customise by storing chrome.storage.local[\"lc_apply_profile\"] = { ... }.",
+      "Select dropdowns now match Apply Profile answers when the label fits, before falling back to the generic Yes default.",
+    ],
+  },
+  {
     version: "1.0.254",
     date: "Jun 15, 2026",
     size: "238 KB",
     file: "/extensions/leadcaptura-extension-v1.0.254.zip",
-    latest: true,
     changes: [
       "Mass Apply no longer accidentally opens LinkedIn's “Why are these results not helpful?” feedback popup or the “Preferences match” modal. Autofill now refuses to run at document scope (which was clicking the BETA thumbs and the On-site / Full-time chips).",
       "applyFormScope anchors on the Next/Submit button when the modal's class name isn't recognised, so the new hashed-class apply modal is still detected.",

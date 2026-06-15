@@ -403,6 +403,69 @@
     return /experien|years|how many|number of|notice period|salary|ctc|expected/i.test(str || "");
   }
 
+  // Detect "No longer accepting applications" / closed jobs in the detail
+  // pane. Opening Easy Apply on these triggers LinkedIn's "Preferences match"
+  // modal instead of a real apply form — which my autofill then walks into.
+  function detailPaneIsClosedJob() {
+    const root = document.querySelector(
+      ".jobs-search__job-details, .scaffold-layout__detail, .jobs-details, .job-view-layout"
+    ) || document;
+    const txt = (root.innerText || "").toLowerCase();
+    return /no longer accepting applications|this job is no longer|applications are closed/i.test(txt);
+  }
+
+  // Apply Profile — user's stored answers for repeat-question autofill.
+  // Loaded from chrome.storage.local["lc_apply_profile"]; sensible defaults
+  // until the user customises them. Future Options page lets the user edit.
+  let APPLY_PROFILE = {
+    years_of_experience: "9",
+    years_in_role: "9",
+    notice_period_days: "30",
+    expected_salary: "100000",
+    current_salary: "80000",
+    willing_to_relocate: "Yes",
+    authorized_to_work: "Yes",
+    require_sponsorship: "No",
+    gender: "Prefer not to say",
+    ethnicity: "Prefer not to say",
+    veteran_status: "Prefer not to say",
+    disability_status: "Prefer not to say",
+    linkedin_url: "",
+    portfolio_url: "",
+    github_url: "",
+    website: "",
+    cover_letter: "",
+  };
+  try {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(["lc_apply_profile"], (res) => {
+        if (res && res.lc_apply_profile && typeof res.lc_apply_profile === "object") {
+          APPLY_PROFILE = Object.assign({}, APPLY_PROFILE, res.lc_apply_profile);
+        }
+      });
+    }
+  } catch (_) {}
+
+  // Map a question label → a sensible answer from the Apply Profile. Order
+  // matters: specific patterns first. Returns null if no rule matches.
+  function answerForLabel(rawLabel) {
+    const l = (rawLabel || "").toLowerCase().replace(/\s+/g, " ").trim();
+    if (!l) return null;
+    if (/years.*experience|how many years|total experience|relevant experience/.test(l)) return APPLY_PROFILE.years_of_experience;
+    if (/notice period/.test(l)) return APPLY_PROFILE.notice_period_days;
+    if (/expected (salary|ctc|compensation)|salary expectation/.test(l)) return APPLY_PROFILE.expected_salary;
+    if (/current (salary|ctc|compensation)|present salary/.test(l)) return APPLY_PROFILE.current_salary;
+    if (/willing to relocate|open to relocat|relocation/.test(l)) return APPLY_PROFILE.willing_to_relocate;
+    if (/authori[sz]ed to work|right to work|work authori/.test(l)) return APPLY_PROFILE.authorized_to_work;
+    if (/sponsorship|require .* visa|visa sponsor/.test(l)) return APPLY_PROFILE.require_sponsorship;
+    if (/linkedin.*url|linkedin profile/.test(l)) return APPLY_PROFILE.linkedin_url;
+    if (/portfolio/.test(l)) return APPLY_PROFILE.portfolio_url;
+    if (/github/.test(l)) return APPLY_PROFILE.github_url;
+    if (/website|personal site/.test(l)) return APPLY_PROFILE.website;
+    if (/cover letter/.test(l)) return APPLY_PROFILE.cover_letter;
+    return null;
+  }
+
   function fillSelects(scope) {
     scope.querySelectorAll("select").forEach(sel => {
       const cur = (sel.value || "").trim();
@@ -412,11 +475,21 @@
         return v && v !== "Select an option";
       });
       if (!opts.length) return;
+      // Pull the field's label/aria for profile matching.
+      let label = "";
+      if (sel.id) {
+        const l = scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(sel.id) : sel.id) + '"]');
+        if (l) label = textOf(l);
+      }
+      label = label || sel.getAttribute("aria-label") || sel.name || "";
+      const profileAns = (answerForLabel(label) || "").toString().toLowerCase();
       const byText = t => opts.find(o => (o.textContent || "").trim().toLowerCase() === t);
+      const byContains = t => opts.find(o => (o.textContent || "").trim().toLowerCase().includes(t));
       let pick =
         opts.find(o => /@/.test(o.value || o.textContent))          // email
         || opts.find(o => /India \(\+91\)/i.test(o.value || o.textContent)) // phone cc
-        || byText("yes")                                            // yes/no
+        || (profileAns && (byText(profileAns) || byContains(profileAns)))   // profile match
+        || byText("yes")                                            // yes/no default
         || opts[0];                                                 // first valid
       if (pick) setNativeValue(sel, pick.value);
     });
@@ -437,10 +510,16 @@
         if (l) label = textOf(l);
       }
       label = label || el.getAttribute("aria-label") || el.name || "";
-      // Experience / numeric questions → "9" (per spec). Other required-empty
-      // text → "9" as a last resort so the step can advance.
-      if (type === "number" || looksLikeExperience(label)) setNativeValue(el, "9");
-      else setNativeValue(el, "9");
+      // 1) Try the Apply Profile — answers questions like notice period,
+      //    expected salary, LinkedIn URL, etc. from the user's saved data.
+      const fromProfile = answerForLabel(label);
+      if (fromProfile != null && fromProfile !== "") {
+        setNativeValue(el, fromProfile);
+        return;
+      }
+      // 2) Number / experience-shaped questions → "9".
+      // 3) Anything else required-empty → "9" so the step still advances.
+      setNativeValue(el, type === "number" || looksLikeExperience(label) ? APPLY_PROFILE.years_of_experience : APPLY_PROFILE.years_of_experience);
     });
   }
 
@@ -567,10 +646,13 @@
   // failed. Firing all strategies at once (v1.0.250) caused later clicks to
   // land on the NEXT step's button after the form had already advanced.
   async function runApplyModal() {
-    // Wait for the form to mount (up to 12s).
+    // Wait for the form to mount (up to 12s). If a non-apply LinkedIn modal
+    // pops up first (Preferences match / feedback / premium upsell), close
+    // it and keep polling.
     const t0 = Date.now();
     while (Date.now() - t0 < 12000) {
       if (applyFormPresent()) break;
+      try { closeStrayModals(); } catch (_) {}
       await sleep(300);
     }
     if (!applyFormPresent()) return "skipped";
@@ -650,11 +732,19 @@
     const el = (card.el && document.contains(card.el)) ? card.el : cardElForKey(card.key);
     if (!el) return "skipped";
 
+    // Sweep any leftover LinkedIn popups that opened during the previous
+    // job (feedback, preferences-match) so they can't deflect this click.
+    try { closeStrayModals(); } catch (_) {}
+
     // Click the card body to load the right detail pane.
     el.scrollIntoView({ block: "center", behavior: "instant" });
     await sleep(rand(900, 1600));
     humanClick(el);
     await sleep(rand(1800, 3000));   // let the detail pane render
+
+    // Skip closed jobs early. "No longer accepting applications" jobs make
+    // LinkedIn open the Preferences-match modal instead of the apply form.
+    if (detailPaneIsClosedJob()) return "skipped";
 
     // Wait up to ~4s for the detail pane to render the Easy Apply button.
     // Don't try clicking random child elements as a fallback — that risks
