@@ -1,0 +1,3 @@
+# ViaKashmir B2C/B2B content engine (scripts/via-kashmir/*).
+# Cards render with Pillow only - no headless browser needed.
+pillow>=10.0

@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-15",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Early summer meadows and Dal mornings",
+      "subject": "Kashmir is green and the lake is glass",
+      "campaign_code": "VK-INR-B2C-20260615"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "theme": "Missed-booking loss-aversion",
+      "subject": "That booking just went to another hotel",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260615"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Empty seats and idle boats",
+      "subject": "That ride just went to another driver",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260615"
+    }
+  ]
+}
