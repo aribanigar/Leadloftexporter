@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.254",
+    date: "Jun 15, 2026",
+    size: "238 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.254.zip",
+    latest: true,
+    changes: [
+      "Mass Apply no longer accidentally opens LinkedIn's “Why are these results not helpful?” feedback popup or the “Preferences match” modal. Autofill now refuses to run at document scope (which was clicking the BETA thumbs and the On-site / Full-time chips).",
+      "applyFormScope anchors on the Next/Submit button when the modal's class name isn't recognised, so the new hashed-class apply modal is still detected.",
+      "Stray LinkedIn popups (feedback, preferences match, premium upsells) are now automatically dismissed between jobs so they can't linger on screen.",
+      "Job-to-job gap is a steady ~30 seconds, only counting down after the current application finishes.",
+    ],
+  },
+  {
     version: "1.0.253",
     date: "Jun 15, 2026",
     size: "237 KB",
     file: "/extensions/leadcaptura-extension-v1.0.253.zip",
-    latest: true,
     changes: [
       "Mass Apply finds the Easy Apply button on the new hashed-class detail pane again. v1.0.252 locked the scope to specific class names; when LinkedIn renamed them, the finder returned null and every card was marked “Couldn't apply”.",
       "Scope now falls back to <main> and document, but explicitly REJECTS anything inside footer / language picker / promo strips / the left job-list rail / our own per-card chip, so the footer-click regression cannot return.",

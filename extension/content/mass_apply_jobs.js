@@ -45,13 +45,10 @@
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
-  // Human gap between consequential job applications:
-  //   55% → 30-55s, 27% → 50-90s, 18% → 60-180s long tail
+  // ~30s gap between job applications (per user spec). Slight randomness
+  // (30-38s) so the cadence doesn't look mechanical.
   function nextJobDelayMs() {
-    const r = Math.random();
-    if (r < 0.18) return 60000 + rand(0, 120000);
-    if (r < 0.45) return 50000 + rand(0, 40000);
-    return 30000 + rand(0, 25000);
+    return 30000 + rand(0, 8000);
   }
 
   function onJobsResultsPage() {
@@ -270,8 +267,12 @@
     );
   }
 
-  // The container we autofill WITHIN (for select/input scoping only). Prefer the
-  // modal content; fall back to document so a class rename never blocks fill.
+  // The container we autofill WITHIN. This MUST be the Easy Apply modal —
+  // never <document>. If we can't pin down a real modal/form container, we
+  // return null and the caller skips autofill entirely. v1.0.252/253 fell
+  // back to document, which caused autofill to click random thumbs / On-site
+  // chips / "Show match details" buttons all over the page — opening the
+  // LinkedIn feedback and Preferences-match popups instead of advancing.
   function applyFormScope() {
     const modal = document.querySelector(
       '[data-test-modal-id="easy-apply-modal"],' +
@@ -280,8 +281,26 @@
     );
     if (modal && visible(modal)) return modal;
     const region = document.querySelector('[aria-label*="job application progress" i][role="region"]');
-    if (region) return region.closest("form, .artdeco-modal, div[role='dialog']") || document;
-    return document;
+    if (region) {
+      const c = region.closest("form, .artdeco-modal, div[role='dialog'], .jobs-easy-apply-modal");
+      if (c && visible(c)) return c;
+    }
+    // Anchor on the Next/Submit button (globally unique in the apply form)
+    // and climb to the nearest form/dialog/modal container.
+    const btn = document.querySelector(
+      "button[data-easy-apply-next-button]," +
+      "button[data-live-test-easy-apply-next-button]," +
+      "button[data-live-test-easy-apply-submit-button]," +
+      "button[data-live-test-easy-apply-review-button]," +
+      'button[aria-label="Continue to next step"],' +
+      'button[aria-label="Submit application"],' +
+      'button[aria-label="Review your application"]'
+    );
+    if (btn) {
+      const c = btn.closest("form, .artdeco-modal, div[role='dialog'], .jobs-easy-apply-modal");
+      if (c && visible(c)) return c;
+    }
+    return null;   // safer than <document>
   }
 
   function qDoc(sels) {
@@ -456,12 +475,34 @@
   }
 
   function autofill(scope) {
-    if (!scope) return;
+    // CRITICAL: never operate at document scope. autofill on the whole page
+    // clicks the BETA thumbs-down (opens the "Why are these results not
+    // helpful?" feedback modal) and the On-site / Full-time chips (opens
+    // the Preferences-match popup). Both bugs were visible in the user's
+    // 1.0.253 screenshots.
+    if (!scope || scope === document || scope === document.body) return;
     try { fillSelects(scope); } catch (_) {}
     try { fillTextInputs(scope); } catch (_) {}
     try { fillRadios(scope); } catch (_) {}
     try { checkRequiredBoxes(scope); } catch (_) {}
     try { untickFollowCompany(scope); } catch (_) {}
+  }
+
+  // Close any LinkedIn popup that ISN'T the Easy Apply modal (feedback,
+  // preferences-match, premium upsells). Called between jobs so a spurious
+  // modal accidentally opened by autofill can't linger on screen.
+  function closeStrayModals() {
+    const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
+    for (const d of dialogs) {
+      if (!visible(d)) continue;
+      const txt = (d.innerText || "").toLowerCase();
+      // Real Easy Apply modal — leave it alone (runApplyModal handles it).
+      if (/contact info|job application progress|next step|review your application|submit application/i.test(txt)) continue;
+      // Heuristic: anything else with a Dismiss button is something we
+      // accidentally opened or LinkedIn upselled — close it.
+      const x = d.querySelector('button[aria-label="Dismiss"], button[aria-label="Close"], .artdeco-modal__dismiss');
+      if (x) { try { x.click(); } catch (_) {} humanClick(x); }
+    }
   }
 
   // ─────────────────── modal lifecycle ───────────────────────
@@ -541,8 +582,11 @@
       if (isCheckpoint()) return "skipped";
       if (!applyFormPresent()) return "skipped";
 
-      // Autofill this step.
+      // Autofill this step — but ONLY if we have a real modal scope. If
+      // applyFormScope returns null, the Easy Apply container disappeared
+      // mid-flight; bail rather than autofill at document scope.
       const scope = applyFormScope();
+      if (!scope) { await discardAndClose(); return "skipped"; }
       autofill(scope);
       await sleep(rand(500, 900));
 
@@ -708,8 +752,13 @@
         else if (result === "challenge") { banner("Challenge — stopping."); break; }
         else state.skipped++;
 
-        // Make sure nothing is left open before the gap.
+        // Make sure nothing is left open before the gap — close the Easy
+        // Apply modal if it's still there, then dismiss any LinkedIn popups
+        // (feedback, preferences-match, premium upsells) that could linger.
         if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
+        try { closeStrayModals(); } catch (_) {}
+        await sleep(300);
+        try { closeStrayModals(); } catch (_) {}   // some open delayed
 
         if (!state.cancel) {
           const wait = nextJobDelayMs();
