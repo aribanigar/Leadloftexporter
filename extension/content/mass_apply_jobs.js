@@ -311,14 +311,55 @@
     ]);
   }
 
-  // Click an advance/submit button the proven way: real pointer sequence FIRST
-  // (Ember/React honours it), then native .click() + inner <span> as fallbacks.
+  // Click an advance/submit button using the proven 5-strategy sequence from
+  // the existing engine's _forceClick. The SDUI modal is REACT, and React's
+  // onClick handler rejects events with isTrusted=false — which all synthetic
+  // DOM events have. Strategy 5 (direct fiber call with isTrusted=true) is the
+  // only path that reliably fires Next/Submit on the new flow.
   function advanceClick(btn) {
     if (!btn) return;
-    humanClick(btn);
+    try { btn.scrollIntoView({ block: "center", inline: "center" }); } catch (_) {}
+    try { btn.focus({ preventScroll: true }); } catch (_) {}
+
+    // 1. Plain native click — Ember and some React handlers accept this.
     try { btn.click(); } catch (_) {}
-    const inner = btn.querySelector(".artdeco-button__text") || btn.firstElementChild;
-    if (inner) humanClick(inner);
+    // 2. Full pointer/mouse sequence on the button.
+    humanClick(btn);
+    // 3. Same sequence on the inner label span (some handlers bind to child).
+    try {
+      const inner = btn.querySelector(".artdeco-button__text") || btn.querySelector("span") || btn.firstElementChild;
+      if (inner && inner !== btn) { try { inner.click(); } catch (_) {} humanClick(inner); }
+    } catch (_) {}
+    // 4. Keyboard activation — buttons fire on Enter/Space too.
+    try {
+      const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      btn.dispatchEvent(new KeyboardEvent("keydown", k));
+      btn.dispatchEvent(new KeyboardEvent("keyup", k));
+    } catch (_) {}
+    // 5. THE LOAD-BEARING ONE for the SDUI flow: walk the React fiber and call
+    //    the onClick prop DIRECTLY with isTrusted=true so LinkedIn's React
+    //    handler (which checks event.isTrusted) accepts it.
+    try {
+      const fKey = Object.keys(btn).find(
+        k => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
+      );
+      if (fKey) {
+        let fiber = btn[fKey];
+        for (let depth = 0; fiber && depth < 8; fiber = fiber.return, depth++) {
+          const onClick = (fiber.memoizedProps && fiber.memoizedProps.onClick)
+                      || (fiber.pendingProps && fiber.pendingProps.onClick);
+          if (typeof onClick === "function") {
+            onClick({
+              type: "click", bubbles: true, cancelable: true,
+              isTrusted: true, target: btn, currentTarget: btn,
+              preventDefault: () => {}, stopPropagation: () => {},
+              nativeEvent: { isTrusted: true },
+            });
+            break;
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   // Progress signature so we can tell when a Next click failed to advance
@@ -555,7 +596,7 @@
 
     apply.scrollIntoView({ block: "center", behavior: "smooth" });
     await sleep(rand(600, 1100));
-    humanClick(apply);
+    advanceClick(apply);   // same 5-strategy click (incl. React fiber)
 
     return await runApplyModal();
   }

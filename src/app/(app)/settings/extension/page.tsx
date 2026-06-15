@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.250",
+    date: "Jun 15, 2026",
+    size: "236 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.250.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now clicks Next/Submit on the new SDUI flow by calling the React onClick prop directly through the React fiber with isTrusted=true. Synthetic DOM events are always isTrusted=false, which the new React handler rejects — this was the reason Next refused to advance.",
+      "Same 5-strategy click is now used for the Easy Apply button itself, so it stays robust if LinkedIn redesigns the entry.",
+    ],
+  },
+  {
     version: "1.0.249",
     date: "Jun 15, 2026",
     size: "236 KB",
     file: "/extensions/leadcaptura-extension-v1.0.249.zip",
-    latest: true,
     changes: [
       "Mass Apply now also detects the older “Easy Apply” label, not just the renamed “LinkedIn Apply to this job” — so the apply button is clicked on every layout LinkedIn currently ships.",
       "Detection is scoped to the right detail pane and ignores left-list per-card chips + the external “Apply on company website” variant, so it never opens a job without filling it.",
