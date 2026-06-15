@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.252",
+    date: "Jun 15, 2026",
+    size: "237 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.252.zip",
+    latest: true,
+    changes: [
+      "Mass Apply no longer clicks footer / language picker / promo links. The Easy Apply finder now requires a strong in-app signal (Easy Apply / LinkedIn Apply aria-label, jobs-apply-button class, in-app apply href, or the LinkedIn-bug glyph) — plain text “Apply” alone is no longer enough.",
+      "Detail-pane scope is strict — no more falling back to <main> / document, which was matching footer links.",
+      "List paging never falls back to scrolling the whole page (which was dragging the page into the footer).",
+      "Card re-click fallback is just the card itself, never a random child element.",
+    ],
+  },
+  {
     version: "1.0.251",
     date: "Jun 15, 2026",
     size: "237 KB",
     file: "/extensions/leadcaptura-extension-v1.0.251.zip",
-    latest: true,
     changes: [
       "Mass Apply now mirrors the proven Auto Apply engine: one click strategy at a time, verify the modal advanced via innerText comparison, escalate only if it didn’t. The previous build fired all 5 strategies at once, which silently landed the 2nd click on the next step’s button after the form had already advanced.",
       "Step detection is now innerText-based (immune to LinkedIn renaming CSS classes); buttons are re-found after every click because the modal re-renders between steps.",

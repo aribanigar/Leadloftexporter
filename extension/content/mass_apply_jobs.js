@@ -176,8 +176,11 @@
   function listScrollTop() { const s = listScroller(); return s ? Math.round(s.scrollTop) : Math.round(window.scrollY); }
   function scrollListDown() {
     const s = listScroller();
-    if (s) s.scrollBy(0, Math.round(s.clientHeight * 0.8));
-    else window.scrollBy(0, Math.round(window.innerHeight * 0.8));
+    if (s) { s.scrollBy(0, Math.round(s.clientHeight * 0.8)); return true; }
+    // Don't fall back to window.scrollBy — that scrolls the whole page into
+    // the LinkedIn footer (promo cards, language picker, etc.), and the
+    // wider scope makes the apply finder more likely to misfire too.
+    return false;
   }
 
   // The in-app apply control inside the right detail pane. Detects the older
@@ -186,49 +189,53 @@
   // on company website" anchor is excluded so we never start applications we
   // can't auto-fill.
   function findInAppApply() {
-    // SCOPE to the right-hand DETAIL pane. On the split-view jobs results page
-    // the LEFT job cards each show their own "Apply" / "Auto Apply" chip — if
-    // we matched one of those, clicking would just re-open the job and no
-    // form ever opens (then every job logs "skipped").
+    // SCOPE strictly to the right-hand DETAIL pane. NEVER fall back to <main>
+    // or <document> — that lets the matcher pick up footer links, promo
+    // cards, "Get the LinkedIn app" CTAs, and the language/region popup
+    // triggers, all of which can contain the word "Apply" and would be
+    // clicked instead of the real Easy Apply button.
     const root = document.querySelector(
       ".jobs-search__job-details, .jobs-search__job-details--container, " +
       ".jobs-search__job-details--wrapper, .scaffold-layout__detail, " +
       ".jobs-details, .job-view-layout, .jobs-details__main-content, " +
-      ".job-details-jobs-unified-top-card__container--two-pane, main"
-    ) || document;
+      ".job-details-jobs-unified-top-card__container--two-pane"
+    );
+    if (!root) return null;   // detail pane not rendered yet → caller waits
 
     const isExternal = (el) => {
       const t = textOf(el).toLowerCase();
       const a = (el.getAttribute("aria-label") || "").toLowerCase();
       if (a.includes("company website") || /apply on company website/i.test(t)) return true;
-      // Out-link icon is the visual marker of the external apply variant.
       if (el.querySelector("svg#link-external-medium, svg[id='link-external-medium']")) return true;
       const href = (el.getAttribute("href") || "").toLowerCase();
       if (href && /\/safety\/go\?|linkedin\.com\/safety\/go/.test(href)) return true;
       return false;
     };
 
-    const fromQuery = Array.from(root.querySelectorAll(
-      "button.jobs-apply-button, a.jobs-apply-button, " +
-      "button[aria-label*='Easy Apply' i], a[aria-label*='Easy Apply' i], " +
-      "button[aria-label*='LinkedIn Apply' i], a[aria-label*='LinkedIn Apply' i], " +
-      "a[href*='/jobs/view/'][href*='/apply']"
-    ));
+    // A candidate is the REAL in-app apply control only if at least one strong
+    // signal matches. Plain text "Apply" without any of these is REJECTED —
+    // too many false positives in the footer/promo strips.
+    const isInAppApply = (el) => {
+      const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+      const href = (el.getAttribute("href") || "").toLowerCase();
+      const cls = el.className || "";
+      if (/easy apply|linkedin apply/i.test(aria)) return true;
+      if (el.classList && el.classList.contains("jobs-apply-button")) return true;
+      if (el.closest && el.closest(".jobs-apply-button__container, [class*='jobs-apply-button']")) return true;
+      // The 2026 in-app control is an <a> pointing at LinkedIn's own
+      // /jobs/view/<id>/apply/ URL — a reliable in-app signal.
+      if (/(^|linkedin\.com)\/jobs\/view\/\d+\/apply/i.test(href)) return true;
+      // SVG bug icon — LinkedIn's branded Apply button uses this glyph.
+      if (el.querySelector && el.querySelector("svg#linkedin-bug-medium, svg[id^='linkedin-bug']")) return true;
+      return false;
+    };
 
-    // Text-based fallback for the new hashed-class layout — find any
-    // button/anchor in the detail pane whose visible label is exactly Apply /
-    // Easy Apply / LinkedIn Apply, while excluding the external variant.
-    const fromText = Array.from(root.querySelectorAll("button, a")).filter(el => {
-      const t = textOf(el).toLowerCase();
-      return t === "apply" || t === "easy apply" || t === "linkedin apply"
-          || /^easy apply$/i.test(t) || /^linkedin apply$/i.test(t);
-    });
-
-    const all = Array.from(new Set([...fromQuery, ...fromText]));
-    for (const el of all) {
+    const cands = Array.from(root.querySelectorAll("button, a"));
+    for (const el of cands) {
       if (!visible(el)) continue;
       if (el.disabled || el.getAttribute("aria-disabled") === "true") continue;
       if (isExternal(el)) continue;
+      if (!isInAppApply(el)) continue;
       return el;
     }
     return null;
@@ -592,21 +599,34 @@
     if (!el) return "skipped";
 
     // Click the card body to load the right detail pane.
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.scrollIntoView({ block: "center", behavior: "instant" });
     await sleep(rand(900, 1600));
     humanClick(el);
     await sleep(rand(1800, 3000));   // let the detail pane render
 
+    // Wait up to ~4s for the detail pane to render the Easy Apply button.
+    // Don't try clicking random child elements as a fallback — that risks
+    // hitting promo links / footer triggers. Just re-click the card itself.
     let apply = findInAppApply();
     if (!apply) {
-      // Re-click the title once in case the first click didn't register.
-      const title = el.querySelector("p, span");
-      if (title) { humanClick(title); await sleep(rand(1400, 2200)); }
-      apply = findInAppApply();
+      for (let t = 0; t < 8; t++) {
+        await sleep(500);
+        apply = findInAppApply();
+        if (apply) break;
+      }
+    }
+    if (!apply) {
+      // Try a single re-click of the card itself, then poll again.
+      humanClick(el);
+      for (let t = 0; t < 8; t++) {
+        await sleep(500);
+        apply = findInAppApply();
+        if (apply) break;
+      }
     }
     if (!apply) return "skipped";    // external apply / no in-app apply
 
-    apply.scrollIntoView({ block: "center", behavior: "smooth" });
+    apply.scrollIntoView({ block: "center", behavior: "instant" });
     await sleep(rand(600, 1100));
     // STAGE 1 — human pointer click. The classic Easy Apply control opens the
     // modal on this alone (proven by overlay.js's working engine).
