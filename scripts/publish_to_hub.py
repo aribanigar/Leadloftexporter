@@ -28,9 +28,14 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-BRAND, ACCENT = "#00a544", "#008138"
-LOGO = "https://www.giftsgulf.com/gglogo.svg"
-TONE = "minimal"
+# Per-business branding used when the business folder is first created.
+# Override any field via env (HUB_BUSINESS_NAME / HUB_BRAND_COLOR / …).
+BRANDING = {
+    "gifts-gulf": {"name": "Gifts Gulf", "brand": "#00a544", "accent": "#008138",
+                   "logo": "https://www.giftsgulf.com/gglogo.svg", "tone": "minimal"},
+    "via-kashmir": {"name": "Via Kashmir", "brand": "#e0452c", "accent": "#0e6b53",
+                    "logo": "https://viakashmir.in/logo-colour.svg?v=3", "tone": "vibrant"},
+}
 
 
 def normalize(url: str) -> str:
@@ -80,12 +85,17 @@ def main() -> int:
     db = os.environ.get("DATABASE_URL")
     ws = os.environ.get("HUB_WORKSPACE")
     slug = os.environ.get("HUB_BUSINESS_SLUG", "gifts-gulf")
-    biz_name = os.environ.get("HUB_BUSINESS_NAME", "Gifts Gulf")
+    brand_defaults = BRANDING.get(slug, {})
+    biz_name = os.environ.get("HUB_BUSINESS_NAME", brand_defaults.get("name", slug.replace("-", " ").title()))
+    brand = os.environ.get("HUB_BRAND_COLOR", brand_defaults.get("brand", "#0e6b53"))
+    accent = os.environ.get("HUB_ACCENT_COLOR", brand_defaults.get("accent", "#008138"))
+    logo = os.environ.get("HUB_LOGO_URL", brand_defaults.get("logo", ""))
+    tone = os.environ.get("HUB_TONE", brand_defaults.get("tone", "vibrant"))
     if not db or not ws:
         print(json.dumps({"date": args.date, "hub_publish": "skipped (no_secrets)"}))
         return 0
 
-    day = repo_root() / "content" / "gifts-gulf" / args.date
+    day = repo_root() / "content" / slug / args.date
     if not day.is_dir():
         print(json.dumps({"date": args.date, "error": "no content dir: %s" % day}))
         return 4
@@ -103,36 +113,41 @@ def main() -> int:
         n.q("""insert into content_businesses
                  (id,workspace_id,name,slug,brand_color,accent_color,tone,logo_url)
                values ($1,$2,$3,$4,$5,$6,$7,$8)""",
-            [biz, ws, biz_name, slug, BRAND, ACCENT, TONE, LOGO])
+            [biz, ws, biz_name, slug, brand, accent, tone, logo])
 
     rep = {"date": args.date, "business_id": biz, "created_business": created,
            "inserted": 0, "skipped": 0, "failures": []}
 
     for sd in sorted({p.parent for p in day.rglob("meta.json")}):
         m = json.loads(read(sd / "meta.json"))
-        code = m.get("campaign_code", sd.name)
-        name = m.get("campaign_name", code)
-        subj = m.get("subject")
         cur = m.get("currency", sd.parent.name)
+        theme = m.get("theme", sd.name)
+        date_s = m.get("date", args.date)
         seas = m.get("season", "")
+        image = m.get("image") or None  # hero photo → rides on the WhatsApp asset
+        # Stable, unique title per (date, currency, theme) so reruns are no-ops.
+        name = m.get("campaign_name") or f"{date_s} · {cur} · {theme}"
+        code = m.get("campaign_code", f"{date_s}-{cur}-{theme}")
+        subj = m.get("subject")
         eh, ea = read(sd / "email.html"), read(sd / "email.amp.html")
         wa, li = read(sd / "whatsapp.txt"), read(sd / "linkedin.txt")
+        # (title, type, content, subject, platform, tags, amp, image_url)
         jobs = []
         if eh:
-            jobs.append((name, "html_email", eh, subj, None, [code, cur] + ([seas] if seas else []), ea))
+            jobs.append((name, "html_email", eh, subj, None, [code, cur] + ([seas] if seas else []), ea, None))
         if wa:
-            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, cur], None))
+            jobs.append((name + " — WhatsApp", "whatsapp", wa, None, None, [code, cur], None, image))
         if li:
-            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, cur], None))
-        for title, atype, content, s, plat, tags, amp in jobs:
+            jobs.append((name + " — LinkedIn", "caption", li, None, "linkedin", [code, cur], None, None))
+        for title, atype, content, s, plat, tags, amp, image_url in jobs:
             try:
                 if n.q("select 1 from content_assets where business_id=$1 and title=$2 limit 1", [biz, title]):
                     rep["skipped"] += 1
                     continue
                 n.q("""insert into content_assets
-                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content)
-                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)""",
-                    [str(uuid.uuid4()), ws, biz, title, atype, content, s, plat, json.dumps(tags), amp])
+                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content,image_url)
+                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)""",
+                    [str(uuid.uuid4()), ws, biz, title, atype, content, s, plat, json.dumps(tags), amp, image_url])
                 rep["inserted"] += 1
             except Exception as e:  # noqa: BLE001
                 rep["failures"].append([title, str(e)])

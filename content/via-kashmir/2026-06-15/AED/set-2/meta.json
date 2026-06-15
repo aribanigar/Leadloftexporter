@@ -1,0 +1,25 @@
+{
+  "date": "2026-06-15",
+  "currency": "AED",
+  "theme": "alpine-meadows",
+  "season": "summer",
+  "subject": "Alpine Meadows: Gulmarg Gondola Day Trip from AED 142",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Gulmarg_%2C_Jammu_%26_Kashmir.jpg/1280px-Gulmarg_%2C_Jammu_%26_Kashmir.jpg",
+  "products": [
+    {
+      "sku": "VK-GUL",
+      "name": "Gulmarg Gondola Day Trip",
+      "price": "AED 142"
+    },
+    {
+      "sku": "VK-PHG2",
+      "name": "Pahalgam & Betaab Valley — 2N",
+      "price": "AED 770"
+    },
+    {
+      "sku": "VK-SON",
+      "name": "Sonamarg Glacier Day",
+      "price": "AED 115"
+    }
+  ]
+}

@@ -211,19 +211,34 @@ export default function WhatsAppOutreachPage() {
   });
 
   useEffect(() => {
-    if (fromAsset && (fromAsset.content || fromAsset.image_url) && prefilledRef.current !== fromAsset.id) {
-      prefilledRef.current = fromAsset.id;
-      if (fromAsset.content) setMessage(fromAsset.content);
-      // Carry the asset's photo over as the attachment (the message rides as
-      // its caption), so "Send on WhatsApp" arrives ready to send.
-      const img = fromAsset.image_url || "";
-      const m = /^data:([^;]+);base64,(.+)$/.exec(img);
-      if (m) {
-        setMedia({ base64: m[2], mimetype: m[1], filename: `${fromAsset.title.replace(/[^a-z0-9]/gi, "-").toLowerCase() || "image"}` });
-      }
-      setAssetNotice(
-        `Loaded from Content Hub: "${fromAsset.title}"${m ? " — photo attached, message set as caption." : ""}`
-      );
+    if (!fromAsset || prefilledRef.current === fromAsset.id) return;
+    if (!(fromAsset.content || fromAsset.image_url)) return;
+    prefilledRef.current = fromAsset.id;
+    if (fromAsset.content) setMessage(fromAsset.content);
+    // Carry the asset's photo over as the attachment (the message rides as its
+    // caption), so "Send on WhatsApp" arrives ready to send. Handles both a
+    // pasted data: URL and a hosted http(s) image (fetched → base64).
+    const img = fromAsset.image_url || "";
+    const fname = `${fromAsset.title.replace(/[^a-z0-9]/gi, "-").toLowerCase() || "image"}`;
+    const dm = /^data:([^;]+);base64,(.+)$/.exec(img);
+    if (dm) {
+      setMedia({ base64: dm[2], mimetype: dm[1], filename: fname });
+      setAssetNotice(`Loaded from Content Hub: "${fromAsset.title}" — photo attached, message set as caption.`);
+    } else if (/^https?:\/\//.test(img)) {
+      setAssetNotice(`Loaded from Content Hub: "${fromAsset.title}" — fetching photo…`);
+      (async () => {
+        try {
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+          const b64 = await fileToBase64(new File([blob], fname, { type: blob.type }));
+          setMedia({ base64: b64, mimetype: blob.type || "image/jpeg", filename: fname });
+          setAssetNotice(`Loaded from Content Hub: "${fromAsset.title}" — photo attached, message set as caption.`);
+        } catch {
+          setAssetNotice(`Loaded from Content Hub: "${fromAsset.title}" — couldn't auto-attach the photo, add it manually below.`);
+        }
+      })();
+    } else {
+      setAssetNotice(`Loaded from Content Hub: "${fromAsset.title}"`);
     }
   }, [fromAsset]);
 
