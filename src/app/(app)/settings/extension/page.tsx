@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.251",
+    date: "Jun 15, 2026",
+    size: "237 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.251.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now mirrors the proven Auto Apply engine: one click strategy at a time, verify the modal advanced via innerText comparison, escalate only if it didn’t. The previous build fired all 5 strategies at once, which silently landed the 2nd click on the next step’s button after the form had already advanced.",
+      "Step detection is now innerText-based (immune to LinkedIn renaming CSS classes); buttons are re-found after every click because the modal re-renders between steps.",
+      "If the footer isn’t visible, the modal body is scrolled to reveal Next/Review/Submit before clicking.",
+    ],
+  },
+  {
     version: "1.0.250",
     date: "Jun 15, 2026",
     size: "236 KB",
     file: "/extensions/leadcaptura-extension-v1.0.250.zip",
-    latest: true,
     changes: [
       "Mass Apply now clicks Next/Submit on the new SDUI flow by calling the React onClick prop directly through the React fiber with isTrusted=true. Synthetic DOM events are always isTrusted=false, which the new React handler rejects — this was the reason Next refused to advance.",
       "Same 5-strategy click is now used for the Easy Apply button itself, so it stays robust if LinkedIn redesigns the entry.",

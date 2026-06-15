@@ -101,20 +101,6 @@
     return true;
   }
 
-  // Keyboard advance — focus the button and press Enter. Used ONLY as a retry
-  // when a pointer click failed to move the form (so the happy path never
-  // double-advances and skips a step).
-  function keyboardAdvance(btn) {
-    if (!btn) return;
-    try {
-      btn.focus({ preventScroll: true });
-      const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
-      btn.dispatchEvent(new KeyboardEvent("keydown", k));
-      btn.dispatchEvent(new KeyboardEvent("keypress", k));
-      btn.dispatchEvent(new KeyboardEvent("keyup", k));
-    } catch (_) {}
-  }
-
   // Click-of-last-resort for modal primary buttons (Ember binds handlers late).
   function forceClick(btn) {
     if (!btn) return false;
@@ -311,34 +297,28 @@
     ]);
   }
 
-  // Click an advance/submit button using the proven 5-strategy sequence from
-  // the existing engine's _forceClick. The SDUI modal is REACT, and React's
-  // onClick handler rejects events with isTrusted=false — which all synthetic
-  // DOM events have. Strategy 5 (direct fiber call with isTrusted=true) is the
-  // only path that reliably fires Next/Submit on the new flow.
-  function advanceClick(btn) {
+  // ─── proven click sequence, mirrored from overlay.js's working engine ───
+  // STAGE 1 — humanClick: a real pointer-event sequence. This is what
+  // overlay.js's dispatchHumanClick fires and is what the LinkedIn SPA
+  // listens for. The classic Easy Apply Ember modal advances on this alone.
+  // The new SDUI React modal also accepts it as the entry attempt.
+  // STAGE 2 — escalate ONLY if the form didn't advance: native .click() →
+  // inner span click → keyboard Enter → React fiber onClick(isTrusted:true).
+  // Firing all five at once (which v1.0.250 did) causes the second strategy
+  // to land AFTER the form already advanced, hitting the NEXT step's button
+  // — which is why the modal looked stuck at 1/4.
+  function escalateClick(btn) {
     if (!btn) return;
-    try { btn.scrollIntoView({ block: "center", inline: "center" }); } catch (_) {}
-    try { btn.focus({ preventScroll: true }); } catch (_) {}
-
-    // 1. Plain native click — Ember and some React handlers accept this.
     try { btn.click(); } catch (_) {}
-    // 2. Full pointer/mouse sequence on the button.
-    humanClick(btn);
-    // 3. Same sequence on the inner label span (some handlers bind to child).
     try {
       const inner = btn.querySelector(".artdeco-button__text") || btn.querySelector("span") || btn.firstElementChild;
       if (inner && inner !== btn) { try { inner.click(); } catch (_) {} humanClick(inner); }
     } catch (_) {}
-    // 4. Keyboard activation — buttons fire on Enter/Space too.
     try {
       const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
       btn.dispatchEvent(new KeyboardEvent("keydown", k));
       btn.dispatchEvent(new KeyboardEvent("keyup", k));
     } catch (_) {}
-    // 5. THE LOAD-BEARING ONE for the SDUI flow: walk the React fiber and call
-    //    the onClick prop DIRECTLY with isTrusted=true so LinkedIn's React
-    //    handler (which checks event.isTrusted) accepts it.
     try {
       const fKey = Object.keys(btn).find(
         k => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")
@@ -362,17 +342,18 @@
     } catch (_) {}
   }
 
-  // Progress signature so we can tell when a Next click failed to advance
-  // (= a validation error we couldn't satisfy → discard + skip).
-  function progressSig() {
-    let pct = "";
-    const region = document.querySelector('[aria-label*="percent" i]');
-    if (region) {
-      const m = (region.getAttribute("aria-label") || "").match(/(\d+)\s*percent/i);
-      if (m) pct = m[1];
-    }
-    const scope = applyFormScope();
-    return pct + "|" + (scope ? textOf(scope).length : 0);
+  // Visible-text fingerprint of the modal content area. The proven engine
+  // detects "did the step advance?" by comparing innerText — far more
+  // reliable than progress-bar % or character counts, and immune to LinkedIn
+  // renaming its internal CSS classes.
+  function modalText() {
+    const m = document.querySelector(
+      '[data-test-modal-id="easy-apply-modal"],' +
+      'div[role="dialog"][aria-labelledby="jobs-apply-header"],' +
+      ".jobs-easy-apply-modal,.jobs-easy-apply-content,.jobs-easy-apply-form," +
+      "[class*='easy-apply-content'],.artdeco-modal__content"
+    );
+    return ((m || document).innerText || "").trim();
   }
 
   // ─────────────────── form autofill ─────────────────────────
@@ -511,63 +492,94 @@
     if (pick) { forceClick(pick); await sleep(rand(600, 1100)); }
   }
 
+  // Wait up to timeoutMs for the modal's innerText to differ from `before`.
+  // Returns true if it changed (= step advanced) or the modal closed (= done).
+  async function waitAdvanced(before, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await sleep(220);
+      if (!applyFormPresent()) return true;     // modal closed = advanced/submitted
+      if (modalText() !== before) return true;  // text changed = stepped forward
+    }
+    return false;
+  }
+
   // Walk the multi-step apply form. Returns "applied" | "skipped".
+  // Mirrors overlay.js's proven _runEasyApplyModal: ONE click strategy at a
+  // time, between each strategy verify the form actually advanced via
+  // innerText comparison, and only escalate when the previous strategy
+  // failed. Firing all strategies at once (v1.0.250) caused later clicks to
+  // land on the NEXT step's button after the form had already advanced.
   async function runApplyModal() {
-    // Wait for the form to mount (poll up to 12s — modal OR full-page).
+    // Wait for the form to mount (up to 12s).
     const t0 = Date.now();
     while (Date.now() - t0 < 12000) {
       if (applyFormPresent()) break;
       await sleep(300);
     }
     if (!applyFormPresent()) return "skipped";
+    await sleep(700 + Math.random() * 300);
 
     let stuck = 0;
-    for (let step = 0; step < 14; step++) {
+    for (let step = 0; step < 16; step++) {
       if (state.cancel) { await discardAndClose(); return "skipped"; }
       if (isCheckpoint()) return "skipped";
       if (!applyFormPresent()) return "skipped";
 
+      // Autofill this step.
       const scope = applyFormScope();
       autofill(scope);
-      await sleep(rand(600, 1100));
+      await sleep(rand(500, 900));
 
-      const before = progressSig();
-
-      // Terminal step → Submit.
+      // Terminal step → Submit. Click, then wait for the modal to close.
       const submit = submitButton();
       if (submit) {
-        advanceClick(submit);
+        const beforeSubmit = modalText();
+        humanClick(submit);
+        let done = await waitAdvanced(beforeSubmit, 5000);
+        if (!done) { escalateClick(submitButton() || submit); done = await waitAdvanced(beforeSubmit, 4000); }
         await closePostSubmit();
         return "applied";
       }
-      // Otherwise Review → Next, in that order.
-      const advance = reviewButton() || nextButton();
+      // Otherwise: Review (final pre-submit) → Next.
+      let advance = reviewButton() || nextButton();
       if (!advance) {
-        // No actionable control → can't proceed.
-        await discardAndClose();
-        return "skipped";
+        // Footer not rendered yet — scroll the modal body and retry once.
+        try {
+          const sc = scope.querySelector(".artdeco-modal__content, .jobs-easy-apply-content") || scope;
+          sc.scrollTop = sc.scrollHeight;
+        } catch (_) {}
+        await sleep(500);
+        advance = reviewButton() || nextButton() || submitButton();
+        if (!advance) { await discardAndClose(); return "skipped"; }
       }
-      advanceClick(advance);
-      await sleep(rand(1400, 2400));
 
-      // Did the form move? If not, first retry with a focused Enter (React
-      // sometimes only advances on keyboard); if STILL stuck, it's a validation
-      // we couldn't satisfy → discard + skip.
-      let after = progressSig();
-      if (after === before) {
-        const btn = reviewButton() || nextButton() || submitButton();
-        keyboardAdvance(btn);
-        await sleep(rand(1200, 2000));
-        after = progressSig();
+      const before = modalText();
+
+      // STAGE 1 — human pointer click (what overlay.js's working engine uses).
+      humanClick(advance);
+      let advanced = await waitAdvanced(before, 4000);
+
+      // STAGE 2 — escalate. Re-find the button (LinkedIn re-renders between
+      // steps) and fire the heavy 4-fallback sequence: native click, inner
+      // span click, keyboard Enter, React fiber onClick(isTrusted:true).
+      if (!advanced) {
+        const fresh = reviewButton() || nextButton() || submitButton();
+        if (fresh) {
+          escalateClick(fresh);
+          advanced = await waitAdvanced(before, 4000);
+        }
       }
-      if (after === before) {
+
+      if (!advanced) {
+        // The step has a validation error we couldn't satisfy. Try one more
+        // autofill+click pass before declaring stuck.
         stuck++;
         if (stuck >= 2) { await discardAndClose(); return "skipped"; }
       } else {
         stuck = 0;
       }
     }
-    // Ran out of steps → give up cleanly.
     await discardAndClose();
     return "skipped";
   }
@@ -596,7 +608,16 @@
 
     apply.scrollIntoView({ block: "center", behavior: "smooth" });
     await sleep(rand(600, 1100));
-    advanceClick(apply);   // same 5-strategy click (incl. React fiber)
+    // STAGE 1 — human pointer click. The classic Easy Apply control opens the
+    // modal on this alone (proven by overlay.js's working engine).
+    humanClick(apply);
+    // Give LinkedIn ~3s to mount the modal; if nothing appeared, escalate.
+    let mounted = false;
+    for (let t = 0; t < 12; t++) {
+      await sleep(280);
+      if (applyFormPresent()) { mounted = true; break; }
+    }
+    if (!mounted) escalateClick(findInAppApply() || apply);
 
     return await runApplyModal();
   }
