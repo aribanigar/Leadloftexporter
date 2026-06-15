@@ -1,5 +1,13 @@
 /* Company Finder — Google Maps capture (isolated world).
  *
+ * ISOLATION: This script is ONLY injected on google.com/maps/* URLs.
+ * It shares NO state, globals, or functions with the LinkedIn content scripts
+ * (main.js, overlay.js, scraper.js, automate.js). The LinkedIn scripts run only
+ * on linkedin.com. There is zero shared code path.
+ *
+ * START / STOP: Capture NEVER starts automatically. The user must click
+ * "▶ Start" in the status pill. Nothing runs on page load.
+ *
  * Injects the page-world XHR hook (gmaps_inject.js), then parses each Google
  * Maps `/search` response into businesses (name, phone, website, address,
  * lat/lng, category, rating, hours) using the SAME nested-array field paths as
@@ -18,7 +26,7 @@
   const seen = new Set(); // place_id|cid dedupe within this session
   let buffer = [];
   let captured = 0;
-  let auto = false;
+  let auto = false; // NEVER auto-set to true; user must click ▶ Start
 
   // ── inject the page-world hook ──
   try {
@@ -38,9 +46,9 @@
       "background:#0c5d52;color:#fff;font:600 12px system-ui;padding:8px 10px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.25)";
     const label = document.createElement("span");
     label.id = "lc_cf_label";
-    label.textContent = "Company Finder: 0 captured";
+    label.textContent = "Company Finder: stopped";
     const btn = document.createElement("button");
-    btn.textContent = "Auto-scrape";
+    btn.textContent = "▶ Start";
     btn.style.cssText = "background:#f4a300;color:#1b1b1f;border:0;border-radius:7px;padding:5px 9px;font-weight:700;cursor:pointer";
     btn.onclick = () => (auto ? stopAuto() : startAuto(btn));
     btn.id = "lc_cf_btn";
@@ -53,14 +61,14 @@
 
   // ── auto-scroll the results feed so every business loads ──
   async function startAuto(btn) {
-    auto = true; if (btn) { btn.textContent = "Stop"; btn.style.background = "#ea4335"; btn.style.color = "#fff"; }
+    auto = true; if (btn) { btn.textContent = "■ Stop"; btn.style.background = "#ea4335"; btn.style.color = "#fff"; }
     const feed = document.querySelector('[role="feed"]');
     if (!feed) { setLabel("Open a Maps search results list first"); stopAuto(); return; }
     let stale = 0, lastH = -1;
     while (auto) {
       feed.scrollTop = feed.scrollHeight;
       await sleep(1000 + Math.random() * 2500);
-      if (document.getElementsByClassName("HlvSq").length > 0) { setLabel(`Done — ${captured} captured`); break; }
+      if (document.getElementsByClassName("HlvSq").length > 0) { setLabel(`Done — ${captured} captured (all loaded)`); break; }
       if (lastH === feed.scrollHeight) { if (++stale >= 20) break; } else { stale = 0; lastH = feed.scrollHeight; }
     }
     stopAuto();
@@ -68,7 +76,9 @@
   function stopAuto() {
     auto = false;
     const b = document.getElementById("lc_cf_btn");
-    if (b) { b.textContent = "Auto-scrape"; b.style.background = "#f4a300"; b.style.color = "#1b1b1f"; }
+    if (b) { b.textContent = "▶ Start"; b.style.background = "#f4a300"; b.style.color = "#1b1b1f"; }
+    if (captured > 0) setLabel(`Company Finder: ${captured} captured — stopped`);
+    else setLabel("Company Finder: stopped");
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -133,7 +143,7 @@
   function flush(items) {
     buffer.push(...items);
     captured += items.length;
-    setLabel(`Company Finder: ${captured} captured`);
+    setLabel(`Company Finder: ${captured} captured${auto ? "" : " (stopped)"}`);
     if (flushTimer) clearTimeout(flushTimer);
     // small debounce so rapid /search bursts batch into one POST
     flushTimer = setTimeout(() => {

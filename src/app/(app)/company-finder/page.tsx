@@ -21,6 +21,8 @@ import {
   ChevronDown,
   Loader2,
   Radio,
+  Info,
+  PlayCircle,
 } from "lucide-react";
 import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -194,6 +196,20 @@ export default function CompanyFinderPage() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* how-to banner — completely separate from LinkedIn capture */}
+      <div className="flex items-start gap-3 border-b border-dteal-100 bg-dteal-50/60 px-4 py-3">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-dteal-600" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-dteal-800">How to capture businesses</p>
+          <ol className="mt-1 list-decimal list-inside space-y-0.5 text-xs text-dteal-700">
+            <li>Open <strong>Google Maps</strong> in your browser and search for a niche + location (e.g. "restaurants Dubai").</li>
+            <li>Look for the <strong className="inline-flex items-center gap-1 rounded bg-dteal-700 px-1 py-0.5 text-white"><PlayCircle className="h-3 w-3" />▶ Start</strong> button that appears in the bottom-left corner of the Maps page.</li>
+            <li>Click <strong>▶ Start</strong> — the extension will scroll through all results and send them here automatically.</li>
+            <li>Click <strong>■ Stop</strong> at any time to pause. This is <em>completely separate</em> from LinkedIn work.</li>
+          </ol>
+        </div>
+      </div>
+
       {/* header */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <Building2 className="h-5 w-5 text-dteal-600" />
