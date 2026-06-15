@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 """
-publish_to_hub.py — push a day's Gifts Gulf content into the Content Hub DB.
+publish_to_hub.py — push a day's per-business content into the Content Hub DB.
 
 Talks to Neon over its HTTPS SQL endpoint (port 443), NOT the Postgres wire
 protocol (5432), because routine runners and sandboxes usually allow only
 HTTPS egress. No psycopg, no pip install: standard library only.
 
-Reads files the routine wrote under:
-  content/gifts-gulf/<date>/<CUR>/set-<n>/{email.html,email.amp.html,whatsapp.txt,linkedin.txt,meta.json}
-and inserts rows into `content_businesses` + `content_assets`.
+Business-agnostic: nothing is hardcoded. The routine that owns each business
+supplies the slug, name, and branding via environment variables. The script
+reads files under `content/<slug>/<date>/<CUR>/set-<n>/` and inserts rows
+into `content_businesses` + `content_assets`.
 
 Env:
-  DATABASE_URL   required. Neon URL (postgresql+psycopg://... accepted; +driver stripped).
-  HUB_WORKSPACE  required. Workspace UUID the business folder lives under.
-  HUB_BUSINESS_SLUG  optional, default "gifts-gulf".
-  HUB_BUSINESS_NAME  optional, default "Gifts Gulf".
+  DATABASE_URL       required. Neon URL (postgresql+psycopg://... accepted; +driver stripped).
+  HUB_WORKSPACE      required. Workspace UUID the business folder lives under.
+  HUB_BUSINESS_SLUG  required. Folder name under content/ (e.g. "acme-co").
+  HUB_BUSINESS_NAME  optional. Display name (default: slug → title case).
+  HUB_BRAND_COLOR    optional. Hex (default "#0e6b53").
+  HUB_ACCENT_COLOR   optional. Hex (default "#008138").
+  HUB_LOGO_URL       optional. Public logo URL.
+  HUB_TONE           optional. AI-writer tone (default "vibrant").
 
 Usage:
   python3 scripts/publish_to_hub.py --date 2026-06-13   # default: today UTC
@@ -27,13 +32,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-
-# Per-business branding used when the business folder is first created.
-# Override any field via env (HUB_BUSINESS_NAME / HUB_BRAND_COLOR / …).
-BRANDING = {
-    "gifts-gulf": {"name": "Gifts Gulf", "brand": "#00a544", "accent": "#008138",
-                   "logo": "https://www.giftsgulf.com/gglogo.svg", "tone": "minimal"},
-}
 
 
 def normalize(url: str) -> str:
@@ -82,13 +80,15 @@ def main() -> int:
 
     db = os.environ.get("DATABASE_URL")
     ws = os.environ.get("HUB_WORKSPACE")
-    slug = os.environ.get("HUB_BUSINESS_SLUG", "gifts-gulf")
-    brand_defaults = BRANDING.get(slug, {})
-    biz_name = os.environ.get("HUB_BUSINESS_NAME", brand_defaults.get("name", slug.replace("-", " ").title()))
-    brand = os.environ.get("HUB_BRAND_COLOR", brand_defaults.get("brand", "#0e6b53"))
-    accent = os.environ.get("HUB_ACCENT_COLOR", brand_defaults.get("accent", "#008138"))
-    logo = os.environ.get("HUB_LOGO_URL", brand_defaults.get("logo", ""))
-    tone = os.environ.get("HUB_TONE", brand_defaults.get("tone", "vibrant"))
+    slug = os.environ.get("HUB_BUSINESS_SLUG")
+    if not slug:
+        print(json.dumps({"date": args.date, "error": "HUB_BUSINESS_SLUG not set"}))
+        return 2
+    biz_name = os.environ.get("HUB_BUSINESS_NAME", slug.replace("-", " ").title())
+    brand = os.environ.get("HUB_BRAND_COLOR", "#0e6b53")
+    accent = os.environ.get("HUB_ACCENT_COLOR", "#008138")
+    logo = os.environ.get("HUB_LOGO_URL", "")
+    tone = os.environ.get("HUB_TONE", "vibrant")
     if not db or not ws:
         print(json.dumps({"date": args.date, "hub_publish": "skipped (no_secrets)"}))
         return 0

@@ -219,12 +219,14 @@ content/gifts-gulf/<YYYY-MM-DD>/
 - Do **NOT** use the giftsgulf `_next/image` optimizer — Gmail's image proxy can time out on the cold optimizer and cache the failure (blank tile forever for that message).
 - Do **NOT** hand-construct `mo####-##` codes. Pull each code straight from the catalogue row for that SKU. A guessed code 404s upstream → blank tile.
 
-**`scripts/publish_to_hub.py`** — the DB seeder. The Hub HTTP API also exists, but the routine runs the script directly because the routine sandbox can reach Postgres easily but flaked on the HTTP/JWT path. The script:
-- Resolves the `gifts-gulf` (or any) business by `(workspace_id, slug)`. Creates it on first run with Gifts Gulf branding (`#00a544` green, `#008138` accent, gglogo.svg as logo).
-- For each set under `content/<biz>/<date>/<CUR>/set-<n>/`, inserts **3 ContentAsset rows**: `html_email` (with `amp_content`), `whatsapp`, and `caption` (with `platform: linkedin`).
+**`scripts/publish_to_hub.py`** — the DB seeder. Fully **business-agnostic**: nothing about any specific business is hardcoded. Each routine supplies the slug, name, and branding via env vars; the script reads files under `content/<slug>/<date>/<CUR>/set-<n>/` and inserts rows. The Hub HTTP API also exists, but routines run the script directly because the routine sandbox can reach Postgres easily but flaked on the HTTP/JWT path. The script:
+- Resolves the business by `(workspace_id, slug)`. Creates it on first run with the branding supplied via env (`HUB_BUSINESS_NAME`, `HUB_BRAND_COLOR`, `HUB_ACCENT_COLOR`, `HUB_LOGO_URL`, `HUB_TONE`). Sensible defaults if a routine omits a field.
+- For each set under `content/<slug>/<date>/<CUR>/set-<n>/`, inserts **3 ContentAsset rows**: `html_email` (with `amp_content`), `whatsapp`, and `caption` (with `platform: linkedin`).
 - **Idempotent** — skips inserts whose `(business_id, title)` tuple already exists. Title encodes date + currency + theme, so reruns are no-ops.
 - **Schema-tolerant `meta.json`** — only needs date + currency + theme + skus + products. `campaign_code`/`campaign_name` are optional; the publisher builds a title from date + currency + theme when not provided.
-- Required env: `DATABASE_URL` (Neon, accepts the `postgresql+psycopg://` SQLAlchemy prefix; stripped before handing to `psycopg`), `HUB_WORKSPACE` (workspace UUID).
+- Required env: `DATABASE_URL` (Neon, accepts the `postgresql+psycopg://` SQLAlchemy prefix; stripped before handing to `psycopg`), `HUB_WORKSPACE` (workspace UUID), `HUB_BUSINESS_SLUG` (folder name under `content/`).
+
+To onboard a new business, the routine that owns it: (1) writes its day's files under `content/<new-slug>/<date>/…`, (2) sets `HUB_BUSINESS_SLUG=<new-slug>` (plus optional name/colour/logo/tone), (3) runs `publish_to_hub.py`. No code change in this repo.
 
 **Usage:**
 ```bash
