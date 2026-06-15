@@ -189,18 +189,26 @@
   // on company website" anchor is excluded so we never start applications we
   // can't auto-fill.
   function findInAppApply() {
-    // SCOPE strictly to the right-hand DETAIL pane. NEVER fall back to <main>
-    // or <document> — that lets the matcher pick up footer links, promo
-    // cards, "Get the LinkedIn app" CTAs, and the language/region popup
-    // triggers, all of which can contain the word "Apply" and would be
-    // clicked instead of the real Easy Apply button.
+    // Prefer the right-hand detail pane; fall back to <main>; finally the
+    // whole document. The footer-rejection below makes the wider scope safe.
     const root = document.querySelector(
       ".jobs-search__job-details, .jobs-search__job-details--container, " +
       ".jobs-search__job-details--wrapper, .scaffold-layout__detail, " +
       ".jobs-details, .job-view-layout, .jobs-details__main-content, " +
       ".job-details-jobs-unified-top-card__container--two-pane"
-    );
-    if (!root) return null;   // detail pane not rendered yet → caller waits
+    ) || document.querySelector("main") || document;
+
+    // Reject any element that lives inside the LinkedIn page footer, promo
+    // strip, language picker, or the LEFT job-list column — these are the
+    // things v1.0.249/250/251 were accidentally clicking. The leftmost
+    // job-list rail also contains per-card "Auto Apply" chips; clicking them
+    // re-opens the same job and never starts a fresh apply.
+    const inForbiddenSubtree = (el) =>
+         !!el.closest("footer, [role='contentinfo']")
+      || !!el.closest(".jobs-search-results-list, .jobs-search-results, .scaffold-layout__list, ul[role='list']")
+      || !!el.closest(".global-footer, .footer, [class*='global-footer'], [class*='page-footer']")
+      || !!el.closest("[data-test-modal-id='collection-banner-modal'], .artdeco-toast-item")
+      || !!el.closest(".lc-job-apply-row");  // our own per-card chip
 
     const isExternal = (el) => {
       const t = textOf(el).toLowerCase();
@@ -214,11 +222,10 @@
 
     // A candidate is the REAL in-app apply control only if at least one strong
     // signal matches. Plain text "Apply" without any of these is REJECTED —
-    // too many false positives in the footer/promo strips.
+    // too many false positives in the footer / promo strips.
     const isInAppApply = (el) => {
       const aria = (el.getAttribute("aria-label") || "").toLowerCase();
       const href = (el.getAttribute("href") || "").toLowerCase();
-      const cls = el.className || "";
       if (/easy apply|linkedin apply/i.test(aria)) return true;
       if (el.classList && el.classList.contains("jobs-apply-button")) return true;
       if (el.closest && el.closest(".jobs-apply-button__container, [class*='jobs-apply-button']")) return true;
@@ -234,6 +241,7 @@
     for (const el of cands) {
       if (!visible(el)) continue;
       if (el.disabled || el.getAttribute("aria-disabled") === "true") continue;
+      if (inForbiddenSubtree(el)) continue;
       if (isExternal(el)) continue;
       if (!isInAppApply(el)) continue;
       return el;

@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.253",
+    date: "Jun 15, 2026",
+    size: "237 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.253.zip",
+    latest: true,
+    changes: [
+      "Mass Apply finds the Easy Apply button on the new hashed-class detail pane again. v1.0.252 locked the scope to specific class names; when LinkedIn renamed them, the finder returned null and every card was marked “Couldn't apply”.",
+      "Scope now falls back to <main> and document, but explicitly REJECTS anything inside footer / language picker / promo strips / the left job-list rail / our own per-card chip, so the footer-click regression cannot return.",
+    ],
+  },
+  {
     version: "1.0.252",
     date: "Jun 15, 2026",
     size: "237 KB",
     file: "/extensions/leadcaptura-extension-v1.0.252.zip",
-    latest: true,
     changes: [
       "Mass Apply no longer clicks footer / language picker / promo links. The Easy Apply finder now requires a strong in-app signal (Easy Apply / LinkedIn Apply aria-label, jobs-apply-button class, in-app apply href, or the LinkedIn-bug glyph) — plain text “Apply” alone is no longer enough.",
       "Detail-pane scope is strict — no more falling back to <main> / document, which was matching footer links.",
