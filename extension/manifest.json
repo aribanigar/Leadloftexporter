@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "LeadCaptura \u2014 LinkedIn Capture",
-    "version": "1.0.260",
+    "version": "1.0.261",
     "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
     "permissions": [
         "activeTab",
@@ -124,7 +124,8 @@
                 "content/gmaps_inject.js"
             ],
             "matches": [
-                "https://*.linkedin.com/*",
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*",
                 "https://www.google.ae/maps/*",
                 "https://www.google.ca/maps/*",
                 "https://www.google.co.in/maps/*",
