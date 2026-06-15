@@ -19,6 +19,7 @@ from app.api.v1 import (
     linkedin_bridge,
     campaigns,
     content_hub,
+    company_finder,
     tracking,
     calendar,
     scheduling,
@@ -47,6 +48,8 @@ api_router.include_router(whatsapp.router)
 api_router.include_router(whatsapp_web.router)
 api_router.include_router(linkedin_bridge.router)
 api_router.include_router(campaigns.router)
+    
+api_router.include_router(company_finder.router)
 api_router.include_router(content_hub.router)
 api_router.include_router(tracking.router)
 api_router.include_router(calendar.router)

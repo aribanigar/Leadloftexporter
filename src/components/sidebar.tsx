@@ -24,6 +24,7 @@ import {
   CalendarClock,
   CalendarRange,
   Mic,
+  Building2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -138,6 +139,20 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           Quick Views
         </div>
         <div className="space-y-0.5">
+          {/* Finder Lead — Google-Maps-scraped businesses, kept separate from the
+              pipeline/prospecting until explicitly added. */}
+          <Link
+            href="/company-finder"
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              pathname?.startsWith("/company-finder")
+                ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 ring-1 ring-dteal-100"
+                : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
+            )}
+          >
+            <Building2 className={cn("h-4 w-4", pathname?.startsWith("/company-finder") ? "text-dteal-600" : "text-slate-400")} />
+            Finder Lead
+          </Link>
           {(views || [])
             .filter((v) => !HIDDEN_VIEWS.has((v.name || "").trim().toLowerCase()))
             .map((v) => (

@@ -8,6 +8,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -1044,3 +1045,53 @@ class MeetingNote(Base, TimestampMixin):
     source: Mapped[str] = mapped_column(String(20), default="audio")  # audio | transcript
     status: Mapped[str] = mapped_column(String(20), default="done")  # done | failed
     error: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class CompanyFinderBusiness(Base, TimestampMixin):
+    """A business scraped from Google Maps (via the extension's /search
+    interception, or imported from a scraper CSV/JSON). Organised into a
+    country → area → zone → street → building hierarchy derived from the
+    address + lat/lng so the UI can group "businesses in the same building"."""
+
+    __tablename__ = "company_finder_businesses"
+    __table_args__ = (
+        Index("ix_cfb_ws_category", "workspace_id", "category"),
+        Index("ix_cfb_ws_country_area", "workspace_id", "country", "area"),
+        Index("ix_cfb_ws_building", "workspace_id", "building_key"),
+        UniqueConstraint("workspace_id", "dedup_key", name="uq_cfb_ws_dedup"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+
+    name: Mapped[str] = mapped_column(String(400), nullable=False, default="")
+    phone: Mapped[Optional[str]] = mapped_column(String(60))
+    email: Mapped[Optional[str]] = mapped_column(String(400))
+    website: Mapped[Optional[str]] = mapped_column(String(600))
+    address: Mapped[Optional[str]] = mapped_column(Text)
+    category: Mapped[Optional[str]] = mapped_column(String(300))  # niche / business type
+
+    latitude: Mapped[Optional[float]] = mapped_column(Float)
+    longitude: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Google identifiers (used for dedup + a maps link).
+    place_id: Mapped[Optional[str]] = mapped_column(String(120))
+    cid: Mapped[Optional[str]] = mapped_column(String(120))
+    profile_url: Mapped[Optional[str]] = mapped_column(String(600))
+
+    # Derived hierarchy.
+    country: Mapped[Optional[str]] = mapped_column(String(120))
+    area: Mapped[Optional[str]] = mapped_column(String(200))   # city
+    zone: Mapped[Optional[str]] = mapped_column(String(200))   # neighbourhood / district
+    street: Mapped[Optional[str]] = mapped_column(String(300))
+    building: Mapped[Optional[str]] = mapped_column(String(300))
+    # Stable group key for "same building" (rounded lat/lng, else normalised building).
+    building_key: Mapped[Optional[str]] = mapped_column(String(120), index=True)
+
+    socials: Mapped[dict] = mapped_column(JSONB, default=dict)   # {instagram:[],facebook:[],linkedin:[],...}
+    hours: Mapped[dict] = mapped_column(JSONB, default=dict)
+    rating: Mapped[Optional[str]] = mapped_column(String(20))
+    rating_count: Mapped[Optional[str]] = mapped_column(String(40))
+
+    source: Mapped[str] = mapped_column(String(20), default="extension")  # extension | import
+    dedup_key: Mapped[str] = mapped_column(String(200), nullable=False, default="")

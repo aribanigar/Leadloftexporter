@@ -1,86 +1,137 @@
 {
-  "manifest_version": 3,
-  "name": "LeadCaptura — LinkedIn Capture",
-  "version": "1.0.258",
-  "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
-  "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms", "notifications"],
-  "host_permissions": [
-    "https://www.linkedin.com/*",
-    "https://linkedin.com/*",
-    "https://leadloftexporter.onrender.com/*"
-  ],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
-  "action": {
-    "default_popup": "popup/popup.html",
-    "default_title": "LeadCaptura",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "background": {
-    "service_worker": "background/service-worker.js",
-    "type": "module"
-  },
-  "options_page": "options/options.html",
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ],
-      "js": ["content/interceptor.js"],
-      "run_at": "document_start",
-      "all_frames": false
+    "manifest_version": 3,
+    "name": "LeadCaptura \u2014 LinkedIn Capture",
+    "version": "1.0.259",
+    "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage",
+        "tabs",
+        "alarms",
+        "notifications"
+    ],
+    "host_permissions": [
+        "https://leadloftexporter.onrender.com/*",
+        "https://linkedin.com/*",
+        "https://www.google.ae/maps/*",
+        "https://www.google.ca/maps/*",
+        "https://www.google.co.in/maps/*",
+        "https://www.google.co.uk/maps/*",
+        "https://www.google.com.au/maps/*",
+        "https://www.google.com/maps/*",
+        "https://www.linkedin.com/*"
+    ],
+    "optional_host_permissions": [
+        "http://*/*",
+        "https://*/*"
+    ],
+    "action": {
+        "default_popup": "popup/popup.html",
+        "default_title": "LeadCaptura",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
     },
-    {
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ],
-      "css": ["content/overlay.css"],
-      "js": [
-        "content/lib/storage.js",
-        "content/lib/human.js",
-        "content/lib/api.js",
-        "content/lib/dom.js",
-        "content/scraper.js",
-        "content/overlay.js",
-        "content/automate.js",
-        "content/main.js"
-      ],
-      "run_at": "document_idle",
-      "all_frames": false
+    "background": {
+        "service_worker": "background/service-worker.js",
+        "type": "module"
     },
-    {
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ],
-      "js": ["content/connect_all_on_page.js"],
-      "run_at": "document_idle",
-      "all_frames": false
+    "options_page": "options/options.html",
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
     },
-    {
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ],
-      "js": ["content/mass_apply_jobs.js"],
-      "run_at": "document_idle",
-      "all_frames": false
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["content/overlay.css", "icons/*"],
-      "matches": ["https://*.linkedin.com/*"]
-    }
-  ]
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*"
+            ],
+            "js": [
+                "content/interceptor.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*"
+            ],
+            "css": [
+                "content/overlay.css"
+            ],
+            "js": [
+                "content/lib/storage.js",
+                "content/lib/human.js",
+                "content/lib/api.js",
+                "content/lib/dom.js",
+                "content/scraper.js",
+                "content/overlay.js",
+                "content/automate.js",
+                "content/main.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*"
+            ],
+            "js": [
+                "content/connect_all_on_page.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*"
+            ],
+            "js": [
+                "content/mass_apply_jobs.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "https://www.google.com/maps/*",
+                "https://www.google.co.in/maps/*",
+                "https://www.google.ae/maps/*",
+                "https://www.google.co.uk/maps/*",
+                "https://www.google.com.au/maps/*",
+                "https://www.google.ca/maps/*"
+            ],
+            "js": [
+                "content/gmaps.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "content/overlay.css",
+                "icons/*",
+                "content/gmaps_inject.js"
+            ],
+            "matches": [
+                "https://*.linkedin.com/*",
+                "https://www.google.ae/maps/*",
+                "https://www.google.ca/maps/*",
+                "https://www.google.co.in/maps/*",
+                "https://www.google.co.uk/maps/*",
+                "https://www.google.com.au/maps/*",
+                "https://www.google.com/maps/*"
+            ]
+        }
+    ]
 }
