@@ -97,6 +97,8 @@ export default function CompanyFinderPage() {
   const [treeOpen, setTreeOpen] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deep, setDeep] = useState(false);
+  const [grid, setGrid] = useState(5);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyInput, setKeyInput] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
@@ -150,15 +152,15 @@ export default function CompanyFinderPage() {
   // Server-side Google Places search — the backend fetches the businesses.
   const searchMut = useMutation({
     mutationFn: (query: string) =>
-      api<{ found: number; inserted: number; updated: number; query: string }>(
+      api<{ found: number; inserted: number; updated: number; query: string; deep: boolean }>(
         "/company-finder/search",
-        { method: "POST", body: { query, max_pages: 3 } }
+        { method: "POST", body: deep ? { query, deep: true, grid } : { query, max_pages: 3 } }
       ),
     onSuccess: (r) => {
       setNotice(
         r.found === 0
           ? `No businesses found for "${r.query}". Try a different niche or area.`
-          : `Found ${r.found} for "${r.query}" — ${r.inserted} new, ${r.updated} updated.`
+          : `${r.deep ? "Deep sweep" : "Found"} ${r.found} for "${r.query}" — ${r.inserted} new, ${r.updated} updated.`
       );
       invalidate();
     },
@@ -168,6 +170,10 @@ export default function CompanyFinderPage() {
       if (/api key/i.test(msg)) setShowKeyModal(true);
     },
   });
+
+  // Rough cost/coverage hint for deep mode: ~grid² + 1 Google requests.
+  const deepRequests = grid * grid + 1;
+  const deepCost = (deepRequests * 0.035).toFixed(2);
 
   const saveKey = useMutation({
     mutationFn: (google_api_key: string) =>
@@ -268,8 +274,12 @@ export default function CompanyFinderPage() {
             disabled={searchMut.isPending || !searchQuery.trim()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-dteal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-dteal-700 disabled:opacity-50"
           >
-            {searchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {searchMut.isPending ? "Searching Google…" : "Find businesses"}
+            {searchMut.isPending
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : deep ? <Sparkles className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+            {searchMut.isPending
+              ? (deep ? "Sweeping city…" : "Searching Google…")
+              : (deep ? "Deep sweep" : "Find businesses")}
           </button>
           <button
             onClick={() => { setKeyInput(""); setShowKeyModal(true); }}
@@ -280,9 +290,46 @@ export default function CompanyFinderPage() {
             {config?.configured ? "API key ✓" : "Set API key"}
           </button>
         </div>
+
+        {/* deep-search controls */}
+        <div className="mt-2 flex flex-wrap items-center gap-3 pl-7">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-dteal-800">
+            <input
+              type="checkbox"
+              checked={deep}
+              onChange={(e) => setDeep(e.target.checked)}
+              className="h-4 w-4 rounded border-dteal-300 text-dteal-600 focus:ring-dteal-200"
+            />
+            Deep sweep (scan the whole city, not just the top 60)
+          </label>
+          {deep && (
+            <>
+              <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                <span>Coverage:</span>
+                <select
+                  value={grid}
+                  onChange={(e) => setGrid(Number(e.target.value))}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                >
+                  <option value={4}>Standard (4×4)</option>
+                  <option value={5}>Deep (5×5)</option>
+                  <option value={6}>Thorough (6×6)</option>
+                  <option value={7}>Max (7×7)</option>
+                </select>
+              </div>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                ~{deepRequests} Google requests ≈ ${deepCost} · ~{Math.round(deepRequests * 0.5)}s
+              </span>
+            </>
+          )}
+        </div>
+
         <p className="mt-1.5 flex items-center gap-1.5 pl-7 text-xs text-dteal-700/80">
           <Info className="h-3 w-3" />
           The system fetches businesses straight from Google — no manual scraping. This feature is fully separate from LinkedIn.
+          {deep
+            ? <span> Deep sweep tiles the city into a grid so you get every business, not just Google’s first 60. Results dedupe automatically.</span>
+            : null}
           {!config?.configured && <span className="font-semibold text-amber-700"> Add your Google Places API key to start.</span>}
         </p>
       </div>

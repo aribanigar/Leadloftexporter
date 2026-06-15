@@ -123,17 +123,23 @@ def search(
             "No Google API key set. Add your Google Places API key in Company Finder settings first.",
         )
     query = (body.get("query") or body.get("q") or "").strip()
-    max_pages = int(body.get("max_pages") or 3)
     region = (body.get("region_code") or "").strip()
+    deep = bool(body.get("deep"))
     try:
-        businesses = google_places.search_text(
-            api_key, query, max_pages=max_pages, region_code=region
-        )
+        if deep:
+            businesses = google_places.search_grid(
+                api_key, query, grid=int(body.get("grid") or 5), region_code=region
+            )
+        else:
+            businesses = google_places.search_text(
+                api_key, query, max_pages=int(body.get("max_pages") or 3), region_code=region
+            )
     except google_places.PlacesError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
     result = svc.ingest(db, ctx.workspace_id, businesses, source="google_places")
     result["found"] = len(businesses)
     result["query"] = query
+    result["deep"] = deep
     return result
 
 

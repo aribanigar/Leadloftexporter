@@ -158,3 +158,150 @@ def search_text(
             time.sleep(2)
 
     return results
+
+
+# ── Deep / exhaustive coverage via geographic grid tiling ────────────────────
+# Text Search caps at 60 results per query, so a single "restaurants in Dubai"
+# misses most of a big city. To get them all we split the city's bounding box
+# into a grid of rectangles and run the niche query inside each tile
+# (locationRestriction). Each tile gets its own 60-result budget, and we dedup
+# everything by place_id. No place-type mapping needed — free text just works.
+
+# Cheaper Pro-tier mask: we only need the area's geometry to bootstrap the grid.
+_BOOTSTRAP_MASK = "places.location,places.viewport,places.formattedAddress,places.displayName"
+
+
+def _geocode_area(api_key: str, area_query: str, language_code: str = "en") -> Optional[tuple]:
+    """Resolve an area name to a (south, west, north, east) bounding box."""
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": _BOOTSTRAP_MASK,
+    }
+    body = {"textQuery": area_query, "pageSize": 5, "languageCode": language_code}
+    try:
+        resp = httpx.post(SEARCH_URL, json=body, headers=headers, timeout=20)
+    except httpx.HTTPError as e:
+        raise PlacesError(f"Couldn't reach Google Places: {e}") from e
+    if resp.status_code in (401, 403):
+        msg = ""
+        try:
+            msg = (resp.json().get("error") or {}).get("message") or ""
+        except Exception:
+            msg = resp.text[:200]
+        raise PlacesError(
+            "Google rejected the API key (403). Enable 'Places API (New)' and billing. " + msg
+        )
+    if resp.status_code != 200:
+        return None
+    places = resp.json().get("places") or []
+    if not places:
+        return None
+    # Prefer the top result's viewport (a real bounding box).
+    for p in places:
+        vp = p.get("viewport") or {}
+        lo, hi = vp.get("low") or {}, vp.get("high") or {}
+        if lo.get("latitude") is not None and hi.get("latitude") is not None:
+            return (lo["latitude"], lo["longitude"], hi["latitude"], hi["longitude"])
+    # Fallback: build a padded box from the result coordinates.
+    lats = [p["location"]["latitude"] for p in places if p.get("location")]
+    lngs = [p["location"]["longitude"] for p in places if p.get("location")]
+    if not lats:
+        return None
+    pad = 0.05
+    return (min(lats) - pad, min(lngs) - pad, max(lats) + pad, max(lngs) + pad)
+
+
+def grid_dimensions(grid: int) -> int:
+    """Clamp the grid size to a sane range (each side of the N×N tiling)."""
+    return max(2, min(int(grid or 5), 7))
+
+
+def search_grid(
+    api_key: str,
+    query: str,
+    *,
+    grid: int = 5,
+    language_code: str = "en",
+    region_code: str = "",
+) -> list[dict]:
+    """Exhaustively sweep an area: tile its bounding box into grid×grid
+    rectangles and run the niche query in each. Returns deduped businesses.
+
+    The query is split on the last " in " into niche + location
+    ("restaurants in Dubai" → niche "restaurants", area "Dubai"); the area is
+    geocoded to a bounding box and the niche is searched per tile. If there's no
+    " in ", the whole query is used for both and we fall back to a plain search
+    when no box can be resolved.
+    """
+    query = (query or "").strip()
+    if not api_key:
+        raise PlacesError("No Google API key configured.")
+    if not query:
+        raise PlacesError("Enter a search like 'restaurants in Dubai'.")
+    grid = grid_dimensions(grid)
+
+    niche, sep, location = query.rpartition(" in ")
+    niche = (niche.strip() if sep else query) or query
+    location = (location.strip() if sep else query) or query
+
+    bbox = _geocode_area(api_key, location, language_code)
+    if not bbox:
+        # Couldn't resolve a box — degrade gracefully to a normal text search.
+        return search_text(api_key, query, max_pages=3,
+                           language_code=language_code, region_code=region_code)
+
+    south, west, north, east = bbox
+    if north <= south:
+        north = south + 0.01
+    if east <= west:
+        east = west + 0.01
+    dlat = (north - south) / grid
+    dlng = (east - west) / grid
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": FIELD_MASK,
+    }
+    seen: set[str] = set()
+    out: list[dict] = []
+    for i in range(grid):
+        for j in range(grid):
+            lo_lat = south + i * dlat
+            lo_lng = west + j * dlng
+            body: dict[str, Any] = {
+                "textQuery": niche,
+                "pageSize": 20,
+                "languageCode": language_code,
+                "locationRestriction": {
+                    "rectangle": {
+                        "low": {"latitude": lo_lat, "longitude": lo_lng},
+                        "high": {"latitude": lo_lat + dlat, "longitude": lo_lng + dlng},
+                    }
+                },
+            }
+            if region_code:
+                body["regionCode"] = region_code
+            try:
+                resp = httpx.post(SEARCH_URL, json=body, headers=headers, timeout=20)
+            except httpx.HTTPError:
+                continue
+            if resp.status_code != 200:
+                # Surface an auth/enablement problem on the very first tile.
+                if i == 0 and j == 0 and resp.status_code in (401, 403):
+                    raise PlacesError(
+                        "Google rejected the API key (403). Enable 'Places API (New)' and billing."
+                    )
+                continue
+            for p in resp.json().get("places") or []:
+                b = _to_business(p)
+                if not b:
+                    continue
+                pid = b.get("place_id") or ""
+                if pid and pid in seen:
+                    continue
+                if pid:
+                    seen.add(pid)
+                out.append(b)
+    return out
