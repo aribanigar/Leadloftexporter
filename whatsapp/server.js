@@ -335,6 +335,18 @@ async function initAccount(workspaceId, accountId, label) {
         const userId = sock.user?.id?.split(':')[0] || '';
         cs.info = { pushname: sock.user?.name || '', wid: { user: userId } };
         console.log(`[WA:${workspaceId}/${accountId}] connected as +${userId}`);
+        // Resume any campaign that stopped because THIS number dropped — it
+        // continues from the last unsent contact (no duplicates, no skips).
+        try {
+          for (const c of Object.values(activeCampaigns)) {
+            if (c.workspaceId === workspaceId && (c.accountId === accountId || !c.accountId)
+                && c.status === 'disconnected' && !c.cancelled && !c.paused) {
+              console.log(`[WA:${workspaceId}/${accountId}] resuming campaign ${c.id} at ${c.progress}/${c.contacts.length}`);
+              c.status = 'running';
+              runCampaign(c);
+            }
+          }
+        } catch (e) { console.error('[wa] auto-resume failed', e.message); }
       }
       if (connection === 'close') {
         const err = lastDisconnect?.error;
@@ -699,18 +711,27 @@ function buildCampaignPayload(campaign, text) {
 async function runCampaign(campaign) {
   campaign.status = 'running';
   campaign.startedAt = campaign.startedAt || Date.now();
-  const s = sessions.get(sKey(campaign.workspaceId, campaign.accountId)) || getDefaultSession(campaign.workspaceId);
   for (let i = campaign.progress; i < campaign.contacts.length; i++) {
-    if (campaign.paused) { campaign.status = 'paused'; return; }
+    if (campaign.paused) { campaign.status = 'paused'; persistHistory(campaign); return; }
     if (campaign.cancelled) { campaign.status = 'cancelled'; campaign.completedAt = Date.now(); persistHistory(campaign); return; }
+    // Re-fetch the session each pass so a reconnect (new socket) is picked up.
+    // If the number is NOT connected, STOP here rather than burning the rest of
+    // the list as failures: progress stays at i, the last successfully sent
+    // contact is i-1 (campaign.lastSentPhone), and we resume from i on reconnect.
+    const s = sessions.get(sKey(campaign.workspaceId, campaign.accountId)) || getDefaultSession(campaign.workspaceId);
+    if (!s?.sock || s.clientState.status !== 'ready') {
+      campaign.status = 'disconnected';
+      campaign.disconnectedAt = Date.now();
+      persistHistory(campaign);
+      return;
+    }
     const contact = campaign.contacts[i];
     const text = mergeMessage(campaign.message, contact);
     try {
-      if (!s?.sock || s.clientState.status !== 'ready') throw new Error('wa_not_connected');
       const raw = String(contact.phone || '');
       let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
       const cc = String(campaign.countryCode || '91').replace(/\D/g, '') || '91';
-      if (digits.length <= 10) digits = cc + digits;
+      if (digits.length <= 10) digits = cc + digits;   // mixed: local number → default cc
       const lookupJid = `${digits}@s.whatsapp.net`;
       let sendJid = lookupJid;
       try {
@@ -729,7 +750,19 @@ async function runCampaign(campaign) {
       await s.sock.sendMessage(sendJid, buildCampaignPayload(campaign, text));
       contact.result = 'sent';
       campaign.stats.sent++;
+      campaign.lastSentPhone = digits;
+      campaign.lastSentName = contact.name || '';
+      campaign.lastSentAt = Date.now();
     } catch (e) {
+      // A mid-send failure can mean the socket dropped — if so, stop & preserve
+      // progress so we resume from THIS contact instead of skipping it.
+      const live = sessions.get(sKey(campaign.workspaceId, campaign.accountId));
+      if (!live?.sock || live.clientState.status !== 'ready') {
+        campaign.status = 'disconnected';
+        campaign.disconnectedAt = Date.now();
+        persistHistory(campaign);
+        return;
+      }
       contact.result = `error: ${e.message}`;
       campaign.stats.failed++;
     }
@@ -748,6 +781,9 @@ function persistHistory(c) {
     const entry = {
       id: c.id, workspaceId: c.workspaceId, accountId: c.accountId,
       message: c.message, status: c.status, stats: c.stats,
+      progress: c.progress, total: c.contacts.length,
+      lastSentPhone: c.lastSentPhone || null, lastSentName: c.lastSentName || null, lastSentAt: c.lastSentAt || null,
+      disconnectedAt: c.disconnectedAt || null,
       results: c.contacts.map(({ phone, name, result }) => ({ phone, name: name || '', result })),
       createdAt: c.createdAt, startedAt: c.startedAt, completedAt: c.completedAt || Date.now(),
     };
@@ -806,6 +842,9 @@ app.get('/campaigns', (req, res) => {
     .map(c => ({
       id: c.id, accountId: c.accountId, message: c.message,
       status: c.status, stats: c.stats,
+      progress: c.progress, total: c.contacts.length,
+      lastSentPhone: c.lastSentPhone || null, lastSentName: c.lastSentName || null, lastSentAt: c.lastSentAt || null,
+      disconnectedAt: c.disconnectedAt || null,
       results: c.contacts.map(({ phone, name, result }) => ({ phone, name: name || '', result })),
       createdAt: c.createdAt, startedAt: c.startedAt, completedAt: c.completedAt || null,
     }));

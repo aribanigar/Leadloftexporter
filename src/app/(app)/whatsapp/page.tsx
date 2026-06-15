@@ -19,7 +19,7 @@
  *   /whatsapp-web/campaigns         — list runs + live progress
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useQuery,
@@ -101,9 +101,15 @@ interface WaCampaign {
   id: string;
   accountId: string | null;
   message: string;
-  status: "queued" | "running" | "paused" | "completed" | "cancelled" | "failed";
+  status: "queued" | "running" | "paused" | "completed" | "cancelled" | "failed" | "disconnected";
   stats: WaCampaignStats;
   results: { phone: string; name: string; result: string | null }[];
+  progress?: number;
+  total?: number;
+  lastSentPhone?: string | null;
+  lastSentName?: string | null;
+  lastSentAt?: number | null;
+  disconnectedAt?: number | null;
   createdAt: number;
   startedAt: number | null;
   completedAt: number | null;
@@ -129,7 +135,48 @@ const CAMP_BADGE: Record<string, { bg: string; text: string }> = {
   completed: { bg: "#dcfce7", text: "#166534" },
   cancelled: { bg: "#fee2e2", text: "#991b1b" },
   failed:    { bg: "#fee2e2", text: "#991b1b" },
+  disconnected: { bg: "#fee2e2", text: "#991b1b" },
 };
+
+// Common country dial codes for the recipient picker (mixed numbers that already
+// include a code are kept as-is by the sender; this is the default for locals).
+const COUNTRY_CODES: { code: string; label: string }[] = [
+  { code: "91", label: "🇮🇳 India +91" },
+  { code: "971", label: "🇦🇪 UAE +971" },
+  { code: "1", label: "🇺🇸 USA/Canada +1" },
+  { code: "44", label: "🇬🇧 UK +44" },
+  { code: "966", label: "🇸🇦 Saudi +966" },
+  { code: "974", label: "🇶🇦 Qatar +974" },
+  { code: "965", label: "🇰🇼 Kuwait +965" },
+  { code: "973", label: "🇧🇭 Bahrain +973" },
+  { code: "968", label: "🇴🇲 Oman +968" },
+  { code: "92", label: "🇵🇰 Pakistan +92" },
+  { code: "880", label: "🇧🇩 Bangladesh +880" },
+  { code: "977", label: "🇳🇵 Nepal +977" },
+  { code: "61", label: "🇦🇺 Australia +61" },
+  { code: "65", label: "🇸🇬 Singapore +65" },
+  { code: "60", label: "🇲🇾 Malaysia +60" },
+];
+
+// Pull phone-like tokens out of pasted text or CSV (handles +, spaces, (), -,
+// commas, newlines). Returns digit strings (10+ digits, country code optional).
+function parseNumbers(raw: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const tok of raw.split(/[\n,;]+/)) {
+    const t = tok.trim();
+    if (!t) continue;
+    // first phone-shaped run in the cell (so CSV rows with a name column work)
+    const m = t.match(/\+?\d[\d\s().-]{7,}\d/);
+    if (!m) continue;
+    const digits = m[0].replace(/\D/g, "");
+    if (digits.length < 8) continue;
+    if (seen.has(digits)) continue;
+    seen.add(digits);
+    out.push(digits);
+  }
+  return out;
+}
 
 export default function WhatsAppOutreachPage() {
   const qc = useQueryClient();
@@ -186,6 +233,9 @@ export default function WhatsAppOutreachPage() {
   const [accountId, setAccountId] = useState<string>("");
   const [message, setMessage] = useState<string>("Hi {first_name}, ");
   const [stageId, setStageId] = useState<string>("");
+  // Recipient source: CRM pipeline stage, or manually-entered / CSV numbers.
+  const [recipMode, setRecipMode] = useState<"stage" | "manual">("stage");
+  const [manualText, setManualText] = useState<string>("");
   const [countryCode, setCountryCode] = useState<string>("91");
   const [delayMin, setDelayMin] = useState<number>(5);
   const [delayMax, setDelayMax] = useState<number>(12);
@@ -278,6 +328,28 @@ export default function WhatsAppOutreachPage() {
     (l) => (l.phone || "").trim() !== ""
   ).length;
 
+  // Manually-entered / CSV numbers (deduped digit strings).
+  const manualNumbers = useMemo(() => parseNumbers(manualText), [manualText]);
+  // How many already carry a country code (kept as-is) vs. get the default.
+  const manualWithCC = manualNumbers.filter((d) => d.length > 10).length;
+  const totalRecipients = recipMode === "manual" ? manualNumbers.length : recipientCount;
+
+  async function onPickCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const text = await file.text();
+    const found = parseNumbers(text);
+    if (!found.length) {
+      setLastRunNotice("No phone numbers found in that file.");
+      return;
+    }
+    // Merge with anything already typed, dedupe.
+    const merged = parseNumbers(manualText + "\n" + found.join("\n"));
+    setManualText(merged.join("\n"));
+    setRecipMode("manual");
+  }
+
   const startCampaign = useMutation({
     mutationFn: () =>
       api<{ id: string }>("/whatsapp-web/campaigns/start", {
@@ -286,7 +358,9 @@ export default function WhatsAppOutreachPage() {
           account_id: accountId || undefined,
           message,
           media: media || undefined,
-          stage_id: stageId || undefined,
+          ...(recipMode === "manual"
+            ? { contacts: manualNumbers.map((p) => ({ phone: p })) }
+            : { stage_id: stageId || undefined }),
           delay_min: Math.max(3, delayMin) * 1000,
           delay_max: Math.max(6, delayMax) * 1000,
           country_code: countryCode,
@@ -564,44 +638,101 @@ export default function WhatsAppOutreachPage() {
               </select>
             </label>
 
-            <label className="block text-sm">
-              <span className="text-xs font-medium text-slate-700">
-                Recipients — pipeline stage
-              </span>
-              <select
-                value={stageId}
-                onChange={(e) => setStageId(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">— pick a stage —</option>
-                {stages.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+            {/* Recipient source toggle */}
+            <div>
+              <span className="text-xs font-medium text-slate-700">Recipients</span>
+              <div className="mt-1 inline-flex w-full gap-0.5 rounded-lg bg-slate-100 p-0.5">
+                {([["stage", "Pipeline stage"], ["manual", "Numbers / CSV"]] as const).map(([m, lbl]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setRecipMode(m)}
+                    className={
+                      "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors " +
+                      (recipMode === m ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-700")
+                    }
+                  >
+                    {lbl}
+                  </button>
                 ))}
-              </select>
-              {stageId && (
-                <p className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
-                  <Users className="h-3 w-3" />
-                  {recipientCount} lead{recipientCount === 1 ? "" : "s"} with a phone
-                  number{" "}
-                  {stageLeads.length - recipientCount > 0 &&
-                    `(${stageLeads.length - recipientCount} skipped, no phone)`}
+              </div>
+            </div>
+
+            {recipMode === "stage" ? (
+              <label className="block text-sm">
+                <select
+                  value={stageId}
+                  onChange={(e) => setStageId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">— pick a stage —</option>
+                  {stages.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                {stageId && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
+                    <Users className="h-3 w-3" />
+                    {recipientCount} lead{recipientCount === 1 ? "" : "s"} with a phone number{" "}
+                    {stageLeads.length - recipientCount > 0 &&
+                      `(${stageLeads.length - recipientCount} skipped, no phone)`}
+                  </p>
+                )}
+              </label>
+            ) : (
+              <div className="space-y-2">
+                <textarea
+                  value={manualText}
+                  onChange={(e) => setManualText(e.target.value)}
+                  rows={5}
+                  className="block w-full resize-y rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
+                  placeholder={"Paste numbers — one per line or comma-separated:\n9876543210\n+971 50 123 4567\n+1 (415) 555-0142"}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    <Paperclip className="h-3.5 w-3.5" /> Upload CSV
+                    <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={onPickCsv} className="hidden" />
+                  </label>
+                  {manualNumbers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setManualText("")}
+                      className="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-rose-500"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                    <Users className="h-3 w-3" />
+                    {manualNumbers.length} number{manualNumbers.length === 1 ? "" : "s"}
+                    {manualWithCC > 0 && ` · ${manualWithCC} already have a country code`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Mixed numbers are analysed automatically: those without a country code get the default below; those that already include one are kept as-is.
                 </p>
-              )}
-            </label>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-sm">
                 <span className="text-xs font-medium text-slate-700">
-                  Country code
+                  Default country code
                 </span>
-                <input
+                <select
                   value={countryCode}
                   onChange={(e) => setCountryCode(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  placeholder="91"
-                />
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                  {!COUNTRY_CODES.some((c) => c.code === countryCode) && (
+                    <option value={countryCode}>+{countryCode}</option>
+                  )}
+                </select>
               </label>
               <label className="block text-sm">
                 <span className="text-xs font-medium text-slate-700">
@@ -712,7 +843,7 @@ export default function WhatsAppOutreachPage() {
                 !canSend ||
                 startCampaign.isPending ||
                 (!message.trim() && !media) ||
-                !stageId
+                (recipMode === "stage" ? !stageId : manualNumbers.length === 0)
               }
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
@@ -902,6 +1033,17 @@ export default function WhatsAppOutreachPage() {
                         {new Date(c.createdAt).toLocaleString()} ·{" "}
                         {c.stats.sent} sent · {c.stats.failed} failed
                       </p>
+                      {c.lastSentPhone && (
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          Last sent: +{c.lastSentPhone}
+                          {c.lastSentAt ? ` · ${new Date(c.lastSentAt).toLocaleTimeString()}` : ""}
+                        </p>
+                      )}
+                      {c.status === "disconnected" && (
+                        <p className="mt-1 inline-block rounded bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600">
+                          WhatsApp disconnected at {c.progress ?? c.stats.processed}/{c.total ?? c.stats.total} — reconnect the number to auto-resume from the next one (no duplicates).
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span
@@ -925,7 +1067,7 @@ export default function WhatsAppOutreachPage() {
                           <Pause className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      {c.status === "paused" && (
+                      {(c.status === "paused" || c.status === "disconnected") && (
                         <button
                           onClick={() =>
                             api(`/whatsapp-web/campaigns/${c.id}/resume`, {
