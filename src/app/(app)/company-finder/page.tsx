@@ -97,6 +97,7 @@ export default function CompanyFinderPage() {
   const [treeOpen, setTreeOpen] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [source, setSource] = useState<"osm" | "google">("osm");
   const [deep, setDeep] = useState(false);
   const [grid, setGrid] = useState(5);
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -152,15 +153,21 @@ export default function CompanyFinderPage() {
   // Server-side Google Places search — the backend fetches the businesses.
   const searchMut = useMutation({
     mutationFn: (query: string) =>
-      api<{ found: number; inserted: number; updated: number; query: string; deep: boolean }>(
+      api<{ found: number; inserted: number; updated: number; query: string; deep?: boolean; source: string }>(
         "/company-finder/search",
-        { method: "POST", body: deep ? { query, deep: true, grid } : { query, max_pages: 3 } }
+        {
+          method: "POST",
+          body:
+            source === "google"
+              ? (deep ? { query, source: "google", deep: true, grid } : { query, source: "google", max_pages: 3 })
+              : { query, source: "osm" },
+        }
       ),
     onSuccess: (r) => {
       setNotice(
         r.found === 0
           ? `No businesses found for "${r.query}". Try a different niche or area.`
-          : `${r.deep ? "Deep sweep" : "Found"} ${r.found} for "${r.query}" — ${r.inserted} new, ${r.updated} updated.`
+          : `${r.deep ? "Deep sweep" : "Found"} ${r.found} for "${r.query}" (${r.source === "openstreetmap" ? "OpenStreetMap" : "Google"}) — ${r.inserted} new, ${r.updated} updated.`
       );
       invalidate();
     },
@@ -192,7 +199,7 @@ export default function CompanyFinderPage() {
   function runSearch() {
     const q = searchQuery.trim();
     if (!q) return;
-    if (!config?.configured) { setShowKeyModal(true); return; }
+    if (source === "google" && !config?.configured) { setShowKeyModal(true); return; }
     searchMut.mutate(q);
   }
 
@@ -255,7 +262,7 @@ export default function CompanyFinderPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Search bar — the backend fetches businesses from Google for you. */}
+      {/* Search bar — the backend fetches businesses for you (OSM free / Google paid). */}
       <div className="border-b border-dteal-100 bg-gradient-to-r from-dteal-50 via-emerald-50/40 to-white px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Sparkles className="h-5 w-5 shrink-0 text-dteal-600" />
@@ -276,61 +283,94 @@ export default function CompanyFinderPage() {
           >
             {searchMut.isPending
               ? <Loader2 className="h-4 w-4 animate-spin" />
-              : deep ? <Sparkles className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+              : (source === "google" && deep) ? <Sparkles className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             {searchMut.isPending
-              ? (deep ? "Sweeping city…" : "Searching Google…")
-              : (deep ? "Deep sweep" : "Find businesses")}
+              ? (source === "google" && deep ? "Sweeping city…" : "Searching…")
+              : (source === "google" && deep ? "Deep sweep" : "Find businesses")}
           </button>
-          <button
-            onClick={() => { setKeyInput(""); setShowKeyModal(true); }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-dteal-200 bg-white px-3 py-2.5 text-sm font-medium text-dteal-700 hover:bg-dteal-50"
-            title="Google API key"
-          >
-            <KeyRound className="h-4 w-4" />
-            {config?.configured ? "API key ✓" : "Set API key"}
-          </button>
+          {source === "google" && (
+            <button
+              onClick={() => { setKeyInput(""); setShowKeyModal(true); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-dteal-200 bg-white px-3 py-2.5 text-sm font-medium text-dteal-700 hover:bg-dteal-50"
+              title="Google API key"
+            >
+              <KeyRound className="h-4 w-4" />
+              {config?.configured ? "API key ✓" : "Set API key"}
+            </button>
+          )}
         </div>
 
-        {/* deep-search controls */}
+        {/* source toggle + options */}
         <div className="mt-2 flex flex-wrap items-center gap-3 pl-7">
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-dteal-800">
-            <input
-              type="checkbox"
-              checked={deep}
-              onChange={(e) => setDeep(e.target.checked)}
-              className="h-4 w-4 rounded border-dteal-300 text-dteal-600 focus:ring-dteal-200"
-            />
-            Deep sweep (scan the whole city, not just the top 60)
-          </label>
-          {deep && (
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm font-medium">
+            <button
+              onClick={() => setSource("osm")}
+              className={cn("rounded-md px-3 py-1", source === "osm" ? "bg-white text-dteal-700 shadow-sm" : "text-slate-500")}
+            >
+              🌍 OpenStreetMap · Free
+            </button>
+            <button
+              onClick={() => setSource("google")}
+              className={cn("rounded-md px-3 py-1", source === "google" ? "bg-white text-dteal-700 shadow-sm" : "text-slate-500")}
+            >
+              Google · Paid
+            </button>
+          </div>
+
+          {source === "osm" ? (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Free · no API key · no result cap · ~10–30s
+            </span>
+          ) : (
             <>
-              <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
-                <span>Coverage:</span>
-                <select
-                  value={grid}
-                  onChange={(e) => setGrid(Number(e.target.value))}
-                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
-                >
-                  <option value={4}>Standard (4×4)</option>
-                  <option value={5}>Deep (5×5)</option>
-                  <option value={6}>Thorough (6×6)</option>
-                  <option value={7}>Max (7×7)</option>
-                </select>
-              </div>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                ~{deepRequests} Google requests ≈ ${deepCost} · ~{Math.round(deepRequests * 0.5)}s
-              </span>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-dteal-800">
+                <input
+                  type="checkbox"
+                  checked={deep}
+                  onChange={(e) => setDeep(e.target.checked)}
+                  className="h-4 w-4 rounded border-dteal-300 text-dteal-600 focus:ring-dteal-200"
+                />
+                Deep sweep (scan the whole city, not just the top 60)
+              </label>
+              {deep && (
+                <>
+                  <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                    <span>Coverage:</span>
+                    <select
+                      value={grid}
+                      onChange={(e) => setGrid(Number(e.target.value))}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                    >
+                      <option value={4}>Standard (4×4)</option>
+                      <option value={5}>Deep (5×5)</option>
+                      <option value={6}>Thorough (6×6)</option>
+                      <option value={7}>Max (7×7)</option>
+                    </select>
+                  </div>
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    ~{deepRequests} Google requests ≈ ${deepCost} · ~{Math.round(deepRequests * 0.5)}s
+                  </span>
+                </>
+              )}
             </>
           )}
         </div>
 
         <p className="mt-1.5 flex items-center gap-1.5 pl-7 text-xs text-dteal-700/80">
           <Info className="h-3 w-3" />
-          The system fetches businesses straight from Google — no manual scraping. This feature is fully separate from LinkedIn.
-          {deep
-            ? <span> Deep sweep tiles the city into a grid so you get every business, not just Google’s first 60. Results dedupe automatically.</span>
-            : null}
-          {!config?.configured && <span className="font-semibold text-amber-700"> Add your Google Places API key to start.</span>}
+          {source === "osm" ? (
+            <span>
+              OpenStreetMap is <strong>free and unlimited</strong> — one query returns every matching business in the city
+              (name, category, location, plus phone/website where available). No browser scraping. Fully separate from LinkedIn.
+            </span>
+          ) : (
+            <span>
+              Google has the richest phone/website coverage but is paid (~$0.035/request).
+              {deep && " Deep sweep tiles the city into a grid to beat Google’s 60-result cap. "}
+              Results dedupe automatically.
+              {!config?.configured && <strong className="text-amber-700"> Add your Google Places API key to use this source.</strong>}
+            </span>
+          )}
         </p>
       </div>
 

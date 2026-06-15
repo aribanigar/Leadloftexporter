@@ -22,6 +22,7 @@ from app.core.deps import AuthContext, get_extension_context, get_workspace_cont
 from app.models import CompanyFinderBusiness
 from app.services import company_finder as svc
 from app.services import google_places
+from app.services import osm_places
 
 router = APIRouter(prefix="/company-finder", tags=["company-finder"])
 _settings = get_settings()
@@ -113,18 +114,40 @@ def search(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Query Google Places for businesses matching a text query (e.g.
-    "dentists in Abu Dhabi") and ingest them into Company Finder. No browser
-    scraping — the backend fetches everything itself."""
+    """Find businesses for a text query (e.g. "dentists in Abu Dhabi") and
+    ingest them into Company Finder. Two sources:
+
+      * source="osm" (default) — OpenStreetMap via Overpass: FREE, unlimited,
+        no API key, no result cap. Best for bulk discovery.
+      * source="google" — Google Places (New): richer phone/website coverage
+        but paid; needs a Google API key.
+
+    Either way the backend fetches everything — no browser scraping.
+    """
+    query = (body.get("query") or body.get("q") or "").strip()
+    region = (body.get("region_code") or "").strip()
+    deep = bool(body.get("deep"))
+    source = (body.get("source") or "osm").strip().lower()
+
+    if source in ("osm", "openstreetmap", "free"):
+        try:
+            businesses = osm_places.search(query)
+        except osm_places.OSMError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        result = svc.ingest(db, ctx.workspace_id, businesses, source="openstreetmap")
+        result["found"] = len(businesses)
+        result["query"] = query
+        result["source"] = "openstreetmap"
+        return result
+
+    # Google Places path (paid).
     api_key = _resolved_api_key(ctx)
     if not api_key:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "No Google API key set. Add your Google Places API key in Company Finder settings first.",
+            "No Google API key set. Add your Google Places API key in Company Finder settings, "
+            "or use the free OpenStreetMap source.",
         )
-    query = (body.get("query") or body.get("q") or "").strip()
-    region = (body.get("region_code") or "").strip()
-    deep = bool(body.get("deep"))
     try:
         if deep:
             businesses = google_places.search_grid(
@@ -140,6 +163,7 @@ def search(
     result["found"] = len(businesses)
     result["query"] = query
     result["deep"] = deep
+    result["source"] = "google"
     return result
 
 
