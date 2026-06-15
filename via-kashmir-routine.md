@@ -22,8 +22,8 @@ Tracks: `b2c` (travellers), `b2b-hotels`, `b2b-cabs-shikaras`, `b2b-houseboats` 
 operators to list on viakashmir.in). Vary the lead photo + headline daily; keep the shell.
 
 ## FIXED VALUES
-- WHATSAPP_NUMBER = `918218929990` → `https://wa.me/918218929990`
-- CONTACT_EMAIL = `contact@viakashmir.in`  CONTACT_PHONE = `+91 82189 29990`
+- WHATSAPP_NUMBER = `919186051499` → `https://wa.me/919186051499`
+- CONTACT_EMAIL = `contact@viakashmir.in`  CONTACT_PHONE = `+91 91860 51499`
 - Green contact banner with both appears in every email and on every card.
 - HUB_WORKSPACE = `2faa195e-5817-4d32-8e6c-350b70ce32c3`; HUB_BUSINESS_SLUG = `via-kashmir`.
 - Logo (live SVG via wsrv): `https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&w=400&output=png`

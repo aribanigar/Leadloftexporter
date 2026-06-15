@@ -24,7 +24,7 @@ import argparse
 from pathlib import Path
 
 REPO = "raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/via-kashmir/_assets/photos"
-WA = "https://wa.me/918218929990"
+WA = "https://wa.me/919186051499"
 LOGO = "https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&amp;w=400&amp;output=png"
 
 CTA_B2C = "https://viakashmir.in/"
@@ -185,7 +185,7 @@ def build(track, hero, feat, amp=False):
     <a class="wa" href="{WA}">or message us on WhatsApp &rarr;</a>
   </div>
   <div class="sp30"></div>
-  <div class="contact"><span>contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 82189 29990</span></div>
+  <div class="contact"><span>contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 91860 51499</span></div>
   <div class="sp"></div>
   <div class="card foot"><p class="fh">ViaKashmir</p><p class="fp">{s['foot']}</p></div>
 </div>
