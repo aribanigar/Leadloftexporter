@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+/* App-wide base size bumped ~5% so content reads larger & clearer. All
+   rem-based Tailwind sizing scales with it. */
+html {
+  font-size: 105%;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  line-height: 1.55;
+}
+
+/* Headings use Manrope for an elegant, confident display look. */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
+  letter-spacing: -0.018em;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Material Symbols — the Google stylesheet only ships the @font-face; the
+   rendering class that turns ligature text ("arrow_back") into a glyph must
+   be declared here, or the icon names show as raw text. */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+  user-select: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm hover:from-brand-700 hover:to-indigo-700;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-200 bg-white text-slate-700 hover:border-slate-300;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100;
+  }
+  .btn-danger {
+    @apply btn bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-sm hover:from-rose-600 hover:to-red-700 disabled:opacity-50;
+  }
+  .btn-success {
+    @apply btn bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm hover:from-emerald-600 hover:to-teal-700;
+  }
+  .btn-teal {
+    @apply btn bg-gradient-to-r from-dteal-500 to-dteal-700 text-white shadow-sm hover:from-dteal-600 hover:to-dteal-800;
+  }
+  .btn-yellow {
+    @apply btn bg-gradient-to-r from-mcyellow-400 to-mcyellow-500 font-semibold text-dteal-800 shadow-sm hover:from-mcyellow-500 hover:to-mcyellow-600;
+  }
+  /* Reusable gradient helpers for page chrome (cards, headers, hero strips). */
+  .gradient-brand {
+    @apply bg-gradient-to-r from-brand-600 to-indigo-600;
+  }
+  .gradient-emerald {
+    @apply bg-gradient-to-br from-emerald-500 to-teal-600;
+  }
+  .gradient-teal {
+    @apply bg-gradient-to-br from-dteal-500 to-dteal-700;
+  }
+  .gradient-heading {
+    @apply bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent;
+  }
+  /* Light warm-sand canvas behind the whole app — a soft sand tone with a fine
+     fractal-noise grain so it reads as real sand grains, not a flat block. */
+  .app-canvas {
+    background-color: #f3eee2;
+    background-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20type='saturate'%20values='0'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'%20opacity='0.07'/%3E%3C/svg%3E"),
+      radial-gradient(150% 95% at 50% -25%, rgba(255, 253, 247, 0.55), rgba(255, 253, 247, 0) 55%);
+    background-repeat: repeat, no-repeat;
+    background-size: 180px 180px, cover;
+  }
+  .card {
+    @apply rounded-lg border border-slate-200 bg-white shadow-card;
+  }
+  .input {
+    @apply w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-soft outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium text-slate-600;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .action-icon {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-brand-300 hover:text-brand-700;
+  }
+}
+
+/* ── Mobile ergonomics ─────────────────────────────────────────────────── */
+/* Prevent iOS from zooming the page when focusing a small input. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+/* No accidental horizontal page scroll from a stray wide element. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+/* Honour the notch / home-indicator safe areas in standalone (installed) mode. */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: 0;
+  }
+}

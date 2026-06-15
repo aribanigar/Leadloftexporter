@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "UAE",
+  "currency": "AED",
+  "theme": "Executive onboarding",
+  "season": "Summer H2 onboarding",
+  "angle": "Q3 Executive Onboarding",
+  "campaign_code": "GG-AED-20260614-1",
+  "campaign_name": "UAE Onboarding Kits - 14 Jun 2026",
+  "subject": "Hired Monday, equipped Monday",
+  "skus": [
+    "GG1145",
+    "GG1276",
+    "GG1116",
+    "GG1502"
+  ],
+  "products": [
+    {
+      "name": "Emerald Set",
+      "sku": "GG1145",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2314-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1145",
+      "price": "AED 85.25"
+    },
+    {
+      "name": "Chippewa Set",
+      "sku": "GG1276",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2633-09.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1276",
+      "price": "AED 55.16"
+    },
+    {
+      "name": "Eleganote",
+      "sku": "GG1116",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2195-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1116",
+      "price": "AED 36.12"
+    },
+    {
+      "name": "Graz Set",
+      "sku": "GG1502",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6795-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1502",
+      "price": "AED 26.03"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Executive+onboarding+set+%28GG-AED-20260614-1%29+for+UAE"
+}

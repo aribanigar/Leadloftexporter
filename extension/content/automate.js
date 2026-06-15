@@ -1,0 +1,847 @@
+/* Execute queued LinkedIn actions (connect, message) inside the user's own
+ * browser session, at a human pace.
+ *
+ * Rules baked into this module:
+ *   - Never run while the tab is in the background.
+ *   - One action at a time, with paceBetweenActions() between them.
+ *   - Read-and-pause: scroll the page, "read" for 1.2-3.5s, then act.
+ *   - If a captcha / security check is detected, abort and notify the user.
+ *   - Type messages character-by-character, with jitter.
+ *   - Honour the daily caps the backend already enforces (we just execute).
+ */
+(() => {
+  if (globalThis.__lcAutomate) return;
+  const { sleep, paceBetweenActions, readingPause, scrollLikeHuman, tabIsForeground, waitUntilForeground } = globalThis.__lcHuman;
+  const { first, waitFor, dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
+  const Api = globalThis.__lcApi;
+
+  let running = false;
+
+  function detectChallenge() {
+    const indicators = [
+      "form#captcha",
+      "form[action*='checkpoint']",
+      "div[data-test-id='challenge']",
+      "div.cp-multi-step-flow",
+      "input[name='pin']",
+    ];
+    return indicators.some((sel) => document.querySelector(sel));
+  }
+
+  async function navigateToProfile(linkedinUrl) {
+    const target = new URL(linkedinUrl, "https://www.linkedin.com");
+    if (location.href.split("?")[0] !== target.href.split("?")[0]) {
+      location.href = target.href;
+      return new Promise((resolve) => {
+        // Resolve when the URL settles (LinkedIn SPA + a small delay)
+        const start = Date.now();
+        const tick = () => {
+          if (location.href.startsWith(target.href.split("?")[0])) {
+            setTimeout(resolve, 1500);
+          } else if (Date.now() - start > 20_000) {
+            resolve();
+          } else {
+            setTimeout(tick, 250);
+          }
+        };
+        tick();
+      });
+    }
+  }
+
+  async function doConnect(job) {
+    const url = job.payload?.linkedin_url;
+    const note = job.payload?.body || "";
+    if (!url) return { status: "failed", error: "missing_linkedin_url" };
+
+    await navigateToProfile(url);
+    await sleep(readingPause());
+    await scrollLikeHuman(200);
+
+    if (detectChallenge()) return { status: "failed", error: "captcha_or_checkpoint" };
+
+    // Primary "Connect" button
+    let btn = first(document, [
+      "button[aria-label*='Connect' i]:not([aria-label*='Pending' i])",
+      "main button.artdeco-button:has(span:contains('Connect'))",
+    ]);
+    if (!btn) {
+      // Try the "More" menu and click the Connect item.
+      const more = first(document, ["main button[aria-label*='More actions' i]", "button[aria-label*='More' i]"]);
+      if (more) {
+        await dispatchHumanClick(more);
+        await sleep(800);
+        btn = await waitFor(["div[role='menu'] [aria-label*='Connect' i]", "div.artdeco-dropdown__content [aria-label*='Connect' i]"], { timeout: 3000 });
+      }
+    }
+    if (!btn) return { status: "failed", error: "connect_button_not_found" };
+    await dispatchHumanClick(btn);
+
+    // Optionally add a note.
+    if (note) {
+      const addNote = await waitFor(["button[aria-label*='Add a note' i]", "button[aria-label*='add a free note' i]"], { timeout: 3000 });
+      if (addNote) {
+        await dispatchHumanClick(addNote);
+        const noteInput = await waitFor(["textarea[name='message']", "textarea#custom-message"], { timeout: 2000 });
+        if (noteInput) {
+          await typeIntoEditable(noteInput, note);
+          await sleep(600);
+        }
+      }
+    }
+    const send = await waitFor(["button[aria-label*='Send' i]", "button[aria-label*='Send invitation' i]"], { timeout: 3000 });
+    if (!send) return { status: "failed", error: "send_button_not_found" };
+    await dispatchHumanClick(send);
+    await sleep(1200);
+    return { status: "done", result: { url, with_note: !!note } };
+  }
+
+  // ── Pending-message persistence ─────────────────────────────────────────
+  // doMessage navigates to the lead's profile via `location.href = url`, which
+  // is a hard navigation: the content-script context dies before the next line
+  // runs. Without a resume hook the message step (find Message btn → type →
+  // Send) never executes — jobs stayed "claimed" forever and the CRM's
+  // "0 sent · N in progress" indicator was correct: nothing was sending.
+  //
+  // Fix: before navigating, persist the job to chrome.storage.local. On the
+  // next page boot, main.js calls resumePendingMessage() which finishes the
+  // send and posts the result to the backend. TTL is 5 min so a stranded
+  // record (user navigates away mid-flow) doesn't replay forever.
+  const PENDING_KEY = "lcPendingMessage";
+  const PENDING_TTL_MS = 5 * 60_000;
+
+  async function _persistPending(job) {
+    try {
+      await chrome.storage.local.set({
+        [PENDING_KEY]: {
+          jobId: job.id,
+          body: job.payload?.body || "",
+          url: job.payload?.linkedin_url || "",
+          leadName: job.payload?.lead_name || "",
+          startedAt: Date.now(),
+        },
+      });
+    } catch {}
+  }
+
+  async function _clearPending() {
+    try { await chrome.storage.local.remove(PENDING_KEY); } catch {}
+  }
+
+  async function _readPending() {
+    try {
+      const o = await chrome.storage.local.get(PENDING_KEY);
+      return o?.[PENDING_KEY] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Spotlight bridges — overlay.js mounts the visual indicator. Best-effort,
+  // so a missing overlay (e.g. during resume before overlay hydrates) is fine.
+  function _spotShow(opts) { try { globalThis.__lcOverlay?.showMessageSpotlight?.(opts); } catch {} }
+  function _spotUpdate(opts) { try { globalThis.__lcOverlay?.updateMessageSpotlight?.(opts); } catch {} }
+  function _spotRemove() { try { globalThis.__lcOverlay?.removeMessageSpotlight?.(); } catch {} }
+
+  // Find the BLUE primary "Message" button next to the profile name.
+  //
+  // PRIOR BUG (v1.0.188/189): the finder used `closest('[class*="sales-nav"]')`
+  // to reject buttons. LinkedIn ships profile-page wrappers like
+  // `<div class="...sales-navigator-promo...">` and entire-page chrome
+  // classes containing the substring "sales-nav" — those wrappers
+  // ENCLOSED the real Message button, so `.closest()` walked up the
+  // tree, matched the wrapper, and the strict finder rejected EVERY
+  // button in the profile action bar. Result: "message_button_not_found"
+  // → the bulk send "skipped" the Message button every time.
+  //
+  // Fix: only reject based on the button's OWN attributes (aria-label /
+  // text / href) and the messaging-dock ancestor (which is a small,
+  // well-defined container). Never use wildcard class substrings on
+  // ancestors. We also log every candidate considered so the user can
+  // see exactly why a button was accepted or rejected.
+  async function _findProfileMessageButton(timeoutMs = 6000) {
+    function _accept(el) {
+      if (!el || el.disabled) return false;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) return false;
+
+      // Tightly-defined ancestor reject — ONLY the messaging dock. Anything
+      // broader (sales-nav class wildcard, generic data attributes) catches
+      // page-wide wrappers that contain the real Message button.
+      if (el.closest("#msg-overlay, [data-test-conversations-container], .msg-overlay-list-bubble")) {
+        return false;
+      }
+
+      const lbl = (el.getAttribute("aria-label") || "").trim();
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      const lblLc = lbl.toLowerCase();
+      const txtLc = txt.toLowerCase();
+      const href = (el.getAttribute("href") || "").toLowerCase();
+
+      // Reject on the button's OWN label/text — phrases that mean "this
+      // isn't the profile Message button" no matter where it lives.
+      const own = lblLc + " | " + txtLc;
+      if (
+        own.includes("compose") ||
+        own.includes("recruiter") ||
+        own.includes("inmail") ||
+        own.includes("your team") ||
+        own.includes("save in sales navigator") ||
+        own.includes("view in sales navigator") ||
+        own.includes("open in sales navigator") ||
+        own.includes("view profile") ||
+        own.includes("see your profile")
+      ) {
+        return false;
+      }
+      // Reject avatar / cover overlay anchors.
+      if (/\/overlay\/(photo|edit-photo|cover)/.test(href)) return false;
+
+      // Positive matches — strict.
+      if (/^message\b/i.test(lbl)) return true;          // "Message Berna Kekec"
+      if (txtLc === "message") return true;              // icon + word
+      if (/^message\b/.test(txtLc) && txt.length < 60) return true; // "Message Berna"
+      if (el.classList && el.classList.contains("message-anywhere-button")) return true;
+      return false;
+    }
+
+    // Scopes to look in first (preferred over a full-document scan).
+    const HEADER_SCOPES = [
+      ".pv-top-card", ".pv-top-card-v2",
+      ".pv-top-card__primary-section", ".pv-top-card__non-self",
+      ".pvs-profile-actions", ".pv-top-card__actions",
+      "main section",
+      "main",
+    ];
+
+    function _scanOnce(verbose = false) {
+      for (const scopeSel of HEADER_SCOPES) {
+        let scopes;
+        try { scopes = document.querySelectorAll(scopeSel); } catch { continue; }
+        for (const scope of scopes) {
+          const cands = scope.querySelectorAll("button, a[role='button'], a.artdeco-button, a");
+          for (const el of cands) {
+            if (_accept(el)) return el;
+          }
+        }
+      }
+      // Diagnostic: log everything we considered so a stuck run is traceable.
+      if (verbose) {
+        const all = document.querySelectorAll("main button, main a");
+        const candidates = [];
+        for (const el of all) {
+          const lbl = (el.getAttribute("aria-label") || "").trim();
+          const txt = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60);
+          if (/message/i.test(lbl) || /message/i.test(txt)) {
+            candidates.push(`<${el.tagName.toLowerCase()} aria-label="${lbl}" text="${txt}" accepted=${_accept(el)}>`);
+          }
+        }
+        console.log("[LeadCaptura] msg finder DIAG — Message-ish candidates:", candidates);
+      }
+      return null;
+    }
+
+    const start = Date.now();
+    let btn = _scanOnce();
+    while (!btn && Date.now() - start < timeoutMs) {
+      await sleep(300);
+      btn = _scanOnce();
+    }
+    if (!btn) _scanOnce(true); // log diagnostics on failure
+    return btn;
+  }
+
+  // The actual "open chat → type → Send" steps. Runs only when the tab is
+  // already on the target profile. Used by both doMessage (when no navigation
+  // is needed) and resumePendingMessage (after a navigation). Drives the
+  // Spotlight On Message overlay end-to-end so the user sees every step.
+  async function _sendMessageInPlace(body, url, leadName) {
+    _spotShow({ stage: "opening", url, leadName });
+    if (detectChallenge()) {
+      _spotRemove();
+      return { status: "failed", error: "captcha_or_checkpoint" };
+    }
+    await sleep(readingPause());
+
+    // Find the profile-header action button — the BLUE primary "Message"
+    // button next to the avatar (the one in the screenshot). Has to be
+    // strict because LinkedIn renders multiple "message-ish" controls:
+    //   - The messaging dock pencil on the right rail
+    //     (aria-label="Compose a new message") — wrong, opens blank composer.
+    //   - "View in Sales Navigator" / "Save in Sales Navigator" outline
+    //     buttons next to Message — wrong target.
+    //   - Recruiter / InMail buttons further down — wrong context.
+    //
+    // Match strategy:
+    //   1. Scope the search to the profile-header action region only.
+    //   2. Require either exact text "Message" or aria-label starting with
+    //      "Message " (LinkedIn always renders "Message <first-name>" on
+    //      1st-degree connections).
+    //   3. Reject any button inside a Sales Navigator / messaging-dock
+    //      ancestor — defence-in-depth even if a stray label slips through.
+    const msgBtn = await _findProfileMessageButton(8000);
+    if (!msgBtn) {
+      console.log("[LeadCaptura] msg: step1 ✗ message_button_not_found");
+      _spotRemove();
+      return { status: "failed", error: "message_button_not_found" };
+    }
+    console.log("[LeadCaptura] msg: step1 ✓ found Message button:", msgBtn.outerHTML.slice(0, 120));
+    try {
+      msgBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+      await sleep(450);
+    } catch {}
+    _spotUpdate({ stage: "click_message", target: msgBtn, leadName });
+    await sleep(300 + Math.random() * 400);
+    await dispatchHumanClick(msgBtn);
+    console.log("[LeadCaptura] msg: step2 ✓ Message button clicked, waiting for composer…");
+
+    // Wait for the popup composer to mount AND find its editor. Scoped to
+    // the msg-overlay container when present so we find the right editor
+    // even if a stale composer is hidden elsewhere on the page.
+    const editor = await _findComposerEditor(10000);
+    if (!editor) {
+      console.log("[LeadCaptura] msg: step3 ✗ message_editor_not_found");
+      _spotRemove();
+      return { status: "failed", error: "message_editor_not_found" };
+    }
+    console.log("[LeadCaptura] msg: step3 ✓ found editor:", editor.tagName + "." + (editor.className || "").slice(0, 60));
+
+    _spotUpdate({ stage: "typing", target: editor, leadName });
+    // LinkedIn's composer is built on Lexical (Meta's contenteditable
+    // framework) which IGNORES document.execCommand("insertText"). The
+    // ONLY reliable input path is a real clipboard paste event with a
+    // DataTransfer. _typeIntoLexicalEditor does that, then falls back
+    // through execCommand + character-by-character InputEvent for older
+    // composers.
+    const typed = await _typeIntoLexicalEditor(editor, body);
+    if (!typed) {
+      console.log("[LeadCaptura] msg: step4 ✗ typing_failed");
+      _spotRemove();
+      return { status: "failed", error: "typing_failed" };
+    }
+    console.log("[LeadCaptura] msg: step4 ✓ message typed, looking for Send button…");
+    // Wait for Lexical to update React's state — the Send button stays
+    // disabled until then. Poll up to 4 s.
+    let sendBtn = null;
+    const sendStart = Date.now();
+    while (Date.now() - sendStart < 4000) {
+      sendBtn = _findComposerSendButton(editor);
+      if (sendBtn && !sendBtn.disabled) break;
+      await sleep(200);
+    }
+    if (!sendBtn) {
+      console.log("[LeadCaptura] msg: step5 ✗ send_button_not_found");
+      _spotRemove();
+      return { status: "failed", error: "send_button_not_found" };
+    }
+    if (sendBtn.disabled) {
+      console.log("[LeadCaptura] msg: step5 ✗ send_disabled (text never registered with React)");
+      _spotRemove();
+      return { status: "failed", error: "send_disabled" };
+    }
+    console.log("[LeadCaptura] msg: step5 ✓ send button enabled, clicking…");
+    _spotUpdate({ stage: "sending", target: sendBtn, leadName });
+    await sleep(200 + Math.random() * 300);
+    await dispatchHumanClick(sendBtn);
+
+    // Confirm send by waiting for the editor to clear OR the composer to
+    // close. If neither happens within 4 s, the click didn't land — try
+    // a keyboard Enter as last-resort (LinkedIn binds Ctrl+Enter to send).
+    let confirmed = false;
+    for (let t = 0; t < 16; t++) {
+      await sleep(250);
+      const txt = (editor.textContent || "").trim();
+      if (!txt || !document.body.contains(editor)) { confirmed = true; break; }
+    }
+    if (!confirmed) {
+      console.log("[LeadCaptura] msg: step6 click didn't take, trying Enter key…");
+      try { editor.focus(); } catch {}
+      const k = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13, ctrlKey: true };
+      editor.dispatchEvent(new KeyboardEvent("keydown", k));
+      editor.dispatchEvent(new KeyboardEvent("keyup", k));
+      await sleep(800);
+      const txt2 = (editor.textContent || "").trim();
+      if (!txt2 || !document.body.contains(editor)) confirmed = true;
+    }
+    if (!confirmed) {
+      console.log("[LeadCaptura] msg: step6 ✗ send did not confirm");
+      _spotRemove();
+      return { status: "failed", error: "send_did_not_confirm" };
+    }
+    console.log("[LeadCaptura] msg: step6 ✓ message sent");
+    _spotUpdate({ stage: "sent", leadName });
+    setTimeout(_spotRemove, 1600);
+    return { status: "done", result: { url } };
+  }
+
+  // Find the active composer's editable area. LinkedIn opens a popup
+  // composer ("msg-overlay-conversation-bubble") on profile pages and an
+  // inline composer on /messaging/<thread> pages — scope to whichever one
+  // is currently mounted so we never grab a stale empty composer.
+  async function _findComposerEditor(timeoutMs = 8000) {
+    const ROOTS = [
+      ".msg-overlay-conversation-bubble--is-active",
+      ".msg-overlay-conversation-bubble",
+      ".msg-form__contenteditable", // sometimes the editor is the root
+      ".msg-convo-wrapper",
+      ".msg-overlay-list-bubble",
+      "#message-overlay",
+    ];
+    const EDITOR_SELS = [
+      ".msg-form__contenteditable[contenteditable='true']",
+      "div[contenteditable='true'][role='textbox']",
+      "div[contenteditable='true'][aria-label*='message' i]",
+      "[contenteditable='true'][data-placeholder*='message' i]",
+    ];
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      // Prefer an editor inside a mounted composer root.
+      for (const rootSel of ROOTS) {
+        const root = document.querySelector(rootSel);
+        if (!root) continue;
+        for (const sel of EDITOR_SELS) {
+          const el = root.matches?.(sel) ? root : root.querySelector(sel);
+          if (el && _isVisible(el)) return el;
+        }
+      }
+      // Document-wide fallback.
+      for (const sel of EDITOR_SELS) {
+        const el = document.querySelector(sel);
+        if (el && _isVisible(el)) return el;
+      }
+      await sleep(250);
+    }
+    return null;
+  }
+
+  function _isVisible(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none";
+  }
+
+  // Find the SEND button for the composer that owns `editor`. Walks up to
+  // the composer root, then looks for the send button inside it — never
+  // grabs a send button from a different composer or the right-rail
+  // messaging dock.
+  function _findComposerSendButton(editor) {
+    const root = editor.closest(
+      ".msg-overlay-conversation-bubble, .msg-convo-wrapper, " +
+      ".msg-form, .msg-form__msg-content-container, " +
+      ".msg-overlay-list-bubble, [class*='msg-form']"
+    ) || document;
+    const SELS = [
+      "button.msg-form__send-button:not([disabled])",
+      "button.msg-form__send-btn:not([disabled])",
+      "button[type='submit'][class*='msg-form__send']:not([disabled])",
+      "button[aria-label*='Send' i]:not([aria-label*='Send a connection' i]):not([aria-label*='Send invitation' i])",
+      "button[type='submit']",
+    ];
+    for (const sel of SELS) {
+      const btns = root.querySelectorAll(sel);
+      for (const b of btns) {
+        if (!_isVisible(b)) continue;
+        const txt = (b.textContent || "").trim().toLowerCase();
+        const lbl = (b.getAttribute("aria-label") || "").toLowerCase();
+        if (/send/i.test(txt) || /^send\b/i.test(lbl)) return b;
+        // For form __send-button class, accept even without text (icon-only).
+        if (b.matches?.("button.msg-form__send-button,button.msg-form__send-btn")) return b;
+      }
+    }
+    return null;
+  }
+
+  // Insert `text` into a Lexical contenteditable. Lexical (LinkedIn's
+  // composer framework, formerly Draft.js) IGNORES document.execCommand
+  // and direct .textContent mutation — the only path it respects is a
+  // synthetic ClipboardEvent("paste") with a DataTransfer payload, which
+  // Lexical's onPaste handler converts into proper editor state.
+  //
+  // Returns true if the text ended up in the editor (visually), false if
+  // we couldn't get any input path to land. Caller bails on false.
+  async function _typeIntoLexicalEditor(el, text) {
+    if (!el || !text) return false;
+    try { el.focus(); } catch {}
+    el.dispatchEvent(new Event("focus", { bubbles: true }));
+    // Small human "thinking" pause before typing starts.
+    await sleep(200 + Math.random() * 300);
+
+    // STRATEGY 1: ClipboardEvent paste with DataTransfer (works on Lexical).
+    try {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      const pasteEvt = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      const accepted = el.dispatchEvent(pasteEvt);
+      // Give Lexical a tick to process + render.
+      await sleep(250);
+      if (_editorHasText(el, text)) return true;
+      // If the dispatch was cancelled (Lexical accepted), but the DOM update
+      // is async, keep polling.
+      if (!accepted) {
+        for (let i = 0; i < 12; i++) {
+          await sleep(120);
+          if (_editorHasText(el, text)) return true;
+        }
+      }
+    } catch (e) {
+      console.log("[LeadCaptura] msg: paste strategy threw:", e?.message);
+    }
+
+    // STRATEGY 2: beforeinput + insertFromPaste InputEvent (modern Chromium).
+    try {
+      const dt2 = new DataTransfer();
+      dt2.setData("text/plain", text);
+      const beforeInput = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertFromPaste",
+        data: text,
+        dataTransfer: dt2,
+      });
+      el.dispatchEvent(beforeInput);
+      await sleep(200);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    // STRATEGY 3: execCommand (works on the older classic editor).
+    try {
+      document.execCommand("insertText", false, text);
+      await sleep(150);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    // STRATEGY 4: char-by-char with InputEvent (last resort — for plain
+    // contenteditable elements without a JS-framework editor).
+    try {
+      const { typingPause } = globalThis.__lcHuman;
+      for (const ch of text) {
+        const inp = new InputEvent("input", {
+          bubbles: true, data: ch, inputType: "insertText",
+        });
+        // Try execCommand first (some non-Lexical inputs accept it).
+        try { document.execCommand("insertText", false, ch); } catch {}
+        el.dispatchEvent(inp);
+        await sleep(typingPause());
+      }
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      await sleep(150);
+      if (_editorHasText(el, text)) return true;
+    } catch {}
+
+    return false;
+  }
+
+  // Cheap content check — does the editor's visible text contain the
+  // first ~12 chars of what we tried to type? Substring match is robust
+  // to Lexical adding wrapper spans / paragraphs around the text.
+  function _editorHasText(el, text) {
+    const visible = (el.innerText || el.textContent || "").trim();
+    if (!visible) return false;
+    const needle = text.slice(0, Math.min(12, text.length)).trim();
+    return visible.includes(needle);
+  }
+
+  function _sameProfile(a, b) {
+    try {
+      const norm = (s) => {
+        const u = new URL(s, "https://www.linkedin.com");
+        // Normalize linkedin.com → www.linkedin.com
+        if (u.hostname === "linkedin.com") u.hostname = "www.linkedin.com";
+        // Strip query string and trailing slash so all these match each other:
+        //   https://www.linkedin.com/in/johndoe
+        //   https://www.linkedin.com/in/johndoe/
+        //   https://linkedin.com/in/johndoe?miniProfileUrn=...
+        return (u.origin + u.pathname).replace(/\/$/, "").toLowerCase();
+      };
+      return norm(a) === norm(b);
+    } catch { return false; }
+  }
+
+  async function doMessage(job) {
+    const url = job.payload?.linkedin_url;
+    const body = job.payload?.body;
+    const leadName = job.payload?.lead_name || "";
+    if (!url || !body) return { status: "failed", error: "missing_url_or_body" };
+
+    // Already on the target profile → send in place immediately.
+    if (_sameProfile(location.href, url)) {
+      return _sendMessageInPlace(body, url, leadName);
+    }
+
+    // Off-profile: the user explicitly queued this from the CRM Bulk Messaging
+    // page (or via a playbook), so they consented to the navigation. Persist
+    // the job + navigate. After the page loads, resumePendingMessage() in
+    // main.js's boot path finishes the send and POSTs the result.
+    //
+    // Without this navigation path the autopilot would forever return
+    // "not_on_target_profile" for every queued message — which is exactly the
+    // "0 sent · 1 in progress" stuck state users were seeing.
+    _spotShow({ stage: "navigating", url, leadName });
+    await _persistPending(job);
+    await sleep(150 + Math.random() * 250);
+    try {
+      const target = new URL(url, "https://www.linkedin.com").href;
+      location.href = target;
+    } catch {
+      await _clearPending();
+      _spotRemove();
+      return { status: "failed", error: "invalid_linkedin_url" };
+    }
+    // executeOne special-cases this exact reason so we don't double-report —
+    // the resume hook owns the final POST after navigation completes.
+    return { status: "skipped", error: "navigating_to_profile" };
+  }
+
+  // Called from main.js on every page boot. If a message job is pending and
+  // we're now on the right profile, finish the send and report the result.
+  async function resumePendingMessage() {
+    const pending = await _readPending();
+    if (!pending || !pending.jobId) return;
+
+    // Stale → drop & report as failed so the backend can re-queue.
+    if (!pending.startedAt || Date.now() - pending.startedAt > PENDING_TTL_MS) {
+      await _clearPending();
+      for (let _si = 0; _si < 3; _si++) {
+        try {
+          await Api.submitJobResult(pending.jobId, {
+            status: "failed",
+            error: "resume_expired",
+          });
+          break;
+        } catch (_se) {
+          if (_si < 2) await sleep(300 * Math.pow(2, _si));
+        }
+      }
+      return;
+    }
+
+    // Wrong profile (user navigated elsewhere mid-flow) → wait quietly.
+    if (!_sameProfile(location.href, pending.url)) return;
+
+    // Wait for hydration + add a small human-like reading pause.
+    try { await waitFor(["main h1", "h1"], { timeout: 12000 }); } catch {}
+    await sleep(1200 + Math.random() * 1800);
+    // Do NOT wait for foreground — message jobs are intentionally designed to
+    // run in background tabs so the user can stay on the CRM dashboard while
+    // bulk sends execute. (executeOne already skips waitUntilForeground for
+    // message jobs for the same reason — this must match that behaviour.
+    // Before this fix, resumePendingMessage blocked here until the user switched
+    // to the LinkedIn tab, causing jobs to stay "claimed" forever → the 10-min
+    // reclaim brought them back to "queued" → profiles kept re-opening on loop.)
+
+    // Clear BEFORE sending so a crash mid-send doesn't replay on the next boot.
+    await _clearPending();
+
+    let result;
+    try {
+      result = await _sendMessageInPlace(pending.body, pending.url, pending.leadName || "");
+    } catch (err) {
+      result = { status: "failed", error: String(err?.message || err) };
+    }
+    // Retry submitJobResult up to 3 times — the MV3 service worker may be idle
+    // and need one wakeup attempt before it can proxy the API call.
+    for (let _si = 0; _si < 3; _si++) {
+      try {
+        await Api.submitJobResult(pending.jobId, {
+          status: result.status,
+          result: result.result || {},
+          error: result.error,
+        });
+        break;
+      } catch (_se) {
+        if (_si < 2) await sleep(300 * Math.pow(2, _si));
+      }
+    }
+  }
+
+  /**
+   * Bridge: open the profile in a background tab where main.js's bridge
+   * trigger (mirror of the enrichment trigger) scrapes the visible profile
+   * + contact info, syncs the lead, and reports a structured snapshot back
+   * via the regular extension-job result endpoint. Same anti-bot envelope
+   * as enrichment: background tab via the service worker, foreground only
+   * for write actions.
+   */
+  async function doBridgeProfile(job) {
+    const url = job.payload?.linkedin_url;
+    if (!url || !url.includes("linkedin.com/")) {
+      return { status: "failed", error: "missing_linkedin_url" };
+    }
+    let openUrl = url;
+    try {
+      const u = new URL(url);
+      u.searchParams.set("lc_bridge", String(job.id));
+      openUrl = u.toString();
+    } catch {
+      openUrl = url + (url.includes("?") ? "&" : "?") + "lc_bridge=" + encodeURIComponent(job.id);
+    }
+    try {
+      await chrome.runtime.sendMessage({
+        type: "lc:openProfileTab",
+        url: openUrl,
+        active: false,
+        awaitClose: true,
+      });
+    } catch (e) {
+      return { status: "failed", error: "bridge_open_failed: " + (e?.message || e) };
+    }
+    // Snapshot is delivered by main.js directly to the job-result endpoint.
+    // We report "done" with an empty payload so the autopilot loop doesn't
+    // overwrite the richer payload that main.js already sent.
+    return { status: "done", result: { bridged: true } };
+  }
+
+  async function executeOne(job) {
+    // Connect / Follow / SearchScraper all touch high-risk surfaces (invite
+    // modal, scroll-load) so still gate on foreground — matches the
+    // bot-avoidance rule in CLAUDE.md ("Never automate in a hidden tab for
+    // write actions"). MESSAGE jobs are different: the user explicitly
+    // clicked "Send to N leads" in the CRM, so they're consciously driving
+    // the action. Running message jobs without waiting for the LinkedIn tab
+    // to be visible is what makes "send N messages in real-time" actually
+    // work — otherwise the user clicks Send in the CRM, the LinkedIn tab is
+    // backgrounded, executeOne hangs on waitUntilForeground, and the
+    // progress bar sits at 0% forever.
+    if (job.kind !== "message") {
+      if (!tabIsForeground()) await waitUntilForeground();
+    }
+    try {
+      let result;
+      if (job.kind === "connect") result = await doConnect(job);
+      else if (job.kind === "message") result = await doMessage(job);
+      else if (job.kind === "scrape_search") result = await doScrapeSearch(job);
+      else if (job.kind === "bridge_profile") result = await doBridgeProfile(job);
+      else result = { status: "skipped", error: "unknown_kind" };
+
+      // When doMessage persists + navigates, the resume hook on the next page
+      // boot owns the final POST. Posting now would race the resume and
+      // either double-fire or mark the job "skipped" before the send completes.
+      if (result.status === "skipped" && result.error === "navigating_to_profile") {
+        return result;
+      }
+      await Api.submitJobResult(job.id, {
+        status: result.status,
+        result: result.result || {},
+        error: result.error,
+      });
+      return result;
+    } catch (err) {
+      await Api.submitJobResult(job.id, { status: "failed", error: String(err) });
+      return { status: "failed", error: String(err) };
+    }
+  }
+
+  /**
+   * SearchScraper job: navigate to the saved LinkedIn people-search URL,
+   * scrape up to N visible results, return them so the backend can ingest
+   * + auto-enroll. Honors the same bot-bypass rules — runs only in a
+   * foreground tab, human-paced.
+   */
+  async function doScrapeSearch(job) {
+    const url = job.payload?.search_url;
+    const maxResults = Math.max(1, Math.min(50, job.payload?.max_results || 25));
+    if (!url || !url.includes("linkedin.com/")) {
+      return { status: "failed", error: "missing_or_invalid_search_url" };
+    }
+    // Navigate the current tab to the search URL — same-tab, no new tab.
+    // We're already in a foreground LinkedIn tab so navigation is safe.
+    const target = new URL(url, "https://www.linkedin.com");
+    if (location.href.split("?")[0] !== target.href.split("?")[0]) {
+      location.href = target.href;
+      // Wait for SPA to settle on the new URL
+      const startAt = Date.now();
+      while (
+        Date.now() - startAt < 20000 &&
+        !location.href.startsWith(target.href.split("?")[0])
+      ) {
+        await sleep(300);
+      }
+      await sleep(readingPause());
+    }
+    if (detectChallenge()) {
+      return { status: "failed", error: "captcha_or_checkpoint" };
+    }
+    // Let the page hydrate (LinkedIn renders search results lazily)
+    await waitFor(["a[href*='/in/']"], { timeout: 12000 });
+    await sleep(1200);
+    // Eased scroll so virtualized results below the fold render
+    for (let i = 0; i < 4; i++) {
+      await scrollLikeHuman(420);
+      await sleep(700 + Math.random() * 800);
+    }
+    const Scraper = globalThis.__lcScraper;
+    const profiles = (Scraper?.scrapeSearchResults?.() || []).slice(0, maxResults);
+    if (!profiles.length) {
+      return { status: "done", result: { profiles: [], reason: "no_results" } };
+    }
+    return { status: "done", result: { profiles } };
+  }
+
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      // Guard against a stale extension context. After an extension reload,
+      // open LinkedIn tabs still have the OLD content scripts running but
+      // their chrome.storage / chrome.runtime references are dead. Calling
+      // them throws "Cannot read properties of undefined (reading 'get')"
+      // every 60s until the tab is reloaded. Detect and bail silently.
+      if (!chrome?.storage?.local?.get) return;
+      try { if (!chrome.runtime?.id) return; } catch { return; }
+
+      const settings = await globalThis.__lcStorage.getSettings();
+      // Only the master `enabled` flag gates the loop. `autopilot` defaults ON
+      // (see storage.js DEFAULTS) so messages the user queued from the CRM
+      // start sending the moment any LinkedIn tab is open — no hidden toggle
+      // required. Users who explicitly turned autopilot OFF still get
+      // respected here as a manual override.
+      if (!settings.enabled) return;
+      if (settings.autopilot === false) return;
+
+      // Don't claim a new job while a message send is mid-navigation —
+      // the resume hook owns the in-flight job. Claiming another now
+      // would stomp the pending slot and lose the in-flight send.
+      const pending = await _readPending();
+      if (pending && pending.jobId) {
+        // If we ARE on the target profile now, kick the resume immediately
+        // so the user doesn't wait for the next 15 s interval tick.
+        if (_sameProfile(location.href, pending.url)) {
+          resumePendingMessage().catch(() => {});
+        }
+        return;
+      }
+
+      const jobs = await Api.nextJobs(1).catch(() => []);
+      if (!jobs?.length) return;
+      const [job] = jobs;
+
+      await executeOne(job);
+      // Inter-action pause. The message channel walks profiles via
+      // location.href so the natural gap is page-load + a small post-send
+      // pause set in resumePendingMessage — keep this tight (2–4 s) so a
+      // bulk send actually feels live. Other channels keep the long-tail
+      // bot-safety wait.
+      if (job.kind === "message") {
+        await sleep(2000 + Math.random() * 2000);
+      } else {
+        await sleep(paceBetweenActions());
+      }
+    } finally {
+      running = false;
+    }
+  }
+
+  globalThis.__lcAutomate = {
+    tick,
+    executeOne,
+    doConnect,
+    doMessage,
+    resumePendingMessage,
+  };
+})();

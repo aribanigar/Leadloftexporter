@@ -1,0 +1,53 @@
+{
+  "date": "2026-06-15",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Eco & Sustainable",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "C",
+  "campaign_code": "GG-SAR-20260615-3",
+  "campaign_name": "KSA Eco & Sustainable - 15 Jun 2026",
+  "subject": "Sustainable and clearly yours",
+  "skus": [
+    "GG1492",
+    "GG1463",
+    "GG1392",
+    "GG1137",
+    "GG1178"
+  ],
+  "products": [
+    {
+      "name": "SUMLESS",
+      "sku": "GG1492",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6729-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1492"
+    },
+    {
+      "name": "TOOLBAM",
+      "sku": "GG1463",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6559-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1463"
+    },
+    {
+      "name": "ZIMDE COLOUR",
+      "sku": "GG1392",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6189-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1392"
+    },
+    {
+      "name": "VIVEKA",
+      "sku": "GG1137",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2301-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1137"
+    },
+    {
+      "name": "LEIRUR",
+      "sku": "GG1178",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2391-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1178"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20eco%20%26%20sustainable%20options%20for%20our%20KSA%20team."
+}

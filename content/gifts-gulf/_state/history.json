@@ -1,0 +1,272 @@
+[
+  {
+    "date": "2026-06-13",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260613-1",
+    "campaign_name": "UAE Summer Hydration - 13 Jun 2026",
+    "subject": "Beat the heat",
+    "theme": "Insulated drinkware",
+    "angle": "UAE Summer Hydration",
+    "skus": [
+      "GG6373",
+      "GG9812",
+      "GG6750",
+      "GG9356"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260613-2",
+    "campaign_name": "UAE Cooler Season - 13 Jun 2026",
+    "subject": "Cold all day",
+    "theme": "Cooler bags",
+    "angle": "UAE Summer Hydration",
+    "skus": [
+      "GG6404",
+      "GG6709",
+      "GG6388",
+      "GG9227"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260613-3",
+    "campaign_name": "UAE Sun and Shade - 13 Jun 2026",
+    "subject": "Made for shade",
+    "theme": "Caps and light hydration",
+    "angle": "UAE Summer Hydration",
+    "skus": [
+      "GG7011",
+      "GG6433",
+      "GG6210",
+      "GG9910"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260613-1",
+    "campaign_name": "KSA Power Your H2 - 13 Jun 2026",
+    "subject": "Power your H2",
+    "theme": "Tech carry",
+    "angle": "KSA H2 Planning",
+    "skus": [
+      "GG6584",
+      "GG6075",
+      "GG6395",
+      "GG9843"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260613-2",
+    "campaign_name": "KSA Desk Done Right - 13 Jun 2026",
+    "subject": "Desk done right",
+    "theme": "Executive desk",
+    "angle": "KSA H2 Planning",
+    "skus": [
+      "GG8200",
+      "GG9479",
+      "GG6555",
+      "GG6489"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260613-3",
+    "campaign_name": "KSA Client Appreciation - 13 Jun 2026",
+    "subject": "Pour the deal",
+    "theme": "Premium drinkware",
+    "angle": "KSA H2 Planning",
+    "skus": [
+      "GG6371",
+      "GG6044",
+      "GG6748",
+      "GG6612"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260613-1",
+    "campaign_name": "Qatar Recycled Carry - 13 Jun 2026",
+    "subject": "Recycled, never binned",
+    "theme": "RPET bags",
+    "angle": "Qatar Eco Gifting",
+    "skus": [
+      "GG6701",
+      "GG6688",
+      "GG9846",
+      "GG6710"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260613-2",
+    "campaign_name": "Qatar Refill Culture - 13 Jun 2026",
+    "subject": "Sip, refill, repeat",
+    "theme": "Recycled drinkware",
+    "angle": "Qatar Eco Gifting",
+    "skus": [
+      "GG6468",
+      "GG6390",
+      "GG6391",
+      "GG6492"
+    ]
+  },
+  {
+    "date": "2026-06-13",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260613-3",
+    "campaign_name": "Qatar Green Desk - 13 Jun 2026",
+    "subject": "Green at work",
+    "theme": "Eco desk",
+    "angle": "Qatar Eco Gifting",
+    "skus": [
+      "GG6791",
+      "GG6792",
+      "GG6480",
+      "GG6793"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260614-1",
+    "campaign_name": "UAE Onboarding Kits - 14 Jun 2026",
+    "subject": "Hired Monday, equipped Monday",
+    "theme": "Executive onboarding",
+    "angle": "Q3 Executive Onboarding",
+    "skus": [
+      "GG1145",
+      "GG1276",
+      "GG1116",
+      "GG1502"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260614-2",
+    "campaign_name": "UAE Branded Notebooks - 14 Jun 2026",
+    "subject": "Where good ideas land",
+    "theme": "Notebooks and writing",
+    "angle": "Q3 Executive Onboarding",
+    "skus": [
+      "GG1177",
+      "GG1236",
+      "GG1223",
+      "GG1196"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "UAE",
+    "campaign_code": "GG-AED-20260614-3",
+    "campaign_name": "UAE Desk Tech - 14 Jun 2026",
+    "subject": "Cut the cable clutter",
+    "theme": "Tech and desk",
+    "angle": "Q3 Executive Onboarding",
+    "skus": [
+      "GG1159",
+      "GG1536",
+      "GG1097",
+      "GG1068"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260614-1",
+    "campaign_name": "KSA Sustainable Gifting - 14 Jun 2026",
+    "subject": "Gifts that give back",
+    "theme": "Eco and sustainable",
+    "angle": "Sustainable H2 Gifting",
+    "skus": [
+      "GG1530",
+      "GG1117",
+      "GG1239",
+      "GG1470"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260614-2",
+    "campaign_name": "KSA Travel Bags - 14 Jun 2026",
+    "subject": "Built to be carried",
+    "theme": "Bags and travel",
+    "angle": "Sustainable H2 Gifting",
+    "skus": [
+      "GG1061",
+      "GG1124",
+      "GG1605",
+      "GG1170"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "KSA",
+    "campaign_code": "GG-SAR-20260614-3",
+    "campaign_name": "KSA Event Giveaways - 14 Jun 2026",
+    "subject": "Branding by the thousand",
+    "theme": "Event giveaways",
+    "angle": "Sustainable H2 Gifting",
+    "skus": [
+      "GG1166",
+      "GG1646",
+      "GG1686",
+      "GG1205"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260614-1",
+    "campaign_name": "Qatar Smart Tech - 14 Jun 2026",
+    "subject": "Power the whole desk",
+    "theme": "Tech and desk",
+    "angle": "Smart Workspace Tech",
+    "skus": [
+      "GG1538",
+      "GG1526",
+      "GG1100",
+      "GG1541"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260614-2",
+    "campaign_name": "Qatar Premium Drinkware - 14 Jun 2026",
+    "subject": "Pour something premium",
+    "theme": "Premium drinkware",
+    "angle": "Smart Workspace Tech",
+    "skus": [
+      "GG1370",
+      "GG1354",
+      "GG1680",
+      "GG1531"
+    ]
+  },
+  {
+    "date": "2026-06-14",
+    "market": "Qatar",
+    "campaign_code": "GG-QAR-20260614-3",
+    "campaign_name": "Qatar Travel Carry - 14 Jun 2026",
+    "subject": "Pack the brand along",
+    "theme": "Bags and travel",
+    "angle": "Smart Workspace Tech",
+    "skus": [
+      "GG1062",
+      "GG1093",
+      "GG1391",
+      "GG1312"
+    ]
+  }
+]

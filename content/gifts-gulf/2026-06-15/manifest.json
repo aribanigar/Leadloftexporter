@@ -1,0 +1,136 @@
+{
+  "date": "2026-06-15",
+  "sets": [
+    {
+      "currency": "AED",
+      "design": "A",
+      "theme": "Premium Drinkware",
+      "campaign_code": "GG-AED-20260615-1",
+      "campaign_name": "UAE Premium Drinkware - 15 Jun 2026",
+      "subject": "Cold drinks, warm branding",
+      "skus": [
+        "GG1050",
+        "GG1716",
+        "GG1065",
+        "GG1658",
+        "GG1064"
+      ]
+    },
+    {
+      "currency": "AED",
+      "design": "B",
+      "theme": "Bags & Travel",
+      "campaign_code": "GG-AED-20260615-2",
+      "campaign_name": "UAE Bags & Travel - 15 Jun 2026",
+      "subject": "Carry your logo everywhere",
+      "skus": [
+        "GG1024",
+        "GG1685",
+        "GG1688",
+        "GG1604"
+      ]
+    },
+    {
+      "currency": "AED",
+      "design": "C",
+      "theme": "Eco & Sustainable",
+      "campaign_code": "GG-AED-20260615-3",
+      "campaign_name": "UAE Eco & Sustainable - 15 Jun 2026",
+      "subject": "Green gifts they keep",
+      "skus": [
+        "GG1701",
+        "GG1763",
+        "GG1472",
+        "GG1495",
+        "GG1464"
+      ]
+    },
+    {
+      "currency": "SAR",
+      "design": "A",
+      "theme": "Notebooks & Writing",
+      "campaign_code": "GG-SAR-20260615-1",
+      "campaign_name": "KSA Notebooks & Writing - 15 Jun 2026",
+      "subject": "Pages with your name",
+      "skus": [
+        "GG1649",
+        "GG1452",
+        "GG1678",
+        "GG1598",
+        "GG1303"
+      ]
+    },
+    {
+      "currency": "SAR",
+      "design": "B",
+      "theme": "Tech & Desk",
+      "campaign_code": "GG-SAR-20260615-2",
+      "campaign_name": "KSA Tech & Desk - 15 Jun 2026",
+      "subject": "Power up every desk",
+      "skus": [
+        "GG1630",
+        "GG1362",
+        "GG1363",
+        "GG1626"
+      ]
+    },
+    {
+      "currency": "SAR",
+      "design": "C",
+      "theme": "Eco & Sustainable",
+      "campaign_code": "GG-SAR-20260615-3",
+      "campaign_name": "KSA Eco & Sustainable - 15 Jun 2026",
+      "subject": "Sustainable and clearly yours",
+      "skus": [
+        "GG1492",
+        "GG1463",
+        "GG1392",
+        "GG1137",
+        "GG1178"
+      ]
+    },
+    {
+      "currency": "QAR",
+      "design": "A",
+      "theme": "Executive Onboarding",
+      "campaign_code": "GG-QAR-20260615-1",
+      "campaign_name": "Qatar Executive Onboarding - 15 Jun 2026",
+      "subject": "Welcome them in style",
+      "skus": [
+        "GG1636",
+        "GG1499",
+        "GG1243",
+        "GG1547",
+        "GG1215"
+      ]
+    },
+    {
+      "currency": "QAR",
+      "design": "B",
+      "theme": "Bags & Travel",
+      "campaign_code": "GG-QAR-20260615-2",
+      "campaign_name": "Qatar Bags & Travel - 15 Jun 2026",
+      "subject": "Bags built for work",
+      "skus": [
+        "GG1185",
+        "GG1383",
+        "GG1227",
+        "GG1690"
+      ]
+    },
+    {
+      "currency": "QAR",
+      "design": "C",
+      "theme": "Premium Drinkware",
+      "campaign_code": "GG-QAR-20260615-3",
+      "campaign_name": "Qatar Premium Drinkware - 15 Jun 2026",
+      "subject": "Their daily cup, branded",
+      "skus": [
+        "GG1245",
+        "GG1430",
+        "GG1529",
+        "GG1599"
+      ]
+    }
+  ]
+}

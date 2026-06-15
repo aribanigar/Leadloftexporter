@@ -1,0 +1,53 @@
+# Local dev. Reads DATABASE_URL + REDIS_URL + ANTHROPIC_API_KEY from a .env
+# file in this directory (gitignored). If DATABASE_URL is unset, falls back to
+# a local Postgres container. Redis is always local because it's tiny.
+#
+# Typical .env for the Neon-backed flow:
+#   DATABASE_URL=postgresql+psycopg://user:pw@host/db?sslmode=require
+#   SECRET_KEY=<openssl rand -hex 32>
+#   ANTHROPIC_API_KEY=sk-ant-...
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: claude-opus-4-7
+      ANTHROPIC_FAST_MODEL: claude-haiku-4-5
+      APP_ENV: ${APP_ENV:-development}
+    ports: ["8000:8000"]
+    depends_on:
+      redis: { condition: service_healthy }
+
+  worker:
+    build: ./api
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      api: { condition: service_started }
+
+  beat:
+    build: ./api
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+    depends_on:
+      api: { condition: service_started }

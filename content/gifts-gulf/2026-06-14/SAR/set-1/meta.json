@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Eco and sustainable",
+  "season": "Summer eco",
+  "angle": "Sustainable H2 Gifting",
+  "campaign_code": "GG-SAR-20260614-1",
+  "campaign_name": "KSA Sustainable Gifting - 14 Jun 2026",
+  "subject": "Gifts that give back",
+  "skus": [
+    "GG1530",
+    "GG1117",
+    "GG1239",
+    "GG1470"
+  ],
+  "products": [
+    {
+      "name": "Namib Bottle",
+      "sku": "GG1530",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6931-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1530",
+      "price": "SR 47.75"
+    },
+    {
+      "name": "Bente",
+      "sku": "GG1117",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2196-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1117",
+      "price": "SR 8.00"
+    },
+    {
+      "name": "Sticknote",
+      "sku": "GG1239",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2554-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1239",
+      "price": "SR 18.90"
+    },
+    {
+      "name": "Bayin Set",
+      "sku": "GG1470",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6601-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1470",
+      "price": "SR 15.91"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Eco+and+sustainable+set+%28GG-SAR-20260614-1%29+for+KSA"
+}

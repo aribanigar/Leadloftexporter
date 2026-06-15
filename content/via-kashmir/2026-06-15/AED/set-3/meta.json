@@ -1,0 +1,25 @@
+{
+  "date": "2026-06-15",
+  "currency": "AED",
+  "theme": "grand-tour",
+  "season": "summer",
+  "subject": "Grand Kashmir Tour: Grand Kashmir — 6 Nights from AED 2,075",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Aru_Valley_Kashmir_in_Autumn.jpg/1280px-Aru_Valley_Kashmir_in_Autumn.jpg",
+  "products": [
+    {
+      "sku": "VK-G6",
+      "name": "Grand Kashmir — 6 Nights",
+      "price": "AED 2,075"
+    },
+    {
+      "sku": "VK-G4",
+      "name": "Classic Kashmir — 4 Nights",
+      "price": "AED 1,394"
+    },
+    {
+      "sku": "VK-HM5",
+      "name": "Honeymoon Special — 5N",
+      "price": "AED 2,301"
+    }
+  ]
+}

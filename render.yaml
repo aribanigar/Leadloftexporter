@@ -1,0 +1,129 @@
+services:
+  - type: web
+    name: leadcaptura-api
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
+    rootDir: api
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: leadcaptura-redis
+          property: connectionString
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-7
+      - key: ANTHROPIC_FAST_MODEL
+        value: claude-haiku-4-5
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      # Google Calendar OAuth (scheduling / reminders calendar sync). The
+      # consent screen must have the Calendar API enabled and register the
+      # redirect URI: <PUBLIC_API_URL>/api/v1/calendar/oauth/google/callback.
+      # Optional — users can also paste a Client ID/Secret in the UI instead.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      # Public, internet-reachable base URL of THIS backend. Drives the Google
+      # OAuth redirect URI + email tracking links. Set to the real API origin.
+      - key: PUBLIC_API_URL
+        sync: false
+      # Meeting Notetaker audio transcription (OpenAI Whisper). Without it the
+      # notetaker still works from a pasted transcript.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: WHISPER_MODEL
+        value: whisper-1
+      - key: SENTRY_DSN
+        sync: false
+      # WhatsApp sidecar — set these to point at the Node service below.
+      # WA_SIDECAR_URL = https://leadcaptura-whatsapp.onrender.com
+      # WA_SIDECAR_TOKEN must match the value on that service.
+      - key: WA_SIDECAR_URL
+        sync: false
+      - key: WA_SIDECAR_TOKEN
+        sync: false
+
+  # ── WhatsApp sidecar ─────────────────────────────────────────────────────
+  # Node/Baileys service that owns the actual WhatsApp Web connection.
+  # The main API proxies /whatsapp-web/* to this service.
+  #
+  # Storage: set WA_DB_URL (below) to the same Postgres (Neon) URL as the API's
+  # DATABASE_URL — the sidecar stores Baileys sessions + the account registry in
+  # the `wa_auth` / `wa_kv` tables, so paired phones survive restarts WITHOUT a
+  # disk. The disk below is kept only as a fallback for when WA_DB_URL is unset;
+  # once Postgres storage is confirmed you can remove the disk and drop to a
+  # cheaper plan.
+  # Runs on the FREE plan with NO disk: WA_DB_URL points at the same Neon
+  # Postgres as the API, so Baileys sessions + the account registry live in the
+  # wa_auth / wa_kv tables and a paired phone survives restarts. A free web
+  # service sleeps when idle; a cron-job.org ping to /health keeps it warm, and
+  # on any wake it reconnects from the stored creds with no new QR scan.
+  - type: web
+    name: leadcaptura-whatsapp
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
+    rootDir: whatsapp
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8001"
+      # Same value as the API service's DATABASE_URL (Neon) — enables disk-free,
+      # Postgres-backed session storage.
+      - key: WA_DB_URL
+        sync: false
+      - key: WA_SIDECAR_TOKEN
+        sync: false
+
+  - type: worker
+    name: leadcaptura-worker
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
+    rootDir: api
+    plan: starter
+    dockerCommand: celery -A app.workers.celery_app worker --loglevel=info
+    autoDeploy: true
+    envVars:
+      - fromGroup: leadcaptura-api
+
+  - type: worker
+    name: leadcaptura-beat
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
+    rootDir: api
+    plan: starter
+    dockerCommand: celery -A app.workers.celery_app beat --loglevel=info
+    autoDeploy: true
+    envVars:
+      - fromGroup: leadcaptura-api
+
+  - type: redis
+    name: leadcaptura-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction

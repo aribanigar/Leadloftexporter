@@ -1,0 +1,673 @@
+/* ── Send-button highlight (nuclear auto-confirm overlay) ──────────────── */
+@keyframes lc-pulse-ring {
+  0%   { box-shadow: 0 0 0 4px rgba(10,102,194,0.6), 0 0 16px rgba(10,102,194,0.4); }
+  50%  { box-shadow: 0 0 0 8px rgba(10,102,194,0.3), 0 0 28px rgba(10,102,194,0.6); }
+  100% { box-shadow: 0 0 0 4px rgba(10,102,194,0.6), 0 0 16px rgba(10,102,194,0.4); }
+}
+
+/* ── Full-page spotlight overlay (invitation modal guide) ─────────────── */
+@keyframes lc-spotlight-pulse {
+  0%,100% { box-shadow: 0 0 0 9999px rgba(0,0,0,0.76), 0 0 0 3px #fff, 0 0 0 6px #0a66c2, 0 0 24px rgba(10,102,194,0.9); }
+  50%     { box-shadow: 0 0 0 9999px rgba(0,0,0,0.76), 0 0 0 3px #fff, 0 0 0 9px #0a66c2, 0 0 44px rgba(10,102,194,1); }
+}
+@keyframes lc-banner-in {
+  from { opacity:0; transform:translateY(-8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+#lc-send-spotlight {
+  position: fixed !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  z-index: 2147483647 !important;
+  animation: lc-spotlight-pulse 1s ease-in-out infinite !important;
+  transition: left 0.08s ease, top 0.08s ease, width 0.08s ease, height 0.08s ease !important;
+}
+#lc-send-banner {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 2147483647 !important;
+  background: #0a66c2 !important;
+  color: #fff !important;
+  font: 700 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  padding: 12px 22px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 6px 28px rgba(0,0,0,0.55) !important;
+  white-space: nowrap !important;
+  animation: lc-banner-in 0.25s ease-out !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.4 !important;
+}
+@keyframes lc-arrow-bounce {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+#lc-send-btn-arrow {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  transition: top 0.1s, left 0.1s !important;
+}
+#lc-send-btn-arrow .lc-arrow-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #0a66c2 !important;
+  color: #fff !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  box-shadow: 0 4px 20px rgba(10,102,194,0.5) !important;
+  white-space: nowrap !important;
+}
+#lc-send-btn-arrow .lc-arrow-emoji {
+  font-size: 18px !important;
+  display: inline-block !important;
+  animation: lc-arrow-bounce 0.6s ease-in-out infinite !important;
+}
+#lc-send-btn-arrow .lc-arrow-tail {
+  width: 0 !important;
+  height: 0 !important;
+  border-left: 10px solid transparent !important;
+  border-right: 10px solid transparent !important;
+  border-top: 10px solid #0a66c2 !important;
+  margin: 0 auto !important;
+}
+
+/* LeadCaptura overlay — three surfaces:
+ *   #lc-profile-panel   compact card top-right on /in/<handle>
+ *   #lc-toolbar         persistent bottom bar on search / sales nav
+ *   .lc-inline-save     per-card Save button styled like LinkedIn's native pills
+ *
+ * Class prefix `lc-` and high z-index instead of Shadow DOM, so we can layer
+ * above LinkedIn's chat / modal stack.
+ */
+
+#lc-profile-panel,
+#lc-toolbar {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  z-index: 2147483646;
+  color: #1f2328;
+  box-sizing: border-box;
+}
+#lc-profile-panel *,
+#lc-toolbar * {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+/* ------------ Profile card ------------ */
+
+#lc-profile-panel {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  transition: transform 0.18s ease;
+}
+#lc-profile-panel.lc-collapsed .lc-card-body { display: none; }
+
+.lc-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #0a66c2 0%, #1e88e5 100%);
+  color: #fff;
+}
+.lc-card-title { font-weight: 600; font-size: 13px; }
+.lc-card-body { padding: 12px; display: grid; gap: 10px; }
+
+.lc-logo {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700; font-size: 12px;
+}
+
+.lc-flex { flex: 1; }
+.lc-muted { color: #64748b; font-size: 12px; }
+
+.lc-profile-meta { display: flex; gap: 10px; align-items: center; }
+.lc-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover;
+  background: #e0e0e0;
+}
+.lc-avatar-placeholder {
+  display: inline-grid; place-items: center;
+  color: #475569; font-weight: 600;
+}
+.lc-profile-text { min-width: 0; flex: 1; }
+.lc-profile-name {
+  font-weight: 600; font-size: 14px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lc-profile-sub {
+  font-size: 12px; color: #64748b; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ------------ Bottom toolbar ------------ */
+
+#lc-toolbar {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
+  color: #fff;
+  padding: 0;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.18);
+}
+/* Collapsed: shrink to just the branded pill at the bottom-left */
+#lc-toolbar.lc-collapsed { width: fit-content; right: auto; border-radius: 6px 6px 0 0; }
+#lc-toolbar.lc-collapsed .lc-toolbar-body { display: none !important; }
+
+/* Always-visible handle — the branded "LeadCaptura ↑/↓" pill */
+.lc-toolbar-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+.lc-toolbar-handle:hover { background: rgba(255,255,255,0.06); }
+
+/* Expandable body — all dropdowns and action buttons */
+.lc-toolbar-body {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid rgba(255,255,255,0.10);
+}
+
+.lc-toolbar-arrow {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.lc-toolbar-handle:hover .lc-toolbar-arrow { opacity: 1; }
+
+.lc-toolbar-inner {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 1400px; margin: 0 auto;
+  padding: 10px 16px 12px;
+}
+.lc-tb-title { font-weight: 600; font-size: 13px; letter-spacing: 0.01em; }
+.lc-tb-version { font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 0.01em; }
+
+/* ------------ Dropdowns inside the toolbar ------------ */
+
+.lc-dd { position: relative; }
+.lc-dd-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+.lc-dd-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.lc-dd-label { color: rgba(255, 255, 255, 0.7); }
+.lc-dd-value { font-weight: 600; }
+.lc-dd-caret { font-size: 10px; opacity: 0.8; margin-left: 2px; }
+
+.lc-dd-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  padding: 4px;
+  display: none;
+}
+.lc-dd-menu.lc-open { display: block; }
+.lc-dd-item {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  background: transparent; border: none;
+  text-align: left;
+  font-size: 12px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #0f172a;
+}
+.lc-dd-item:hover { background: #f1f5f9; }
+
+.lc-overflow {
+  bottom: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  min-width: 160px;
+}
+
+/* ------------ Buttons (shared) ------------ */
+
+.lc-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.lc-btn-sm { padding: 5px 10px; font-size: 12px; }
+.lc-btn:active { transform: translateY(0.5px); }
+.lc-btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.lc-btn-primary {
+  background: #2563eb; color: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.lc-btn-primary:hover { background: #1d4ed8; }
+.lc-btn-ghost {
+  background: transparent;
+  color: #64748b;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.lc-btn-ghost:hover { background: #f1f5f9; color: #0f172a; }
+
+/* ---- Toolbar button hierarchy (on the blue gradient bar) ----
+ * PRIMARY  = Save  → solid white pill, blue text (highest emphasis)
+ * CONNECT  = Connect → outlined white pill (secondary action)
+ * GHOST    = Select All / Clear → subtle translucent (tertiary)
+ * STOP     = halt a run → solid white pill, red text (clear "danger")
+ */
+#lc-toolbar .lc-btn-primary {
+  background: #ffffff; color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(2, 23, 71, 0.22);
+}
+#lc-toolbar .lc-btn-primary:hover { background: #eef4ff; }
+#lc-toolbar .lc-btn-ghost {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+#lc-toolbar .lc-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.20);
+  color: #ffffff;
+}
+.lc-btn-connect {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+}
+.lc-btn-connect:hover {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 8px rgba(2, 23, 71, 0.22);
+}
+.lc-btn-stop {
+  background: #ffffff; color: #dc2626;
+  box-shadow: 0 2px 8px rgba(2, 23, 71, 0.22);
+}
+.lc-btn-stop:hover { background: #fef2f2; color: #b91c1c; }
+
+.lc-icon-btn {
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px;
+  border: none; border-radius: 6px; background: transparent;
+  color: inherit; cursor: pointer; font-size: 14px;
+  opacity: 0.85;
+}
+.lc-icon-btn:hover { background: rgba(255, 255, 255, 0.1); opacity: 1; }
+.lc-icon-btn-light { color: #fff; }
+
+/* ------------ Status pill ------------ */
+
+.lc-status-slot { display: inline-flex; align-items: center; min-height: 22px; }
+.lc-status {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.lc-status.lc-ok    { background: rgba(16, 185, 129, 0.18); color: #d1fae5; }
+.lc-status.lc-err   { background: rgba(239, 68, 68, 0.22); color: #fecaca; }
+.lc-status.lc-warn  { background: rgba(245, 158, 11, 0.22); color: #fde68a; }
+#lc-profile-panel .lc-status { background: #f1f5f9; color: #475569; }
+#lc-profile-panel .lc-status.lc-ok  { background: #ecfdf5; color: #047857; }
+#lc-profile-panel .lc-status.lc-err { background: #fef2f2; color: #b91c1c; }
+#lc-profile-panel .lc-status.lc-warn { background: #fefce8; color: #854d0e; }
+
+/* ------------ Inline per-card Save chip ------------
+ *
+ * One Save chip per profile card, anchored absolutely to the top-right
+ * corner of the card — to the LEFT of LinkedIn's Connect/Pending button so
+ * the two never collide. The card itself is forced to `position: relative`
+ * at inject time, so our absolute position is relative to the card.
+ */
+.lc-save-row {
+  position: static !important;
+  z-index: 50 !important;
+  margin: 0 8px 0 0 !important;
+  padding: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+  pointer-events: auto !important;
+}
+
+/* Fallback placement only when a card has no native action button to sit
+ * beside — pinned to the card's top-right corner. */
+.lc-save-row-floating {
+  position: absolute !important;
+  top: 12px !important;
+  right: 130px !important;
+  margin: 0 !important;
+}
+
+/* Per-job chip — portal-mounted with position:fixed so LinkedIn's
+ * overflow:hidden scroll container can never clip it. top/left are set
+ * per-frame by _syncJobChipPositions() from getBoundingClientRect(). */
+/* Portal-chip (legacy fixed-position, kept for reference) */
+.lc-job-row {
+  position: fixed !important;
+  z-index: 2147483640 !important;
+  visibility: hidden !important;
+  margin: 0 !important;
+  padding: 2px 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  pointer-events: auto !important;
+}
+
+/* Inline per-card Apply chip — injected directly into the job card DOM */
+.lc-job-apply-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 8px 4px 4px !important;
+  margin: 2px 0 0 !important;
+  pointer-events: all !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* While an Auto Apply run is in progress the per-card chips have nothing to do
+   and a stray one can float over the open Easy Apply modal. Hide them all for
+   the duration of the run; the bottom toolbar shows progress + Stop instead. */
+.lc-applying .lc-job-apply-row {
+  display: none !important;
+}
+
+.lc-inline-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #d4d4d8 !important;
+  color: #71717a !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: border-color 0.12s, background 0.12s, color 0.12s !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+.lc-inline-check:hover {
+  border-color: #0a66c2 !important;
+  color: #0a66c2 !important;
+}
+.lc-inline-check.lc-inline-check-on {
+  background: #0a66c2 !important;
+  border-color: #0a66c2 !important;
+  color: #ffffff !important;
+}
+
+.lc-bulk-progress {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 10px !important;
+  background: #eaf3fb !important;
+  border: 1px solid #0a66c2 !important;
+  border-radius: 999px !important;
+  color: #084d92 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  max-width: 480px !important;
+  overflow: hidden !important;
+}
+.lc-bulk-progress-text {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif !important;
+}
+.lc-bulk-spinner {
+  display: inline-block !important;
+  animation: lc-spin 1.2s linear infinite !important;
+}
+@keyframes lc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.lc-inline-save {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  background: #ffffff !important;
+  color: #0a66c2 !important;
+  border: 1.5px solid #0a66c2 !important;
+  border-radius: 999px !important;
+  padding: 5px 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  transition: background 0.12s, box-shadow 0.12s !important;
+  white-space: nowrap !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif !important;
+  min-width: 72px !important;
+}
+.lc-inline-save:hover {
+  background: #eaf3fb !important;
+  box-shadow: 0 2px 8px rgba(10, 102, 194, 0.18) !important;
+}
+.lc-inline-save:active { transform: translateY(0.5px) !important; }
+.lc-inline-save[data-state="saved"] {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #10b981 !important;
+  animation: lc-pop 0.22s ease-out !important;
+}
+.lc-inline-save[data-state="error"] {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+  border-color: #ef4444 !important;
+}
+.lc-inline-save[data-state="saving"] {
+  background: #eaf3fb !important;
+  cursor: progress !important;
+  animation: lc-pulse 1.1s ease-in-out infinite !important;
+}
+.lc-inline-save[data-state="contacted"] {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border-color: #cbd5e1 !important;
+  border-style: dashed !important;
+}
+@keyframes lc-pop {
+  0% { transform: scale(0.92); }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes lc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ------------ Top floating Select-All pill ------------
+ *
+ * Anchored top-right of the viewport on list pages so the user can select
+ * every visible /in/ card with one click without scrolling to the bottom
+ * toolbar. Uses `all: initial` reset so LinkedIn's global styles can't bleed
+ * into our button typography.
+ */
+#lc-select-all-top {
+  all: initial !important;
+  position: fixed !important;
+  top: 88px !important;
+  right: 24px !important;
+  z-index: 2147483645 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 9px 16px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #0a66c2 !important;
+  border-radius: 999px !important;
+  color: #0a66c2 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12) !important;
+  transition: background 0.12s, transform 0.12s !important;
+  white-space: nowrap !important;
+}
+#lc-select-all-top:hover {
+  background: #eaf3fb !important;
+  transform: translateY(-1px) !important;
+}
+#lc-select-all-top.lc-active {
+  background: #0a66c2 !important;
+  color: #ffffff !important;
+}
+#lc-select-all-top.lc-active:hover {
+  background: #084d92 !important;
+}
+
+/* Make room for the bottom bar on the underlying page */
+body.lc-toolbar-mounted { padding-bottom: 64px !important; }
+
+/* LinkedIn unread message count badge in toolbar */
+.lc-msg-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+.lc-msg-badge:hover {
+  background: #b91c1c !important;
+}
+
+/* ── Avoid Duplicate Outreach floating panel ─────────────────────────────── */
+#lc-avoid-dup-panel {
+  all: initial !important;
+  position: fixed !important;
+  bottom: 72px !important;      /* sits just above our bottom toolbar */
+  right: 16px !important;
+  z-index: 9999997 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.10) !important;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif !important;
+  white-space: nowrap !important;
+  pointer-events: all !important;
+}
+.lc-ado-textcol {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  min-width: 0 !important;
+}
+.lc-ado-label {
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  font-size: 12px !important;
+}
+.lc-ado-count {
+  font-size: 10px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+#lc-avoid-dup-panel.lc-ado-on .lc-ado-count { color: #2563eb !important; }
+.lc-ado-info {
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+  cursor: default !important;
+}
+.lc-ado-btns {
+  display: flex !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+.lc-ado-btn {
+  all: initial !important;
+  font: 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  cursor: pointer !important;
+  color: #64748b !important;
+  background: #f8fafc !important;
+  transition: background 0.12s !important;
+}
+.lc-ado-btn:first-child {
+  border-right: 1px solid #e2e8f0 !important;
+}
+.lc-ado-btn.lc-ado-active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+.lc-ado-btn:not(.lc-ado-active):hover {
+  background: #f1f5f9 !important;
+}

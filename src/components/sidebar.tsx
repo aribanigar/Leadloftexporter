@@ -1,0 +1,196 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import {
+  Search,
+  Inbox,
+  CheckSquare,
+  Send,
+  Columns3,
+  MessageSquare,
+  BarChart3,
+  Settings,
+  Gift,
+  Play,
+  Plus,
+  ChevronDown,
+  Sparkles,
+  Mail,
+  MessageCircle,
+  FolderOpen,
+  CalendarClock,
+  CalendarRange,
+  Mic,
+  Building2,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { cn, initials } from "@/lib/utils";
+import type { PipelineStage, SavedView } from "@/lib/types";
+import { CreateLeadModal } from "@/components/create-lead-modal";
+
+const NAV = [
+  { href: "/prospecting", label: "Prospecting", icon: Search },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/calendar", label: "Calendar", icon: CalendarClock },
+  { href: "/scheduling", label: "Scheduling", icon: CalendarRange },
+  { href: "/notetaker", label: "Notetaker", icon: Mic },
+  { href: "/playbooks", label: "Playbooks", icon: Send },
+  { href: "/pipeline", label: "Pipeline", icon: Columns3 },
+  { href: "/outreach", label: "Outreach", icon: Sparkles },
+  { href: "/campaigns", label: "Campaigns", icon: Mail },
+  { href: "/content-hub", label: "Content Hub", icon: FolderOpen },
+  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/messaging", label: "Messaging", icon: MessageSquare },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+] as const;
+
+// Saved views hidden from the sidebar (matched case-insensitively by name).
+const HIDDEN_VIEWS = new Set(["new", "school connect"]);
+
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void } = {}) {
+  const pathname = usePathname();
+  const { user, workspace } = useAuth();
+  const { data: views } = useQuery<SavedView[]>({
+    queryKey: ["saved-views"],
+    queryFn: () => api("/workspaces/current/views"),
+    enabled: !!user,
+  });
+  const { data: stages } = useQuery<PipelineStage[]>({
+    queryKey: ["stages"],
+    queryFn: () => api("/pipeline/stages"),
+    enabled: !!user,
+  });
+  const [creatingLead, setCreatingLead] = useState(false);
+
+  return (
+    <>
+      {/* mobile backdrop */}
+      <div
+        onClick={onClose}
+        className={cn(
+          "fixed inset-0 z-[140] bg-slate-900/40 transition-opacity lg:hidden",
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+      />
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-[150] flex h-full w-60 flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
+      <div className="flex h-14 items-center gap-2 border-b border-slate-100 bg-gradient-to-r from-dteal-50 via-teal-50/50 to-white px-4">
+        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-dteal-500 to-dteal-700 text-xs font-semibold uppercase text-white shadow-sm ring-1 ring-mcyellow-400/60">
+          {initials(workspace?.name || user?.email)}
+        </div>
+        <span className="truncate text-sm font-bold uppercase tracking-wide text-dteal-800">{workspace?.name || "Workspace"}</span>
+        <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />
+      </div>
+
+      <nav className="space-y-0.5 px-2 pt-3">
+        {NAV.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || pathname?.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 shadow-sm ring-1 ring-dteal-100"
+                  : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
+              )}
+            >
+              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-dteal-600" : "text-slate-400 group-hover:text-dteal-600")} />
+              <span>{label}</span>
+              {href === "/pipeline" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    // Stop the Link from navigating; just open the modal.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCreatingLead(true);
+                  }}
+                  className="ml-auto rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  title="Add lead"
+                  aria-label="Add lead"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+      {creatingLead && (
+        <CreateLeadModal
+          onClose={() => setCreatingLead(false)}
+          stages={stages || []}
+        />
+      )}
+
+      <div className="mt-4 px-2">
+        <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Quick Views
+        </div>
+        <div className="space-y-0.5">
+          {/* Finder Lead — Google-Maps-scraped businesses, kept separate from the
+              pipeline/prospecting until explicitly added. */}
+          <Link
+            href="/company-finder"
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              pathname?.startsWith("/company-finder")
+                ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 ring-1 ring-dteal-100"
+                : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
+            )}
+          >
+            <Building2 className={cn("h-4 w-4", pathname?.startsWith("/company-finder") ? "text-dteal-600" : "text-slate-400")} />
+            Finder Lead
+          </Link>
+          {(views || [])
+            .filter((v) => !HIDDEN_VIEWS.has((v.name || "").trim().toLowerCase()))
+            .map((v) => (
+              <Link
+                key={v.id}
+                href={`/prospecting?view=${v.id}`}
+                className="block truncate rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700"
+              >
+                {v.name}
+              </Link>
+            ))}
+        </div>
+      </div>
+
+      <div className="mt-auto space-y-0.5 border-t border-slate-100 px-2 py-3">
+        <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg bg-gradient-to-r from-mcyellow-400 to-mcyellow-500 px-3 py-2 text-sm font-semibold text-dteal-800 shadow-sm ring-1 ring-mcyellow-600/30 transition-colors hover:from-mcyellow-500 hover:to-mcyellow-600">
+          <Gift className="h-4 w-4 text-dteal-700" />
+          <span>Get LeadCaptura Free</span>
+          <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-dteal-600" />
+        </Link>
+        <Link href="/help" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700">
+          <Play className="h-4 w-4 text-slate-400" />
+          <span>Video Tutorials</span>
+        </Link>
+        <Link
+          href="/settings"
+          className={cn(
+            "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            pathname?.startsWith("/settings")
+              ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 shadow-sm ring-1 ring-dteal-100"
+              : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
+          )}
+        >
+          <Settings className={cn("h-4 w-4", pathname?.startsWith("/settings") ? "text-dteal-600" : "text-slate-400 group-hover:text-dteal-600")} />
+          <span>Settings</span>
+        </Link>
+      </div>
+      </aside>
+    </>
+  );
+}

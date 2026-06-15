@@ -1,0 +1,25 @@
+{
+  "date": "2026-06-15",
+  "currency": "USD",
+  "theme": "summer-srinagar",
+  "season": "summer",
+  "subject": "Summer in Srinagar: Deluxe Houseboat — 2 Nights from $180",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Dal_lake_by_Ahanger_HOBO.jpg/1280px-Dal_lake_by_Ahanger_HOBO.jpg",
+  "products": [
+    {
+      "sku": "VK-HB2",
+      "name": "Deluxe Houseboat — 2 Nights",
+      "price": "$180"
+    },
+    {
+      "sku": "VK-SGR3",
+      "name": "Srinagar & Mughal Gardens — 3N",
+      "price": "$271"
+    },
+    {
+      "sku": "VK-SHK",
+      "name": "Private Sunset Shikara",
+      "price": "$22"
+    }
+  ]
+}

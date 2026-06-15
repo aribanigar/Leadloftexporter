@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "Qatar",
+  "currency": "QAR",
+  "theme": "Bags and travel",
+  "season": "Summer",
+  "angle": "Smart Workspace Tech",
+  "campaign_code": "GG-QAR-20260614-3",
+  "campaign_name": "Qatar Travel Carry - 14 Jun 2026",
+  "subject": "Pack the brand along",
+  "skus": [
+    "GG1062",
+    "GG1093",
+    "GG1391",
+    "GG1312"
+  ],
+  "products": [
+    {
+      "name": "Bright Rollpack",
+      "sku": "GG1062",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2056-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1062",
+      "price": "QAR 65.59"
+    },
+    {
+      "name": "Coolpack",
+      "sku": "GG1093",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2125-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1093",
+      "price": "QAR 96.16"
+    },
+    {
+      "name": "Baglo",
+      "sku": "GG1391",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6186-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1391",
+      "price": "QAR 26.86"
+    },
+    {
+      "name": "Brenna Pouch",
+      "sku": "GG1312",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2754-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1312",
+      "price": "QAR 18.84"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Bags+and+travel+set+%28GG-QAR-20260614-3%29+for+Qatar"
+}

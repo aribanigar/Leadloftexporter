@@ -1,0 +1,48 @@
+{
+  "date": "2026-06-14",
+  "market": "Qatar",
+  "currency": "QAR",
+  "theme": "Tech and desk",
+  "season": "Summer",
+  "angle": "Smart Workspace Tech",
+  "campaign_code": "GG-QAR-20260614-1",
+  "campaign_name": "Qatar Smart Tech - 14 Jun 2026",
+  "subject": "Power the whole desk",
+  "skus": [
+    "GG1538",
+    "GG1526",
+    "GG1100",
+    "GG1541"
+  ],
+  "products": [
+    {
+      "name": "Tricpower",
+      "sku": "GG1538",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6949-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1538",
+      "price": "QAR 48.95"
+    },
+    {
+      "name": "Techmate Bamboo",
+      "sku": "GG1526",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6898-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1526",
+      "price": "QAR 24.13"
+    },
+    {
+      "name": "Hubstand",
+      "sku": "GG1100",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2144-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1100",
+      "price": "QAR 23.27"
+    },
+    {
+      "name": "Sound",
+      "sku": "GG1541",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6962-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1541",
+      "price": "QAR 21.97"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Tech+and+desk+set+%28GG-QAR-20260614-1%29+for+Qatar"
+}

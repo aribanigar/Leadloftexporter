@@ -1,0 +1,5 @@
+node_modules/
+.baileys_auth/
+data/accounts.json
+data/campaigns.json
+*.log

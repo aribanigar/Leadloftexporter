@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "Qatar",
+  "currency": "QAR",
+  "campaign_code": "GG-QAR-20260613-2",
+  "campaign_name": "Qatar Refill Culture - 13 Jun 2026",
+  "subject": "Sip, refill, repeat",
+  "angle": "Qatar Eco Gifting",
+  "season": "Eco / Summer",
+  "theme": "Recycled drinkware",
+  "skus": [
+    "GG6468",
+    "GG6390",
+    "GG6391",
+    "GG6492"
+  ],
+  "products": [
+    {
+      "name": "Recycle",
+      "sku": "GG6468",
+      "usd": 5.4,
+      "price": 16.71,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6468.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6468"
+    },
+    {
+      "name": "Bamboo",
+      "sku": "GG6390",
+      "usd": 4.8,
+      "price": 14.85,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6390.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6390"
+    },
+    {
+      "name": "Wheat",
+      "sku": "GG6391",
+      "usd": 3.6,
+      "price": 11.14,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6391.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6391"
+    },
+    {
+      "name": "Ocean",
+      "sku": "GG6492",
+      "usd": 8.7,
+      "price": 26.92,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6492.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6492"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Recycled+drinkware+set+%28GG-QAR-20260613-2%29+for+Qatar"
+}

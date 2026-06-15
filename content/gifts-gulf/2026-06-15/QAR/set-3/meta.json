@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-15",
+  "market": "Qatar",
+  "currency": "QAR",
+  "theme": "Premium Drinkware",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "C",
+  "campaign_code": "GG-QAR-20260615-3",
+  "campaign_name": "Qatar Premium Drinkware - 15 Jun 2026",
+  "subject": "Their daily cup, branded",
+  "skus": [
+    "GG1245",
+    "GG1430",
+    "GG1529",
+    "GG1599"
+  ],
+  "products": [
+    {
+      "name": "PEZE",
+      "sku": "GG1245",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2564-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1245"
+    },
+    {
+      "name": "HELSINKI MED",
+      "sku": "GG1430",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6372-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1430"
+    },
+    {
+      "name": "OLMA",
+      "sku": "GG1529",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6922-26.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1529"
+    },
+    {
+      "name": "TAZA",
+      "sku": "GG1599",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8831-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1599"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/QAR/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/QAR/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20drinkware%20options%20for%20our%20Qatar%20team."
+}

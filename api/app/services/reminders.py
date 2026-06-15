@@ -1,0 +1,847 @@
+"""Reminder engine + AI daily agenda.
+
+A *reminder* is a time-based nudge delivered to the USER (whose calendar/inbox
+it lands in), as opposed to outreach which targets leads. Reminders are created
+three ways:
+
+1. **Manually** from the UI ("remind me to call X at 3pm").
+2. **By CRM signals** — an inbound reply, a pipeline stage change, or a new note
+   auto-creates a follow-up reminder (the "make my day from inbox/pipeline/notes"
+   behaviour). These hooks are best-effort: they never raise into the request.
+3. **By the daily-agenda job** — once a day per user we gather the day's open
+   threads, due tasks, fresh replies and notes into a clear, prioritized
+   "who to talk to & about what" plan (deterministic, no AI) and deliver it.
+
+Delivery mirrors the EnrollmentStepRun pattern: rows sit ``pending`` until
+``remind_at`` passes, then ``tick_reminders`` (Celery beat) delivers them —
+writing a Google Calendar event for ``channel="calendar"`` or sending mail for
+``channel="email"`` — and flips them to ``sent``/``failed``. The whole system
+works over plain email/SMTP with no calendar connected; calendar delivery is an
+optional upgrade.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+try:  # stdlib on 3.9+, but guard anyway
+    from zoneinfo import ZoneInfo
+except Exception:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
+
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.models import (
+    Activity,
+    ConnectedAccount,
+    Lead,
+    Note,
+    Reminder,
+    Task,
+    Workspace,
+)
+from app.services import google_calendar as gcal
+
+log = logging.getLogger(__name__)
+_settings = get_settings()
+
+
+# --------------------------------------------------------------------------- #
+# Account + config helpers
+# --------------------------------------------------------------------------- #
+
+def calendar_account_for(db: Session, workspace_id: str, user_id: str) -> Optional[ConnectedAccount]:
+    """The active Google Calendar connection for a user in a workspace."""
+    return (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.workspace_id == workspace_id,
+            ConnectedAccount.user_id == user_id,
+            ConnectedAccount.provider == gcal.PROVIDER,
+            ConnectedAccount.status == "active",
+        )
+        .order_by(ConnectedAccount.created_at.asc())
+        .first()
+    )
+
+
+def _write_calendar_id(account: ConnectedAccount) -> str:
+    cfg = account.config or {}
+    return cfg.get("write_calendar_id") or "primary"
+
+
+def conflict_calendar_ids(account: ConnectedAccount) -> list[str]:
+    cfg = account.config or {}
+    ids = cfg.get("conflict_calendar_ids")
+    if ids:
+        return list(ids)
+    # Default: just the write calendar (usually "primary").
+    return [_write_calendar_id(account)]
+
+
+# Reminder preferences (agenda + auto-reminders) are stored PER-USER in
+# ``workspace.settings["reminder_prefs"][user_id]`` — deliberately NOT on the
+# calendar account, so the whole reminder/agenda system works over plain
+# email/SMTP even when no calendar is connected. The calendar account only
+# holds calendar-specific roles (write/conflict calendars).
+DEFAULT_AGENDA = {"enabled": True, "hour": 8, "channels": ["email"]}
+DEFAULT_AUTO = {"inbox_reply": True, "stage_change": True, "note": True, "default_offset_minutes": 60, "notify_on_create": True}
+
+
+def _prefs_root(workspace: Workspace) -> dict:
+    return (workspace.settings or {}).get("reminder_prefs", {}) or {}
+
+
+def _user_prefs(workspace: Workspace, user_id: str) -> dict:
+    return _prefs_root(workspace).get(user_id) or {}
+
+
+def agenda_config(workspace: Workspace, user_id: str) -> dict:
+    stored = _user_prefs(workspace, user_id).get("agenda") or {}
+    tz = stored.get("timezone") or (workspace.settings or {}).get("outreach", {}).get("timezone") or "UTC"
+    return {
+        "enabled": bool(stored.get("enabled", DEFAULT_AGENDA["enabled"])),
+        "hour": int(stored.get("hour", DEFAULT_AGENDA["hour"])),
+        "timezone": tz,
+        "channels": stored.get("channels") or list(DEFAULT_AGENDA["channels"]),
+        "last_generated_date": stored.get("last_generated_date"),
+    }
+
+
+def auto_reminder_config(workspace: Workspace, user_id: str) -> dict:
+    stored = _user_prefs(workspace, user_id).get("auto_reminders") or {}
+    return {
+        "inbox_reply": bool(stored.get("inbox_reply", DEFAULT_AUTO["inbox_reply"])),
+        "stage_change": bool(stored.get("stage_change", DEFAULT_AUTO["stage_change"])),
+        "note": bool(stored.get("note", DEFAULT_AUTO["note"])),
+        "default_offset_minutes": int(stored.get("default_offset_minutes", DEFAULT_AUTO["default_offset_minutes"])),
+        "notify_on_create": bool(stored.get("notify_on_create", DEFAULT_AUTO["notify_on_create"])),
+    }
+
+
+def set_prefs(
+    db: Session,
+    workspace: Workspace,
+    user_id: str,
+    *,
+    agenda: Optional[dict] = None,
+    auto_reminders: Optional[dict] = None,
+) -> None:
+    """Merge a patch into a user's reminder prefs and persist."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    settings = dict(workspace.settings or {})
+    root = dict(settings.get("reminder_prefs", {}) or {})
+    entry = dict(root.get(user_id, {}) or {})
+    if agenda is not None:
+        entry["agenda"] = {**(entry.get("agenda") or {}), **agenda}
+    if auto_reminders is not None:
+        entry["auto_reminders"] = {**(entry.get("auto_reminders") or {}), **auto_reminders}
+    root[user_id] = entry
+    settings["reminder_prefs"] = root
+    workspace.settings = settings
+    flag_modified(workspace, "settings")
+    db.commit()
+
+
+# ---- delivery availability (calendar OR email/SMTP) ----
+
+def email_account_for(db: Session, workspace_id: str, user_id: str):
+    from app.services.email_sender import _pick_account
+
+    return _pick_account(db, workspace_id, user_id)
+
+
+def delivery_options(db: Session, workspace_id: str, user_id: str) -> dict:
+    return {
+        "calendar": calendar_account_for(db, workspace_id, user_id) is not None,
+        "email": email_account_for(db, workspace_id, user_id) is not None,
+    }
+
+
+def effective_channel(db: Session, workspace_id: str, user_id: str, requested: str) -> Optional[str]:
+    """Resolve the channel a reminder can actually be delivered on, falling back
+    when the requested one isn't available. Returns None if nothing is set up."""
+    opts = delivery_options(db, workspace_id, user_id)
+    if requested == "calendar" and opts["calendar"]:
+        return "calendar"
+    if requested == "email" and opts["email"]:
+        return "email"
+    if opts["calendar"]:
+        return "calendar"
+    if opts["email"]:
+        return "email"
+    return None
+
+
+def _zone(name: str):
+    if ZoneInfo is None:
+        return timezone.utc
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return timezone.utc
+
+
+# --------------------------------------------------------------------------- #
+# Creation
+# --------------------------------------------------------------------------- #
+
+def create_reminder(
+    db: Session,
+    *,
+    workspace_id: str,
+    user_id: str,
+    title: str,
+    remind_at: datetime,
+    body: str = "",
+    channel: str = "calendar",
+    source: str = "manual",
+    lead_id: Optional[str] = None,
+    task_id: Optional[str] = None,
+    duration_minutes: int = 15,
+    payload: Optional[dict] = None,
+    recipient_email: Optional[str] = None,
+    booking_id: Optional[str] = None,
+    target_calendar_id: Optional[str] = None,
+    escalate: bool = True,
+    commit: bool = True,
+    notify: bool = True,
+) -> Reminder:
+    if remind_at.tzinfo is None:
+        remind_at = remind_at.replace(tzinfo=timezone.utc)
+    rem = Reminder(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        lead_id=lead_id,
+        task_id=task_id,
+        title=title[:300],
+        body=body or "",
+        remind_at=remind_at,
+        duration_minutes=duration_minutes,
+        channel=channel if channel in {"calendar", "email"} else "calendar",
+        source=source,
+        payload=payload or {},
+        recipient_email=recipient_email,
+        booking_id=booking_id,
+        target_calendar_id=target_calendar_id,
+        # Invitee-facing reminders never escalate (they fire at fixed offsets).
+        escalate=bool(escalate) and not recipient_email,
+        status="pending",
+    )
+    db.add(rem)
+    if commit:
+        db.commit()
+        db.refresh(rem)
+    # Real-time heads-up: the moment an owner-facing reminder is created, email
+    # the owner's connected inbox a nicely-formatted notification.
+    if notify:
+        notify_reminder_created(db, rem)
+    return rem
+
+
+def notify_reminder_created(db: Session, reminder: Reminder) -> None:
+    """Best-effort: email the owner's connected inbox a nice HTML 'reminder set'
+    notification immediately on creation. Skips invitee-facing reminders and
+    respects the per-user notify_on_create preference."""
+    try:
+        # Invitee-facing reminders (recipient_email set) aren't "to your inbox".
+        if reminder.recipient_email:
+            return
+        workspace = db.get(Workspace, reminder.workspace_id)
+        if not workspace:
+            return
+        if not auto_reminder_config(workspace, reminder.user_id).get("notify_on_create", True):
+            return
+        account = email_account_for(db, reminder.workspace_id, reminder.user_id)
+        if not account:
+            return
+        to_addr = account.external_id or (account.config or {}).get("from_email")
+        if not to_addr:
+            return
+        from app.services.email_sender import send_via_account
+
+        subject, html, text = _render_created_email(reminder)
+        send_via_account(account, to_addr, subject, text, html)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("reminder-created notification skipped for %s: %s", reminder.id, exc)
+
+
+_SOURCE_LABELS = {
+    "manual": "Manual reminder",
+    "inbox_reply": "Lead reply follow-up",
+    "stage_change": "Pipeline stage change",
+    "note": "Note follow-up",
+    "daily_agenda": "Daily agenda",
+    "booking": "Meeting booked",
+    "pre_meeting_brief": "Pre-meeting brief",
+}
+
+
+def _render_created_email(reminder: Reminder) -> tuple[str, str, str]:
+    """Return (subject, html, text) for the 'reminder set' notification."""
+    when_utc = reminder.remind_at
+    if when_utc.tzinfo is None:
+        when_utc = when_utc.replace(tzinfo=timezone.utc)
+    when_abs = when_utc.strftime("%A, %b %d · %H:%M UTC")
+    label = _SOURCE_LABELS.get(reminder.source, "Reminder")
+    title = reminder.title
+    body = (reminder.body or "").strip()
+    channel = "Calendar event" if reminder.channel == "calendar" else "Email"
+
+    subject = f"🔔 Reminder set — {title}"
+    body_html = ""
+    if body:
+        body_html = (
+            '<tr><td style="padding:0 28px 8px;color:#475569;font-size:14px;line-height:1.6;">'
+            + body.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")
+            + "</td></tr>"
+        )
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 16px;">
+  <tr><td align="center">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08);">
+      <tr><td style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);padding:22px 28px;">
+        <div style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#dbeafe;">🔔 {label}</div>
+        <div style="margin-top:4px;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:-.01em;">Reminder set</div>
+      </td></tr>
+      <tr><td style="padding:24px 28px 6px;">
+        <div style="font-size:17px;font-weight:700;color:#0f172a;line-height:1.35;">{title}</div>
+      </td></tr>
+      {body_html}
+      <tr><td style="padding:14px 28px 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;">
+          <tr><td style="padding:12px 14px;color:#334155;font-size:14px;">
+            <span style="display:inline-block;width:64px;color:#94a3b8;">When</span>
+            <strong style="color:#0f172a;">{when_abs}</strong>
+          </td></tr>
+          <tr><td style="padding:0 14px 12px;color:#334155;font-size:14px;">
+            <span style="display:inline-block;width:64px;color:#94a3b8;">Via</span>
+            <strong style="color:#0f172a;">{channel}</strong>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:18px 28px 26px;">
+        <a href="{_calendar_link()}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;box-shadow:0 6px 16px rgba(37,99,235,.35);">View in LeadCaptura →</a>
+      </td></tr>
+      <tr><td style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center;">
+        You're getting this because reminder notifications are on. Turn them off in Calendar → Auto-reminders.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+    text = f"Reminder set: {title}\nWhen: {when_abs}\nVia: {channel}" + (f"\n\n{body}" if body else "")
+    return subject, html, text
+
+
+def _calendar_link() -> str:
+    return f"{_settings.primary_frontend_origin}/calendar"
+
+
+def _has_recent_reminder(db: Session, workspace_id: str, user_id: str, source: str, lead_id: Optional[str], within_hours: int = 12) -> bool:
+    """De-dupe guard so a chatty thread doesn't spawn a pile of reminders."""
+    if not lead_id:
+        return False
+    since = datetime.now(timezone.utc) - timedelta(hours=within_hours)
+    q = (
+        db.query(Reminder.id)
+        .filter(
+            Reminder.workspace_id == workspace_id,
+            Reminder.user_id == user_id,
+            Reminder.lead_id == lead_id,
+            Reminder.source == source,
+            Reminder.status.in_(["pending", "scheduled"]),
+            Reminder.created_at >= since,
+        )
+        .first()
+    )
+    return q is not None
+
+
+# --------------------------------------------------------------------------- #
+# Signal hooks (best-effort — never raise into the calling request)
+# --------------------------------------------------------------------------- #
+
+def _lead_label(lead: Optional[Lead]) -> str:
+    if not lead:
+        return "a lead"
+    name = lead.full_name or (f"{lead.first_name or ''} {lead.last_name or ''}".strip()) or lead.email or "a lead"
+    company = lead.company.name if lead.company else None
+    return f"{name}{f' ({company})' if company else ''}"
+
+
+def _signal_reminder(db: Session, *, workspace_id: str, user_id: str, lead: Optional[Lead], source: str, title: str, body: str) -> None:
+    try:
+        workspace = db.get(Workspace, workspace_id)
+        if not workspace:
+            return
+        ar = auto_reminder_config(workspace, user_id)
+        if source in ar and not ar.get(source, True):
+            return
+        # Need somewhere to deliver — a calendar OR an email/SMTP account.
+        requested = (agenda_config(workspace, user_id).get("channels") or ["email"])[0]
+        channel = effective_channel(db, workspace_id, user_id, requested)
+        if not channel:
+            return
+        if _has_recent_reminder(db, workspace_id, user_id, source, lead.id if lead else None):
+            return
+        offset = ar.get("default_offset_minutes", 60)
+        remind_at = datetime.now(timezone.utc) + timedelta(minutes=offset)
+        create_reminder(
+            db,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            title=title,
+            body=body,
+            remind_at=remind_at,
+            channel=channel,
+            source=source,
+            lead_id=lead.id if lead else None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("signal reminder (%s) skipped: %s", source, exc)
+
+
+def on_inbound_reply(db: Session, *, workspace_id: str, user_id: str, lead: Optional[Lead], preview: str = "") -> None:
+    label = _lead_label(lead)
+    _signal_reminder(
+        db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        lead=lead,
+        source="inbox_reply",
+        title=f"Reply: follow up with {label}",
+        body=(f"{label} replied. {preview[:240]}" if preview else f"{label} replied — respond."),
+    )
+
+
+def on_stage_change(db: Session, *, workspace_id: str, user_id: str, lead: Optional[Lead], stage_name: str = "") -> None:
+    label = _lead_label(lead)
+    _signal_reminder(
+        db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        lead=lead,
+        source="stage_change",
+        title=f"Stage moved: {label}{f' → {stage_name}' if stage_name else ''}",
+        body=f"{label} moved pipeline stage{f' to {stage_name}' if stage_name else ''}. Plan the next touch.",
+    )
+
+
+def on_note_added(db: Session, *, workspace_id: str, user_id: str, lead: Optional[Lead], note_body: str = "") -> None:
+    label = _lead_label(lead)
+    _signal_reminder(
+        db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        lead=lead,
+        source="note",
+        title=f"Note follow-up: {label}",
+        body=(note_body[:240] or f"You added a note on {label} — act on it."),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Delivery
+# --------------------------------------------------------------------------- #
+
+# Escalation backoff (minutes after the previous nudge) — rising urgency so a
+# procrastinated task can't be missed. After the last step it keeps nudging at
+# the final interval until the user marks it done.
+ESCALATION_MINUTES = [20, 45, 90, 180, 360, 720]
+
+
+def process_due_reminders(db: Session) -> dict:
+    """Drive every due reminder + escalation nudge. Called each minute (cron or
+    Celery beat). First delivery hits ALL available channels (email + calendar);
+    after that, an owner reminder keeps re-emailing with rising urgency until it
+    is marked done."""
+    now = datetime.now(timezone.utc)
+    delivered = nudged = 0
+
+    # 1) First delivery — due, not yet sent, not done.
+    due = (
+        db.query(Reminder)
+        .filter(
+            Reminder.status.in_(["pending", "failed"]),
+            Reminder.remind_at <= now,
+            Reminder.done_at.is_(None),
+        )
+        .order_by(Reminder.remind_at.asc())
+        .limit(25)
+        .all()
+    )
+    for r in due:
+        ok = _send_reminder(db, r, urgency=0, write_calendar=True)
+        if ok:
+            r.status = "sent"
+            r.sent_at = now
+            r.error = None
+            # Owner-facing + escalate → schedule the first nudge.
+            if r.escalate and not r.recipient_email:
+                r.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[0])
+            delivered += 1
+        db.commit()
+
+    # 2) Escalation nudges — owner reminders that fired but aren't done.
+    nudge_due = (
+        db.query(Reminder)
+        .filter(
+            Reminder.status == "sent",
+            Reminder.done_at.is_(None),
+            Reminder.escalate.is_(True),
+            Reminder.recipient_email.is_(None),
+            Reminder.next_nudge_at.isnot(None),
+            Reminder.next_nudge_at <= now,
+        )
+        .order_by(Reminder.next_nudge_at.asc())
+        .limit(25)
+        .all()
+    )
+    for r in nudge_due:
+        r.nudge_count = (r.nudge_count or 0) + 1
+        _send_reminder(db, r, urgency=r.nudge_count, write_calendar=False)
+        idx = min(r.nudge_count, len(ESCALATION_MINUTES) - 1)
+        r.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[idx])
+        nudged += 1
+        db.commit()
+
+    return {"delivered": delivered, "nudged": nudged}
+
+
+# Back-compat: single-reminder delivery used elsewhere.
+def deliver_reminder(db: Session, reminder: Reminder) -> bool:
+    if reminder.status not in {"pending", "failed", "scheduled"}:
+        return False
+    ok = _send_reminder(db, reminder, urgency=0, write_calendar=True)
+    now = datetime.now(timezone.utc)
+    if ok:
+        reminder.status = "sent"
+        reminder.sent_at = now
+        reminder.error = None
+        if reminder.escalate and not reminder.recipient_email:
+            reminder.next_nudge_at = now + timedelta(minutes=ESCALATION_MINUTES[0])
+    db.commit()
+    return ok
+
+
+def _urgency_subject(reminder: Reminder, urgency: int) -> str:
+    t = reminder.title
+    if urgency <= 0:
+        return f"🔔 {t}"
+    if urgency == 1:
+        return f"⏰ Reminder: {t}"
+    if urgency == 2:
+        return f"⚠️ Still pending: {t}"
+    return f"🚨 OVERDUE — {t}"
+
+
+def _send_reminder(db: Session, reminder: Reminder, *, urgency: int, write_calendar: bool) -> bool:
+    """Send the reminder on every available channel. For an owner reminder that
+    means email AND (on first delivery) a calendar event; an invitee reminder is
+    email-only. Returns True if at least one channel delivered."""
+    try:
+        # Invitee-facing reminder — email the external recipient only.
+        if reminder.recipient_email:
+            return _email_reminder(db, reminder, urgency=urgency)
+
+        any_ok = False
+        attempted = False
+        # Email the owner (the relentless channel).
+        if email_account_for(db, reminder.workspace_id, reminder.user_id):
+            attempted = True
+            any_ok = _email_reminder(db, reminder, urgency=urgency) or any_ok
+        # Write/refresh the calendar block on the first delivery (not on nudges,
+        # so we don't clutter the calendar with duplicates).
+        if write_calendar and calendar_account_for(db, reminder.workspace_id, reminder.user_id):
+            attempted = True
+            any_ok = _calendar_reminder(db, reminder) or any_ok
+
+        if not any_ok:
+            # Distinguish "nothing connected" from "we tried and the send failed".
+            # _email_reminder records the real transport error on the reminder;
+            # only fall back to no_delivery_channel when no channel even exists.
+            if not attempted:
+                reminder.error = "no_delivery_channel"
+            elif not reminder.error:
+                reminder.error = "send_failed"
+        return any_ok
+    except Exception as exc:  # noqa: BLE001
+        reminder.error = str(exc)[:500]
+        log.warning("reminder %s send failed: %s", reminder.id, exc)
+        return False
+
+
+def _calendar_reminder(db: Session, reminder: Reminder) -> bool:
+    account = calendar_account_for(db, reminder.workspace_id, reminder.user_id)
+    if not account:
+        return False
+    creds = gcal.ensure_credentials(db, account)
+    if not creds:
+        return False
+    cal_id = reminder.target_calendar_id or _write_calendar_id(account)
+    start = reminder.remind_at
+    end = start + timedelta(minutes=reminder.duration_minutes or 15)
+    if reminder.external_event_id:
+        gcal.update_event(
+            creds, cal_id, reminder.external_event_id,
+            summary=reminder.title, description=reminder.body or "", start=start, end=end,
+        )
+    else:
+        ev = gcal.create_event(
+            creds, cal_id,
+            summary=reminder.title, description=reminder.body or "", start=start, end=end,
+        )
+        reminder.external_event_id = ev.get("id")
+        reminder.calendar_account_id = account.id
+    return True
+
+
+def _email_reminder(db: Session, reminder: Reminder, *, urgency: int) -> bool:
+    from app.services.email_sender import _pick_account, send_via_account
+
+    account = _pick_account(db, reminder.workspace_id, reminder.user_id)
+    if not account:
+        return False
+    to_addr = reminder.recipient_email or account.external_id or (account.config or {}).get("from_email")
+    if not to_addr:
+        reminder.error = "no_recipient_address"
+        return False
+    subject = _urgency_subject(reminder, urgency)
+    html, text = _render_due_email(reminder, urgency)
+    result = send_via_account(account, to_addr, subject, text, html)
+    if not result.ok:
+        # Surface the real transport error (e.g. "smtp_relay: 535 auth failed",
+        # "resend_http_401") so the user can see WHICH sender is broken instead
+        # of a generic "no_delivery_channel".
+        who = account.external_id or account.id
+        reminder.error = f"email via {account.provider} ({who}) failed: {result.error}"[:500]
+    return bool(result.ok)
+
+
+def _render_due_email(reminder: Reminder, urgency: int) -> tuple[str, str]:
+    when = reminder.remind_at
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    when_abs = when.strftime("%A, %b %d · %H:%M UTC")
+    overdue = urgency >= 1
+    accent = "#dc2626" if urgency >= 3 else "#d97706" if urgency >= 1 else "#2563eb"
+    heading = "OVERDUE — please act" if urgency >= 3 else ("Still pending" if urgency >= 1 else "Reminder")
+    body = (reminder.body or "").strip().replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br/>")
+    body_html = f'<tr><td style="padding:0 28px 8px;color:#475569;font-size:14px;line-height:1.6;">{body}</td></tr>' if body else ""
+    nudge_note = (
+        '<tr><td style="padding:4px 28px 0;color:#94a3b8;font-size:12px;">'
+        "This will keep reminding you until you mark it done in LeadCaptura."
+        "</td></tr>"
+        if reminder.escalate and not reminder.recipient_email
+        else ""
+    )
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 16px;"><tr><td align="center">
+  <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08);">
+    <tr><td style="background:{accent};padding:20px 28px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;opacity:.85;">{heading}</div>
+      <div style="margin-top:3px;color:#fff;font-size:19px;font-weight:800;">{reminder.title}</div>
+    </td></tr>
+    {body_html}
+    <tr><td style="padding:14px 28px 4px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;"><tr>
+        <td style="padding:12px 14px;color:#334155;font-size:14px;"><span style="color:#94a3b8;">Due</span> &nbsp;<strong style="color:#0f172a;">{when_abs}</strong>{' &nbsp;·&nbsp; <span style="color:'+accent+';font-weight:700;">overdue</span>' if overdue else ''}</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:18px 28px 8px;">
+      <a href="{_calendar_link()}" style="display:inline-block;background:{accent};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:10px;">Open &amp; mark done →</a>
+    </td></tr>
+    {nudge_note}
+    <tr><td style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center;">LeadCaptura reminder</td></tr>
+  </table>
+</td></tr></table></body></html>"""
+    text = f"{heading}: {reminder.title}\nDue: {when_abs}" + (f"\n\n{reminder.body}" if reminder.body else "")
+    return html, text
+
+
+# --------------------------------------------------------------------------- #
+# Daily agenda
+# --------------------------------------------------------------------------- #
+
+def _gather_signals(db: Session, workspace_id: str, user_id: str, tz) -> dict:
+    """Collect today's actionable CRM signals for the agenda."""
+    now = datetime.now(timezone.utc)
+    today_local = now.astimezone(tz).date()
+    end_of_day = datetime.combine(today_local, datetime.max.time()).replace(tzinfo=tz).astimezone(timezone.utc)
+    since_24h = now - timedelta(hours=24)
+    since_48h = now - timedelta(hours=48)
+
+    # Tasks due today (open), assigned to this user or unassigned.
+    due_tasks = (
+        db.query(Task)
+        .filter(
+            Task.workspace_id == workspace_id,
+            Task.status == "open",
+            Task.due_at.isnot(None),
+            Task.due_at <= end_of_day,
+        )
+        .order_by(Task.due_at.asc())
+        .limit(25)
+        .all()
+    )
+
+    # Leads that replied in the last 48h (awaiting our response).
+    replied = (
+        db.query(Lead)
+        .filter(
+            Lead.workspace_id == workspace_id,
+            Lead.last_inbound_at.isnot(None),
+            Lead.last_inbound_at >= since_48h,
+        )
+        .order_by(Lead.last_inbound_at.desc())
+        .limit(15)
+        .all()
+    )
+
+    # Recent stage changes (last 24h).
+    stage_moves = (
+        db.query(Activity)
+        .filter(
+            Activity.workspace_id == workspace_id,
+            Activity.type == "stage_changed",
+            Activity.created_at >= since_24h,
+        )
+        .order_by(Activity.created_at.desc())
+        .limit(15)
+        .all()
+    )
+
+    # Recent notes (last 24h).
+    recent_notes = (
+        db.query(Note)
+        .filter(Note.workspace_id == workspace_id, Note.created_at >= since_24h)
+        .order_by(Note.created_at.desc())
+        .limit(15)
+        .all()
+    )
+
+    return {
+        "due_tasks": due_tasks,
+        "replied": replied,
+        "stage_moves": stage_moves,
+        "recent_notes": recent_notes,
+    }
+
+
+def build_agenda_text(db: Session, signals: dict) -> tuple[str, int]:
+    """Compose the agenda body — a clean, prioritized plain-text plan of who to
+    talk to and about what. Deterministic, no AI. Returns (text, item_count).
+
+    Ordering is the priority order: replies awaiting a response first, then
+    tasks due today, then pipeline moves, then fresh notes.
+    """
+    sections: list[str] = []
+    count = 0
+
+    replied = signals["replied"]
+    if replied:
+        lines = [
+            f"• {_lead_label(lead)} — replied {lead.last_inbound_at:%b %d %H:%M}, respond"
+            for lead in replied
+        ]
+        sections.append("Reply to:\n" + "\n".join(lines))
+        count += len(replied)
+
+    due_tasks = signals["due_tasks"]
+    if due_tasks:
+        lines = []
+        for t in due_tasks:
+            lead = db.get(Lead, t.lead_id) if t.lead_id else None
+            who = f" — {_lead_label(lead)}" if lead else ""
+            lines.append(f"• {t.title}{who} (due {t.due_at:%H:%M})")
+        sections.append("Tasks due:\n" + "\n".join(lines))
+        count += len(due_tasks)
+
+    stage_moves = signals["stage_moves"]
+    if stage_moves:
+        lines = []
+        for a in stage_moves:
+            lead = db.get(Lead, a.lead_id) if a.lead_id else None
+            lines.append(f"• {_lead_label(lead)} — plan the next touch")
+        sections.append("Moved stage:\n" + "\n".join(lines))
+        count += len(stage_moves)
+
+    recent_notes = signals["recent_notes"]
+    if recent_notes:
+        lines = []
+        for n in recent_notes:
+            lead = db.get(Lead, n.lead_id) if n.lead_id else None
+            lines.append(f"• {_lead_label(lead)} — {n.body[:140]}")
+        sections.append("Follow up on notes:\n" + "\n".join(lines))
+        count += len(recent_notes)
+
+    if count == 0:
+        return ("You have no open conversations or due tasks today. Clear runway.", 0)
+
+    header = f"Your day — {count} item{'s' if count != 1 else ''} to handle:\n"
+    return (header + "\n\n".join(sections), count)
+
+
+def generate_daily_agenda(
+    db: Session,
+    *,
+    workspace: Workspace,
+    user_id: str,
+    force: bool = False,
+) -> Optional[Reminder]:
+    """Build today's agenda for a user and schedule it as a reminder.
+
+    Works over email/SMTP or calendar — whichever is connected. Skips silently
+    if agenda is disabled, there's no delivery channel, or today's agenda was
+    already generated (unless ``force``)."""
+    cfg = agenda_config(workspace, user_id)
+    if not cfg["enabled"] and not force:
+        return None
+
+    requested = (cfg.get("channels") or ["email"])[0]
+    channel = effective_channel(db, workspace.id, user_id, requested)
+    if not channel:
+        return None  # nowhere to deliver (no calendar, no email account)
+
+    tz = _zone(cfg["timezone"])
+    now_local = datetime.now(timezone.utc).astimezone(tz)
+    today_str = now_local.date().isoformat()
+    if not force and cfg.get("last_generated_date") == today_str:
+        return None
+
+    signals = _gather_signals(db, workspace.id, user_id, tz)
+    body, count = build_agenda_text(db, signals)
+
+    # Schedule at the configured hour today (local); if that's already past,
+    # deliver now.
+    target_local = now_local.replace(hour=cfg["hour"], minute=0, second=0, microsecond=0)
+    if target_local < now_local:
+        target_local = now_local
+    remind_at = target_local.astimezone(timezone.utc)
+
+    title = f"📋 Your day — {count} item{'s' if count != 1 else ''}" if count else "📋 Your day — clear"
+    rem = create_reminder(
+        db,
+        workspace_id=workspace.id,
+        user_id=user_id,
+        title=title,
+        body=body,
+        remind_at=remind_at,
+        channel=channel,
+        source="daily_agenda",
+        duration_minutes=30,
+        payload={"item_count": count, "date": today_str},
+        commit=False,
+    )
+
+    # Stamp last_generated_date in the user's prefs so we don't regenerate today.
+    set_prefs(db, workspace, user_id, agenda={"last_generated_date": today_str})
+    db.refresh(rem)
+    return rem

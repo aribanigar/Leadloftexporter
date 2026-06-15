@@ -1,0 +1,52 @@
+{
+  "date": "2026-06-13",
+  "market": "KSA",
+  "currency": "SAR",
+  "campaign_code": "GG-SAR-20260613-2",
+  "campaign_name": "KSA Desk Done Right - 13 Jun 2026",
+  "subject": "Desk done right",
+  "angle": "KSA H2 Planning",
+  "season": "Mid-year",
+  "theme": "Executive desk",
+  "skus": [
+    "GG8200",
+    "GG9479",
+    "GG6555",
+    "GG6489"
+  ],
+  "products": [
+    {
+      "name": "Baobab",
+      "sku": "GG8200",
+      "usd": 5.6,
+      "price": 17.85,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO8200.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG8200"
+    },
+    {
+      "name": "Nimbus",
+      "sku": "GG9479",
+      "usd": 1.85,
+      "price": 5.9,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO9479.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG9479"
+    },
+    {
+      "name": "Cork",
+      "sku": "GG6555",
+      "usd": 8.9,
+      "price": 28.37,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6555.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6555"
+    },
+    {
+      "name": "Econote",
+      "sku": "GG6489",
+      "usd": 4.3,
+      "price": 13.71,
+      "image": "https://www.giftsgulf.com/_next/image?url=https%3A%2F%2Fcdn1.midocean.com%2Fimage%2Foriginal%2FMO6489.jpg&w=640&q=75",
+      "product_url": "https://www.giftsgulf.com/product/GG6489"
+    }
+  ],
+  "cta_url": "https://wa.me/916005001499?text=Send+me+the+Executive+desk+set+%28GG-SAR-20260613-2%29+for+KSA"
+}

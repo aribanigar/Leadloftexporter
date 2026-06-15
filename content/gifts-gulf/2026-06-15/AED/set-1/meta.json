@@ -1,0 +1,53 @@
+{
+  "date": "2026-06-15",
+  "market": "UAE",
+  "currency": "AED",
+  "theme": "Premium Drinkware",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "A",
+  "campaign_code": "GG-AED-20260615-1",
+  "campaign_name": "UAE Premium Drinkware - 15 Jun 2026",
+  "subject": "Cold drinks, warm branding",
+  "skus": [
+    "GG1050",
+    "GG1716",
+    "GG1065",
+    "GG1658",
+    "GG1064"
+  ],
+  "products": [
+    {
+      "name": "TRENT",
+      "sku": "GG1050",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7063-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1050"
+    },
+    {
+      "name": "LOKKA",
+      "sku": "GG1716",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9937-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1716"
+    },
+    {
+      "name": "MENKAURE",
+      "sku": "GG1065",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2061-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1065"
+    },
+    {
+      "name": "RODEO COLOUR",
+      "sku": "GG1658",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9618-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1658"
+    },
+    {
+      "name": "FJARD",
+      "sku": "GG1064",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2063-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1064"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/AED/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/AED/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20drinkware%20options%20for%20our%20UAE%20team."
+}
