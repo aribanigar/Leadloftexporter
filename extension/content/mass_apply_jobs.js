@@ -45,12 +45,6 @@
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
-  // ~30s gap between job applications (per user spec). Slight randomness
-  // (30-38s) so the cadence doesn't look mechanical.
-  function nextJobDelayMs() {
-    return 30000 + rand(0, 8000);
-  }
-
   function onJobsResultsPage() {
     return /^\/jobs\/(search-results|collections)\//.test(location.pathname)
         || /^\/jobs\/view\/\d+\/apply\//.test(location.pathname);
@@ -72,6 +66,30 @@
   }
 
   // ──────────────────── humanised clicking ───────────────────
+  // Spotlight a button with a pulsing blue outline so the user can SEE which
+  // control Mass Apply is about to click. Mirrors the visual style used by
+  // overlay.js's working Auto Apply engine. Auto-clears after `holdMs`.
+  function spotlight(el, holdMs) {
+    if (!el) return;
+    try {
+      el.style.setProperty("outline", "3px solid #0a66c2", "important");
+      el.style.setProperty("outline-offset", "3px", "important");
+      el.style.setProperty("box-shadow", "0 0 0 6px rgba(10,102,194,0.25), 0 0 24px rgba(10,102,194,0.55)", "important");
+      el.style.setProperty("transition", "outline .15s, box-shadow .15s", "important");
+      el.style.setProperty("animation", "lc-ma-pulse-ring 0.9s ease-in-out infinite", "important");
+      el.setAttribute("data-lc-ma-spotlight", "true");
+      setTimeout(() => {
+        try {
+          el.style.removeProperty("outline");
+          el.style.removeProperty("outline-offset");
+          el.style.removeProperty("box-shadow");
+          el.style.removeProperty("animation");
+          el.removeAttribute("data-lc-ma-spotlight");
+        } catch (_) {}
+      }, holdMs || 1500);
+    } catch (_) {}
+  }
+
   function humanClick(el) {
     if (!el) return false;
     try {
@@ -672,10 +690,16 @@
       autofill(scope);
       await sleep(rand(500, 900));
 
-      // Terminal step → Submit. Click, then wait for the modal to close.
+      // Sweep stray popups EVERY step — Preferences-match / feedback /
+      // premium upsell can open at any time and would deflect the next click.
+      try { closeStrayModals(); } catch (_) {}
+
+      // Terminal step → Submit. Spotlight, click, wait for the modal to close.
       const submit = submitButton();
       if (submit) {
         const beforeSubmit = modalText();
+        spotlight(submit, 2000);
+        await sleep(rand(220, 380));
         humanClick(submit);
         let done = await waitAdvanced(beforeSubmit, 5000);
         if (!done) { escalateClick(submitButton() || submit); done = await waitAdvanced(beforeSubmit, 4000); }
@@ -697,7 +721,10 @@
 
       const before = modalText();
 
-      // STAGE 1 — human pointer click (what overlay.js's working engine uses).
+      // STAGE 1 — spotlight + human pointer click. Pulsing outline tells the
+      // user exactly which button Mass Apply is targeting.
+      spotlight(advance, 2000);
+      await sleep(rand(220, 380));
       humanClick(advance);
       let advanced = await waitAdvanced(before, 4000);
 
@@ -705,8 +732,10 @@
       // steps) and fire the heavy 4-fallback sequence: native click, inner
       // span click, keyboard Enter, React fiber onClick(isTrusted:true).
       if (!advanced) {
+        try { closeStrayModals(); } catch (_) {}
         const fresh = reviewButton() || nextButton() || submitButton();
         if (fresh) {
+          spotlight(fresh, 1800);
           escalateClick(fresh);
           advanced = await waitAdvanced(before, 4000);
         }
@@ -746,21 +775,16 @@
     // LinkedIn open the Preferences-match modal instead of the apply form.
     if (detailPaneIsClosedJob()) return "skipped";
 
-    // Wait up to ~4s for the detail pane to render the Easy Apply button.
-    // Don't try clicking random child elements as a fallback — that risks
-    // hitting promo links / footer triggers. Just re-click the card itself.
+    // Wait up to ~6s for the detail pane to render the Easy Apply button.
+    // Do NOT re-click the card or any child element — re-clicking can hit
+    // the On-site / Full-time chips behind the modal (which open the
+    // Preferences-match popup) or footer links. If Easy Apply still isn't
+    // there after the poll, skip the card cleanly.
     let apply = findInAppApply();
     if (!apply) {
-      for (let t = 0; t < 8; t++) {
-        await sleep(500);
-        apply = findInAppApply();
-        if (apply) break;
-      }
-    }
-    if (!apply) {
-      // Try a single re-click of the card itself, then poll again.
-      humanClick(el);
-      for (let t = 0; t < 8; t++) {
+      for (let t = 0; t < 12; t++) {
+        if (state.cancel) return "skipped";
+        try { closeStrayModals(); } catch (_) {}     // keep popups dismissed while waiting
         await sleep(500);
         apply = findInAppApply();
         if (apply) break;
@@ -769,7 +793,10 @@
     if (!apply) return "skipped";    // external apply / no in-app apply
 
     apply.scrollIntoView({ block: "center", behavior: "instant" });
-    await sleep(rand(600, 1100));
+    await sleep(rand(400, 700));
+    // Spotlight the Easy Apply button so the user sees what's being clicked.
+    spotlight(apply, 2000);
+    await sleep(rand(220, 380));
     // STAGE 1 — human pointer click. The classic Easy Apply control opens the
     // modal on this alone (proven by overlay.js's working engine).
     humanClick(apply);
@@ -842,24 +869,16 @@
         else if (result === "challenge") { banner("Challenge — stopping."); break; }
         else state.skipped++;
 
-        // Make sure nothing is left open before the gap — close the Easy
-        // Apply modal if it's still there, then dismiss any LinkedIn popups
-        // (feedback, preferences-match, premium upsells) that could linger.
+        // Clean up before the next job — close any stray modals (preferences
+        // match / feedback / premium upsell) and the Easy Apply modal if it's
+        // still around. NO TIMER between jobs (per user spec) — proceed
+        // immediately to the next card. A short settle pause covers DOM
+        // transitions only.
         if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
         try { closeStrayModals(); } catch (_) {}
-        await sleep(300);
-        try { closeStrayModals(); } catch (_) {}   // some open delayed
-
-        if (!state.cancel) {
-          const wait = nextJobDelayMs();
-          const start = Date.now();
-          while (Date.now() - start < wait) {
-            if (state.cancel) break;
-            const left = Math.max(0, Math.round((wait - (Date.now() - start)) / 1000));
-            setLabel("Next in " + left + "s · " + state.applied + " applied");
-            await sleep(250);
-          }
-        }
+        await sleep(400);
+        try { closeStrayModals(); } catch (_) {}
+        setLabel("Next job · " + state.applied + " applied");
       }
     } finally {
       setLabel("Done · " + state.applied + " applied, " + state.skipped + " skipped");
@@ -926,7 +945,9 @@
     style.id = "lc-massapply-style";
     style.textContent =
       "#" + BTN_ID + ".lc-ma-running .lc-ma-dot { animation: lc-ma-pulse 1.2s infinite; }" +
-      "@keyframes lc-ma-pulse { 0%,100% { opacity:1 } 50% { opacity:0.35 } }";
+      "@keyframes lc-ma-pulse { 0%,100% { opacity:1 } 50% { opacity:0.35 } }" +
+      "@keyframes lc-ma-pulse-ring { 0%,100% { box-shadow: 0 0 0 6px rgba(10,102,194,0.25), 0 0 24px rgba(10,102,194,0.55); }" +
+      "                              50%     { box-shadow: 0 0 0 12px rgba(10,102,194,0.10), 0 0 32px rgba(10,102,194,0.75); } }";
     document.head.appendChild(style);
   }
 

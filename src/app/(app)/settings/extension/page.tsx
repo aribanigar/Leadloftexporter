@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.256",
+    date: "Jun 15, 2026",
+    size: "240 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.256.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now visibly SPOTLIGHTS the button it's about to click — Easy Apply, Next, Review, Submit — with a pulsing blue outline + glow so you can see exactly what the engine is targeting.",
+      "No more timer between jobs. Mass Apply runs continuously: finishes one application, sweeps stray popups, immediately starts the next.",
+      "Stray LinkedIn popups (Preferences match, feedback, premium upsell) are dismissed at the start of every step, while waiting for the form to mount, and before every advance click — they can't deflect Next anymore.",
+      "Removed the card re-click fallback. If Easy Apply isn't in the right pane after the poll, the job is skipped cleanly — preventing accidental clicks on On-site / Full-time chips or other detail-pane controls.",
+    ],
+  },
+  {
     version: "1.0.255",
     date: "Jun 15, 2026",
     size: "239 KB",
     file: "/extensions/leadcaptura-extension-v1.0.255.zip",
-    latest: true,
     changes: [
       "Mass Apply skips “No longer accepting applications” jobs immediately, before LinkedIn can swap the apply form for the Preferences-match modal.",
       "Stray LinkedIn popups (Preferences match / feedback / premium upsell) are dismissed continuously — at the start of each job, while waiting for the apply form to mount, and again between jobs.",
