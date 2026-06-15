@@ -586,20 +586,62 @@
   }
 
   // Close any LinkedIn popup that ISN'T the Easy Apply modal (feedback,
-  // preferences-match, premium upsells). Called between jobs so a spurious
-  // modal accidentally opened by autofill can't linger on screen.
+  // preferences-match, premium upsells). Use forceClick so dismiss never
+  // fails silently on a React handler (synthetic .click() can be no-op on
+  // SDUI dialogs); the React-fiber strategy inside forceClick fires the
+  // close handler directly.
   function closeStrayModals() {
     const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
+    let closed = 0;
     for (const d of dialogs) {
       if (!visible(d)) continue;
       const txt = (d.innerText || "").toLowerCase();
       // Real Easy Apply modal — leave it alone (runApplyModal handles it).
       if (/contact info|job application progress|next step|review your application|submit application/i.test(txt)) continue;
-      // Heuristic: anything else with a Dismiss button is something we
-      // accidentally opened or LinkedIn upselled — close it.
-      const x = d.querySelector('button[aria-label="Dismiss"], button[aria-label="Close"], .artdeco-modal__dismiss');
-      if (x) { try { x.click(); } catch (_) {} humanClick(x); }
+      const x = d.querySelector(
+        'button[aria-label="Dismiss"][data-test-modal-close-btn],' +
+        'button[aria-label="Dismiss"],' +
+        'button[aria-label="Close"],' +
+        ".artdeco-modal__dismiss"
+      );
+      if (x) { forceClick(x); closed++; }
     }
+    return closed;
+  }
+
+  // Background watcher — dismisses the Preferences-match / feedback /
+  // premium-upsell popups the millisecond they appear, without my apply
+  // loop having to wait between sleeps. Started while Mass Apply is
+  // running, stopped when it ends.
+  let _strayWatchTimer = null;
+  function startStrayWatcher() {
+    if (_strayWatchTimer) return;
+    _strayWatchTimer = setInterval(() => {
+      try { closeStrayModals(); } catch (_) {}
+    }, 250);
+  }
+  function stopStrayWatcher() {
+    if (_strayWatchTimer) { clearInterval(_strayWatchTimer); _strayWatchTimer = null; }
+  }
+
+  // CSS injected when Mass Apply is running — hides the existing engine's
+  // per-card "Auto Apply" chips so they can't visually conflict with the
+  // Mass Apply flow (and so they can't be accidentally clicked by stray
+  // events). The chips stay in the DOM, just hidden, per overlay.js's
+  // own .lc-applying pattern.
+  let _runStyleEl = null;
+  function injectRunStyles() {
+    if (_runStyleEl) return;
+    _runStyleEl = document.createElement("style");
+    _runStyleEl.id = "lc-mass-apply-run-style";
+    _runStyleEl.textContent =
+      "html.lc-mass-applying .lc-job-apply-row { display: none !important; }" +
+      "html.lc-mass-applying .lc-job-apply-chip { display: none !important; }" +
+      "html.lc-mass-applying [class*='lc-job-apply'] { display: none !important; }";
+    document.head.appendChild(_runStyleEl);
+  }
+  function removeRunStyles() {
+    if (_runStyleEl) { _runStyleEl.remove(); _runStyleEl = null; }
   }
 
   // ─────────────────── modal lifecycle ───────────────────────
@@ -820,6 +862,11 @@
     state.applied = state.skipped = 0;
     setLabel("Scanning jobs…");
 
+    // Hide per-card Auto Apply chips, start the stray-popup watcher.
+    try { document.documentElement.classList.add("lc-mass-applying"); } catch (_) {}
+    try { injectRunStyles(); } catch (_) {}
+    try { startStrayWatcher(); } catch (_) {}
+
     // Process ONE freshly-rendered card per iteration, then scroll the
     // virtualised list to reveal more. This survives cards unmounting as the
     // list scrolls — we never hold a stale list, we re-collect every loop.
@@ -881,6 +928,9 @@
         setLabel("Next job · " + state.applied + " applied");
       }
     } finally {
+      try { stopStrayWatcher(); } catch (_) {}
+      try { document.documentElement.classList.remove("lc-mass-applying"); } catch (_) {}
+      try { removeRunStyles(); } catch (_) {}
       setLabel("Done · " + state.applied + " applied, " + state.skipped + " skipped");
       state.running = false; state.cancel = false;
       setTimeout(resetLabel, 9000);

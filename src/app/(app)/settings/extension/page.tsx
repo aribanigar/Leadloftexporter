@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.257",
+    date: "Jun 15, 2026",
+    size: "241 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.257.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now hides the per-card Auto Apply chips while it's running, so no stray chip floats next to the LinkedIn modals.",
+      "A background watcher dismisses the Preferences-match / feedback / premium upsell popups every 250ms — they can't linger anymore.",
+      "Stray-popup dismissal uses the heavy 5-strategy click (React fiber included), so the X actually fires on React-driven LinkedIn dialogs.",
+    ],
+  },
+  {
     version: "1.0.256",
     date: "Jun 15, 2026",
     size: "240 KB",
     file: "/extensions/leadcaptura-extension-v1.0.256.zip",
-    latest: true,
     changes: [
       "Mass Apply now visibly SPOTLIGHTS the button it's about to click — Easy Apply, Next, Review, Submit — with a pulsing blue outline + glow so you can see exactly what the engine is targeting.",
       "No more timer between jobs. Mass Apply runs continuously: finishes one application, sweeps stray popups, immediately starts the next.",
