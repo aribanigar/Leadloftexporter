@@ -194,18 +194,56 @@
     else window.scrollBy(0, Math.round(window.innerHeight * 0.8));
   }
 
-  // The in-app apply control inside the right detail pane. The external
-  // "Apply on company website" anchor is intentionally excluded.
+  // The in-app apply control inside the right detail pane. Detects the older
+  // "Easy Apply" label, the renamed "LinkedIn Apply to this job", and the
+  // hashed-class new layouts — on BOTH <button> and <a>. The external "Apply
+  // on company website" anchor is excluded so we never start applications we
+  // can't auto-fill.
   function findInAppApply() {
-    const a = document.querySelector('a[aria-label="LinkedIn Apply to this job"]');
-    if (a && visible(a)) return a;
-    // Fallback: an apply anchor whose href is the in-app apply path.
-    const cands = Array.from(document.querySelectorAll('a[href*="/jobs/view/"][href*="/apply"]'));
-    for (const c of cands) {
-      if (!visible(c)) continue;
-      const lbl = (c.getAttribute("aria-label") || "").toLowerCase();
-      if (lbl.includes("company website")) continue;
-      return c;
+    // SCOPE to the right-hand DETAIL pane. On the split-view jobs results page
+    // the LEFT job cards each show their own "Apply" / "Auto Apply" chip — if
+    // we matched one of those, clicking would just re-open the job and no
+    // form ever opens (then every job logs "skipped").
+    const root = document.querySelector(
+      ".jobs-search__job-details, .jobs-search__job-details--container, " +
+      ".jobs-search__job-details--wrapper, .scaffold-layout__detail, " +
+      ".jobs-details, .job-view-layout, .jobs-details__main-content, " +
+      ".job-details-jobs-unified-top-card__container--two-pane, main"
+    ) || document;
+
+    const isExternal = (el) => {
+      const t = textOf(el).toLowerCase();
+      const a = (el.getAttribute("aria-label") || "").toLowerCase();
+      if (a.includes("company website") || /apply on company website/i.test(t)) return true;
+      // Out-link icon is the visual marker of the external apply variant.
+      if (el.querySelector("svg#link-external-medium, svg[id='link-external-medium']")) return true;
+      const href = (el.getAttribute("href") || "").toLowerCase();
+      if (href && /\/safety\/go\?|linkedin\.com\/safety\/go/.test(href)) return true;
+      return false;
+    };
+
+    const fromQuery = Array.from(root.querySelectorAll(
+      "button.jobs-apply-button, a.jobs-apply-button, " +
+      "button[aria-label*='Easy Apply' i], a[aria-label*='Easy Apply' i], " +
+      "button[aria-label*='LinkedIn Apply' i], a[aria-label*='LinkedIn Apply' i], " +
+      "a[href*='/jobs/view/'][href*='/apply']"
+    ));
+
+    // Text-based fallback for the new hashed-class layout — find any
+    // button/anchor in the detail pane whose visible label is exactly Apply /
+    // Easy Apply / LinkedIn Apply, while excluding the external variant.
+    const fromText = Array.from(root.querySelectorAll("button, a")).filter(el => {
+      const t = textOf(el).toLowerCase();
+      return t === "apply" || t === "easy apply" || t === "linkedin apply"
+          || /^easy apply$/i.test(t) || /^linkedin apply$/i.test(t);
+    });
+
+    const all = Array.from(new Set([...fromQuery, ...fromText]));
+    for (const el of all) {
+      if (!visible(el)) continue;
+      if (el.disabled || el.getAttribute("aria-disabled") === "true") continue;
+      if (isExternal(el)) continue;
+      return el;
     }
     return null;
   }

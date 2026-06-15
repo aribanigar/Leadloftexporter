@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.249",
+    date: "Jun 15, 2026",
+    size: "236 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.249.zip",
+    latest: true,
+    changes: [
+      "Mass Apply now also detects the older “Easy Apply” label, not just the renamed “LinkedIn Apply to this job” — so the apply button is clicked on every layout LinkedIn currently ships.",
+      "Detection is scoped to the right detail pane and ignores left-list per-card chips + the external “Apply on company website” variant, so it never opens a job without filling it.",
+    ],
+  },
+  {
     version: "1.0.248",
     date: "Jun 15, 2026",
     size: "235 KB",
     file: "/extensions/leadcaptura-extension-v1.0.248.zip",
-    latest: true,
     changes: [
       "Mass Apply now drives LinkedIn’s new SDUI apply flow: clicks carry React-required pointer properties (pointerId/pointerType/isPrimary) so Next/Submit actually advance, with a focused-Enter retry if a step won’t move.",
       "Walks the virtualised job list by scrolling and applying one card at a time, instead of seeing only the first rendered card.",
