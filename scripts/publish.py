@@ -21,6 +21,9 @@ def get_db():
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise SystemExit("DATABASE_URL not set")
+    # strip SQLAlchemy driver prefix (postgresql+psycopg:// -> postgresql://)
+    import re as _re
+    url = _re.sub(r"^postgresql\+\w+://", "postgresql://", url)
     try:
         import psycopg
         return psycopg.connect(url)
