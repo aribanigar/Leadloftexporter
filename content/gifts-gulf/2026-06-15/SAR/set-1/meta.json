@@ -1,0 +1,53 @@
+{
+  "date": "2026-06-15",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Notebooks & Writing",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "A",
+  "campaign_code": "GG-SAR-20260615-1",
+  "campaign_name": "KSA Notebooks & Writing - 15 Jun 2026",
+  "subject": "Pages with your name",
+  "skus": [
+    "GG1649",
+    "GG1452",
+    "GG1678",
+    "GG1598",
+    "GG1303"
+  ],
+  "products": [
+    {
+      "name": "FOLDNOTE",
+      "sku": "GG1649",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9541-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1649"
+    },
+    {
+      "name": "MEMO SEED",
+      "sku": "GG1452",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6511-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1452"
+    },
+    {
+      "name": "ASPEN GLASS",
+      "sku": "GG1678",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9800-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1678"
+    },
+    {
+      "name": "MULTIPEN",
+      "sku": "GG1598",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8812-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1598"
+    },
+    {
+      "name": "USBNOTE",
+      "sku": "GG1303",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2725-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1303"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20notebooks%20%26%20writing%20options%20for%20our%20KSA%20team."
+}

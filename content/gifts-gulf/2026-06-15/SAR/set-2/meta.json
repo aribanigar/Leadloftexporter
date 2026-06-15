@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-15",
+  "market": "KSA",
+  "currency": "SAR",
+  "theme": "Tech & Desk",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "B",
+  "campaign_code": "GG-SAR-20260615-2",
+  "campaign_name": "KSA Tech & Desk - 15 Jun 2026",
+  "subject": "Power up every desk",
+  "skus": [
+    "GG1630",
+    "GG1362",
+    "GG1363",
+    "GG1626"
+  ],
+  "products": [
+    {
+      "name": "PRO LIGHT USB",
+      "sku": "GG1630",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9322-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1630"
+    },
+    {
+      "name": "MUV USB AC30 PD",
+      "sku": "GG1362",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2980-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1362"
+    },
+    {
+      "name": "PRO LIGHT USB AC30 PD",
+      "sku": "GG1363",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2981-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1363"
+    },
+    {
+      "name": "POWERNOTY",
+      "sku": "GG1626",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9231-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1626"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/SAR/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20tech%20%26%20desk%20options%20for%20our%20KSA%20team."
+}

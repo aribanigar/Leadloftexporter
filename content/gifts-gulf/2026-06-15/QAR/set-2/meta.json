@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-15",
+  "market": "Qatar",
+  "currency": "QAR",
+  "theme": "Bags & Travel",
+  "season": "GCC summer 2026, post-Eid, back-to-office",
+  "design": "B",
+  "campaign_code": "GG-QAR-20260615-2",
+  "campaign_name": "Qatar Bags & Travel - 15 Jun 2026",
+  "subject": "Bags built for work",
+  "skus": [
+    "GG1185",
+    "GG1383",
+    "GG1227",
+    "GG1690"
+  ],
+  "products": [
+    {
+      "name": "FELTOTE",
+      "sku": "GG1185",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2408-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1185"
+    },
+    {
+      "name": "NAIMA TOTE",
+      "sku": "GG1383",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6162-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1383"
+    },
+    {
+      "name": "LIBAG",
+      "sku": "GG1227",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2527-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1227"
+    },
+    {
+      "name": "NATU POUCH",
+      "sku": "GG1690",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9834-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1690"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/QAR/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-15/QAR/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20bags%20%26%20travel%20options%20for%20our%20Qatar%20team."
+}
