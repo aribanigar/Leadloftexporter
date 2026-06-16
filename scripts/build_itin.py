@@ -30,7 +30,7 @@ RAW = "raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/via-ka
 LOGO = "https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&amp;w=400&amp;output=png"
 SIGNUP = "https://viakashmiritinerary.in/signup"
 WA = "https://wa.me/919186051499?text=Hi%20ViaKashmir%2C%20I%27d%20like%20to%20try%20the%20itinerary%20builder"
-CONTACT = "contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 91860 51499"
+CONTACT = "contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 9186051499"
 
 def img(photo, preview):
     if preview:
@@ -429,7 +429,7 @@ p.body{{font-size:26px;color:rgba(255,255,255,0.74);line-height:1.45;margin-bott
     <span class="cta">Build my first itinerary &nbsp;&rarr;</span>
     {ar}
   </div>
-  <div class="contact">contact@viakashmir.in &nbsp;|&nbsp; +91 91860 51499</div>
+  <div class="contact">contact@viakashmir.in &nbsp;|&nbsp; +91 9186051499</div>
 </div></body></html>"""
 
 MARKETS = ["india", "kashmir", "saudi", "dubai"]

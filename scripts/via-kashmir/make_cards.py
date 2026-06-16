@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ASSETS = Path(__file__).resolve().parent.parent.parent / "content/via-kashmir/_assets/photos"
 LOGO_WSRV = "https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&w=520&output=png"
-CONTACT = "contact@viakashmir.in   |   +91 91860 51499"
+CONTACT = "contact@viakashmir.in   |   +91 9186051499"
 
 FB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"

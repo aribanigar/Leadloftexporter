@@ -185,7 +185,7 @@ def build(track, hero, feat, amp=False):
     <a class="wa" href="{WA}">or message us on WhatsApp &rarr;</a>
   </div>
   <div class="sp30"></div>
-  <div class="contact"><span>contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 91860 51499</span></div>
+  <div class="contact"><span>contact@viakashmir.in &nbsp;&nbsp;|&nbsp;&nbsp; +91 9186051499</span></div>
   <div class="sp"></div>
   <div class="card foot"><p class="fh">ViaKashmir</p><p class="fp">{s['foot']}</p></div>
 </div>

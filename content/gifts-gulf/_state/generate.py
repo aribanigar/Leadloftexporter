@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # content/gi
 STATE = os.path.join(ROOT, "_state")
 
 # ---- fixed values (never hardcode elsewhere) ------------------------------
-WHATSAPP_NUMBER = "916005001499"
+WHATSAPP_NUMBER = "919186051499"
 CONTACT_EMAIL = "contact@giftsgulf.com"
 LOGO_SVG = "https://www.giftsgulf.com/gglogo.svg"
 
