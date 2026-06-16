@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.266",
+    date: "Jun 16, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.266.zip",
+    latest: true,
+    changes: [
+      "Sales Navigator Connect All — spotlights now reliably fall on the Send Invitation button. Step 5 now finds the Send Invitation button INSIDE the SN modal (exact text match, then Artdeco primary fallback), and spotlights it with the same direct-anchor variant that worked on the Connect dropdown item. The previous _showSendSpotlight depended on _findSendWithoutNoteButton, which could miss the SN button and leave the spotlight invisible.",
+      "Same click sequence (dispatchHumanClick → _forceClick → main-world) — no behaviour change for the regular LinkedIn invitation flow, which still uses _findSendWithoutNoteButton + _showSendSpotlight as before.",
+    ],
+  },
+  {
     version: "1.0.265",
     date: "Jun 16, 2026",
     size: "247 KB",
     file: "/extensions/leadcaptura-extension-v1.0.265.zip",
-    latest: true,
     changes: [
       "Sales Navigator Connect All fixed. The run was showing “Connect All: 0 invited, 0 skipped, 14 failed (14)” because the invitation-modal detector matched only regular LinkedIn phrasing (“add a note to your invitation”, “send without a note”, “personalize your invitation”) — none of which appear in the Sales Nav modal, which says “Send invitation” + “Include a personal message”.",
       "Added a Sales-Nav-only structural branch to the modal detector (requires BOTH “include a personal message” AND “send invitation”), so the regular LinkedIn path is byte-for-byte unchanged. The existing spotlight + “…” → Connect → Send Invitation sequence now completes end-to-end.",

@@ -2305,11 +2305,49 @@
     // STEP 5: invitation modal — same spotlight flow as the regular LinkedIn
     // connect path. Auto-click is tried but isTrusted=false means LinkedIn
     // gates this on a real user click; the spotlight makes it one-tap.
-    _showSendSpotlight();
+    //
+    // Sales Nav-specific path: find the "Send Invitation" button INSIDE the
+    // detected SN modal (not via the generic _findSendWithoutNoteButton, which
+    // searches the whole document and can miss the button on SN). Use the
+    // proven _showButtonSpotlight (same simple, direct-anchor variant we use on
+    // the Connect dropdown item at step 3) so the ring is guaranteed to render
+    // around the right button. Identical click sequence as before.
+    const _findSalesNavSendInvitationBtn = () => {
+      const modal = _findInvitationModal();
+      if (!modal) return null;
+      const all = Array.from(modal.querySelectorAll(
+        "button, [role='button'], .artdeco-button"
+      ));
+      // 1. Exact text/aria match on "Send Invitation" / "Send invitation".
+      for (const b of all) {
+        if (!_isVisible(b) || b.disabled) continue;
+        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
+        const a = (b.getAttribute("aria-label") || "").trim();
+        if (/^send invitation$/i.test(t) || /^send invitation$/i.test(a)) return b;
+      }
+      // 2. Artdeco primary button inside the modal, as long as it isn't Cancel/Close.
+      const primary = modal.querySelector(
+        ".artdeco-button--primary, [data-test-dialog-primary-btn]"
+      );
+      if (primary && _isVisible(primary) && !primary.disabled) {
+        const t = (primary.textContent || "").replace(/\s+/g, " ").trim();
+        if (!/^(cancel|close|dismiss|back)$/i.test(t)) return primary;
+      }
+      return null;
+    };
+
+    const snSendBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
+    if (snSendBtn) {
+      _showButtonSpotlight(snSendBtn, "⚡ Step 3 — Sending invitation", "auto-clicking 'Send Invitation'", 1100);
+      console.log("[LeadCaptura] salesNav step 5 → spotlight on Send Invitation", {
+        t: (snSendBtn.textContent || "").trim().slice(0, 40),
+      });
+      await sleep(950);
+    }
     console.log("[LeadCaptura] salesNav step 5 → modal opened, spotlight shown");
 
     for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
-      const sendBtn = _findSendWithoutNoteButton();
+      const sendBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
       if (!sendBtn) { await sleep(400); continue; }
       if (attempt === 0) {
         _tryServiceWorkerMainWorldClick();
@@ -2322,7 +2360,7 @@
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w > 0 && w % 17 === 0) {
-        const retryBtn = _findSendWithoutNoteButton();
+        const retryBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
         if (retryBtn) {
           _tryServiceWorkerMainWorldClick();
           _tryMainWorldClick(retryBtn);
