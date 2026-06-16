@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "LeadCaptura \u2014 LinkedIn Capture",
-    "version": "1.0.259",
+    "name": "LeadCaptura — LinkedIn Capture",
+    "version": "1.0.263",
     "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
     "permissions": [
         "activeTab",
@@ -14,12 +14,6 @@
     "host_permissions": [
         "https://leadloftexporter.onrender.com/*",
         "https://linkedin.com/*",
-        "https://www.google.ae/maps/*",
-        "https://www.google.ca/maps/*",
-        "https://www.google.co.in/maps/*",
-        "https://www.google.co.uk/maps/*",
-        "https://www.google.com.au/maps/*",
-        "https://www.google.com/maps/*",
         "https://www.linkedin.com/*"
     ],
     "optional_host_permissions": [
@@ -99,38 +93,19 @@
             ],
             "run_at": "document_idle",
             "all_frames": false
-        },
-        {
-            "matches": [
-                "https://www.google.com/maps/*",
-                "https://www.google.co.in/maps/*",
-                "https://www.google.ae/maps/*",
-                "https://www.google.co.uk/maps/*",
-                "https://www.google.com.au/maps/*",
-                "https://www.google.ca/maps/*"
-            ],
-            "js": [
-                "content/gmaps.js"
-            ],
-            "run_at": "document_idle",
-            "all_frames": false
         }
     ],
     "web_accessible_resources": [
         {
             "resources": [
                 "content/overlay.css",
-                "icons/*",
-                "content/gmaps_inject.js"
+                "icons/icon16.png",
+                "icons/icon48.png",
+                "icons/icon128.png"
             ],
             "matches": [
-                "https://*.linkedin.com/*",
-                "https://www.google.ae/maps/*",
-                "https://www.google.ca/maps/*",
-                "https://www.google.co.in/maps/*",
-                "https://www.google.co.uk/maps/*",
-                "https://www.google.com.au/maps/*",
-                "https://www.google.com/maps/*"
+                "https://www.linkedin.com/*",
+                "https://linkedin.com/*"
             ]
         }
     ]

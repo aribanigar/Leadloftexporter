@@ -14,6 +14,7 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app.models import CompanyFinderBusiness
+from app.services import geo_gcc
 
 _LEADING_NUM = re.compile(r"^[\d/\-\s,#\.]+")
 
@@ -113,9 +114,38 @@ def _normalize(raw: dict) -> Optional[dict]:
         "socials": socials, "hours": hours,
     }
     item.update(_derive_hierarchy(address, lat, lng))
+    # Prefer coordinate-based country/area (reliable) over noisy address parsing.
+    geo_country, geo_area = geo_gcc.classify(lat, lng)
+    if geo_country:
+        item["country"] = geo_country
+        if geo_area:
+            item["area"] = geo_area
     # dedup key: prefer google ids, else a hash of name+address
     item["dedup_key"] = (place_id or cid or hashlib.sha1(f"{name}|{address}".lower().encode()).hexdigest())[:200]
     return item
+
+
+def normalize_many(raw_items: list[dict], source: str = "search") -> list[dict]:
+    """Normalize raw results for DISPLAY without touching the DB. Each item gets
+    a synthetic ``id`` (client selection key) and the source. Used by on-demand
+    search so big result sets are never persisted to the free-tier database."""
+    import uuid as _uuidmod
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for raw in raw_items or []:
+        if not isinstance(raw, dict):
+            continue
+        item = _normalize(raw)
+        if not item:
+            continue
+        if item["dedup_key"] in seen:
+            continue
+        seen.add(item["dedup_key"])
+        item["id"] = str(_uuidmod.uuid4())
+        item["source"] = source
+        out.append(item)
+    return out
 
 
 def ingest(db: Session, workspace_id: str, raw_items: list[dict], source: str = "extension") -> dict:

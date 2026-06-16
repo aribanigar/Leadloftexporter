@@ -215,22 +215,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
     return true;
   }
-  // Company Finder — Google Maps capture POSTs scraped businesses here; we relay
-  // them to the backend with the workspace API key (X-API-Key via fetchJson).
-  if (msg?.type === "lc_cf_ingest") {
-    (async () => {
-      try {
-        const res = await fetchJson("/company-finder/ingest", {
-          method: "POST",
-          body: { businesses: msg.businesses || [] },
-        });
-        sendResponse({ ok: true, result: res });
-      } catch (e) {
-        sendResponse({ ok: false, error: e?.message || String(e) });
-      }
-    })();
-    return true;
-  }
   // Run a click on "Send without a note" inside the PAGE's MAIN world.
   // Content scripts live in an isolated world; code injected via executeScript
   // with world:"MAIN" runs in the actual page context and can reach window.jQuery
