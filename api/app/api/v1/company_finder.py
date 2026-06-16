@@ -70,6 +70,16 @@ def import_web(
     return svc.ingest(db, ctx.workspace_id, items, source="import")
 
 
+# ── Normalize uploaded rows for DISPLAY only (no DB write) ───────────────────
+@router.post("/normalize")
+def normalize_rows(body: dict, ctx: AuthContext = Depends(get_workspace_context)):
+    """Normalize a CSV/JSON the user uploaded so it shows in the on-demand list
+    with proper hierarchy — without persisting anything to the database."""
+    rows = body.get("businesses") or body.get("rows") or []
+    items = svc.normalize_many(rows, source="import")
+    return {"businesses": items, "found": len(items)}
+
+
 # ── Google API key config (web app, JWT) ────────────────────────────────────
 @router.get("/config")
 def get_config(ctx: AuthContext = Depends(get_workspace_context)):
@@ -115,14 +125,13 @@ def search(
     db: Session = Depends(get_db),
 ):
     """Find businesses for a text query (e.g. "dentists in Abu Dhabi") and
-    ingest them into Company Finder. Two sources:
+    RETURN them directly — results are NOT persisted (on-demand model, so the
+    free-tier DB never fills with huge datasets). The frontend holds them in
+    memory; only businesses the user explicitly adds become Leads. Sources:
 
       * source="osm" (default) — OpenStreetMap via Overpass: FREE, unlimited,
-        no API key, no result cap. Best for bulk discovery.
-      * source="google" — Google Places (New): richer phone/website coverage
-        but paid; needs a Google API key.
-
-    Either way the backend fetches everything — no browser scraping.
+        no API key, no result cap.
+      * source="google" — Google Places (New): richer phone/website but paid.
     """
     query = (body.get("query") or body.get("q") or "").strip()
     region = (body.get("region_code") or "").strip()
@@ -131,14 +140,11 @@ def search(
 
     if source in ("osm", "openstreetmap", "free"):
         try:
-            businesses = osm_places.search(query)
+            raw = osm_places.search(query)
         except osm_places.OSMError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
-        result = svc.ingest(db, ctx.workspace_id, businesses, source="openstreetmap")
-        result["found"] = len(businesses)
-        result["query"] = query
-        result["source"] = "openstreetmap"
-        return result
+        items = svc.normalize_many(raw, source="openstreetmap")
+        return {"businesses": items, "found": len(items), "query": query, "source": "openstreetmap"}
 
     # Google Places path (paid).
     api_key = _resolved_api_key(ctx)
@@ -150,21 +156,17 @@ def search(
         )
     try:
         if deep:
-            businesses = google_places.search_grid(
+            raw = google_places.search_grid(
                 api_key, query, grid=int(body.get("grid") or 5), region_code=region
             )
         else:
-            businesses = google_places.search_text(
+            raw = google_places.search_text(
                 api_key, query, max_pages=int(body.get("max_pages") or 3), region_code=region
             )
     except google_places.PlacesError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
-    result = svc.ingest(db, ctx.workspace_id, businesses, source="google_places")
-    result["found"] = len(businesses)
-    result["query"] = query
-    result["deep"] = deep
-    result["source"] = "google"
-    return result
+    items = svc.normalize_many(raw, source="google")
+    return {"businesses": items, "found": len(items), "query": query, "deep": deep, "source": "google"}
 
 
 def _filtered(db: Session, ws: str, q, category, country, area, zone, building_key, has_email):
@@ -349,47 +351,65 @@ def add_to_pipeline(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Explicitly promote selected Company Finder businesses into the CRM
-    (pipeline/prospecting). Until this is called, scraped businesses live ONLY
-    in Company Finder and never appear as Leads."""
+    """Explicitly promote chosen businesses into the CRM (pipeline/prospecting).
+
+    Accepts either ``businesses`` (objects straight from on-demand search — the
+    primary path, since search results aren't persisted) or ``ids`` (rows that
+    were previously imported into the DB). Only what the user picks becomes a
+    Lead — nothing else is stored."""
     from app.models import Activity, Lead
     from app.services.leads import default_stage, upsert_company
 
-    ids = body.get("ids") or []
-    rows = (
-        db.query(CompanyFinderBusiness)
-        .filter(CompanyFinderBusiness.workspace_id == ctx.workspace_id, CompanyFinderBusiness.id.in_(ids))
-        .all()
-    )
+    objs: list[dict] = []
+    raw_objs = body.get("businesses") or []
+    if raw_objs:
+        objs = [b for b in raw_objs if isinstance(b, dict) and (b.get("name"))][:2000]
+    else:
+        ids = (body.get("ids") or [])[:2000]
+        rows = (
+            db.query(CompanyFinderBusiness)
+            .filter(CompanyFinderBusiness.workspace_id == ctx.workspace_id, CompanyFinderBusiness.id.in_(ids))
+            .all()
+        )
+        objs = [{
+            "name": b.name, "email": b.email, "phone": b.phone, "website": b.website,
+            "category": b.category, "address": b.address, "area": b.area, "country": b.country,
+            "building": b.building, "profile_url": b.profile_url, "socials": b.socials,
+        } for b in rows]
+
     stage = default_stage(db, ctx.workspace_id)
     stage_id = stage.id if stage else None
     created = 0
-    for b in rows:
-        company = upsert_company(db, ctx.workspace_id, name=b.name, website=b.website or None)
+    for b in objs:
+        name = (b.get("name") or "").strip()
+        if not name:
+            continue
+        website = b.get("website") or None
+        company = upsert_company(db, ctx.workspace_id, name=name, website=website)
         lead = Lead(
             workspace_id=ctx.workspace_id,
             owner_id=ctx.user_id,
             stage_id=stage_id,
             company_id=company.id if company else None,
-            full_name=b.name,
-            email=b.email or None,
-            phone=b.phone or None,
-            location=", ".join(filter(None, [b.area, b.country])) or b.address,
+            full_name=name,
+            email=b.get("email") or None,
+            phone=b.get("phone") or None,
+            location=", ".join(filter(None, [b.get("area"), b.get("country")])) or b.get("address"),
             source="company_finder",
             custom={
-                "website": b.website or "",
-                "category": b.category or "",
-                "address": b.address or "",
-                "maps_url": b.profile_url or "",
-                "building": b.building or "",
-                **({"socials": b.socials} if b.socials else {}),
+                "website": b.get("website") or "",
+                "category": b.get("category") or "",
+                "address": b.get("address") or "",
+                "maps_url": b.get("profile_url") or "",
+                "building": b.get("building") or "",
+                **({"socials": b.get("socials")} if b.get("socials") else {}),
             },
         )
         db.add(lead)
         db.flush()
         db.add(Activity(
             workspace_id=ctx.workspace_id, lead_id=lead.id, actor_id=ctx.user_id,
-            type="lead_created_company_finder", payload={"company_finder_id": b.id},
+            type="lead_created_company_finder", payload={"name": name},
         ))
         created += 1
     db.commit()
