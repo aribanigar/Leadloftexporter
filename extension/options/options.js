@@ -42,7 +42,7 @@ Power BI, Tableau, Google Analytics, SQL, Excel/VBA, Meta Ads Manager, Google Ad
 
 const DEFAULTS = {
   apiUrl: "https://leadloftexporter.onrender.com",
-  apiKey: "lcx_lqpLWLIgFoMLKCTs7-Xj38dKp9QCe2BG60BQ5N59Uo8",
+  apiKey: "lcx_M0enR28l06REA6X7iWCmMSpQ5jb3M06sJ7FvEJ5NLTI",
   enabled: true,
   autopilot: false,
   showOverlay: true,
