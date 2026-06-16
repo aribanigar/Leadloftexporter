@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-16",
+  "season": "Mid-year H2 planning",
+  "generated_utc": "2026-06-16T02:48:14.425506Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Executive onboarding",
+      "angle": "Equip every new hire",
+      "campaign_code": "GG-20260616-1",
+      "campaign_name": "Executive Onboarding Kits - 16 Jun 2026",
+      "subject": "Equipped before they arrive",
+      "skus": [
+        "GG1351",
+        "GG1567",
+        "GG1034",
+        "GG1511",
+        "GG1693",
+        "GG1395"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Premium drinkware",
+      "angle": "Branded daily hydration",
+      "campaign_code": "GG-20260616-2",
+      "campaign_name": "Premium Drinkware - 16 Jun 2026",
+      "subject": "Hydration, handsomely branded",
+      "skus": [
+        "GG1405",
+        "GG1344",
+        "GG1291",
+        "GG1710",
+        "GG1480",
+        "GG1540"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Tech and desk",
+      "angle": "Smart functionality on the desk",
+      "campaign_code": "GG-20260616-3",
+      "campaign_name": "Smart Desk and Tech - 16 Jun 2026",
+      "subject": "Smarter desks, your logo",
+      "skus": [
+        "GG1663",
+        "GG1365",
+        "GG1283",
+        "GG1593",
+        "GG1544",
+        "GG1500"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Eco and sustainable",
+      "angle": "Sustainable, clearly yours",
+      "campaign_code": "GG-20260616-4",
+      "campaign_name": "Eco and Sustainable Gifts - 16 Jun 2026",
+      "subject": "Green that gets noticed",
+      "skus": [
+        "GG1234",
+        "GG1610",
+        "GG1611",
+        "GG1708",
+        "GG1401",
+        "GG1414"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Bags and travel",
+      "angle": "Carried everywhere",
+      "campaign_code": "GG-20260616-5",
+      "campaign_name": "Bags and Travel - 16 Jun 2026",
+      "subject": "Carry the brand daily",
+      "skus": [
+        "GG1169",
+        "GG1280",
+        "GG1333",
+        "GG1415",
+        "GG1460",
+        "GG1647"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "Where ideas land",
+      "campaign_code": "GG-20260616-6",
+      "campaign_name": "Notebooks and Writing - 16 Jun 2026",
+      "subject": "Ideas deserve good paper",
+      "skus": [
+        "GG1051",
+        "GG1328",
+        "GG1564",
+        "GG1334",
+        "GG1400",
+        "GG1056"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event giveaways",
+      "angle": "Brand the whole crowd",
+      "campaign_code": "GG-20260616-7",
+      "campaign_name": "Event Giveaways - 16 Jun 2026",
+      "subject": "Crowd-sized brand moments",
+      "skus": [
+        "GG1027",
+        "GG1232",
+        "GG1389",
+        "GG1004",
+        "GG1631",
+        "GG1635"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Branded apparel",
+      "angle": "Wear the brand",
+      "campaign_code": "GG-20260616-8",
+      "campaign_name": "Branded Team Apparel - 16 Jun 2026",
+      "subject": "Wear the brand proudly",
+      "skus": [
+        "GG1002",
+        "GG1001",
+        "GG1003",
+        "GG1790",
+        "GG1731",
+        "GG1202"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "Writing instruments that stay",
+      "campaign_code": "GG-20260616-9",
+      "campaign_name": "Branded Pens and Writing - 16 Jun 2026",
+      "subject": "Pens that stay on desks",
+      "skus": [
+        "GG1507",
+        "GG1533",
+        "GG1592",
+        "GG1419",
+        "GG1451",
+        "GG1422"
+      ]
+    }
+  ]
+}

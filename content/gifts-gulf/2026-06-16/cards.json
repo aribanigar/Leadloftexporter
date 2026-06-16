@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-16",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Welcome set, ready to brand",
+      "out": "content/gifts-gulf/2026-06-16/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2916-03",
+          "sku": "GG1351",
+          "name": "Jucoset"
+        },
+        {
+          "code": "mo7755-13",
+          "sku": "GG1567",
+          "name": "Ecoset"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Daily carry, your brand",
+      "out": "content/gifts-gulf/2026-06-16/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6257-03",
+          "sku": "GG1405",
+          "name": "Irmug"
+        },
+        {
+          "code": "mo2890-03",
+          "sku": "GG1344",
+          "name": "Mugiva"
+        },
+        {
+          "code": "mo2670-02",
+          "sku": "GG1291",
+          "name": "Isforden Tumbler"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "On every desk, your brand",
+      "out": "content/gifts-gulf/2026-06-16/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9692-40",
+          "sku": "GG1663",
+          "name": "Wirestand"
+        },
+        {
+          "code": "mo2983-03",
+          "sku": "GG1365",
+          "name": "Karta Stand"
+        },
+        {
+          "code": "mo2646-03",
+          "sku": "GG1283",
+          "name": "Fauleti Charge"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Recycled, proudly branded",
+      "out": "content/gifts-gulf/2026-06-16/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2551-03",
+          "sku": "GG1234",
+          "name": "Recoba Colour"
+        },
+        {
+          "code": "mo8973-13",
+          "sku": "GG1610",
+          "name": "Organic Cottonel"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Daily commute, your logo",
+      "out": "content/gifts-gulf/2026-06-16/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2372-03",
+          "sku": "GG1169",
+          "name": "Bagga"
+        },
+        {
+          "code": "mo2639-03",
+          "sku": "GG1280",
+          "name": "Bangkok Bag"
+        },
+        {
+          "code": "mo2858-13",
+          "sku": "GG1333",
+          "name": "Baga"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Where good ideas land",
+      "out": "content/gifts-gulf/2026-06-16/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7083-03",
+          "sku": "GG1051",
+          "name": "Memoff"
+        },
+        {
+          "code": "mo2823-13",
+          "sku": "GG1328",
+          "name": "Memoring"
+        },
+        {
+          "code": "mo7627-06",
+          "sku": "GG1564",
+          "name": "Memokit"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Worn out of the booth",
+      "out": "content/gifts-gulf/2026-06-16/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc1447-10",
+          "sku": "GG1027",
+          "name": "Glop Cap"
+        },
+        {
+          "code": "mo2543-03",
+          "sku": "GG1232",
+          "name": "Capo"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Team-ready, on brand",
+      "out": "content/gifts-gulf/2026-06-16/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "ar1470-01",
+          "sku": "GG1002",
+          "name": "Classic Polo Shirt"
+        },
+        {
+          "code": "ar1589-01",
+          "sku": "GG1001",
+          "name": "Premium Cotton T-Shirt"
+        },
+        {
+          "code": "it0971-04",
+          "sku": "GG1003",
+          "name": "Classic Pullover Hoodie"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Picked up, never returned",
+      "out": "content/gifts-gulf/2026-06-16/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6822-03",
+          "sku": "GG1507",
+          "name": "Mito Pen"
+        },
+        {
+          "code": "mo6936-03",
+          "sku": "GG1533",
+          "name": "Cleanpen"
+        },
+        {
+          "code": "mo8679-03",
+          "sku": "GG1592",
+          "name": "Toolpen"
+        }
+      ]
+    }
+  ]
+}

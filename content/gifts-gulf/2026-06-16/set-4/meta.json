@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-16",
+  "theme": "Eco and sustainable",
+  "season": "Mid-year H2 planning",
+  "design": "A",
+  "campaign_code": "GG-20260616-4",
+  "campaign_name": "Eco and Sustainable Gifts - 16 Jun 2026",
+  "subject": "Green that gets noticed",
+  "skus": [
+    "GG1234",
+    "GG1610",
+    "GG1611",
+    "GG1708",
+    "GG1401",
+    "GG1414"
+  ],
+  "products": [
+    {
+      "name": "Recoba Colour",
+      "sku": "GG1234",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2551-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1234"
+    },
+    {
+      "name": "Organic Cottonel",
+      "sku": "GG1610",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8973-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1610"
+    },
+    {
+      "name": "Organic Hundred",
+      "sku": "GG1611",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8974-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1611"
+    },
+    {
+      "name": "Tuko Rpet",
+      "sku": "GG1708",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9918-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1708"
+    },
+    {
+      "name": "Glacier Rpet",
+      "sku": "GG1401",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6237-25.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1401"
+    },
+    {
+      "name": "Aspen Cork",
+      "sku": "GG1414",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6313-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1414"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-16/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20eco%20and%20sustainable%20options%20for%20our%20team."
+}

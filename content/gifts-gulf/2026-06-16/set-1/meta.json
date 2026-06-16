@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-16",
+  "theme": "Executive onboarding",
+  "season": "Mid-year H2 planning",
+  "design": "A",
+  "campaign_code": "GG-20260616-1",
+  "campaign_name": "Executive Onboarding Kits - 16 Jun 2026",
+  "subject": "Equipped before they arrive",
+  "skus": [
+    "GG1351",
+    "GG1567",
+    "GG1034",
+    "GG1511",
+    "GG1693",
+    "GG1395"
+  ],
+  "products": [
+    {
+      "name": "Jucoset",
+      "sku": "GG1351",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2916-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1351"
+    },
+    {
+      "name": "Ecoset",
+      "sku": "GG1567",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7755-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1567"
+    },
+    {
+      "name": "Isoset",
+      "sku": "GG1034",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2694-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1034"
+    },
+    {
+      "name": "Mito Set",
+      "sku": "GG1511",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6837-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1511"
+    },
+    {
+      "name": "Todo Set",
+      "sku": "GG1693",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9836-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1693"
+    },
+    {
+      "name": "Suber Set",
+      "sku": "GG1395",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6202-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1395"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-16/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20executive%20onboarding%20options%20for%20our%20team."
+}

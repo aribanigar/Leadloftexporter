@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-16",
+  "theme": "Notebooks and writing",
+  "season": "Mid-year H2 planning",
+  "design": "C",
+  "campaign_code": "GG-20260616-6",
+  "campaign_name": "Notebooks and Writing - 16 Jun 2026",
+  "subject": "Ideas deserve good paper",
+  "skus": [
+    "GG1051",
+    "GG1328",
+    "GG1564",
+    "GG1334",
+    "GG1400",
+    "GG1056"
+  ],
+  "products": [
+    {
+      "name": "Memoff",
+      "sku": "GG1051",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7083-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1051"
+    },
+    {
+      "name": "Memoring",
+      "sku": "GG1328",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2823-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1328"
+    },
+    {
+      "name": "Memokit",
+      "sku": "GG1564",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7627-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1564"
+    },
+    {
+      "name": "Cordi Note",
+      "sku": "GG1334",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2861-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1334"
+    },
+    {
+      "name": "Grownotebook\u2122",
+      "sku": "GG1400",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6225-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1400"
+    },
+    {
+      "name": "Notelux",
+      "sku": "GG1056",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo1800-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1056"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-16/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20notebooks%20and%20writing%20options%20for%20our%20team."
+}

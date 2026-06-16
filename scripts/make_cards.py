@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 GREEN=(0,165,68); ZINC=(24,24,27); BODY=(63,63,70); MUTED=(113,113,123)
 WHITE=(255,255,255); BORDER=(228,228,231)
 W,H=1080,1450; M=60
-EMAIL_C="sales@giftgulf.com"; PHONE_C="+919186051499"
+EMAIL_C="sales@giftsgulf.com"; PHONE_C="+916005001499"
 _FD=Path(__file__).resolve().parent/"fonts"
 FB=str(_FD/"DMSans-Bold.ttf")    if (_FD/"DMSans-Bold.ttf").exists()    else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FR=str(_FD/"DMSans-Regular.ttf") if (_FD/"DMSans-Regular.ttf").exists() else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
