@@ -1721,7 +1721,17 @@
     for (const d of candidates) {
       if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
+      // Regular LinkedIn invitation modal — unchanged.
       if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
+        return d;
+      // Sales Navigator invitation modal — different wording, same purpose:
+      // heading "Send invitation" + a personal-message textarea + a primary
+      // "Send Invitation" button. We require BOTH "include a personal message"
+      // AND "send invitation" so we never false-match an unrelated dialog that
+      // happens to mention "send invitation". The regular LinkedIn detection
+      // above runs first and short-circuits, so this branch only ever runs on
+      // Sales Nav and the existing LinkedIn path is untouched.
+      if (/include a personal message/.test(t) && /\bsend invitation\b/.test(t))
         return d;
     }
     return null;

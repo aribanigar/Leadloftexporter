@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.265",
+    date: "Jun 16, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.265.zip",
+    latest: true,
+    changes: [
+      "Sales Navigator Connect All fixed. The run was showing “Connect All: 0 invited, 0 skipped, 14 failed (14)” because the invitation-modal detector matched only regular LinkedIn phrasing (“add a note to your invitation”, “send without a note”, “personalize your invitation”) — none of which appear in the Sales Nav modal, which says “Send invitation” + “Include a personal message”.",
+      "Added a Sales-Nav-only structural branch to the modal detector (requires BOTH “include a personal message” AND “send invitation”), so the regular LinkedIn path is byte-for-byte unchanged. The existing spotlight + “…” → Connect → Send Invitation sequence now completes end-to-end.",
+    ],
+  },
+  {
     version: "1.0.258",
     date: "Jun 15, 2026",
     size: "242 KB",
     file: "/extensions/leadcaptura-extension-v1.0.258.zip",
-    latest: true,
     changes: [
       "ROOT CAUSE FIX. The background popup-killer was closing the Easy Apply modal itself on every step past page 1 — because it kept the modal alive only when its text matched “Contact info / next step / review / submit”, but steps 2-6 say “Home address”, “Resume”, “Additional questions”, “Education”, etc. So at step 2 the modal got dismissed; my code skipped; the click bled to the On-site chip.",
       "Easy Apply detection is now STRUCTURAL: dialog has aria-labelledby=\"jobs-apply-header\", or data-test-modal-id=\"easy-apply-modal\", or contains a data-easy-apply-* button, or its heading starts with “Apply to ”, or it contains the progress region. None of those depend on step content.",

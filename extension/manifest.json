@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "LeadCaptura — LinkedIn Capture",
-    "version": "1.0.264",
+    "version": "1.0.265",
     "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
     "permissions": [
         "activeTab",
