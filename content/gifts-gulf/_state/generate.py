@@ -630,7 +630,7 @@ def main():
             products=[dict(name=p["name"], sku=p["sku"],
                            image=img_src(p["code"], escaped=False),
                            product_url=product_url(p["sku"])) for p in prods],
-            promo_image=promo_image, cta_url=cta)
+            promo_image=promo_image, image=promo_image, cta_url=cta)
         json.dump(meta, open(os.path.join(set_dir, "meta.json"), "w"), indent=2)
 
         variant = {"A": 1, "B": 2, "C": 3}[s["design"]]
