@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-16",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "B",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "Dal mornings and open meadows",
+      "subject": "Your Kashmir week starts on the Dal",
+      "campaign_code": "VK-INR-B2C-20260616"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "B",
+      "theme": "Idle boats and empty seats",
+      "subject": "An empty seat never comes back",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260616"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "theme": "Dal Lake houseboat demand",
+      "subject": "Another houseboat just got your guest",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260616"
+    }
+  ]
+}
