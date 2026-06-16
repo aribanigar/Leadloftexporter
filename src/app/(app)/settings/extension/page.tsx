@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.267",
+    date: "Jun 16, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.267.zip",
+    latest: true,
+    changes: [
+      "Sales Nav spotlights now use a brand-new, fully isolated spotlight (own IDs, own state, own teardown) so nothing in the LinkedIn spotlight pipeline can interfere with it. Banner + ring + bouncing arrow at top z-index, visible for 2 seconds with a centred top banner that ALWAYS appears (even if the target rect resolves to 0×0).",
+      "Both Connect (step 3) and Send Invitation (step 5) now use the new spotlight. Wait extended to 1300ms so you have time to see it before the click lands.",
+      "Regular LinkedIn invitation flow is byte-identical — uses the original _showButtonSpotlight / _showSendSpotlight / _removeSpotlight pipeline unchanged.",
+    ],
+  },
+  {
     version: "1.0.266",
     date: "Jun 16, 2026",
     size: "247 KB",
     file: "/extensions/leadcaptura-extension-v1.0.266.zip",
-    latest: true,
     changes: [
       "Sales Navigator Connect All — spotlights now reliably fall on the Send Invitation button. Step 5 now finds the Send Invitation button INSIDE the SN modal (exact text match, then Artdeco primary fallback), and spotlights it with the same direct-anchor variant that worked on the Connect dropdown item. The previous _showSendSpotlight depended on _findSendWithoutNoteButton, which could miss the SN button and leave the spotlight invisible.",
       "Same click sequence (dispatchHumanClick → _forceClick → main-world) — no behaviour change for the regular LinkedIn invitation flow, which still uses _findSendWithoutNoteButton + _showSendSpotlight as before.",

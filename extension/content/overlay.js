@@ -2176,6 +2176,113 @@
     const { dispatchHumanClick } = globalThis.__lcDom;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+    // ── Sales-Nav-only spotlight ─────────────────────────────────────────
+    // A self-contained spotlight that does NOT share IDs or state with
+    // _showButtonSpotlight / _showSendSpotlight, so nothing in the existing
+    // spotlight pipeline can tear it down. Always renders a banner + ring +
+    // arrow at the top stacking context, sized either from the target's
+    // rect (preferred) or center-of-viewport (fallback). Lives for `holdMs`
+    // ms and survives target detachment.
+    const _snSpotlightShow = (target, title, subtitle, holdMs) => {
+      _snSpotlightHide();
+      const Z = "2147483647";
+      const wrap = document.createElement("div");
+      wrap.id = "lc-sn-spotlight-wrap";
+      // The wrap itself is invisible — it just hosts our children at top z.
+      wrap.style.cssText =
+        "position:fixed!important;left:0!important;top:0!important;" +
+        "width:0!important;height:0!important;pointer-events:none!important;" +
+        "z-index:" + Z + "!important;";
+
+      const ring = document.createElement("div");
+      ring.id = "lc-sn-spotlight-ring";
+      ring.style.cssText =
+        "position:fixed!important;pointer-events:none!important;z-index:" + Z + "!important;" +
+        "border-radius:12px!important;" +
+        "box-shadow:0 0 0 4px rgba(10,102,194,0.95)," +
+        "0 0 28px 10px rgba(10,102,194,0.75)," +
+        "0 0 0 9999px rgba(0,0,0,0.45)!important;" +
+        "transition:left .12s linear,top .12s linear,width .12s linear,height .12s linear!important;";
+
+      const banner = document.createElement("div");
+      banner.id = "lc-sn-spotlight-banner";
+      banner.style.cssText =
+        "position:fixed!important;left:50%!important;top:24px!important;" +
+        "transform:translateX(-50%)!important;pointer-events:none!important;" +
+        "z-index:" + Z + "!important;" +
+        "background:linear-gradient(135deg,#0a66c2,#004182)!important;" +
+        "color:#fff!important;padding:14px 28px!important;border-radius:14px!important;" +
+        "box-shadow:0 14px 36px rgba(0,0,0,0.55)!important;" +
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif!important;" +
+        "font-weight:800!important;text-align:center!important;min-width:280px!important;" +
+        "white-space:nowrap!important;";
+      banner.innerHTML =
+        '<div style="font-size:17px;font-weight:800;margin-bottom:4px;">' + title + '</div>' +
+        '<div style="font-size:12px;font-weight:500;opacity:0.92;">' + subtitle + '</div>';
+
+      const arrow = document.createElement("div");
+      arrow.id = "lc-sn-spotlight-arrow";
+      arrow.textContent = "👇";
+      arrow.style.cssText =
+        "position:fixed!important;pointer-events:none!important;z-index:" + Z + "!important;" +
+        "font-size:32px!important;line-height:1!important;" +
+        "filter:drop-shadow(0 4px 6px rgba(0,0,0,0.6))!important;" +
+        "animation:lc-sn-bounce 0.7s ease-in-out infinite alternate!important;";
+
+      if (!document.getElementById("lc-sn-bounce-style")) {
+        const st = document.createElement("style");
+        st.id = "lc-sn-bounce-style";
+        st.textContent = "@keyframes lc-sn-bounce { from { transform: translateY(0); } to { transform: translateY(8px); } }";
+        document.head.appendChild(st);
+      }
+
+      document.body.appendChild(wrap);
+      document.body.appendChild(ring);
+      document.body.appendChild(banner);
+      document.body.appendChild(arrow);
+
+      const place = () => {
+        let r = null;
+        if (target && target.isConnected) {
+          try { r = target.getBoundingClientRect(); } catch {}
+        }
+        if (r && r.width >= 1 && r.height >= 1) {
+          const pad = 6;
+          ring.style.setProperty("left", Math.max(0, r.left - pad) + "px", "important");
+          ring.style.setProperty("top", Math.max(0, r.top - pad) + "px", "important");
+          ring.style.setProperty("width", (r.width + pad * 2) + "px", "important");
+          ring.style.setProperty("height", (r.height + pad * 2) + "px", "important");
+          ring.style.setProperty("display", "block", "important");
+          const cx = r.left + r.width / 2;
+          arrow.style.setProperty("left", (cx - 16) + "px", "important");
+          arrow.style.setProperty("top", Math.max(80, r.top - 48) + "px", "important");
+          arrow.style.setProperty("display", "block", "important");
+        } else {
+          // Fallback: keep banner visible center-top, hide the ring/arrow.
+          ring.style.setProperty("display", "none", "important");
+          arrow.style.setProperty("display", "none", "important");
+        }
+      };
+      place();
+      const tickId = setInterval(place, 100);
+      const t = setTimeout(() => {
+        clearInterval(tickId);
+        _snSpotlightHide();
+      }, holdMs);
+      _snSpotlightState = { wrap, ring, banner, arrow, tickId, t };
+    };
+    const _snSpotlightHide = () => {
+      const s = _snSpotlightState;
+      if (!s) return;
+      try { clearInterval(s.tickId); } catch {}
+      try { clearTimeout(s.t); } catch {}
+      try { s.wrap.remove(); } catch {}
+      try { s.ring.remove(); } catch {}
+      try { s.banner.remove(); } catch {}
+      try { s.arrow.remove(); } catch {}
+      _snSpotlightState = null;
+    };
+
     // STEP 1: bring card into view & click the "..." trigger.
     try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
     await sleep(250 + Math.random() * 250);
@@ -2244,9 +2351,9 @@
     // the overlay so the real click below still lands on the button). The
     // spotlight freezes in place if the target detaches mid-show — Sales Nav
     // sometimes closes the dropdown the instant we insert DOM nodes near it.
-    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 1100);
+    _snSpotlightShow(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 2000);
     console.log("[LeadCaptura] salesNav step 3 → spotlight requested");
-    await sleep(950);
+    await sleep(1300);
 
     // If our original connectItem detached during the spotlight wait (dropdown
     // closed), find it again. Otherwise the click below would target a node
@@ -2269,10 +2376,10 @@
       try { await dispatchHumanClick(clickTarget); } catch {}
     } else {
       console.log("[LeadCaptura] salesNav step 3 ✗ Connect item unrecoverable");
-      _removeSpotlight();
+      _snSpotlightHide();
       return { ok: false, reason: "connect_item_lost" };
     }
-    _removeSpotlight();
+    _snSpotlightHide();
     await sleep(500 + Math.random() * 400);
 
     // STEP 4: did the invitation modal open?
@@ -2338,11 +2445,11 @@
 
     const snSendBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
     if (snSendBtn) {
-      _showButtonSpotlight(snSendBtn, "⚡ Step 3 — Sending invitation", "auto-clicking 'Send Invitation'", 1100);
+      _snSpotlightShow(snSendBtn, "⚡ Step 3 — Sending invitation", "auto-clicking 'Send Invitation'", 2000);
       console.log("[LeadCaptura] salesNav step 5 → spotlight on Send Invitation", {
         t: (snSendBtn.textContent || "").trim().slice(0, 40),
       });
-      await sleep(950);
+      await sleep(1300);
     }
     console.log("[LeadCaptura] salesNav step 5 → modal opened, spotlight shown");
 
@@ -2369,7 +2476,7 @@
       }
     }
 
-    _removeSpotlight();
+    _snSpotlightHide();
     if (!_invitationModalOpen()) {
       console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent");
       return { ok: true };
@@ -5459,6 +5566,8 @@
   let _arrowEl = null;
   let _skipBtnEl = null;
   let _spotlightSkipCb = null;
+  // Sales-Nav-only spotlight (isolated from the LinkedIn pipeline).
+  let _snSpotlightState = null;
 
   function _playSpotlightBeep() {
     try {
