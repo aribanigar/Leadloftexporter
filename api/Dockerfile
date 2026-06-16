@@ -16,9 +16,11 @@ RUN pip install -r requirements.txt
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
+COPY migrate.py ./
 
 EXPOSE 8000
 
-# Run migrations on boot, then start the app. PORT is provided by the host
+# Bootstrap the DB on boot (handles fresh DBs whose 0001 metadata.create_all
+# builds the whole schema), then start the app. PORT is provided by the host
 # (Railway / Render / Fly). Defaults to 8000 for local docker runs.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
