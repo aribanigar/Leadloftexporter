@@ -228,11 +228,12 @@ def _eligible_senders(
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
     """Senders this campaign can dispatch through, round-robin ordered.
 
-    CAMPAIGN SENDING IS FULLY DECOUPLED FROM WARMUP. Every active sender in the
-    campaign's pool is always eligible — warmup never caps or defers a campaign
-    send. (Warmup remains its own separate per-inbox feature; we still attach
-    the SenderWarmup row so sent_today/total_sent counters stay accurate, but
-    it is NEVER used to skip a sender here.)
+    WARMUP IS OPT-IN PER INBOX. By default (warmup OFF) a sender has NO cap and
+    is always eligible — campaigns send freely. When a user turns warmup ON for
+    an inbox, that inbox respects today's ramp cap: once it's hit, the inbox is
+    skipped for the rest of the day and its overflow DEFERS to tomorrow (the
+    recipients stay pending and resume after the UTC day rolls over) — it is
+    never failed. Senders with warmup OFF are unaffected.
 
     Ordered to start at campaign.rotation_index for round-robin fairness so the
     volume spreads evenly across the connected mailboxes.
@@ -242,6 +243,10 @@ def _eligible_senders(
     out: list[tuple[ConnectedAccount, SenderWarmup]] = []
     for a in accts:
         w = _warmup_for_account(db, campaign.workspace_id, a.id)
+        # Campaign sending is DECOUPLED from warmup. Warmup row is still
+        # attached so its counters stay accurate, but it never caps a
+        # campaign send. (Per the user's explicit instruction: "the sending
+        # emails should not be determined with the warmup".)
         out.append((a, w))
 
     # Rotate starting at the campaign's rotation_index so consecutive ticks
@@ -281,23 +286,48 @@ def _seconds_until_next_utc_day() -> int:
 
 
 def _schedule_recipients(db: Session, campaign: Campaign) -> None:
-    """Make every not-yet-scheduled pending recipient immediately due.
+    """Assign each not-yet-scheduled pending recipient a human-jittered
+    send_after so the campaign DRIPS instead of bursting.
 
-    Pacing is enforced PER-SENDER at send-time inside _process_tick (using
-    EmailMessage.sent_at as the gate), NOT by pre-spreading send_after across
-    hours at launch. The old behaviour scheduled recipient #N for
-    `now + N * pace`, which meant the campaign could only ever send
-    `60 / pace` recipients per minute regardless of batch size — and any cron
-    pause stretched the tail by the same amount the cron stayed paused. By
-    marking everything immediately due, the tick can drain backlogs as fast
-    as the senders' pace allows, while still respecting the per-inbox cap.
+    - Pace = campaign.seconds_between_sends (the "send delay" from the builder).
+    - Recipients are dealt round-robin across the campaign's active inboxes, and
+      each inbox advances its own cursor by a randomised gap in
+      [pace*0.6, pace*1.4]. So inboxes send in PARALLEL (one per inbox at a
+      time) while each inbox stays human-paced — and multiple campaigns each
+      drip on their own schedule, giving true concurrency.
+    - pace<=0 means "no delay" → everything is due now (legacy burst behaviour),
+      which we still allow but is not the default.
     """
+    pace = max(0, int(campaign.seconds_between_sends or 0))
     now = datetime.now(timezone.utc)
-    db.query(CampaignRecipient).filter(
-        CampaignRecipient.campaign_id == campaign.id,
-        CampaignRecipient.status == "pending",
-        CampaignRecipient.send_after.is_(None),
-    ).update({"send_after": now}, synchronize_session=False)
+    if pace == 0:
+        # No pacing requested — make everything immediately due.
+        db.query(CampaignRecipient).filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+            CampaignRecipient.send_after.is_(None),
+        ).update({"send_after": now}, synchronize_session=False)
+        return
+
+    senders = _campaign_sender_accounts(db, campaign)
+    n = max(1, len(senders))
+    pending = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+            CampaignRecipient.send_after.is_(None),
+        )
+        .order_by(CampaignRecipient.created_at.asc())
+        .all()
+    )
+    # Each inbox starts near-now (small randomised head-start so they don't all
+    # fire on the exact same instant) and advances independently.
+    cursors = [now + timedelta(seconds=random.uniform(0, min(pace, 20))) for _ in range(n)]
+    for i, r in enumerate(pending):
+        s = i % n
+        r.send_after = cursors[s]
+        cursors[s] = cursors[s] + timedelta(seconds=random.uniform(pace * 0.6, pace * 1.4))
     db.commit()
 
 
@@ -1133,62 +1163,6 @@ def resume_campaign(
     return _process_tick(db, c, ctx_user_id=ctx.user_id)
 
 
-@router.post("/{campaign_id}/nudge")
-def nudge_campaign(
-    campaign_id: str,
-    ctx: AuthContext = Depends(get_workspace_context),
-    db: Session = Depends(get_db),
-):
-    """Drop every pre-stretched future schedule on this campaign and re-arm
-    its drip from NOW. Useful for campaigns that were launched before the
-    new (no pre-stretch) scheduler shipped and are still sitting on
-    multi-hour pre-stretched send_after values, or after a transient cooldown
-    that left rows scheduled in the future. Per-sender pacing still applies
-    inside _process_tick, so anti-ban behaviour is preserved.
-
-    No-op when the campaign isn't currently sending. Runs an inline tick at
-    the end so the user sees immediate progress in the UI.
-    """
-    c = _own_campaign(db, ctx, campaign_id)
-    now = datetime.now(timezone.utc)
-
-    # Clear any active cooldown so the next tick isn't gated.
-    sources = dict(c.recipient_sources or {})
-    if "_cooldown_until" in sources:
-        sources.pop("_cooldown_until", None)
-        c.recipient_sources = sources
-
-    # Pull EVERY pending recipient's send_after forward to now. The new
-    # _process_tick will then drain as fast as the per-sender pacing
-    # allows.
-    n = (
-        db.query(CampaignRecipient)
-        .filter(
-            CampaignRecipient.campaign_id == c.id,
-            CampaignRecipient.status == "pending",
-        )
-        .update({"send_after": now}, synchronize_session=False)
-    )
-    # If a row got stuck in "sending" (a tick died mid-flight before the
-    # 5-minute orphan-reclaim cutoff), pull it back to pending too.
-    orphan_cutoff = now - timedelta(seconds=30)
-    o = (
-        db.query(CampaignRecipient)
-        .filter(
-            CampaignRecipient.campaign_id == c.id,
-            CampaignRecipient.status == "sending",
-            CampaignRecipient.updated_at < orphan_cutoff,
-        )
-        .update({"status": "pending", "send_after": now}, synchronize_session=False)
-    )
-    db.commit()
-
-    if c.status != "sending":
-        return {"nudged": int(n) + int(o), "campaign_status": c.status, "ticked": False}
-    tick = _process_tick(db, c, ctx_user_id=ctx.user_id)
-    return {"nudged": int(n) + int(o), "ticked": True, "tick": tick}
-
-
 @router.post("/{campaign_id}/cancel")
 def cancel_campaign(
     campaign_id: str,
@@ -1210,8 +1184,8 @@ def delete_campaign(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Hard-delete a campaign. Cascades to CampaignRecipient via the FK
-    (ondelete='CASCADE'); Suppression.source_campaign_id nulls out via
+    """Hard-delete a campaign. CampaignRecipient cascades via the
+    ondelete='CASCADE' FK; Suppression.source_campaign_id nulls out via
     ondelete='SET NULL'. A campaign still in 'sending' is cancelled first so
     no in-flight tick races against the delete.
     """
@@ -1543,188 +1517,173 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         )
     }
 
-    # Per-tick loop bound — drain successive batches in ONE tick so a small
-    # backlog clears fast, but DO NOT let a single campaign monopolise the
-    # cron thread. SMTP sends are synchronous (~1-5s each); 50 × 5s = 250s
-    # worst-case per campaign per tick, which is safe for the Render worker
-    # pool and the cron-job.org ping window. Cron fires every minute, so
-    # sustained throughput is up to 50 × 60 = 3000 emails/hour/campaign —
-    # plenty for any reasonable workload.
-    PER_TICK_CAP = 50
+    # Claim a batch of pending recipients that are DUE (human-paced schedule).
+    _now = datetime.now(timezone.utc)
+    batch = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "pending",
+            sa_or(
+                CampaignRecipient.send_after.is_(None),
+                CampaignRecipient.send_after <= _now,
+            ),
+        )
+        .order_by(CampaignRecipient.send_after.asc().nullsfirst())
+        .limit(int(campaign.batch_size or 8))
+        .with_for_update(skip_locked=True)
+        .all()
+    )
+    if not batch:
+        _maybe_finalize(db, campaign)
+        return _stats(campaign, sent=0, failed=0, skipped=0)
 
     sent = failed = skipped = 0
     rotation_index = campaign.rotation_index or 0
 
-    while sent + failed + skipped < PER_TICK_CAP:
-        # Claim a batch of pending recipients that are DUE.
-        _now = datetime.now(timezone.utc)
-        batch = (
-            db.query(CampaignRecipient)
-            .filter(
-                CampaignRecipient.campaign_id == campaign.id,
-                CampaignRecipient.status == "pending",
-                sa_or(
-                    CampaignRecipient.send_after.is_(None),
-                    CampaignRecipient.send_after <= _now,
-                ),
+    for r in batch:
+        # Workspace suppression check.
+        if (r.email or "").lower() in suppressed:
+            r.status = "skipped"
+            r.error = "suppressed"
+            campaign.skipped_count = (campaign.skipped_count or 0) + 1
+            skipped += 1
+            continue
+
+        # Round-robin to the next sender. DECOUPLED from warmup — every active
+        # sender can dispatch; a warmup cap never blocks a campaign send.
+        sender, warmup = eligible[rotation_index % len(eligible)]
+        rotation_index = (rotation_index + 1) % len(eligible)
+
+        # Materialise the EmailMessage row, render merge tags, dispatch.
+        # Recipients may be CRM leads OR arbitrary pasted/CSV addresses. When
+        # there's a lead, prefer its fields; otherwise fall back to the
+        # per-recipient merge_data captured at create time.
+        lead = db.get(Lead, r.lead_id) if r.lead_id else None
+        if lead is not None:
+            subject = _render_token(campaign.subject or "", lead)
+            body_html = _render_token(campaign.body_html or "", lead)
+            body_text = (
+                _render_token(campaign.body_text or "", lead)
+                if campaign.body_text else None
             )
-            .order_by(CampaignRecipient.send_after.asc().nullsfirst())
-            .limit(int(campaign.batch_size or 8))
-            .with_for_update(skip_locked=True)
-            .all()
+        else:
+            merge = dict(r.merge_data or {})
+            subject = _render_merge(campaign.subject or "", merge, r.email)
+            body_html = _render_merge(campaign.body_html or "", merge, r.email)
+            body_text = (
+                _render_merge(campaign.body_text or "", merge, r.email)
+                if campaign.body_text else None
+            )
+
+        thread = EmailThread(
+            workspace_id=campaign.workspace_id,
+            lead_id=lead.id if lead is not None else None,
+            subject=subject,
         )
-        if not batch:
-            # No work left in this tick.
-            break
+        db.add(thread)
+        db.flush()
+        msg = EmailMessage(
+            workspace_id=campaign.workspace_id,
+            thread_id=thread.id,
+            lead_id=lead.id if lead is not None else None,
+            direction="outbound",
+            from_address=sender.external_id or "",
+            to_address=r.email,
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text,
+            status="queued",
+        )
+        db.add(msg)
+        db.flush()
+        r.message_id = msg.id
+        r.sender_account_id = sender.id
+        r.status = "sending"
 
-        for r in batch:
-            # Workspace suppression check.
-            if (r.email or "").lower() in suppressed:
-                r.status = "skipped"
-                r.error = "suppressed"
-                campaign.skipped_count = (campaign.skipped_count or 0) + 1
-                skipped += 1
-                continue
+        # Inject open/click tracking now that we know the recipient row id.
+        # `campaign.links` is the shared registry — same URL → same tracking
+        # id across recipients. Re-assign so SQLAlchemy flags the JSONB dirty.
+        links = list(campaign.links or [])
+        msg.body_html = _inject_tracking(
+            body_html, settings.public_api_url, campaign.id, r.id, links
+        )
+        campaign.links = links
+        db.flush()
 
-            # Round-robin to the next sender. No pacing gate — every DUE
-            # recipient is dispatched this tick; the only throttle is the
-            # batch claim + per-tick loop bound above.
-            sender, warmup = eligible[rotation_index % len(eligible)]
-            rotation_index = (rotation_index + 1) % len(eligible)
-
-            # Materialise the EmailMessage row, render merge tags, dispatch.
-            # Recipients may be CRM leads OR arbitrary pasted/CSV addresses. When
-            # there's a lead, prefer its fields; otherwise fall back to the
-            # per-recipient merge_data captured at create time.
-            lead = db.get(Lead, r.lead_id) if r.lead_id else None
-            if lead is not None:
-                subject = _render_token(campaign.subject or "", lead)
-                body_html = _render_token(campaign.body_html or "", lead)
-                body_text = (
-                    _render_token(campaign.body_text or "", lead)
-                    if campaign.body_text else None
-                )
-            else:
-                merge = dict(r.merge_data or {})
-                subject = _render_merge(campaign.subject or "", merge, r.email)
-                body_html = _render_merge(campaign.body_html or "", merge, r.email)
-                body_text = (
-                    _render_merge(campaign.body_text or "", merge, r.email)
-                    if campaign.body_text else None
-                )
-    
-            thread = EmailThread(
-                workspace_id=campaign.workspace_id,
-                lead_id=lead.id if lead is not None else None,
-                subject=subject,
-            )
-            db.add(thread)
-            db.flush()
-            msg = EmailMessage(
-                workspace_id=campaign.workspace_id,
-                thread_id=thread.id,
-                lead_id=lead.id if lead is not None else None,
-                direction="outbound",
-                from_address=sender.external_id or "",
-                to_address=r.email,
-                subject=subject,
-                body_html=body_html,
-                body_text=body_text,
-                status="queued",
-            )
-            db.add(msg)
-            db.flush()
-            r.message_id = msg.id
-            r.sender_account_id = sender.id
-            r.status = "sending"
-    
-            # Inject open/click tracking now that we know the recipient row id.
-            # `campaign.links` is the shared registry — same URL → same tracking
-            # id across recipients. Re-assign so SQLAlchemy flags the JSONB dirty.
-            links = list(campaign.links or [])
-            msg.body_html = _inject_tracking(
-                body_html, settings.public_api_url, campaign.id, r.id, links
-            )
-            campaign.links = links
-            db.flush()
-    
-            # Dispatch through the existing transport layer with the rotated
-            # sender pinned — this picks the right stack (Resend, SendGrid, Gmail
-            # HTTPS, or SMTP via the Vercel relay) and stamps msg.status / error.
-            try:
-                ws = db.get(Workspace, campaign.workspace_id)
-                if ws is None:
-                    r.status = "failed"
-                    r.error = "workspace_missing"
-                    campaign.failed_count = (campaign.failed_count or 0) + 1
-                    failed += 1
-                    continue
-                result = send_email_message(
-                    db,
-                    msg,
-                    ws,
-                    user_id=ctx_user_id or campaign.user_id,
-                    account=sender,
-                )
-                if result.ok:
-                    r.status = "sent"
-                    r.sent_at = datetime.now(timezone.utc)
-                    warmup.sent_today += 1
-                    warmup.total_sent += 1
-                    campaign.sent_count = (campaign.sent_count or 0) + 1
-                    sent += 1
-                    if lead is not None:
-                        db.add(
-                            Activity(
-                                workspace_id=campaign.workspace_id,
-                                lead_id=lead.id,
-                                actor_id=campaign.user_id,
-                                type="campaign_sent",
-                                payload={
-                                    "campaign_id": campaign.id,
-                                    "subject": subject,
-                                    "from": sender.external_id,
-                                },
-                            )
-                        )
-                elif _is_transient(result.error or ""):
-                    # Temporary (rate limit / greylist / 4.x.x) — retry later. Keep
-                    # the recipient pending and cool the campaign down so we stop
-                    # hammering the sender's rate limit. The cooldown check at the
-                    # top of the next tick short-circuits, so break out now.
-                    r.status = "pending"
-                    r.error = (result.error or "rate_limited")[:500]
-                    _set_cooldown(campaign)
-                    campaign.rotation_index = rotation_index
-                    db.commit()
-                    return _stats(campaign, sent=sent, failed=failed, skipped=skipped, note="cooling_down")
-                else:
-                    # Distinguish a true recipient bounce from a SENDER/transport
-                    # failure. Only a real bounce suppresses the address; a transport
-                    # failure (bad SMTP password, relay/API error) stays "failed" and
-                    # never poisons the recipient.
-                    if _is_hard_bounce(result.error or ""):
-                        r.status = "bounced"
-                        r.error = (result.error or "bounced")[:500]
-                        campaign.bounced_count = (campaign.bounced_count or 0) + 1
-                        db.add(
-                            Suppression(
-                                workspace_id=campaign.workspace_id,
-                                email=(r.email or "").lower(),
-                                reason="bounce",
-                                source_campaign_id=campaign.id,
-                            )
-                        )
-                    else:
-                        r.status = "failed"
-                        r.error = (result.error or "send_failed")[:500]
-                    campaign.failed_count = (campaign.failed_count or 0) + 1
-                    failed += 1
-            except Exception as exc:  # noqa: BLE001
+        # Dispatch through the existing transport layer with the rotated
+        # sender pinned — this picks the right stack (Resend, SendGrid, Gmail
+        # HTTPS, or SMTP via the Vercel relay) and stamps msg.status / error.
+        try:
+            ws = db.get(Workspace, campaign.workspace_id)
+            if ws is None:
                 r.status = "failed"
-                r.error = str(exc)[:500]
+                r.error = "workspace_missing"
                 campaign.failed_count = (campaign.failed_count or 0) + 1
                 failed += 1
+                continue
+            result = send_email_message(
+                db,
+                msg,
+                ws,
+                user_id=ctx_user_id or campaign.user_id,
+                account=sender,
+            )
+            if result.ok:
+                r.status = "sent"
+                r.sent_at = datetime.now(timezone.utc)
+                warmup.sent_today += 1
+                warmup.total_sent += 1
+                campaign.sent_count = (campaign.sent_count or 0) + 1
+                sent += 1
+                if lead is not None:
+                    db.add(
+                        Activity(
+                            workspace_id=campaign.workspace_id,
+                            lead_id=lead.id,
+                            actor_id=campaign.user_id,
+                            type="campaign_sent",
+                            payload={
+                                "campaign_id": campaign.id,
+                                "subject": subject,
+                                "from": sender.external_id,
+                            },
+                        )
+                    )
+            elif _is_transient(result.error or ""):
+                # Temporary (rate limit / greylist / 4.x.x) — retry later. Keep
+                # the recipient pending and cool the campaign down so we stop
+                # hammering the sender's rate limit.
+                r.status = "pending"
+                r.error = (result.error or "rate_limited")[:500]
+                _set_cooldown(campaign)
+            else:
+                # Distinguish a true recipient bounce from a SENDER/transport
+                # failure. Only a real bounce suppresses the address; a transport
+                # failure (bad SMTP password, relay/API error) stays "failed" and
+                # never poisons the recipient.
+                if _is_hard_bounce(result.error or ""):
+                    r.status = "bounced"
+                    r.error = (result.error or "bounced")[:500]
+                    campaign.bounced_count = (campaign.bounced_count or 0) + 1
+                    db.add(
+                        Suppression(
+                            workspace_id=campaign.workspace_id,
+                            email=(r.email or "").lower(),
+                            reason="bounce",
+                            source_campaign_id=campaign.id,
+                        )
+                    )
+                else:
+                    r.status = "failed"
+                    r.error = (result.error or "send_failed")[:500]
+                campaign.failed_count = (campaign.failed_count or 0) + 1
+                failed += 1
+        except Exception as exc:  # noqa: BLE001
+            r.status = "failed"
+            r.error = str(exc)[:500]
+            campaign.failed_count = (campaign.failed_count or 0) + 1
+            failed += 1
 
     campaign.rotation_index = rotation_index
     _maybe_finalize(db, campaign)
