@@ -56,9 +56,9 @@ def title_exists(title, business_id):
 def insert_asset(business_id, title, asset_type, content, subject=None, platform=None, amp_content=None):
     sql("""
         INSERT INTO content_assets
-          (id, workspace_id, business_id, title, type, content, amp_content, subject, platform, created_at, updated_at)
+          (id, workspace_id, business_id, title, type, content, amp_content, subject, platform, tags, created_at, updated_at)
         VALUES
-          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, now(), now())
+          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, '[]'::jsonb, now(), now())
     """, [WORKSPACE_ID, business_id, title, asset_type, content, amp_content, subject, platform])
 
 def fix_phone_in_existing(business_id, date):
