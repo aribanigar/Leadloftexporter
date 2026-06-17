@@ -85,7 +85,7 @@ export default function LoginPage() {
           <span className="text-xl font-semibold tracking-tight">LeadCaptura</span>
         </div>
         <h1 className="mb-6 text-center text-lg font-semibold">Sign in to your workspace</h1>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4" autoComplete="off">
           <div>
             <label className="label">Email</label>
             <input
@@ -95,6 +95,8 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
+              autoComplete="off"
+              name="login-email"
             />
           </div>
           <div>
@@ -114,6 +116,8 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete="new-password"
+              name="login-password"
             />
           </div>
           {err && <p className="text-sm text-rose-600">{err}</p>}
