@@ -1137,6 +1137,62 @@ def resume_campaign(
     return _process_tick(db, c, ctx_user_id=ctx.user_id)
 
 
+@router.post("/{campaign_id}/nudge")
+def nudge_campaign(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Drop every pre-stretched future schedule on this campaign and re-arm
+    its drip from NOW. Useful for campaigns that were launched before the
+    new (no pre-stretch) scheduler shipped and are still sitting on
+    multi-hour pre-stretched send_after values, or after a transient cooldown
+    that left rows scheduled in the future. Per-sender pacing still applies
+    inside _process_tick, so anti-ban behaviour is preserved.
+
+    No-op when the campaign isn't currently sending. Runs an inline tick at
+    the end so the user sees immediate progress in the UI.
+    """
+    c = _own_campaign(db, ctx, campaign_id)
+    now = datetime.now(timezone.utc)
+
+    # Clear any active cooldown so the next tick isn't gated.
+    sources = dict(c.recipient_sources or {})
+    if "_cooldown_until" in sources:
+        sources.pop("_cooldown_until", None)
+        c.recipient_sources = sources
+
+    # Pull EVERY pending recipient's send_after forward to now. The new
+    # _process_tick will then drain as fast as the per-sender pacing
+    # allows.
+    n = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == c.id,
+            CampaignRecipient.status == "pending",
+        )
+        .update({"send_after": now}, synchronize_session=False)
+    )
+    # If a row got stuck in "sending" (a tick died mid-flight before the
+    # 5-minute orphan-reclaim cutoff), pull it back to pending too.
+    orphan_cutoff = now - timedelta(seconds=30)
+    o = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == c.id,
+            CampaignRecipient.status == "sending",
+            CampaignRecipient.updated_at < orphan_cutoff,
+        )
+        .update({"status": "pending", "send_after": now}, synchronize_session=False)
+    )
+    db.commit()
+
+    if c.status != "sending":
+        return {"nudged": int(n) + int(o), "campaign_status": c.status, "ticked": False}
+    tick = _process_tick(db, c, ctx_user_id=ctx.user_id)
+    return {"nudged": int(n) + int(o), "ticked": True, "tick": tick}
+
+
 @router.post("/{campaign_id}/cancel")
 def cancel_campaign(
     campaign_id: str,

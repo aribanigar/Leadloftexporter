@@ -339,11 +339,11 @@ function CampaignStatusBadge({ performance }: { performance?: Perf }) {
 // ─── Three-dot Menu ───────────────────────────────────────────────────────────
 
 function ActionMenu({
-  campaign, sending, duplicating, onStart, onDuplicate, onCancel, onPause, onResume,
+  campaign, sending, duplicating, onStart, onDuplicate, onCancel, onPause, onResume, onNudge,
 }: {
   campaign: Campaign; sending: boolean; duplicating: boolean;
   onStart: () => void; onDuplicate: () => void; onCancel: () => void;
-  onPause: () => void; onResume: () => void;
+  onPause: () => void; onResume: () => void; onNudge: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -373,6 +373,11 @@ function ActionMenu({
       label: 'Pause Campaign',
       icon: 'pause_circle', color: '#c8a84b',
       onClick: () => { setOpen(false); onPause(); },
+    }] : []),
+    ...(campaign.status === 'sending' || campaign.status === 'paused' ? [{
+      label: 'Send Now (reset schedule)',
+      icon: 'bolt', color: T.primary,
+      onClick: () => { setOpen(false); onNudge(); },
     }] : []),
     {
       label: 'Edit Campaign',
@@ -699,6 +704,27 @@ export default function CampaignDetailPage() {
     }
   };
 
+  // ── Nudge — reset every pending recipient's send_after to NOW so a
+  //    campaign launched on the old pre-stretch schedule (or stalled after a
+  //    cooldown) drains immediately at the configured per-sender pace.
+  const handleNudge = async () => {
+    try {
+      const res = await api<{ nudged: number; ticked: boolean }>(
+        `/campaigns/${id}/nudge`, { method: 'POST' }
+      );
+      setToast({
+        msg: res.nudged
+          ? `Nudged ${res.nudged} recipient${res.nudged === 1 ? '' : 's'} — sending now`
+          : 'No pending recipients to nudge',
+        type: 'success',
+      });
+      await fetchStats(true);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to nudge';
+      setToast({ msg, type: 'error' });
+    }
+  };
+
   // ── Cancel
   const handleCancel = async () => {
     setShowCancelConfirm(false);
@@ -861,6 +887,7 @@ export default function CampaignDetailPage() {
               onCancel={() => setShowCancelConfirm(true)}
               onPause={handlePause}
               onResume={handleResume}
+              onNudge={handleNudge}
             />
           </div>
         </div>
