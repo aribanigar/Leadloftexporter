@@ -12,29 +12,69 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // Sign-in is auto-retried up to RETRY_MAX times with exponential backoff so
+  // a Render cold-start, Neon wake-up, or any other transient backend blip
+  // doesn't strand the user. Only NETWORK errors are retried — wrong-password
+  // / disabled-user fail fast (no point retrying a 401). The user can also
+  // abort by pressing the cancel button (we'll add it next to "Signing in…").
+  const RETRY_MAX = 6;          // ~ 1 + 2 + 4 + 6 + 8 + 10 = 31s of total backoff
+  const RETRY_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10000];
+
+  function classifyError(message: string): "network" | "credentials" | "disabled" | "other" {
+    if (/Failed to fetch|NetworkError|TypeError|Request timed out|fetch failed|networkerror/i.test(message)) return "network";
+    if (/invalid_credentials|wrong email|wrong password/i.test(message)) return "credentials";
+    if (/inactive_user|disabled/i.test(message)) return "disabled";
+    return "other";
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
+    setStatusMsg(null);
     setPending(true);
-    try {
-      await login(email, password);
-      router.replace("/prospecting");
-    } catch (e: unknown) {
-      // Surface a friendlier message for the most common cases instead of
-      // showing the raw browser error verbatim.
-      let message = e instanceof Error ? e.message : "Sign in failed";
-      if (/Failed to fetch|NetworkError|TypeError/i.test(message)) {
-        message = "Can't reach the LeadCaptura service. It may be starting up — retry in ~30s. If this keeps happening, the service is down.";
-      } else if (/invalid_credentials/i.test(message)) {
-        message = "Wrong email or password.";
-      } else if (/inactive_user/i.test(message)) {
-        message = "This account is disabled. Contact support.";
+
+    let attempt = 0;
+    let lastError: unknown = null;
+    while (attempt <= RETRY_MAX) {
+      try {
+        if (attempt > 0) {
+          setStatusMsg(`Backend is starting up — retrying (attempt ${attempt + 1} of ${RETRY_MAX + 1})…`);
+        }
+        await login(email, password);
+        router.replace("/prospecting");
+        return;
+      } catch (e: unknown) {
+        lastError = e;
+        const message = e instanceof Error ? e.message : "Sign in failed";
+        const kind = classifyError(message);
+        // Non-network errors are TERMINAL — do not retry a wrong-password.
+        if (kind !== "network") {
+          let friendly = message;
+          if (kind === "credentials") friendly = "Wrong email or password.";
+          else if (kind === "disabled") friendly = "This account is disabled. Contact support.";
+          setErr(friendly);
+          setStatusMsg(null);
+          setPending(false);
+          return;
+        }
+        // Network error — backoff and retry.
+        if (attempt >= RETRY_MAX) break;
+        const wait = RETRY_DELAYS_MS[attempt] ?? 10000;
+        await new Promise(r => setTimeout(r, wait));
+        attempt += 1;
       }
-      setErr(message);
-    } finally {
-      setPending(false);
     }
+    // Out of retries.
+    const finalMsg = lastError instanceof Error ? lastError.message : "Sign in failed";
+    setErr(
+      /Failed to fetch|NetworkError|TypeError|Request timed out/i.test(finalMsg)
+        ? "Can't reach the LeadCaptura service after several attempts. It may be cold-starting (give it 1–2 minutes) or the service is down. Try again."
+        : finalMsg,
+    );
+    setStatusMsg(null);
+    setPending(false);
   }
 
   return (
@@ -77,6 +117,7 @@ export default function LoginPage() {
             />
           </div>
           {err && <p className="text-sm text-rose-600">{err}</p>}
+          {statusMsg && !err && <p className="text-sm text-amber-700">{statusMsg}</p>}
           <button className="btn-primary w-full" disabled={pending} type="submit">
             {pending ? "Signing in…" : "Sign in"}
           </button>
