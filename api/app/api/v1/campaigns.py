@@ -1543,11 +1543,14 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         )
     }
 
-    # Per-tick loop bound — drain successive batches in ONE tick so a backlog
-    # clears fast. This is NOT a daily/volume cap; it only bounds how much a
-    # single campaign does in one cron run so it can't monopolise a shared
-    # cron. Sending is otherwise unthrottled — every DUE recipient goes out.
-    PER_TICK_CAP = 2000
+    # Per-tick loop bound — drain successive batches in ONE tick so a small
+    # backlog clears fast, but DO NOT let a single campaign monopolise the
+    # cron thread. SMTP sends are synchronous (~1-5s each); 50 × 5s = 250s
+    # worst-case per campaign per tick, which is safe for the Render worker
+    # pool and the cron-job.org ping window. Cron fires every minute, so
+    # sustained throughput is up to 50 × 60 = 3000 emails/hour/campaign —
+    # plenty for any reasonable workload.
+    PER_TICK_CAP = 50
 
     sent = failed = skipped = 0
     rotation_index = campaign.rotation_index or 0
