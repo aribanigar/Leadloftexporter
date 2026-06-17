@@ -1,21 +1,62 @@
+import logging
+import threading
+import time
 from contextlib import asynccontextmanager
 
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.db import engine
 
 _settings = get_settings()
+log = logging.getLogger(__name__)
 
 if _settings.sentry_dsn:
     sentry_sdk.init(dsn=_settings.sentry_dsn, traces_sample_rate=0.1)
 
 
+# ── Neon keep-alive ───────────────────────────────────────────────────────
+# Neon's free tier auto-suspends the compute after ~5 minutes idle. First
+# query after a sleep takes 2-5 seconds — long enough that login feels
+# broken. This background thread runs `SELECT 1` every 4 minutes from
+# WITHIN the API process, so Neon never sees idle time. The thread is a
+# daemon so it dies with the worker, never blocks shutdown. Failures are
+# logged and swallowed — a missed ping is not fatal, the next one will
+# wake the DB anyway.
+_KEEPALIVE_INTERVAL_S = 240   # 4 minutes
+_keepalive_stop = threading.Event()
+
+
+def _keepalive_loop() -> None:
+    while not _keepalive_stop.is_set():
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("keepalive ping failed: %s", exc)
+        # interruptible sleep so shutdown is fast
+        _keepalive_stop.wait(_KEEPALIVE_INTERVAL_S)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    # Warm the pool immediately so the FIRST real request after a deploy
+    # doesn't pay the cold-connect cost, then start the keep-alive loop.
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("initial DB warm-up failed: %s", exc)
+    t = threading.Thread(target=_keepalive_loop, name="db-keepalive", daemon=True)
+    t.start()
+    try:
+        yield
+    finally:
+        _keepalive_stop.set()
 
 
 app = FastAPI(
