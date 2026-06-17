@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-17",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "A welcome they unbox",
+      "out": "content/gifts-gulf/2026-06-17/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2091-22",
+          "sku": "GG1073",
+          "name": "Celestial"
+        },
+        {
+          "code": "mo1804-03",
+          "sku": "GG1057",
+          "name": "Arconot Lined"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Daily carry, your brand",
+      "out": "content/gifts-gulf/2026-06-17/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3177-03",
+          "sku": "GG1015",
+          "name": "Oregon"
+        },
+        {
+          "code": "kc2225-17",
+          "sku": "GG1033",
+          "name": "Epsom"
+        },
+        {
+          "code": "kc6589-16",
+          "sku": "GG1043",
+          "name": "Heim"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Where good ideas land",
+      "out": "content/gifts-gulf/2026-06-17/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "ar1804-03",
+          "sku": "GG1000",
+          "name": "Arconot Plain"
+        },
+        {
+          "code": "it3233-06",
+          "sku": "GG1018",
+          "name": "Visionmax"
+        },
+        {
+          "code": "it3630-03",
+          "sku": "GG1020",
+          "name": "Blocky"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Recycled, proudly branded",
+      "out": "content/gifts-gulf/2026-06-17/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it1047-01",
+          "sku": "GG1005",
+          "name": "Arcolor"
+        },
+        {
+          "code": "it2369-40",
+          "sku": "GG1008",
+          "name": "Genio"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Daily commute, your logo",
+      "out": "content/gifts-gulf/2026-06-17/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2190-03",
+          "sku": "GG1114",
+          "name": "Fukuro"
+        },
+        {
+          "code": "mo2209-13",
+          "sku": "GG1120",
+          "name": "Zolang"
+        },
+        {
+          "code": "mo2492-03",
+          "sku": "GG1211",
+          "name": "Wooler"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Team-ready, on brand",
+      "out": "content/gifts-gulf/2026-06-17/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it1639-04",
+          "sku": "GG1007",
+          "name": "Yatch"
+        },
+        {
+          "code": "mo1447-03",
+          "sku": "GG1055",
+          "name": "Buzz"
+        },
+        {
+          "code": "mo1464-03",
+          "sku": "GG1058",
+          "name": "Buffalo"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "The first cup, your brand",
+      "out": "content/gifts-gulf/2026-06-17/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7062-06",
+          "sku": "GG1049",
+          "name": "Dublin"
+        },
+        {
+          "code": "mo2101-06",
+          "sku": "GG1082",
+          "name": "Karoo"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled and refilled",
+      "out": "content/gifts-gulf/2026-06-17/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2090-16",
+          "sku": "GG1071",
+          "name": "Ursa"
+        },
+        {
+          "code": "mo2107-16",
+          "sku": "GG1085",
+          "name": "Florence"
+        },
+        {
+          "code": "mo2108-16",
+          "sku": "GG1086",
+          "name": "Manoa"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled, still premium",
+      "out": "content/gifts-gulf/2026-06-17/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3775-03",
+          "sku": "GG1022",
+          "name": "Sonora Plus"
+        },
+        {
+          "code": "it3789-03",
+          "sku": "GG1025",
+          "name": "Sonora"
+        },
+        {
+          "code": "kc7012-03",
+          "sku": "GG1047",
+          "name": "Bloquero"
+        }
+      ]
+    }
+  ]
+}

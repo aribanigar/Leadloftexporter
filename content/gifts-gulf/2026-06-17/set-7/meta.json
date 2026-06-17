@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-17",
+  "theme": "Premium drinkware",
+  "season": "Mid-year, H2 and year-end planning",
+  "design": "A",
+  "campaign_code": "GG-20260617-7",
+  "campaign_name": "Premium Ceramics - 17 Jun 2026",
+  "subject": "The mug they choose",
+  "skus": [
+    "GG1049",
+    "GG1082",
+    "GG1083",
+    "GG1212",
+    "GG1225",
+    "GG1264"
+  ],
+  "products": [
+    {
+      "name": "Dublin",
+      "sku": "GG1049",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7062-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1049"
+    },
+    {
+      "name": "Karoo",
+      "sku": "GG1082",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2101-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1082"
+    },
+    {
+      "name": "Karoo Sublim",
+      "sku": "GG1083",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2102-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1083"
+    },
+    {
+      "name": "Cerack",
+      "sku": "GG1212",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2493-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1212"
+    },
+    {
+      "name": "Qeram",
+      "sku": "GG1225",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2528-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1225"
+    },
+    {
+      "name": "Orot",
+      "sku": "GG1264",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2598-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1264"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-17/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-17/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20drinkware%20options%20for%20our%20team."
+}

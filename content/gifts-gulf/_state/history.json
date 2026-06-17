@@ -421,5 +421,158 @@
       "GG1451",
       "GG1422"
     ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260617-1",
+    "campaign_name": "Executive Onboarding Kits - 17 Jun 2026",
+    "subject": "Day one, fully equipped",
+    "theme": "Executive onboarding",
+    "skus": [
+      "GG1073",
+      "GG1057",
+      "GG1079",
+      "GG1060",
+      "GG1397",
+      "GG1442"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260617-2",
+    "campaign_name": "Premium Drinkware - 17 Jun 2026",
+    "subject": "Built to be refilled",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1015",
+      "GG1033",
+      "GG1043",
+      "GG1054",
+      "GG1066",
+      "GG1072"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260617-3",
+    "campaign_name": "Notebooks and Writing - 17 Jun 2026",
+    "subject": "Blank pages, big plans",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1000",
+      "GG1018",
+      "GG1020",
+      "GG1038",
+      "GG1045",
+      "GG1053"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260617-4",
+    "campaign_name": "Eco and Sustainable Gifts - 17 Jun 2026",
+    "subject": "Better materials, kept longer",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1005",
+      "GG1008",
+      "GG1013",
+      "GG1023",
+      "GG1036",
+      "GG1059"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260617-5",
+    "campaign_name": "Bags and Travel - 17 Jun 2026",
+    "subject": "Totes for every commute",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1114",
+      "GG1120",
+      "GG1211",
+      "GG1216",
+      "GG1381",
+      "GG1406"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260617-6",
+    "campaign_name": "Branded Team Apparel - 17 Jun 2026",
+    "subject": "Cotton that wears the brand",
+    "theme": "Branded apparel",
+    "skus": [
+      "GG1007",
+      "GG1055",
+      "GG1058",
+      "GG1075",
+      "GG1076",
+      "GG1078"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260617-7",
+    "campaign_name": "Premium Ceramics - 17 Jun 2026",
+    "subject": "The mug they choose",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1049",
+      "GG1082",
+      "GG1083",
+      "GG1212",
+      "GG1225",
+      "GG1264"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260617-8",
+    "campaign_name": "Recycled Drinkware - 17 Jun 2026",
+    "subject": "Recycled steel, daily carry",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1071",
+      "GG1085",
+      "GG1086",
+      "GG1087",
+      "GG1122",
+      "GG1123"
+    ]
+  },
+  {
+    "date": "2026-06-17",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260617-9",
+    "campaign_name": "Sustainable Stationery - 17 Jun 2026",
+    "subject": "Recycled paper, clean print",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1022",
+      "GG1025",
+      "GG1047",
+      "GG1048",
+      "GG1136",
+      "GG1197"
+    ]
   }
 ]
