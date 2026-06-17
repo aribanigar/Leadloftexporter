@@ -230,8 +230,11 @@ export default function EmailCampaignsPage() {
       await api(`/campaigns/${id}`, { method: 'DELETE' });
       setCampaigns(prev => prev.filter(c => c.id !== id));
     } catch (e) {
-      // DELETE may not be supported — fall back to a refresh
-      if (e instanceof ApiError) await fetchCampaigns();
+      // Surface the real reason — silently refreshing made it impossible to
+      // tell that the delete had 405'd on the missing backend endpoint.
+      const msg = e instanceof ApiError ? (e.message || `Delete failed (${e.status})`) : 'Delete failed';
+      alert(msg);
+      await fetchCampaigns();
     } finally {
       setDeleteId(null);
     }

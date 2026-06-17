@@ -1204,6 +1204,27 @@ def cancel_campaign(
     return {"status": c.status}
 
 
+@router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_campaign(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Hard-delete a campaign. Cascades to CampaignRecipient via the FK
+    (ondelete='CASCADE'); Suppression.source_campaign_id nulls out via
+    ondelete='SET NULL'. A campaign still in 'sending' is cancelled first so
+    no in-flight tick races against the delete.
+    """
+    c = _own_campaign(db, ctx, campaign_id)
+    if c.status == "sending":
+        c.status = "cancelled"
+        c.finished_at = datetime.now(timezone.utc)
+        db.flush()
+    db.delete(c)
+    db.commit()
+    return None
+
+
 @router.post("/{campaign_id}/tick")
 def tick_campaign(
     campaign_id: str,
