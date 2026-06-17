@@ -311,15 +311,18 @@ export default function WhatsAppOutreachPage() {
   });
 
   // Preview how many leads in the chosen stage actually have a phone number,
-  // so the user knows what they're about to send to.
+  // so the user knows what they're about to send to. Backend list_leads returns
+  // { items, total, page, page_size } and accepts page_size (not 'limit') — so
+  // pull the items field and request 500 with the right param.
   const { data: stageLeads = [] } = useQuery<LeadLite[]>({
     queryKey: ["wa-stage-leads", stageId],
     queryFn: async () => {
       if (!stageId) return [];
-      const rows = await api<{ rows?: LeadLite[] } | LeadLite[]>(
-        `/leads?stage_id=${stageId}&limit=500`
+      const res = await api<{ items?: LeadLite[]; rows?: LeadLite[] } | LeadLite[]>(
+        `/leads?stage_id=${stageId}&page_size=500`
       );
-      return Array.isArray(rows) ? rows : rows.rows || [];
+      if (Array.isArray(res)) return res;
+      return res.items || res.rows || [];
     },
     enabled: !!stageId,
   });
