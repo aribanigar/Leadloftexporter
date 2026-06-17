@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +15,22 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const warmedRef = useRef(false);
+
+  // Pre-warm the backend the moment the login page mounts. Fires a
+  // lightweight unauthenticated /cron/health probe so Render's container and
+  // the Neon DB connection are hot by the time the user hits "Sign in". Fail
+  // silently — this is a side-channel and never blocks the form.
+  useEffect(() => {
+    if (warmedRef.current) return;
+    warmedRef.current = true;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15_000);
+    fetch(`${API_URL}/api/v1/cron/health`, { signal: ctrl.signal, cache: "no-store" })
+      .catch(() => { /* silent — best-effort warm-up */ })
+      .finally(() => clearTimeout(t));
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, []);
 
   // Sign-in is auto-retried up to RETRY_MAX times with exponential backoff so
   // a Render cold-start, Neon wake-up, or any other transient backend blip
@@ -32,15 +50,17 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
-    setStatusMsg(null);
+    setStatusMsg("Connecting…");
     setPending(true);
 
     let attempt = 0;
     let lastError: unknown = null;
     while (attempt <= RETRY_MAX) {
       try {
-        if (attempt > 0) {
-          setStatusMsg(`Backend is starting up — retrying (attempt ${attempt + 1} of ${RETRY_MAX + 1})…`);
+        if (attempt === 0) {
+          setStatusMsg("Connecting…");
+        } else {
+          setStatusMsg(`Backend is waking up — retrying (attempt ${attempt + 1} of ${RETRY_MAX + 1})…`);
         }
         await login(email, password);
         router.replace("/prospecting");
