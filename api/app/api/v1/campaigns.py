@@ -1478,18 +1478,24 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
     PER_TICK_CAP = 500
     pace_seconds = max(0, int(campaign.seconds_between_sends or 0))
 
-    # Seed per-sender "earliest next send" from the most recent EmailMessage we
-    # successfully sent through each inbox. This enforces the user's pacing
-    # without requiring send_after to be pre-stretched across hours.
+    # Seed each sender's "earliest next send" cursor from the most recent
+    # message this CAMPAIGN sent through that inbox. Per-campaign, not
+    # workspace-wide: when multiple campaigns share an inbox, each campaign
+    # paces its own drip independently — otherwise a freshly-launched campaign
+    # would inherit the other campaign's sender_next_ok and stall for 40s+
+    # before its first send. Anti-ban behaviour is preserved per-campaign;
+    # the rare case of multiple concurrent campaigns from the same inbox is
+    # the user's deliberate choice (and matches the legacy pre-spread
+    # behaviour we replaced).
     sender_next_ok: dict[str, datetime] = {}
     if pace_seconds > 0:
         for s, _w in eligible:
             last = (
                 db.query(EmailMessage.sent_at)
+                .join(CampaignRecipient, CampaignRecipient.message_id == EmailMessage.id)
                 .filter(
-                    EmailMessage.workspace_id == campaign.workspace_id,
-                    EmailMessage.from_address == (s.external_id or ""),
-                    EmailMessage.direction == "outbound",
+                    CampaignRecipient.campaign_id == campaign.id,
+                    CampaignRecipient.sender_account_id == s.id,
                     EmailMessage.sent_at.isnot(None),
                 )
                 .order_by(EmailMessage.sent_at.desc())
