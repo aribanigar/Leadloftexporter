@@ -228,12 +228,11 @@ def _eligible_senders(
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
     """Senders this campaign can dispatch through, round-robin ordered.
 
-    WARMUP IS OPT-IN PER INBOX. By default (warmup OFF) a sender has NO cap and
-    is always eligible — campaigns send freely. When a user turns warmup ON for
-    an inbox, that inbox respects today's ramp cap: once it's hit, the inbox is
-    skipped for the rest of the day and its overflow DEFERS to tomorrow (the
-    recipients stay pending and resume after the UTC day rolls over) — it is
-    never failed. Senders with warmup OFF are unaffected.
+    CAMPAIGN SENDING IS FULLY DECOUPLED FROM WARMUP. Every active sender in the
+    campaign's pool is always eligible — warmup never caps or defers a campaign
+    send. (Warmup remains its own separate per-inbox feature; we still attach
+    the SenderWarmup row so sent_today/total_sent counters stay accurate, but
+    it is NEVER used to skip a sender here.)
 
     Ordered to start at campaign.rotation_index for round-robin fairness so the
     volume spreads evenly across the connected mailboxes.
@@ -243,9 +242,6 @@ def _eligible_senders(
     out: list[tuple[ConnectedAccount, SenderWarmup]] = []
     for a in accts:
         w = _warmup_for_account(db, campaign.workspace_id, a.id)
-        # Opt-in: only a warmup-ENABLED inbox is capped; default (disabled) = no cap.
-        if w.enabled and w.sent_today >= _warmup_daily_cap(w):
-            continue
         out.append((a, w))
 
     # Rotate starting at the campaign's rotation_index so consecutive ticks
@@ -1526,39 +1522,11 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         )
     }
 
-    # Per-tick safety cap — even on a huge backlog with multiple senders, we
-    # never send more than this many in one tick so a single campaign can't
-    # monopolise the cron run. The outer loop below claims successive batches
-    # until either (a) no more recipients are DUE, (b) every sender is in its
-    # own per-inbox pacing cooldown, or (c) we hit this cap.
-    PER_TICK_CAP = 500
-    pace_seconds = max(0, int(campaign.seconds_between_sends or 0))
-
-    # Seed each sender's "earliest next send" cursor from the most recent
-    # message this CAMPAIGN sent through that inbox. Per-campaign, not
-    # workspace-wide: when multiple campaigns share an inbox, each campaign
-    # paces its own drip independently — otherwise a freshly-launched campaign
-    # would inherit the other campaign's sender_next_ok and stall for 40s+
-    # before its first send. Anti-ban behaviour is preserved per-campaign;
-    # the rare case of multiple concurrent campaigns from the same inbox is
-    # the user's deliberate choice (and matches the legacy pre-spread
-    # behaviour we replaced).
-    sender_next_ok: dict[str, datetime] = {}
-    if pace_seconds > 0:
-        for s, _w in eligible:
-            last = (
-                db.query(EmailMessage.sent_at)
-                .join(CampaignRecipient, CampaignRecipient.message_id == EmailMessage.id)
-                .filter(
-                    CampaignRecipient.campaign_id == campaign.id,
-                    CampaignRecipient.sender_account_id == s.id,
-                    EmailMessage.sent_at.isnot(None),
-                )
-                .order_by(EmailMessage.sent_at.desc())
-                .limit(1)
-                .scalar()
-            )
-            sender_next_ok[s.id] = (last + timedelta(seconds=pace_seconds)) if last else datetime.now(timezone.utc)
+    # Per-tick loop bound — drain successive batches in ONE tick so a backlog
+    # clears fast. This is NOT a daily/volume cap; it only bounds how much a
+    # single campaign does in one cron run so it can't monopolise a shared
+    # cron. Sending is otherwise unthrottled — every DUE recipient goes out.
+    PER_TICK_CAP = 2000
 
     sent = failed = skipped = 0
     rotation_index = campaign.rotation_index or 0
@@ -1585,11 +1553,6 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             # No work left in this tick.
             break
 
-        # Track whether THIS pass managed to send anything; if not (every
-        # claimed recipient hit a sender that's still in pacing cooldown), we
-        # exit to avoid spinning forever on the same batch.
-        progressed_this_pass = False
-
         for r in batch:
             # Workspace suppression check.
             if (r.email or "").lower() in suppressed:
@@ -1597,33 +1560,14 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                 r.error = "suppressed"
                 campaign.skipped_count = (campaign.skipped_count or 0) + 1
                 skipped += 1
-                progressed_this_pass = True
                 continue
-    
-            # Round-robin to the next sender. DECOUPLED from warmup — every active
-            # sender can dispatch; a warmup cap never blocks a campaign send.
-            # PER-SENDER PACING GATE: skip any sender that hasn't satisfied its
-            # human-paced gap yet. We scan up to len(eligible) senders so a
-            # rate-limited inbox can yield to a free one — only if EVERY sender
-            # is still in cooldown do we leave this recipient pending.
-            picked = None
-            if pace_seconds > 0:
-                _gate_now = datetime.now(timezone.utc)
-                for _ in range(len(eligible)):
-                    cand_sender, cand_warmup = eligible[rotation_index % len(eligible)]
-                    rotation_index = (rotation_index + 1) % len(eligible)
-                    if sender_next_ok.get(cand_sender.id, _gate_now) <= _gate_now:
-                        picked = (cand_sender, cand_warmup)
-                        break
-                if picked is None:
-                    # All senders still in their pacing cooldown — leave this
-                    # recipient pending for the next tick (don't burn budget).
-                    continue
-                sender, warmup = picked
-            else:
-                sender, warmup = eligible[rotation_index % len(eligible)]
-                rotation_index = (rotation_index + 1) % len(eligible)
-    
+
+            # Round-robin to the next sender. No pacing gate — every DUE
+            # recipient is dispatched this tick; the only throttle is the
+            # batch claim + per-tick loop bound above.
+            sender, warmup = eligible[rotation_index % len(eligible)]
+            rotation_index = (rotation_index + 1) % len(eligible)
+
             # Materialise the EmailMessage row, render merge tags, dispatch.
             # Recipients may be CRM leads OR arbitrary pasted/CSV addresses. When
             # there's a lead, prefer its fields; otherwise fall back to the
@@ -1690,7 +1634,6 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                     r.error = "workspace_missing"
                     campaign.failed_count = (campaign.failed_count or 0) + 1
                     failed += 1
-                    progressed_this_pass = True
                     continue
                 result = send_email_message(
                     db,
@@ -1706,11 +1649,6 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                     warmup.total_sent += 1
                     campaign.sent_count = (campaign.sent_count or 0) + 1
                     sent += 1
-                    progressed_this_pass = True
-                    # Reset the chosen sender's "earliest next send" so we
-                    # honour pace_seconds before reusing it inside this tick.
-                    if pace_seconds > 0:
-                        sender_next_ok[sender.id] = datetime.now(timezone.utc) + timedelta(seconds=pace_seconds)
                     if lead is not None:
                         db.add(
                             Activity(
@@ -1728,13 +1666,14 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                 elif _is_transient(result.error or ""):
                     # Temporary (rate limit / greylist / 4.x.x) — retry later. Keep
                     # the recipient pending and cool the campaign down so we stop
-                    # hammering the sender's rate limit. Mark progressed so the
-                    # outer while still moves on this iteration; the cooldown
-                    # check at the top of the next tick will short-circuit.
+                    # hammering the sender's rate limit. The cooldown check at the
+                    # top of the next tick short-circuits, so break out now.
                     r.status = "pending"
                     r.error = (result.error or "rate_limited")[:500]
                     _set_cooldown(campaign)
-                    progressed_this_pass = True
+                    campaign.rotation_index = rotation_index
+                    db.commit()
+                    return _stats(campaign, sent=sent, failed=failed, skipped=skipped, note="cooling_down")
                 else:
                     # Distinguish a true recipient bounce from a SENDER/transport
                     # failure. Only a real bounce suppresses the address; a transport
@@ -1757,18 +1696,11 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                         r.error = (result.error or "send_failed")[:500]
                     campaign.failed_count = (campaign.failed_count or 0) + 1
                     failed += 1
-                    progressed_this_pass = True
             except Exception as exc:  # noqa: BLE001
                 r.status = "failed"
                 r.error = str(exc)[:500]
                 campaign.failed_count = (campaign.failed_count or 0) + 1
                 failed += 1
-                progressed_this_pass = True
-
-        # If every recipient in this batch hit a sender still in pacing
-        # cooldown, do not spin — leave them pending for the next tick.
-        if not progressed_this_pass:
-            break
 
     campaign.rotation_index = rotation_index
     _maybe_finalize(db, campaign)
