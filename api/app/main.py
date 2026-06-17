@@ -32,25 +32,24 @@ _keepalive_stop = threading.Event()
 
 
 def _keepalive_loop() -> None:
+    # First iteration fires immediately (no wait) so the pool warms ASAP
+    # after boot without blocking the lifespan / first HTTP request.
     while not _keepalive_stop.is_set():
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
         except Exception as exc:  # noqa: BLE001
             log.warning("keepalive ping failed: %s", exc)
-        # interruptible sleep so shutdown is fast
         _keepalive_stop.wait(_KEEPALIVE_INTERVAL_S)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm the pool immediately so the FIRST real request after a deploy
-    # doesn't pay the cold-connect cost, then start the keep-alive loop.
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
-        log.warning("initial DB warm-up failed: %s", exc)
+    # Kick the keep-alive thread off immediately and let IT do the initial
+    # warm-up. Doing the `SELECT 1` inline here used to block startup for 5–10s
+    # whenever Neon was suspended at boot, which meant the server wasn't
+    # accepting requests during that window — login appeared to hang on
+    # Render Free-tier cold starts.
     t = threading.Thread(target=_keepalive_loop, name="db-keepalive", daemon=True)
     t.start()
     try:

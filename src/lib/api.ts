@@ -42,12 +42,12 @@ export function clearSession() {
   localStorage.removeItem("lc_workspace_id");
 }
 
-// Default request timeout — prevents the UI from hanging forever if Render
-// is cold-starting or Neon is suspended. 25s is comfortably longer than a
-// typical cold start (~30s worst case for the API + DB warm-up combined we
-// hit elsewhere, but most calls complete in <2s; this catches the pathological
-// hang). Callers can pass their own `signal` to override.
-const DEFAULT_TIMEOUT_MS = 25_000;
+// Default request timeout — long enough to outlast a Render Free-tier
+// cold-start (container spin-up is 30–60s on top of the Neon wake). 25s was
+// too aggressive: the abort fired BEFORE the container was even ready, the
+// retry then hit the same cold-start, and login appeared to hang forever on
+// "Connecting…". Callers can pass their own `signal` to override.
+const DEFAULT_TIMEOUT_MS = 90_000;
 
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const token = getToken();

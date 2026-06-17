@@ -16,6 +16,7 @@ unset the endpoint is open (works out of the box) — set it in production.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Optional
@@ -42,16 +43,26 @@ def _authorized(token: Optional[str], header_token: Optional[str]) -> bool:
 
 
 def _run_all() -> dict:
-    """Invoke each periodic task synchronously, isolating failures."""
+    """Invoke each periodic task synchronously, isolating failures.
+
+    On Render's Free tier (0.1 CPU) the heavy email-pipeline tasks must NOT
+    run on the same process as the web requests — they starve bcrypt-verify
+    in login and the whole API appears to hang. Default behaviour is now to
+    run only the lightweight tasks; set ``CRON_FULL=1`` on a beefier plan
+    (Starter+) to re-enable the email/campaign work in the cron path.
+    """
     from app.workers import tasks
 
-    jobs = [
+    light = [
         ("tick_reminders", tasks.tick_reminders),
-        ("send_queued_emails", tasks.send_queued_emails),
         ("generate_daily_agendas", tasks.generate_daily_agendas),
         ("tick_outreach_scheduler", tasks.tick_outreach_scheduler),
+    ]
+    heavy = [
+        ("send_queued_emails", tasks.send_queued_emails),
         ("tick_email_campaigns", tasks.tick_email_campaigns),
     ]
+    jobs = light + (heavy if os.getenv("CRON_FULL") == "1" else [])
     out: dict = {}
     for name, fn in jobs:
         try:
