@@ -468,8 +468,8 @@ class CampaignCreateIn(BaseModel):
     include_all_leads: bool = False
     # Throttle / senders.
     sender_account_ids: list[str] = []
-    batch_size: int = 8
-    seconds_between_sends: int = 30
+    batch_size: int = 50
+    seconds_between_sends: int = 0
     daily_limit: Optional[int] = None
     warmup_enabled: bool = True
 
@@ -870,9 +870,38 @@ def update_campaign(
             setattr(c, field, data[field])
     if data.get("batch_size") is not None:
         c.batch_size = max(1, min(50, data["batch_size"]))
+    pace_changed = False
     if data.get("seconds_between_sends") is not None:
-        c.seconds_between_sends = max(0, min(3600, data["seconds_between_sends"]))
+        new_pace = max(0, min(3600, data["seconds_between_sends"]))
+        pace_changed = new_pace != (c.seconds_between_sends or 0)
+        c.seconds_between_sends = new_pace
     db.commit()
+    # If the user dropped the throttle on a running/queued campaign, the
+    # already-scheduled recipients carry their OLD send_after stamps and would
+    # keep draining at the old pace. Re-stamp pending rows so the new throttle
+    # actually takes effect on the existing queue.
+    if pace_changed:
+        _now = datetime.now(timezone.utc)
+        if (c.seconds_between_sends or 0) == 0:
+            (
+                db.query(CampaignRecipient)
+                .filter(
+                    CampaignRecipient.campaign_id == c.id,
+                    CampaignRecipient.status == "pending",
+                )
+                .update({"send_after": _now}, synchronize_session=False)
+            )
+        else:
+            (
+                db.query(CampaignRecipient)
+                .filter(
+                    CampaignRecipient.campaign_id == c.id,
+                    CampaignRecipient.status == "pending",
+                )
+                .update({"send_after": None}, synchronize_session=False)
+            )
+            _schedule_recipients(db, c)
+        db.commit()
     db.refresh(c)
     return _campaign_dict(c)
 
