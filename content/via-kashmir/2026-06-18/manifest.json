@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-18",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "C",
+      "theme": "Summer escape - cool meadows above the heat",
+      "subject": "Trade the city heat for a Kashmir morning",
+      "campaign_code": "VK-INR-B2C-20260618"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "C",
+      "theme": "Peak summer demand - get listed",
+      "subject": "Peak season is filling the room next door",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260618"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "C",
+      "theme": "Summer rush - rides and shikaras booking now",
+      "subject": "Summer riders are picking a driver today",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260618"
+    }
+  ]
+}
