@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-18",
+  "theme": "Notebooks and writing",
+  "season": "Mid-year planning",
+  "design": "C",
+  "campaign_code": "GG-20260618-6",
+  "campaign_name": "Notebooks worth keeping - 18 Jun 2026",
+  "subject": "Pages with your name",
+  "skus": [
+    "GG1196",
+    "GG1564",
+    "GG1400",
+    "GG1507",
+    "GG1614"
+  ],
+  "products": [
+    {
+      "name": "MAIPEN",
+      "sku": "GG1196",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2449-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1196"
+    },
+    {
+      "name": "MEMOKIT",
+      "sku": "GG1564",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7627-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1564"
+    },
+    {
+      "name": "GROWNOTEBOOK™",
+      "sku": "GG1400",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6225-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1400"
+    },
+    {
+      "name": "MITO PEN",
+      "sku": "GG1507",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6822-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1507"
+    },
+    {
+      "name": "MEMOSTICKY",
+      "sku": "GG1614",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9036-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1614"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20notebooks%20and%20writing%20with%20our%20logo.%20Please%20share%20options."
+}

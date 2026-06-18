@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-18",
+  "theme": "Premium drinkware",
+  "season": "Summer hydration",
+  "design": "C",
+  "campaign_code": "GG-20260618-3",
+  "campaign_name": "Leakproof tumblers - 18 Jun 2026",
+  "subject": "The daily carry, branded",
+  "skus": [
+    "GG1680",
+    "GG1291",
+    "GG1354",
+    "GG1634",
+    "GG1530"
+  ],
+  "products": [
+    {
+      "name": "BELO BOTTLE",
+      "sku": "GG1680",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9812-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1680"
+    },
+    {
+      "name": "ISFORDEN TUMBLER",
+      "sku": "GG1291",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2670-02.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1291"
+    },
+    {
+      "name": "COZYCUP",
+      "sku": "GG1354",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2922-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1354"
+    },
+    {
+      "name": "PIN FLASK",
+      "sku": "GG1634",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9334-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1634"
+    },
+    {
+      "name": "NAMIB BOTTLE",
+      "sku": "GG1530",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6931-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1530"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20premium%20drinkware%20with%20our%20logo.%20Please%20share%20options."
+}

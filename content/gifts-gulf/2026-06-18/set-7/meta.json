@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-18",
+  "theme": "Event giveaways",
+  "season": "Summer events",
+  "design": "A",
+  "campaign_code": "GG-20260618-7",
+  "campaign_name": "Crowd-pleasers - 18 Jun 2026",
+  "subject": "Giveaways they keep",
+  "skus": [
+    "GG1531",
+    "GG1344",
+    "GG1391",
+    "GG1592",
+    "GG1646",
+    "GG1723"
+  ],
+  "products": [
+    {
+      "name": "NAMIB MUG",
+      "sku": "GG1531",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6933-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1531"
+    },
+    {
+      "name": "MUGIVA",
+      "sku": "GG1344",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2890-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1344"
+    },
+    {
+      "name": "BAGLO",
+      "sku": "GG1391",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6186-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1391"
+    },
+    {
+      "name": "TOOLPEN",
+      "sku": "GG1592",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8679-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1592"
+    },
+    {
+      "name": "ILLA TOTE",
+      "sku": "GG1646",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9517-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1646"
+    },
+    {
+      "name": "ASTOGLASS",
+      "sku": "GG1723",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9992-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1723"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20event%20giveaways%20with%20our%20logo.%20Please%20share%20options."
+}

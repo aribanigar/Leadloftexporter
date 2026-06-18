@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-18",
+  "theme": "Eco and sustainable",
+  "season": "Summer",
+  "design": "C",
+  "campaign_code": "GG-20260618-9",
+  "campaign_name": "Recycled hydration - 18 Jun 2026",
+  "subject": "Recycled and refillable",
+  "skus": [
+    "GG1251",
+    "GG1537",
+    "GG1582",
+    "GG1329",
+    "GG1359"
+  ],
+  "products": [
+    {
+      "name": "BLENDIE",
+      "sku": "GG1251",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2574-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1251"
+    },
+    {
+      "name": "ATERA",
+      "sku": "GG1537",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6948-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1537"
+    },
+    {
+      "name": "SQUARED",
+      "sku": "GG1582",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8360-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1582"
+    },
+    {
+      "name": "RE-ONE MOSS",
+      "sku": "GG1329",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2829-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1329"
+    },
+    {
+      "name": "SILBASE",
+      "sku": "GG1359",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2958-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1359"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20eco%20and%20sustainable%20with%20our%20logo.%20Please%20share%20options."
+}

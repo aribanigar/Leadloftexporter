@@ -1,0 +1,43 @@
+{
+  "date": "2026-06-18",
+  "theme": "Eco and sustainable",
+  "season": "Summer",
+  "design": "B",
+  "campaign_code": "GG-20260618-2",
+  "campaign_name": "Recycled materials - 18 Jun 2026",
+  "subject": "Recycled, not forgettable",
+  "skus": [
+    "GG1642",
+    "GG1307",
+    "GG1388",
+    "GG1174"
+  ],
+  "products": [
+    {
+      "name": "BERN BAMBOO",
+      "sku": "GG1642",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9482-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1642"
+    },
+    {
+      "name": "NAMUR",
+      "sku": "GG1307",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2738-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1307"
+    },
+    {
+      "name": "PAPER TONE L",
+      "sku": "GG1388",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6174-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1388"
+    },
+    {
+      "name": "NUNAVUT",
+      "sku": "GG1174",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2383-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1174"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20eco%20and%20sustainable%20with%20our%20logo.%20Please%20share%20options."
+}

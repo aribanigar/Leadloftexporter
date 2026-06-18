@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-18",
+  "theme": "Executive onboarding",
+  "season": "Summer intake",
+  "design": "A",
+  "campaign_code": "GG-20260618-1",
+  "campaign_name": "New starter kits - 18 Jun 2026",
+  "subject": "Kitted from day one",
+  "skus": [
+    "GG1452",
+    "GG1710",
+    "GG1683",
+    "GG1460",
+    "GG1629",
+    "GG1029"
+  ],
+  "products": [
+    {
+      "name": "MEMO SEED",
+      "sku": "GG1452",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6511-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1452"
+    },
+    {
+      "name": "BIELO TUMBLER",
+      "sku": "GG1710",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9927-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1710"
+    },
+    {
+      "name": "KLEUREN BAG",
+      "sku": "GG1683",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9816-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1683"
+    },
+    {
+      "name": "PANDA BAG",
+      "sku": "GG1460",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6550-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1460"
+    },
+    {
+      "name": "PRO WORLD & USB",
+      "sku": "GG1629",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9321-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1629"
+    },
+    {
+      "name": "RELICUP",
+      "sku": "GG1029",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2720-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1029"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20executive%20onboarding%20with%20our%20logo.%20Please%20share%20options."
+}

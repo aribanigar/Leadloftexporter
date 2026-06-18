@@ -1,0 +1,311 @@
+{
+  "date": "2026-06-18",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Executive onboarding",
+      "variant": 1,
+      "campaign_code": "GG-20260618-1",
+      "campaign_name": "New starter kits - 18 Jun 2026",
+      "subject": "Kitted from day one",
+      "skus": [
+        "GG1452",
+        "GG1710",
+        "GG1683",
+        "GG1460",
+        "GG1629",
+        "GG1029"
+      ],
+      "promo": "Their first day. Your logo on it.",
+      "card_products": [
+        {
+          "code": "mo6511-06",
+          "sku": "GG1452",
+          "name": "MEMO SEED"
+        },
+        {
+          "code": "mo9927-03",
+          "sku": "GG1710",
+          "name": "BIELO TUMBLER"
+        },
+        {
+          "code": "mo9816-03",
+          "sku": "GG1683",
+          "name": "KLEUREN BAG"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Eco and sustainable",
+      "variant": 2,
+      "campaign_code": "GG-20260618-2",
+      "campaign_name": "Recycled materials - 18 Jun 2026",
+      "subject": "Recycled, not forgettable",
+      "skus": [
+        "GG1642",
+        "GG1307",
+        "GG1388",
+        "GG1174"
+      ],
+      "promo": "Recycled materials. Lasting impression.",
+      "card_products": [
+        {
+          "code": "mo9482-40",
+          "sku": "GG1642",
+          "name": "BERN BAMBOO"
+        },
+        {
+          "code": "mo2738-03",
+          "sku": "GG1307",
+          "name": "NAMUR"
+        },
+        {
+          "code": "mo6174-03",
+          "sku": "GG1388",
+          "name": "PAPER TONE L"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Premium drinkware",
+      "variant": 3,
+      "campaign_code": "GG-20260618-3",
+      "campaign_name": "Leakproof tumblers - 18 Jun 2026",
+      "subject": "The daily carry, branded",
+      "skus": [
+        "GG1680",
+        "GG1291",
+        "GG1354",
+        "GG1634",
+        "GG1530"
+      ],
+      "promo": "Branded drinkware they keep.",
+      "card_products": [
+        {
+          "code": "mo9812-16",
+          "sku": "GG1680",
+          "name": "BELO BOTTLE"
+        },
+        {
+          "code": "mo2670-02",
+          "sku": "GG1291",
+          "name": "ISFORDEN TUMBLER"
+        },
+        {
+          "code": "mo2922-03",
+          "sku": "GG1354",
+          "name": "COZYCUP"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Bags and travel",
+      "variant": 1,
+      "campaign_code": "GG-20260618-4",
+      "campaign_name": "Warm-weather carry - 18 Jun 2026",
+      "subject": "Branded to go",
+      "skus": [
+        "GG1185",
+        "GG1312",
+        "GG1333",
+        "GG1606",
+        "GG1685",
+        "GG1442"
+      ],
+      "promo": "Your logo. Their everyday carry.",
+      "card_products": [
+        {
+          "code": "mo2408-03",
+          "sku": "GG1185",
+          "name": "FELTOTE"
+        },
+        {
+          "code": "mo2754-03",
+          "sku": "GG1312",
+          "name": "BRENNA POUCH"
+        },
+        {
+          "code": "mo2858-13",
+          "sku": "GG1333",
+          "name": "BAGA"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Tech and desk",
+      "variant": 2,
+      "campaign_code": "GG-20260618-5",
+      "campaign_name": "Desk tech - 18 Jun 2026",
+      "subject": "Tech they plug in daily",
+      "skus": [
+        "GG1362",
+        "GG1288",
+        "GG1068",
+        "GG1159"
+      ],
+      "promo": "Desk tech, branded to your spec.",
+      "card_products": [
+        {
+          "code": "mo2980-06",
+          "sku": "GG1362",
+          "name": "MUV USB AC30 PD"
+        },
+        {
+          "code": "mo2663-01",
+          "sku": "GG1288",
+          "name": "TINTRAY"
+        },
+        {
+          "code": "mo2080-06",
+          "sku": "GG1068",
+          "name": "TECHMATE RABS"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "variant": 3,
+      "campaign_code": "GG-20260618-6",
+      "campaign_name": "Notebooks worth keeping - 18 Jun 2026",
+      "subject": "Pages with your name",
+      "skus": [
+        "GG1196",
+        "GG1564",
+        "GG1400",
+        "GG1507",
+        "GG1614"
+      ],
+      "promo": "Notebooks they actually use.",
+      "card_products": [
+        {
+          "code": "mo2449-03",
+          "sku": "GG1196",
+          "name": "MAIPEN"
+        },
+        {
+          "code": "mo7627-06",
+          "sku": "GG1564",
+          "name": "MEMOKIT"
+        },
+        {
+          "code": "mo6225-13",
+          "sku": "GG1400",
+          "name": "GROWNOTEBOOK™"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event giveaways",
+      "variant": 1,
+      "campaign_code": "GG-20260618-7",
+      "campaign_name": "Crowd-pleasers - 18 Jun 2026",
+      "subject": "Giveaways they keep",
+      "skus": [
+        "GG1531",
+        "GG1344",
+        "GG1391",
+        "GG1592",
+        "GG1646",
+        "GG1723"
+      ],
+      "promo": "Hand it out. They keep it.",
+      "card_products": [
+        {
+          "code": "mo6933-01",
+          "sku": "GG1531",
+          "name": "NAMIB MUG"
+        },
+        {
+          "code": "mo2890-03",
+          "sku": "GG1344",
+          "name": "MUGIVA"
+        },
+        {
+          "code": "mo6186-07",
+          "sku": "GG1391",
+          "name": "BAGLO"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Seasonal occasions",
+      "variant": 2,
+      "campaign_code": "GG-20260618-8",
+      "campaign_name": "Warm-weather wellness - 18 Jun 2026",
+      "subject": "Summer, your brand on it",
+      "skus": [
+        "GG1678",
+        "GG1003",
+        "GG1604",
+        "GG1169"
+      ],
+      "promo": "Warm-weather gifts, your mark.",
+      "card_products": [
+        {
+          "code": "mo9800-03",
+          "sku": "GG1678",
+          "name": "ASPEN GLASS"
+        },
+        {
+          "code": "it0971-04",
+          "sku": "GG1003",
+          "name": "Classic Pullover Hoodie"
+        },
+        {
+          "code": "mo8941-16",
+          "sku": "GG1604",
+          "name": "OMBRA POUCH"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "variant": 3,
+      "campaign_code": "GG-20260618-9",
+      "campaign_name": "Recycled hydration - 18 Jun 2026",
+      "subject": "Recycled and refillable",
+      "skus": [
+        "GG1251",
+        "GG1537",
+        "GG1582",
+        "GG1329",
+        "GG1359"
+      ],
+      "promo": "Recycled drinkware, your logo.",
+      "card_products": [
+        {
+          "code": "mo2574-04",
+          "sku": "GG1251",
+          "name": "BLENDIE"
+        },
+        {
+          "code": "mo6948-16",
+          "sku": "GG1537",
+          "name": "ATERA"
+        },
+        {
+          "code": "mo8360-03",
+          "sku": "GG1582",
+          "name": "SQUARED"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "date": "2026-06-18",
+  "theme": "Seasonal occasions",
+  "season": "Summer",
+  "design": "B",
+  "campaign_code": "GG-20260618-8",
+  "campaign_name": "Warm-weather wellness - 18 Jun 2026",
+  "subject": "Summer, your brand on it",
+  "skus": [
+    "GG1678",
+    "GG1003",
+    "GG1604",
+    "GG1169"
+  ],
+  "products": [
+    {
+      "name": "ASPEN GLASS",
+      "sku": "GG1678",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9800-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1678"
+    },
+    {
+      "name": "Classic Pullover Hoodie",
+      "sku": "GG1003",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it0971-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1003"
+    },
+    {
+      "name": "OMBRA POUCH",
+      "sku": "GG1604",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8941-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1604"
+    },
+    {
+      "name": "BAGGA",
+      "sku": "GG1169",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2372-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1169"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20seasonal%20occasions%20with%20our%20logo.%20Please%20share%20options."
+}

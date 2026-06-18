@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-18",
+  "theme": "Bags and travel",
+  "season": "Summer travel",
+  "design": "A",
+  "campaign_code": "GG-20260618-4",
+  "campaign_name": "Warm-weather carry - 18 Jun 2026",
+  "subject": "Branded to go",
+  "skus": [
+    "GG1185",
+    "GG1312",
+    "GG1333",
+    "GG1606",
+    "GG1685",
+    "GG1442"
+  ],
+  "products": [
+    {
+      "name": "FELTOTE",
+      "sku": "GG1185",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2408-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1185"
+    },
+    {
+      "name": "BRENNA POUCH",
+      "sku": "GG1312",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2754-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1312"
+    },
+    {
+      "name": "BAGA",
+      "sku": "GG1333",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2858-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1333"
+    },
+    {
+      "name": "APO BAG",
+      "sku": "GG1606",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8959-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1606"
+    },
+    {
+      "name": "PORTO BAG",
+      "sku": "GG1685",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9817-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1685"
+    },
+    {
+      "name": "STYLE POUCH",
+      "sku": "GG1442",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6421-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1442"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20bags%20and%20travel%20with%20our%20logo.%20Please%20share%20options."
+}

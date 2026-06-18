@@ -1,0 +1,43 @@
+{
+  "date": "2026-06-18",
+  "theme": "Tech and desk",
+  "season": "Mid-year",
+  "design": "B",
+  "campaign_code": "GG-20260618-5",
+  "campaign_name": "Desk tech - 18 Jun 2026",
+  "subject": "Tech they plug in daily",
+  "skus": [
+    "GG1362",
+    "GG1288",
+    "GG1068",
+    "GG1159"
+  ],
+  "products": [
+    {
+      "name": "MUV USB AC30 PD",
+      "sku": "GG1362",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2980-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1362"
+    },
+    {
+      "name": "TINTRAY",
+      "sku": "GG1288",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2663-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1288"
+    },
+    {
+      "name": "TECHMATE RABS",
+      "sku": "GG1068",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2080-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1068"
+    },
+    {
+      "name": "POWERFLAT8C",
+      "sku": "GG1159",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2340-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1159"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-18/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20tech%20and%20desk%20with%20our%20logo.%20Please%20share%20options."
+}
