@@ -598,10 +598,15 @@
     let result;
     try {
       result = await Api.syncProfile(enriched);
+      // Show ALL six captured fields so the user gets visible confirmation
+      // that name/title/company/email/phone/location/website all landed.
       const fields = [
         enriched.email && "email",
         enriched.phone && "phone",
         enriched.location && "location",
+        enriched.title && "title",
+        enriched.company_name && "company",
+        enriched.company_url && "website",
       ].filter(Boolean);
       const fieldsLabel = fields.length ? ` (${fields.join(" + ")})` : "";
       flashStatus(

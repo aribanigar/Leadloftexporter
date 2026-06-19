@@ -19,6 +19,16 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.284",
+    date: "Jun 19, 2026",
+    size: "246 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.284.zip",
+    latest: true,
+    changes: [
+      "Save Lead success toast now lists ALL captured fields (email + phone + location + title + company + website) so you get visible confirmation that everything landed. No change to the actual capture/sync logic — that audit is in the field-by-field summary below.",
+    ],
+  },
+  {
     version: "1.0.283",
     date: "Jun 19, 2026",
     size: "246 KB",
