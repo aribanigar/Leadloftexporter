@@ -209,6 +209,8 @@ git checkout main && git cherry-pick <commit-hash> && git push -u origin main
 
 Key schema facts (confirmed 2026-06-19): item table = `content_assets`, folder table = `content_businesses`, body column = `content` (not `body`), id requires manual UUID generation (no default), tags is JSONB NOT NULL (pass `[]`).
 
+**Type enum** (must match exactly or items show as broken "Other" in the UI): `html_email | whatsapp | caption | sms | other`. Use `html_email` for emails (NOT `email`). LinkedIn posts use `type: caption` + `platform: linkedin`. Outreach messages use `type: other`.
+
 ### Daily content pipeline (`/content` + `/scripts`)
 
 A side-channel for AI-routine-generated marketing content. Each business has its own folder under `content/<biz-slug>/`. The current consumer is **Gifts Gulf** (corporate-gifting catalogue marketing in AED/SAR/QAR).

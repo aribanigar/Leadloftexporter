@@ -112,12 +112,19 @@ def publish(folder_name, items):
             continue
         item_id = str(uuid.uuid4())
         body = item.get("body") or item.get("body_html") or ""
-        itype = item.get("type", "email")
+        itype = item.get("type", "html_email")
         image_url = item.get("image_url") or ""
-        sql(
-            "insert into content_assets (id, workspace_id, business_id, title, type, content, image_url, tags) values (%s, %s, %s, %s, %s, %s, %s, %s)",
-            [item_id, _WS, business_id, title, itype, body, image_url, []]
-        )
+        platform = item.get("platform") or None
+        if platform:
+            sql(
+                "insert into content_assets (id, workspace_id, business_id, title, type, content, image_url, platform, tags) values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                [item_id, _WS, business_id, title, itype, body, image_url, platform, []]
+            )
+        else:
+            sql(
+                "insert into content_assets (id, workspace_id, business_id, title, type, content, image_url, tags) values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                [item_id, _WS, business_id, title, itype, body, image_url, []]
+            )
         created += 1
     print(f"OK  folder='{folder_name}' business_id={business_id} created={created} skipped={skipped}")
 

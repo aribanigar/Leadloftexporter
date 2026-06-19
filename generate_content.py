@@ -203,10 +203,10 @@ e1_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media", "type": "email", "body": e1_html, "image_url": img1},
+    {"title": f"[{DATE}] Construction and Real Estate | Social Media", "type": "html_email", "body": e1_html, "image_url": img1},
     {"title": f"[{DATE}] Construction and Real Estate | Social Media (WhatsApp)", "type": "whatsapp", "body": e1_wa, "image_url": img1},
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media (LinkedIn)", "type": "linkedin", "body": e1_li, "image_url": img1},
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media (Outreach)", "type": "outreach", "body": e1_outreach, "image_url": img1},
+    {"title": f"[{DATE}] Construction and Real Estate | Social Media (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e1_li, "image_url": img1},
+    {"title": f"[{DATE}] Construction and Real Estate | Social Media (Outreach)", "type": "other", "body": e1_outreach, "image_url": img1},
 ]
 print("  Email 1 done")
 
@@ -259,10 +259,10 @@ e2_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO", "type": "email", "body": e2_html, "image_url": img2},
+    {"title": f"[{DATE}] Education and Research | SEO AEO GEO", "type": "html_email", "body": e2_html, "image_url": img2},
     {"title": f"[{DATE}] Education and Research | SEO AEO GEO (WhatsApp)", "type": "whatsapp", "body": e2_wa, "image_url": img2},
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (LinkedIn)", "type": "linkedin", "body": e2_li, "image_url": img2},
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (Outreach)", "type": "outreach", "body": e2_outreach, "image_url": img2},
+    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e2_li, "image_url": img2},
+    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (Outreach)", "type": "other", "body": e2_outreach, "image_url": img2},
 ]
 print("  Email 2 done")
 
@@ -312,10 +312,10 @@ e3_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program", "type": "email", "body": e3_html, "image_url": img3},
+    {"title": f"[{DATE}] Construction and Real Estate | Industry Program", "type": "html_email", "body": e3_html, "image_url": img3},
     {"title": f"[{DATE}] Construction and Real Estate | Industry Program (WhatsApp)", "type": "whatsapp", "body": e3_wa, "image_url": img3},
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (LinkedIn)", "type": "linkedin", "body": e3_li, "image_url": img3},
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (Outreach)", "type": "outreach", "body": e3_outreach, "image_url": img3},
+    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e3_li, "image_url": img3},
+    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (Outreach)", "type": "other", "body": e3_outreach, "image_url": img3},
 ]
 print("  Email 3 done")
 
@@ -365,10 +365,10 @@ e4_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] Education and Research | Industry Program", "type": "email", "body": e4_html, "image_url": img4},
+    {"title": f"[{DATE}] Education and Research | Industry Program", "type": "html_email", "body": e4_html, "image_url": img4},
     {"title": f"[{DATE}] Education and Research | Industry Program (WhatsApp)", "type": "whatsapp", "body": e4_wa, "image_url": img4},
-    {"title": f"[{DATE}] Education and Research | Industry Program (LinkedIn)", "type": "linkedin", "body": e4_li, "image_url": img4},
-    {"title": f"[{DATE}] Education and Research | Industry Program (Outreach)", "type": "outreach", "body": e4_outreach, "image_url": img4},
+    {"title": f"[{DATE}] Education and Research | Industry Program (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e4_li, "image_url": img4},
+    {"title": f"[{DATE}] Education and Research | Industry Program (Outreach)", "type": "other", "body": e4_outreach, "image_url": img4},
 ]
 print("  Email 4 done")
 
@@ -422,10 +422,10 @@ e5_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content", "type": "email", "body": e5_html, "image_url": img5},
+    {"title": f"[{DATE}] AI Work Studio | Cinematic Content", "type": "html_email", "body": e5_html, "image_url": img5},
     {"title": f"[{DATE}] AI Work Studio | Cinematic Content (WhatsApp)", "type": "whatsapp", "body": e5_wa, "image_url": img5},
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (LinkedIn)", "type": "linkedin", "body": e5_li, "image_url": img5},
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (Outreach)", "type": "outreach", "body": e5_outreach, "image_url": img5},
+    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e5_li, "image_url": img5},
+    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (Outreach)", "type": "other", "body": e5_outreach, "image_url": img5},
 ]
 print("  Email 5 done")
 
@@ -477,10 +477,10 @@ e6_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure", "type": "email", "body": e6_html, "image_url": img6},
+    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure", "type": "html_email", "body": e6_html, "image_url": img6},
     {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (WhatsApp)", "type": "whatsapp", "body": e6_wa, "image_url": img6},
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (LinkedIn)", "type": "linkedin", "body": e6_li, "image_url": img6},
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (Outreach)", "type": "outreach", "body": e6_outreach, "image_url": img6},
+    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e6_li, "image_url": img6},
+    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (Outreach)", "type": "other", "body": e6_outreach, "image_url": img6},
 ]
 print("  Email 6 done")
 
@@ -533,10 +533,10 @@ e7_outreach = outreach(
 )
 
 batch += [
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform", "type": "email", "body": e7_html, "image_url": img7},
+    {"title": f"[{DATE}] School ERP | SchoolOS Platform", "type": "html_email", "body": e7_html, "image_url": img7},
     {"title": f"[{DATE}] School ERP | SchoolOS Platform (WhatsApp)", "type": "whatsapp", "body": e7_wa, "image_url": img7},
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform (LinkedIn)", "type": "linkedin", "body": e7_li, "image_url": img7},
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform (Outreach)", "type": "outreach", "body": e7_outreach, "image_url": img7},
+    {"title": f"[{DATE}] School ERP | SchoolOS Platform (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e7_li, "image_url": img7},
+    {"title": f"[{DATE}] School ERP | SchoolOS Platform (Outreach)", "type": "other", "body": e7_outreach, "image_url": img7},
 ]
 print("  Email 7 done")
 
