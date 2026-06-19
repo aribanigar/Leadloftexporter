@@ -1215,10 +1215,9 @@
 
     // Retry up to 3 more times if the modal opened but the contents weren't
     // rendered yet. Cheap React fiddly markup — the email/phone anchors
-    // can take 1-4 seconds to appear after the dialog mounts. We let the
-    // loop run all 3 retries unless every field is already populated;
-    // bailing on just email+phone (the old behaviour) lost website /
-    // address when LinkedIn rendered them in a slightly later React tick.
+    // can take 1-4 seconds to appear after the dialog mounts. We bail
+    // early once we have something useful (email or phone), capped at
+    // 6s total wait so the user doesn't sit on a hung Save button.
     for (let attempt = 0; attempt < 3; attempt++) {
       if (data.email && data.phone && data.address) break;
       await _sleep(350);
@@ -1232,6 +1231,7 @@
         website: data.website || next.website,
         address: data.address || next.address,
       };
+      if (data.email || data.phone) break;
     }
 
     // Always close the modal when not on the overlay URL directly.

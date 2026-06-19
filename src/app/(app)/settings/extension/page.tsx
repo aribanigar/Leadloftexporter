@@ -19,14 +19,24 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.280",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.280.zip",
+    latest: true,
+    changes: [
+      "Autopilot enrichment is now byte-for-byte v1.0.258 behaviour. Final root cause for the 'Timed out' chips on background tabs: a single line I left in scraper.js (removed the retry-loop early-exit) added ~700ms to the foreground retry budget — but in a backgrounded tab Chrome throttles setTimeout to ≥1s, so the same loop ran ~3s instead of ~1s, and combined with everything else pushed the per-profile in-tab time past the service-worker's 22s safety ceiling.",
+      "extension/content/main.js + extension/content/scraper.js are now reverted entirely to commit 5ab5831 (v1.0.258). The enrichment flow — service-worker tab open, in-tab safety timer, scrapeContactInfo timing, post-sync sleep, autopilot tick — is identical to the version that was working in your earlier runs.",
+      "Kept (orthogonal to enrichment): backend overwrite for location/avatar/company on re-save, overlay Step 1 override for the floating Save Lead button, new coral/pink icon.",
+    ],
+  },
+  {
     version: "1.0.279",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.279.zip",
-    latest: true,
     changes: [
-      "Fix 'Timed out' on autopilot enrichment chips. Root cause: the service-worker has its OWN 22-second safety timer (separate from the in-tab one), and v1.0.278's three in-tab changes (30s in-tab ceiling, sync retry-on-failure, 1.5–2s post-sync sleep) made the per-profile in-tab budget exceed 22s on slow profiles — so the service-worker killed the tab and marked the chip 'Timed out' before the in-tab pipeline could finish. Reverted main.js entirely to the v1.0.258/v1.0.267 baseline timings (18s safety, single-shot sync, 80–200ms post-sync) so the in-tab pipeline fits comfortably under the SW ceiling exactly like v1.0.258.",
-      "Kept: backend overwrite for location/avatar/company on re-save, scraper retry-loop early-exit fix, overlay Step 1 override for name/title/company — those are unrelated to the timeout.",
+      "(superseded by v1.0.280 — main.js was reverted but the scraper.js retry-loop change was still adding ~2s to background-tab enrichment, tripping the SW timer.)",
     ],
   },
   {
