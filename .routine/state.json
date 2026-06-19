@@ -1,0 +1,41 @@
+{
+  "last_run": "2026-06-19",
+  "industries_used": [
+    "Construction and Real Estate",
+    "Education and Research",
+    "Agribusiness",
+    "Consumer Products",
+    "Life Sciences and Healthcare",
+    "Retail",
+    "Wholesale Distribution",
+    "Aerospace and Defense",
+    "Automotive",
+    "High Tech",
+    "Industrial Manufacturing",
+    "Mill Products",
+    "Chemicals",
+    "Mining",
+    "Oil Gas and Energy",
+    "Utilities",
+    "Media Sports and Entertainment",
+    "Professional Services",
+    "Telecommunications",
+    "Travel and Transportation",
+    "Defense and Security",
+    "Government",
+    "Financial Services"
+  ],
+  "next_candidates": [
+    "Agribusiness",
+    "Consumer Products"
+  ],
+  "run_history": [
+    {
+      "date": "2026-06-19",
+      "industries": ["Construction and Real Estate", "Education and Research"],
+      "items_created": 28,
+      "folder": "hudace",
+      "business_id": "49f307c1-7f19-4b0d-845d-3532f77fa92d"
+    }
+  ]
+}
