@@ -1215,7 +1215,13 @@
       try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
       setTimeout(() => { try { window.close(); } catch {} }, 250);
     };
-    const safetyTimer = setTimeout(closeSelf, 18_000);
+    // 30s safety ceiling (was 18s) — gives the scrape + sync comfortable
+    // headroom on slow profiles, slow connections, or Render cold starts.
+    // Background tabs can take longer because Chrome throttles setTimeout
+    // and LinkedIn pauses some hydration; the previous 18s was hitting the
+    // wire before Api.syncProfile completed, so the tab died mid-fetch and
+    // the row never landed in the CRM.
+    const safetyTimer = setTimeout(closeSelf, 30_000);
     let redirected = false;
 
     try {
@@ -1298,10 +1304,25 @@
       const segParam = params.get("lc_segment");
       if (segParam) profile.segment = segParam;
 
-      try {
-        await globalThis.__lcApi.syncProfile(profile);
-      } catch (e) {
-        console.warn("[LeadCaptura] enrichment sync failed", e?.message);
+      // Sync the captured profile to the CRM. Retry up to 2 extra times on
+      // transient failure (Render cold-start, brief network blip, etc.) —
+      // the previous fire-and-forget single-shot was the main cause of
+      // 'tab opened but row never appeared in CRM' when the API was warming
+      // up. Total wait between retries ~2s; the safety timer above has
+      // plenty of headroom for this.
+      let syncedOk = false;
+      for (let s = 0; s < 3; s++) {
+        try {
+          await globalThis.__lcApi.syncProfile(profile);
+          syncedOk = true;
+          break;
+        } catch (e) {
+          console.warn("[LeadCaptura] enrichment sync attempt", s + 1, "failed:", e?.message);
+          if (s < 2) await new Promise((r) => setTimeout(r, 700 + s * 700));
+        }
+      }
+      if (!syncedOk) {
+        console.warn("[LeadCaptura] enrichment sync gave up after 3 attempts");
       }
 
       // Website scraping: fill any missing email / phone / location from the
@@ -1355,7 +1376,13 @@
         } catch { /* best-effort */ }
       }
 
-      await Human.sleep(Human.rand(80, 200));
+      // Keep the tab open ~1.5–2s after sync so any in-flight HTTP keep-alive
+      // packet, retry logic, and the backend's response handshake all finish
+      // before window.close() yanks the renderer. Previous 80-200ms was too
+      // tight on slow connections — sync would complete but the tab closed
+      // before the response was acked, and on some networks Chrome's beacon
+      // sender silently dropped the request.
+      await Human.sleep(Human.rand(1500, 2000));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {

@@ -19,14 +19,26 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.278",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.278.zip",
+    latest: true,
+    changes: [
+      "Autopilot enrichment — CRM sync is now resilient. Three changes vs v1.0.277, all inside maybeRunEnrichmentTrigger (the background tab that opens after a per-card Save):",
+      "(1) Safety ceiling 18s → 30s. Slow profiles + Render cold-start were hitting the wire before Api.syncProfile completed; the tab got force-closed mid-fetch and the row never landed in CRM.",
+      "(2) syncProfile now retries up to 2 extra times on transient failure (700ms, then 1400ms backoff). A single network blip during Render warm-up no longer silently drops the entire scrape.",
+      "(3) Post-sync sleep 80–200ms → 1500–2000ms. The tab stays open ~1.5–2s after sync so any keep-alive packet and the backend's response handshake finish before window.close() yanks the renderer. On slow connections the old 80ms was closing the tab before the response was acked.",
+      "Backend CRM overwrite for location/avatar/company kept from v1.0.276 so re-saves still reflect the canonical /in/ scrape.",
+    ],
+  },
+  {
     version: "1.0.277",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.277.zip",
-    latest: true,
     changes: [
-      "Autopilot enrichment back to v1.0.267 timing. v1.0.276 introduced a visibility-aware retry (5×700ms in background tabs) that pushed the per-tab end-to-end too close to the maybeRunEnrichmentTrigger 18s safety timer — the autopilot tab was being force-closed before Api.syncProfile finished, so profiles opened in the background but never reached the CRM. Reverted to 3×350ms unconditionally (byte-for-byte v1.0.267 background-tab budget) so the safety timer always has comfortable headroom.",
-      "Backend CRM overwrite for location/avatar/company kept (v1.0.276) so re-saves still reflect the canonical /in/ scrape.",
+      "Autopilot enrichment back to v1.0.267 timing (visibility-aware retry was tripping the 18s safety timer).",
     ],
   },
   {
