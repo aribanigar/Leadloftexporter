@@ -19,6 +19,18 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.282",
+    date: "Jun 19, 2026",
+    size: "246 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.282.zip",
+    latest: true,
+    changes: [
+      "Message All — 'Message everyone' now walks through ALL pages of a people-search results list, not just the current page. Root cause: the existing pagination logic only knew the 'Show more results' load-more button (used on the connections page); on the people-search results page (the layout with numeric pages 64, 65, 66… Next ›) there is no 'Show more results' button, so the engine stopped at the end of the current page.",
+      "Both Message All paths (toolbar 'Message All Visible Connections' and the Case-2 connections-page flow) now try 'Show more results' first, and if that doesn't exist, fall back to clicking the 'Next' pagination button. After click, wait until the page-signature flips (URL or active-page indicator change) up to 8s, then re-decorate cards before continuing with the new batch.",
+      "Anti-bot pacing and 15-30s inter-send gap unchanged; this is purely about ending-of-page navigation.",
+    ],
+  },
+  {
     version: "1.0.281",
     date: "Jun 19, 2026",
     size: "245 KB",

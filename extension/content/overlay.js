@@ -8025,15 +8025,44 @@
         }
       }
 
-      // ── "Message Everyone": load the next batch via "Show more results" ──
+      // ── "Message Everyone" pagination ──
+      // Two page-styles to handle:
+      //   A) "Show more results" load-more button (scaffold-finite-scroll —
+      //      connections page, some search variants). Click → cards stream
+      //      into the SAME page, no URL change.
+      //   B) Numeric pagination + "Next" button (people search results page
+      //      shown in the user's screenshot: pages 64/65/66… Next ›). Click
+      //      → URL changes to page=N+1, the whole results list re-renders.
+      // Without (B), "Message everyone" stopped at the end of the current
+      // page on the people-search layout because the load-more button
+      // simply doesn't exist there.
       if (!loadMore || userSelected || state.messageCancel) break;
-      const moreBtn = _findShowMoreResultsButton();
-      if (!moreBtn) break;                       // no more pages → done
-      _lcToast("⏭ Loading more results…", 1800);
-      try { moreBtn.scrollIntoView({ block: "center" }); } catch {}
+      let pageBtn = _findShowMoreResultsButton();
+      let pageMode = "loadmore";
+      if (!pageBtn) {
+        pageBtn = _findNextPageButton();
+        pageMode = "next";
+      }
+      if (!pageBtn) break;                       // no more pages → done
+      _lcToast(
+        pageMode === "next" ? "⏭ Loading next page…" : "⏭ Loading more results…",
+        1800
+      );
+      const sigBefore = _pageSignature();
+      try { pageBtn.scrollIntoView({ block: "center" }); } catch {}
       await sleep(400 + Math.random() * 300);
-      try { await dispatchHumanClick(moreBtn); } catch { try { moreBtn.click(); } catch {} }
-      await sleep(2000);                         // wait ~2s for the new results to load
+      try { await dispatchHumanClick(pageBtn); } catch { try { pageBtn.click(); } catch {} }
+      // Numeric pagination triggers a real route change and the results list
+      // can take 3-6s to fully re-render. Load-more is faster (~2s). Wait
+      // for the page signature to flip OR until we hit a generous ceiling.
+      const waitCeiling = pageMode === "next" ? 8000 : 3500;
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < waitCeiling) {
+        await sleep(400);
+        if (_pageSignature() !== sigBefore) break;
+      }
+      // Extra settle so the chip-decorate pass below sees the final DOM.
+      await sleep(pageMode === "next" ? 1500 : 700);
       try { decorateSearchCards(); } catch {}    // chip the freshly loaded cards
       await sleep(700 + Math.random() * 400);
       const fresh = _allChipUrls().filter((u) => u && u.includes("/in/") && !processedUrls.has(u));
@@ -9713,21 +9742,36 @@
       }
     }
 
-      // ── "Message Everyone": load the next batch via "Show more results" ──
+      // ── "Message Everyone" pagination — handle BOTH page styles ──
+      // (A) "Show more results" load-more (connections / some search variants)
+      // (B) Numeric "Next page" pagination (people-search results page)
       if (!loadMore || _case2State.cancelled) break;
-      const moreBtn = _findShowMoreResultsButton();
-      if (!moreBtn) {
+      let pageBtn = _findShowMoreResultsButton();
+      let pageMode = "loadmore";
+      if (!pageBtn) {
+        pageBtn = _findNextPageButton();
+        pageMode = "next";
+      }
+      if (!pageBtn) {
         statusEl.textContent = "No more results to load — finishing.";
         await sleep(800);
         break;
       }
-      statusEl.textContent = "Loading more results…";
-      try { moreBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+      statusEl.textContent = pageMode === "next" ? "Loading next page…" : "Loading more results…";
+      const sigBefore = _pageSignature();
+      try { pageBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
       await sleep(400);
-      try { moreBtn.click(); } catch (e) { _pointerClick(moreBtn); }
-      // Per user spec: wait 2s after the click, then give cards time to render.
-      await sleep(2000);
-      await sleep(1500);
+      try { pageBtn.click(); } catch (e) { _pointerClick(pageBtn); }
+      // Numeric pagination triggers a real route change and the results list
+      // re-renders; wait for the page signature to flip OR until a ceiling.
+      const waitCeiling = pageMode === "next" ? 8000 : 3500;
+      const waitStart = Date.now();
+      while (Date.now() - waitStart < waitCeiling) {
+        await sleep(400);
+        if (_pageSignature() !== sigBefore) break;
+      }
+      // Extra settle so the case2-decorate pass below sees the final DOM.
+      await sleep(pageMode === "next" ? 1500 : 1500);
       // Trigger fresh decoration so newly mounted cards get checkboxes/chips.
       try { _decorateCase2Cards(); } catch (e) {}
       await sleep(400);
