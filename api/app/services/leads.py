@@ -374,17 +374,10 @@ def ingest_lead(
             old = getattr(lead, attr)
             if val and (not old or _is_ui_noise(old)):
                 setattr(lead, attr, val)
-        # Location, avatar — OVERWRITE when the extension supplies a fresh
-        # value. The /in/<handle> profile page is the authoritative source,
-        # so a more recent scrape from there always wins. (Previously these
-        # were fill-only, which is why some leads showed up in the CRM
-        # without location/avatar even after the user clicked Save Lead on
-        # an already-captured row: the row already had a stale value and
-        # the new accurate one was silently dropped.)
-        if capped.get("location"):
-            lead.location = capped["location"]
-        if capped.get("avatar_url"):
-            lead.avatar_url = capped["avatar_url"]
+        for attr in ("location", "avatar_url"):
+            val = capped.get(attr)
+            if val and not getattr(lead, attr):
+                setattr(lead, attr, val)
         # Fill-only first/last for the case where full_name was already
         # correct and only the individual name parts were missing.
         for attr in ("first_name", "last_name"):
@@ -402,11 +395,7 @@ def ingest_lead(
             lead.email = capped["email"]
         if capped.get("phone"):
             lead.phone = capped["phone"]
-        # Company — OVERWRITE when the fresh scrape resolved a company.
-        # Was fill-only, which left rows pinned to the WRONG company when
-        # the original card-level save matched a generic name (e.g. "Google"
-        # vs the actual employer pulled from the profile's experience block).
-        if company:
+        if company and not lead.company_id:
             lead.company_id = company.id
         merged_custom = dict(lead.custom or {})
         merged_custom.update({k: v for k, v in (payload.get("raw") or {}).items() if v is not None})

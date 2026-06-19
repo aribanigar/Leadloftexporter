@@ -19,16 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.274",
+    date: "Jun 19, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.274.zip",
+    latest: true,
+    changes: [
+      "Reverted to v1.0.267 behaviour (the good autopilot baseline) and applied a single-line fix for the rare skipping of email/phone/website/location. Root cause was one early-exit inside scrapeContactInfo's retry loop: 'if (data.email || data.phone) break;' was firing the moment EITHER field appeared, before LinkedIn had a chance to render website + address in its next React tick. Removed that line so the loop now always runs all 3 retries unless every field is already populated. No other behavioural changes — autopilot, the avatar filter, headline scraping, the modal close timing all match v1.0.267 exactly.",
+    ],
+  },
+  {
     version: "1.0.273",
     date: "Jun 19, 2026",
     size: "247 KB",
     file: "/extensions/leadcaptura-extension-v1.0.273.zip",
-    latest: true,
     changes: [
-      "CRM sync — location, avatar and company now update reliably on a re-save. They were FILL-ONLY in the backend ingest path, which is why some leads showed in the CRM without a location/company even after the extension's floating panel said 'Saved ✓ (location)': the row already had a stale value (often from the initial card-level save) and the new accurate scrape was silently dropped. Now they OVERWRITE (matching the email/phone behaviour), since the /in/ profile page is the authoritative source.",
-      "Save Lead — no longer accidentally opens the profile-picture lightbox while reading. Root cause: LinkedIn 2026 renamed photo overlay paths from /overlay/photo/ → /details/photo/ (and added /details/profile-picture/), so the avatar-rejection filter inside _findContactInfoLink missed them. When the strict contact-info selector returned nothing, the text/aria-label fallback was returning the avatar anchor instead, and clicking it popped the photo viewer.",
-      "Expanded the avatar filter to cover all 2026 photo paths, structural cues (any element whose ancestor matches [class*='profile-picture'] / [class*='profile-photo'] / [class*='profile-image'] / [class*='top-card__non-self-photo']) and aria-label hints ('Open photo', 'View photo', 'Profile picture').",
-      "The fallback also now requires that any anchor candidate either have NO href OR an href containing 'contact-info' — text alone is no longer enough.",
+      "(superseded by v1.0.274 — reverted to v1.0.267 baseline)",
     ],
   },
   {

@@ -1267,7 +1267,7 @@
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 700,
+        settleMs: 400,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
@@ -1355,11 +1355,7 @@
         } catch { /* best-effort */ }
       }
 
-      // Hold the tab open for ~1.8s after the sync completes so the user can
-      // SEE the profile rendered + data captured before it disappears. The
-      // previous 80-200ms window was so fast the tab looked like a glitch
-      // ("opens and closes too fast"). Cap is the safetyTimer at 18s.
-      await Human.sleep(Human.rand(1500, 2200));
+      await Human.sleep(Human.rand(80, 200));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {
@@ -1463,7 +1459,7 @@
       let contact = {};
       try {
         contact = await Scraper.scrapeContactInfo({
-          settleMs: 700,
+          settleMs: 400,
           allowPushStateFallback: true,
         }) || {};
       } catch {}

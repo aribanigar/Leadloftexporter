@@ -361,38 +361,6 @@
       }
       if (!headline) headline = _firstTextAfter(h1);
     }
-    // Fallback: LinkedIn 2026 nests the headline inside the top card in a
-    // div with class .text-body-medium / data-* hooks that's NOT a direct
-    // sibling of <h1>. Search the top card explicitly when the sibling
-    // walk above turned up nothing.
-    if (!headline && card) {
-      const headlineSelectors = [
-        ".text-body-medium.break-words",
-        "[data-test-id='profile-headline']",
-        "[data-anonymize='headline']",
-        ".pv-text-details__title",
-        ".pv-top-card--list .text-body-medium",
-        ".text-body-medium",
-      ];
-      for (const sel of headlineSelectors) {
-        const candidates = card.querySelectorAll(sel);
-        for (const el of candidates) {
-          const t = _txt(el);
-          if (
-            t &&
-            t.length > 4 &&
-            t.length < 400 &&
-            t !== fullName &&
-            !_isFeedNoise(t) &&
-            !/connect|message|follow|more|premium|contact info/i.test(t)
-          ) {
-            headline = t;
-            break;
-          }
-        }
-        if (headline) break;
-      }
-    }
 
     // Location: typically a short string in the top card. Strategy:
     //   Pass 1 — explicit aria/data attribute (LinkedIn sometimes adds these).
@@ -556,36 +524,9 @@
     // whose tooltip happens to contain "contact info" — clicking it
     // opens the avatar lightbox instead of the Contact info modal,
     // which is the bug the user reported during enrichment runs.
-    //
-    // LinkedIn 2026 RENAMED /overlay/ → /details/ for many sub-routes
-    // (including profile-picture / cover-image), so the old href regex
-    // missed them and the fallback was returning the avatar anchor →
-    // clicking it popped the photo viewer. Cover all known photo paths
-    // here AND treat any element whose ancestor is the avatar wrapper
-    // / has an <img> descendant as off-limits.
     function _isAvatarOverlay(n) {
-      if (!n) return false;
-      const href = (n.getAttribute?.("href") || "");
-      if (/\/(overlay|details)\/(photo|edit-photo|cover|profile-picture|cover-image|profile-image)/i.test(href)) return true;
-      // Structural: any element inside .pv-top-card__non-self-photo-wrapper /
-      // .pv-top-card-profile-picture / [class*='profile-picture'] / a button
-      // whose direct child is the avatar IMG — all these scope to the
-      // avatar area, and the only useful click here is the photo viewer.
-      try {
-        if (n.querySelector?.("img")) {
-          const cls = (n.className?.toString?.() || "").toLowerCase();
-          if (/profile-picture|profile-photo|profile-image/.test(cls)) return true;
-        }
-        const ancestor = n.closest?.(
-          "[class*='profile-picture' i], [class*='profile-photo' i], " +
-          "[class*='profile-image' i], [class*='top-card__non-self-photo' i]"
-        );
-        if (ancestor) return true;
-      } catch {}
-      // Aria-label hints: "Open photo" / "View photo" / "Profile picture"
-      const lbl = (n.getAttribute?.("aria-label") || "").toLowerCase();
-      if (/(open|view|see)\s+photo|profile\s+(picture|photo|image)/i.test(lbl)) return true;
-      return false;
+      const href = (n?.getAttribute?.("href") || "");
+      return /\/overlay\/(photo|edit-photo|cover)/i.test(href);
     }
     const strict = [
       "a[href*='/overlay/contact-info/']",
@@ -596,24 +537,11 @@
       const el = document.querySelector(sel);
       if (el && !_isAvatarOverlay(el)) return el;
     }
-    // Fallback: text/aria-label search. Tighter than before — require the
-    // candidate to (a) NOT be the avatar (see expanded check above) AND
-    // (b) if it's an anchor, EITHER carry a /contact-info path in its href
-    // OR have no href at all (button-style anchor). This stops the
-    // photo-overlay anchor from sneaking through on layouts where its
-    // ancestor coincidentally has "Contact info" text nearby.
     return Array.from(document.querySelectorAll("a, button")).find((n) => {
       if (_isAvatarOverlay(n)) return false;
       const txt = (n.textContent || "").trim();
       const lbl = (n.getAttribute("aria-label") || "").trim();
-      const textMatch = /^contact info$/i.test(txt) || /contact info/i.test(lbl);
-      if (!textMatch) return false;
-      if (n.tagName === "A") {
-        const href = (n.getAttribute("href") || "").toLowerCase();
-        // Empty href (action button) is fine; any href MUST be contact-info.
-        if (href && !/contact-info/i.test(href)) return false;
-      }
-      return true;
+      return /^contact info$/i.test(txt) || /contact info/i.test(lbl);
     });
   }
 
@@ -1165,8 +1093,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 5000,
-    settleMs = 700,
+    timeoutMs = 3000,
+    settleMs = 400,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -1285,23 +1213,17 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Retry up to 6 more times if the modal opened but the contents weren't
-    // rendered yet. React renders the modal scaffold first, then attaches the
-    // mailto:/tel: anchors and the website/address blocks in SEPARATE ticks —
-    // typically 0.5-3s apart. The earlier version bailed on the FIRST tick
-    // that produced email OR phone, which is why website/location/title
-    // commonly got dropped: that tick simply hadn't fired yet. We now retry
-    // until we've seen no new fields appear for 2 consecutive polls (the
-    // modal has stabilised) OR all 4 fields are captured. Total cap ~3.5s
-    // beyond the initial settle, so worst case Save UI hangs ~5s.
-    let stableTicks = 0;
-    for (let attempt = 0; attempt < 6; attempt++) {
-      if (data.email && data.phone && data.address && data.website) break;
-      await _sleep(500);
+    // Retry up to 3 more times if the modal opened but the contents weren't
+    // rendered yet. Cheap React fiddly markup — the email/phone anchors
+    // can take 1-4 seconds to appear after the dialog mounts. We let the
+    // loop run all 3 retries unless every field is already populated;
+    // bailing on just email+phone (the old behaviour) lost website /
+    // address when LinkedIn rendered them in a slightly later React tick.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (data.email && data.phone && data.address) break;
+      await _sleep(350);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
-      const before = (data.email ? 1 : 0) + (data.phone ? 1 : 0) +
-                     (data.website ? 1 : 0) + (data.address ? 1 : 0);
       // Merge — preserve any field we already captured (LinkedIn sometimes
       // remounts the modal and we lose a field we had a moment ago).
       data = {
@@ -1310,23 +1232,7 @@
         website: data.website || next.website,
         address: data.address || next.address,
       };
-      const after = (data.email ? 1 : 0) + (data.phone ? 1 : 0) +
-                    (data.website ? 1 : 0) + (data.address ? 1 : 0);
-      // Stabilisation check: no new fields appeared this poll. Allow ONE
-      // empty poll (React may render in a stagger), bail after the second.
-      if (after === before) {
-        stableTicks += 1;
-        if (stableTicks >= 2 && (data.email || data.phone)) break;
-      } else {
-        stableTicks = 0;
-      }
     }
-
-    // Small extra settle BEFORE closing the modal — gives any in-flight
-    // React paint a chance to land so the user visually sees what was
-    // captured, and avoids the "page closes too fast" feel. ~300ms is
-    // imperceptible to the user but reliable for slow connections.
-    await _sleep(300);
 
     // Always close the modal when not on the overlay URL directly.
     // When didPushState is true, clicking × triggers LinkedIn's SPA router to

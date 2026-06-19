@@ -439,30 +439,15 @@
 
     // Step 1: refresh base profile fields (name, title, company, location,
     // avatar) from the current DOM. Pure read, no clicks, no side effects.
-    // We're on the canonical /in/<handle> page — that's the authoritative
-    // source for title/company/headline, so PREFER the fresh page-scrape
-    // over whatever `profile` was carrying (which may be a stale snapshot
-    // from when the side panel first rendered, before LinkedIn finished
-    // hydrating the top-card lazy DOM).
     try {
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
-        // Wait for the h1 to stop changing before reading — without this we
-        // sometimes captured the partial name + missing headline because the
-        // top card was still streaming in. Cheap (≤1.5s, two stable 150ms
-        // polls in a row exits early).
-        if (Scraper._waitForStableH1) {
-          try { await Scraper._waitForStableH1(1500); } catch {}
-        }
         const fresh = Scraper.scrapeProfile();
         if (fresh) {
-          // Canonical /in/ fields: always prefer the fresh scrape. Anything
-          // already in `enriched` from card-level / side-panel render was a
-          // best-guess snapshot — the live profile page is the source of truth.
           for (const k of [
             "linkedin_url", "full_name", "first_name", "last_name",
             "headline", "title", "company_name", "location", "avatar_url",
           ]) {
-            if (fresh[k]) enriched[k] = fresh[k];
+            if (fresh[k] && !enriched[k]) enriched[k] = fresh[k];
           }
         }
       }
@@ -483,9 +468,6 @@
       full_name: enriched.full_name,
       first_name: enriched.first_name,
       last_name: enriched.last_name,
-      headline: enriched.headline,
-      title: enriched.title,
-      company_name: enriched.company_name,
     };
 
     // Step 2: read any Contact info modal the user has already opened.
@@ -522,8 +504,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 5000,
-          settleMs: 700,
+          timeoutMs: 3000,
+          settleMs: 400,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -558,37 +540,14 @@
       } catch {}
     }
 
-    // Step 5: COMMIT THE SNAPSHOT — overwrite any name/URL/headline/title/
-    // company that the pushState fallback above may have polluted with the
-    // canonical values captured before navigation. Email/phone/website/
-    // location/etc. are kept as-is (those were the WHOLE POINT of the
-    // modal-open detour).
+    // Step 5: COMMIT THE SNAPSHOT — overwrite any name/URL that the pushState
+    // fallback above may have polluted with the canonical values captured
+    // before navigation. Email/phone/website/location/etc. are kept as-is
+    // (those were the WHOLE POINT of the modal-open detour).
     if (snapshot.linkedin_url) enriched.linkedin_url = snapshot.linkedin_url;
     if (snapshot.full_name) enriched.full_name = snapshot.full_name;
     if (snapshot.first_name) enriched.first_name = snapshot.first_name;
     if (snapshot.last_name) enriched.last_name = snapshot.last_name;
-    if (snapshot.headline) enriched.headline = snapshot.headline;
-    if (snapshot.title) enriched.title = snapshot.title;
-    if (snapshot.company_name) enriched.company_name = snapshot.company_name;
-
-    // Step 5b: SECOND-PASS profile re-scrape. Some LinkedIn profiles render
-    // the top-card name FIRST and only stream in the headline + company
-    // pill 1-2s later (heavy profiles, slow connections). The Step 1 scrape
-    // may have run BEFORE those fields appeared — by now (post-modal +
-    // URL-restored) the page has had a full second of extra render time, so
-    // the headline/title/company are usually present even when they were
-    // missing earlier. Only fill the GAPS — don't override anything we
-    // already captured successfully.
-    try {
-      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
-        const fresh2 = Scraper.scrapeProfile();
-        if (fresh2) {
-          for (const k of ["headline", "title", "company_name", "location"]) {
-            if (fresh2[k] && !enriched[k]) enriched[k] = fresh2[k];
-          }
-        }
-      }
-    } catch {}
 
     // Step 6: SAFETY URL RESTORE. If _closeContactModal() in scrapeContactInfo
     // clicked the dismiss button, LinkedIn's router will navigate back on its
@@ -7688,8 +7647,7 @@
   // BOTH the legacy bottom-right bubble AND the new design's centred "New
   // message" dialog (close X at the top-right).
   function _closeMsgOverlay() {
-    // 1) Legacy bubble close buttons (kept as a fast path — works on most
-    // legacy LinkedIn layouts even if step 2 below covers them too).
+    // 1) Legacy bubble close buttons.
     const legacy = document.querySelectorAll(
       ".msg-overlay-conversation-bubble button[aria-label*='Close' i], " +
       ".msg-overlay-conversation-bubble button[data-control-name*='close' i], " +
@@ -7698,56 +7656,7 @@
     );
     for (const b of legacy) { try { b.click(); } catch {} }
 
-    // 2) CONVERSATION BUBBLES — LinkedIn renames .msg-overlay-conversation-bubble
-    // every few quarters, so anchor on the SEMANTIC aria-label instead of the
-    // class name. "Close your conversation with <Name>" is the stable label.
-    // Without this, when the class name rotates the bubble silently stops
-    // closing and the next Message All iteration stacks another bubble on top.
-    try {
-      const convCloses = document.querySelectorAll(
-        "button[aria-label^='Close your conversation' i], " +
-        "button[aria-label*='Close conversation' i], " +
-        "button[aria-label*='close conversation' i]"
-      );
-      for (const b of convCloses) { try { b.click(); } catch {} }
-    } catch {}
-
-    // 2b) BROAD FALLBACK — for any unknown LinkedIn class rotation, find ALL
-    // ancestor containers near the bottom-right of the viewport that LOOK like
-    // a chat bubble (class name contains "msg" or "conversation" or "bubble",
-    // OR aria-label starts with "Messaging with"), then click any close-ish
-    // button inside. Skip our own overlay.
-    try {
-      const bubbleSelectors = [
-        "[class*='msg-overlay']",
-        "[class*='conversation-bubble']",
-        "[class*='messaging-bubble']",
-        "[aria-label^='Messaging with' i]",
-        "[data-test-conversation-thread]",
-      ];
-      const seen = new Set();
-      for (const sel of bubbleSelectors) {
-        for (const el of document.querySelectorAll(sel)) {
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
-          // Climb to the outermost matching ancestor so we don't try to close
-          // the same bubble three times via three nested elements.
-          let outer = el;
-          while (outer.parentElement && (
-            outer.parentElement.className?.toString().match(/msg-overlay|conversation-bubble|messaging-bubble/i) ||
-            outer.parentElement.matches?.("[aria-label^='Messaging with' i]")
-          )) outer = outer.parentElement;
-          if (seen.has(outer)) continue;
-          seen.add(outer);
-          const closes = outer.querySelectorAll(
-            "button[aria-label*='Close' i], button[aria-label*='Dismiss' i], " +
-            "button[data-control-name*='close' i]"
-          );
-          for (const b of closes) { try { (b.closest("button") || b).click(); } catch {} }
-        }
-      }
-    } catch {}
-
-    // 3) New dialog: scan all "New message" dialogs and click their X.
+    // 2) New dialog: scan all "New message" dialogs and click their X.
     try {
       const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
@@ -7781,39 +7690,11 @@
       }
     } catch {}
 
-    // 4) Press Escape on the body — closes any modal dialog as last resort.
+    // 3) Press Escape on the body — closes any modal dialog as last resort.
     try {
       document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
       document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
     } catch {}
-  }
-
-  // Poll-and-verify wrapper: call _closeMsgOverlay repeatedly until the
-  // bubbles actually disappear from the DOM, or until ~3.5s elapses. A
-  // single click sometimes loses the race to LinkedIn's bubble animation,
-  // so retrying every 400ms ensures stacking is impossible.
-  async function _closeMsgOverlayAndVerify(maxMs = 3500) {
-    const start = Date.now();
-    const stillOpen = () => {
-      const sels = [
-        "button[aria-label^='Close your conversation' i]",
-        "button[aria-label*='Close conversation' i]",
-        "[class*='msg-overlay-conversation']",
-        "[aria-label^='Messaging with' i]",
-      ];
-      for (const sel of sels) {
-        for (const el of document.querySelectorAll(sel)) {
-          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
-          const r = el.getBoundingClientRect?.();
-          if (r && r.width > 0 && r.height > 0) return true;
-        }
-      }
-      return false;
-    };
-    do {
-      _closeMsgOverlay();
-      await new Promise((r) => setTimeout(r, 400));
-    } while (stillOpen() && Date.now() - start < maxMs);
   }
 
   // Extract template variables from a connections-page card.
@@ -7884,10 +7765,9 @@
           continue;
         }
 
-        // Close any leftover overlay before starting. Verify it's gone — if
-        // a bubble from the PREVIOUS iteration is still up, opening a new
-        // composer here stacks bubbles instead of replacing.
-        await _closeMsgOverlayAndVerify(3500);
+        // Close any leftover overlay before starting.
+        _closeMsgOverlay();
+        await sleep(300);
 
         // Make the card visible.
         try { card.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
@@ -8125,13 +8005,7 @@
           _lcToast(`✅ ${idx}/${total} sent to ${firstName}`, 1800);
         }
 
-        // Close the conversation bubble and VERIFY it's actually gone before
-        // the next iteration. A single click sometimes loses the race to
-        // LinkedIn's slide-out animation, leaving the bubble open — the next
-        // Message All step then opens a SECOND bubble next to it, and the user
-        // sees two/three/four chat tabs stacking up across the screen. Polling
-        // up to 3.5s closes any stragglers reliably.
-        await _closeMsgOverlayAndVerify(3500);
+        _closeMsgOverlay();
 
         // Human-paced gap before the next card.
         if (i < urls.length - 1 && !state.messageCancel) {
@@ -8142,7 +8016,7 @@
           console.log(`[LeadCaptura] msg in-place ${idx}/${total} threw:`, err);
           failed++;
           _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
-          try { await _closeMsgOverlayAndVerify(2500); } catch {}
+          try { _closeMsgOverlay(); } catch {}
         }
       }
 
