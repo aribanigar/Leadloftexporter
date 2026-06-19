@@ -19,11 +19,24 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.271",
+    date: "Jun 19, 2026",
+    size: "246 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.271.zip",
+    latest: true,
+    changes: [
+      "Save Lead now reliably captures title/position + company name (in addition to email/phone/location/website that v1.0.269 fixed). Root cause: Step 1 only filled MISSING fields — if the side panel had pre-populated stale values from before LinkedIn finished hydrating the top card, the fresh scrape never overrode them. Also, no re-scrape was ever done AFTER the contact modal closed, so late-hydrated headlines stayed lost.",
+      "Step 1 now waits for the h1 to stabilise (≤1.5s) before scraping, and always prefers the canonical /in/ page values for name/headline/title/company.",
+      "Added a second-pass profile re-scrape after the contact modal closes and the URL is restored — catches headlines that LinkedIn streamed in late.",
+      "Snapshot now also pins headline/title/company across the modal pushState so a /overlay/contact-info detour can never wipe them.",
+      "Added LinkedIn-2026 headline selectors (.text-body-medium.break-words, data-anonymize='headline', etc.) so the scraper finds the headline even when it's NOT a direct sibling of <h1>.",
+    ],
+  },
+  {
     version: "1.0.270",
     date: "Jun 19, 2026",
     size: "246 KB",
     file: "/extensions/leadcaptura-extension-v1.0.270.zip",
-    latest: true,
     changes: [
       "Per-card Save background-enrichment tab now stays open ~1.5–2.2s after the data has been captured + synced (was 80–200ms). Previous timing felt like a glitch — the tab flashed open and closed before the user could see the profile had loaded. Safety cap is still 18s.",
     ],

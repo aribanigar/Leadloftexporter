@@ -361,6 +361,38 @@
       }
       if (!headline) headline = _firstTextAfter(h1);
     }
+    // Fallback: LinkedIn 2026 nests the headline inside the top card in a
+    // div with class .text-body-medium / data-* hooks that's NOT a direct
+    // sibling of <h1>. Search the top card explicitly when the sibling
+    // walk above turned up nothing.
+    if (!headline && card) {
+      const headlineSelectors = [
+        ".text-body-medium.break-words",
+        "[data-test-id='profile-headline']",
+        "[data-anonymize='headline']",
+        ".pv-text-details__title",
+        ".pv-top-card--list .text-body-medium",
+        ".text-body-medium",
+      ];
+      for (const sel of headlineSelectors) {
+        const candidates = card.querySelectorAll(sel);
+        for (const el of candidates) {
+          const t = _txt(el);
+          if (
+            t &&
+            t.length > 4 &&
+            t.length < 400 &&
+            t !== fullName &&
+            !_isFeedNoise(t) &&
+            !/connect|message|follow|more|premium|contact info/i.test(t)
+          ) {
+            headline = t;
+            break;
+          }
+        }
+        if (headline) break;
+      }
+    }
 
     // Location: typically a short string in the top card. Strategy:
     //   Pass 1 — explicit aria/data attribute (LinkedIn sometimes adds these).

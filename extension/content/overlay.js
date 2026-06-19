@@ -439,15 +439,30 @@
 
     // Step 1: refresh base profile fields (name, title, company, location,
     // avatar) from the current DOM. Pure read, no clicks, no side effects.
+    // We're on the canonical /in/<handle> page — that's the authoritative
+    // source for title/company/headline, so PREFER the fresh page-scrape
+    // over whatever `profile` was carrying (which may be a stale snapshot
+    // from when the side panel first rendered, before LinkedIn finished
+    // hydrating the top-card lazy DOM).
     try {
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
+        // Wait for the h1 to stop changing before reading — without this we
+        // sometimes captured the partial name + missing headline because the
+        // top card was still streaming in. Cheap (≤1.5s, two stable 150ms
+        // polls in a row exits early).
+        if (Scraper._waitForStableH1) {
+          try { await Scraper._waitForStableH1(1500); } catch {}
+        }
         const fresh = Scraper.scrapeProfile();
         if (fresh) {
+          // Canonical /in/ fields: always prefer the fresh scrape. Anything
+          // already in `enriched` from card-level / side-panel render was a
+          // best-guess snapshot — the live profile page is the source of truth.
           for (const k of [
             "linkedin_url", "full_name", "first_name", "last_name",
             "headline", "title", "company_name", "location", "avatar_url",
           ]) {
-            if (fresh[k] && !enriched[k]) enriched[k] = fresh[k];
+            if (fresh[k]) enriched[k] = fresh[k];
           }
         }
       }
@@ -468,6 +483,9 @@
       full_name: enriched.full_name,
       first_name: enriched.first_name,
       last_name: enriched.last_name,
+      headline: enriched.headline,
+      title: enriched.title,
+      company_name: enriched.company_name,
     };
 
     // Step 2: read any Contact info modal the user has already opened.
@@ -540,14 +558,37 @@
       } catch {}
     }
 
-    // Step 5: COMMIT THE SNAPSHOT — overwrite any name/URL that the pushState
-    // fallback above may have polluted with the canonical values captured
-    // before navigation. Email/phone/website/location/etc. are kept as-is
-    // (those were the WHOLE POINT of the modal-open detour).
+    // Step 5: COMMIT THE SNAPSHOT — overwrite any name/URL/headline/title/
+    // company that the pushState fallback above may have polluted with the
+    // canonical values captured before navigation. Email/phone/website/
+    // location/etc. are kept as-is (those were the WHOLE POINT of the
+    // modal-open detour).
     if (snapshot.linkedin_url) enriched.linkedin_url = snapshot.linkedin_url;
     if (snapshot.full_name) enriched.full_name = snapshot.full_name;
     if (snapshot.first_name) enriched.first_name = snapshot.first_name;
     if (snapshot.last_name) enriched.last_name = snapshot.last_name;
+    if (snapshot.headline) enriched.headline = snapshot.headline;
+    if (snapshot.title) enriched.title = snapshot.title;
+    if (snapshot.company_name) enriched.company_name = snapshot.company_name;
+
+    // Step 5b: SECOND-PASS profile re-scrape. Some LinkedIn profiles render
+    // the top-card name FIRST and only stream in the headline + company
+    // pill 1-2s later (heavy profiles, slow connections). The Step 1 scrape
+    // may have run BEFORE those fields appeared — by now (post-modal +
+    // URL-restored) the page has had a full second of extra render time, so
+    // the headline/title/company are usually present even when they were
+    // missing earlier. Only fill the GAPS — don't override anything we
+    // already captured successfully.
+    try {
+      if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
+        const fresh2 = Scraper.scrapeProfile();
+        if (fresh2) {
+          for (const k of ["headline", "title", "company_name", "location"]) {
+            if (fresh2[k] && !enriched[k]) enriched[k] = fresh2[k];
+          }
+        }
+      }
+    } catch {}
 
     // Step 6: SAFETY URL RESTORE. If _closeContactModal() in scrapeContactInfo
     // clicked the dismiss button, LinkedIn's router will navigate back on its
