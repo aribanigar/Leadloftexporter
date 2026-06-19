@@ -19,15 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.281",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.281.zip",
+    latest: true,
+    changes: [
+      "HARD RULE: post-sync sleep before tab close bumped 80–200ms → 1500–2000ms. The autopilot enrichment tab no longer POPS closed the instant the sync returns — it now stays open ~1.5–2.0s so the close feels organised. Still 3s of headroom under the service-worker's 22s safety ceiling, so no chip should ever time out from this change.",
+      "Otherwise identical to v1.0.280 (which was byte-for-byte v1.0.258 autopilot behaviour).",
+    ],
+  },
+  {
     version: "1.0.280",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.280.zip",
-    latest: true,
     changes: [
-      "Autopilot enrichment is now byte-for-byte v1.0.258 behaviour. Final root cause for the 'Timed out' chips on background tabs: a single line I left in scraper.js (removed the retry-loop early-exit) added ~700ms to the foreground retry budget — but in a backgrounded tab Chrome throttles setTimeout to ≥1s, so the same loop ran ~3s instead of ~1s, and combined with everything else pushed the per-profile in-tab time past the service-worker's 22s safety ceiling.",
-      "extension/content/main.js + extension/content/scraper.js are now reverted entirely to commit 5ab5831 (v1.0.258). The enrichment flow — service-worker tab open, in-tab safety timer, scrapeContactInfo timing, post-sync sleep, autopilot tick — is identical to the version that was working in your earlier runs.",
-      "Kept (orthogonal to enrichment): backend overwrite for location/avatar/company on re-save, overlay Step 1 override for the floating Save Lead button, new coral/pink icon.",
+      "main.js + scraper.js reverted to v1.0.258 baseline to fix 'Timed out' chips on backgrounded enrichment tabs.",
     ],
   },
   {

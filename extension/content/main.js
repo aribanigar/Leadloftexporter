@@ -1355,7 +1355,14 @@
         } catch { /* best-effort */ }
       }
 
-      await Human.sleep(Human.rand(80, 200));
+      // HARD RULE — keep the tab open for 1.5–2.0s after the sync finishes
+      // before letting closeSelf fire. The old 80–200ms felt abrupt: the
+      // tab would visibly POP closed the instant Api.syncProfile returned,
+      // sometimes mid-render. 1.5–2s gives the renderer a beat to settle
+      // and feels like an organised close. Still fits comfortably under
+      // the service-worker's 22s safety ceiling (worst-case in-tab budget
+      // is now ~19s vs the SW's 22s — 3s of headroom).
+      await Human.sleep(Human.rand(1500, 2000));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {
