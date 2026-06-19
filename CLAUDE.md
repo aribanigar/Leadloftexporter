@@ -194,6 +194,21 @@ Multi-business, Google-Drive-style folder system for storing reusable marketing 
 
 **Send on WhatsApp from an asset** — `whatsapp`-type assets get a prominent "Send on WhatsApp" action that deep-links to `/whatsapp?from_asset=<id>`. The WhatsApp page reads that param (mirroring the Campaign Builder's `?from_asset` precedent), fetches the asset via `GET /content-hub/assets/{id}`, and seeds the bulk-campaign message once (guarded by a ref so re-renders don't clobber edits). The user then attaches a product image and picks recipients there. `html_email` assets keep going to the Campaign Builder; only `whatsapp` assets surface the WhatsApp action.
 
+### Hudace content routine (`public/email/` + `publish.py`)
+
+The Hudace AI content routine writes:
+- **Background photos and baked promo JPGs** → `public/email/` (served by Vercel at `https://leadloftexporter.vercel.app/email/<name>`)
+- **Content items** → Neon DB `content_assets` table via `publish.py` (HTTP SQL API, not psycopg2 — port 5432 is blocked in the routine environment; `publish.py` uses the Neon HTTP endpoint on port 443)
+- **State tracker** → `.routine/state.json`
+
+**ALWAYS push the content commit to `main`** (not just the feature branch). The images only become live on Vercel after they land on main. The routine should cherry-pick or push directly to main in STEP 4. When running on a dev branch, cherry-pick the content commit to main and push both:
+```bash
+git push -u origin <feature-branch>
+git checkout main && git cherry-pick <commit-hash> && git push -u origin main
+```
+
+Key schema facts (confirmed 2026-06-19): item table = `content_assets`, folder table = `content_businesses`, body column = `content` (not `body`), id requires manual UUID generation (no default), tags is JSONB NOT NULL (pass `[]`).
+
 ### Daily content pipeline (`/content` + `/scripts`)
 
 A side-channel for AI-routine-generated marketing content. Each business has its own folder under `content/<biz-slug>/`. The current consumer is **Gifts Gulf** (corporate-gifting catalogue marketing in AED/SAR/QAR).
