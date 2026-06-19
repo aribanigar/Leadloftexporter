@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-19",
+  "theme": "Event giveaways",
+  "season": "Mid-year, H2 kickoff and event season",
+  "design": "A",
+  "campaign_code": "GG-20260619-7",
+  "campaign_name": "Event Giveaways - 19 Jun 2026",
+  "subject": "Giveaways the crowd keeps",
+  "skus": [
+    "GG1042",
+    "GG1101",
+    "GG1198",
+    "GG1260",
+    "GG1545",
+    "GG1700"
+  ],
+  "products": [
+    {
+      "name": "Vivi",
+      "sku": "GG1042",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6540-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1042"
+    },
+    {
+      "name": "Alas",
+      "sku": "GG1101",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2148-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1101"
+    },
+    {
+      "name": "Lekker",
+      "sku": "GG1198",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2459-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1198"
+    },
+    {
+      "name": "Osole Draw Colour",
+      "sku": "GG1260",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2591-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1260"
+    },
+    {
+      "name": "Fundraw",
+      "sku": "GG1545",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6980-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1545"
+    },
+    {
+      "name": "Veggie",
+      "sku": "GG1700",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9865-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1700"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}

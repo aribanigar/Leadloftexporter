@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-19",
+  "theme": "Premium ceramics",
+  "season": "Mid-year, H2 kickoff and event season",
+  "design": "C",
+  "campaign_code": "GG-20260619-6",
+  "campaign_name": "Ceramic and Glass Mugs - 19 Jun 2026",
+  "subject": "The cup they keep choosing",
+  "skus": [
+    "GG1510",
+    "GG1512",
+    "GG1513",
+    "GG1555",
+    "GG1566",
+    "GG1615"
+  ],
+  "products": [
+    {
+      "name": "Matt",
+      "sku": "GG1510",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6839-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1510"
+    },
+    {
+      "name": "Lim",
+      "sku": "GG1512",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6840-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1512"
+    },
+    {
+      "name": "Dublin Colour",
+      "sku": "GG1513",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6849-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1513"
+    },
+    {
+      "name": "Dual",
+      "sku": "GG1555",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7344-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1555"
+    },
+    {
+      "name": "Tribeca",
+      "sku": "GG1566",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7683-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1566"
+    },
+    {
+      "name": "Rome",
+      "sku": "GG1615",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9078-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1615"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20ceramics%20options%20for%20our%20team."
+}

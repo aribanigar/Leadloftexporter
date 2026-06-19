@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-19",
+  "theme": "Bags and travel",
+  "season": "Mid-year, H2 kickoff and event season",
+  "design": "A",
+  "campaign_code": "GG-20260619-4",
+  "campaign_name": "Cotton and Jute Bags - 19 Jun 2026",
+  "subject": "Totes they reach for",
+  "skus": [
+    "GG1257",
+    "GG1324",
+    "GG1366",
+    "GG1410",
+    "GG1607",
+    "GG1712"
+  ],
+  "products": [
+    {
+      "name": "Hamma",
+      "sku": "GG1257",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2584-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1257"
+    },
+    {
+      "name": "Puri",
+      "sku": "GG1324",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2790-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1324"
+    },
+    {
+      "name": "Aurora",
+      "sku": "GG1366",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2984-99.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1366"
+    },
+    {
+      "name": "Zurich",
+      "sku": "GG1410",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6279-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1410"
+    },
+    {
+      "name": "Brick Lane",
+      "sku": "GG1607",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8965-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1607"
+    },
+    {
+      "name": "Jute Large",
+      "sku": "GG1712",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9930-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1712"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-19/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20bags%20and%20travel%20options%20for%20our%20team."
+}

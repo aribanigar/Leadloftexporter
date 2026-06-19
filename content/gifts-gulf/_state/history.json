@@ -574,5 +574,158 @@
       "GG1136",
       "GG1197"
     ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260619-1",
+    "campaign_name": "Premium Steel Bottles - 19 Jun 2026",
+    "subject": "Steel that travels with them",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1088",
+      "GG1089",
+      "GG1090",
+      "GG1112",
+      "GG1126",
+      "GG1146"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260619-2",
+    "campaign_name": "Notebooks and Writing - 19 Jun 2026",
+    "subject": "Notebooks they actually keep",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1067",
+      "GG1074",
+      "GG1180",
+      "GG1188",
+      "GG1200",
+      "GG1213"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260619-3",
+    "campaign_name": "Bamboo and Cork Gifts - 19 Jun 2026",
+    "subject": "Naturally branded, naturally kept",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1077",
+      "GG1104",
+      "GG1134",
+      "GG1190",
+      "GG1199",
+      "GG1261"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260619-4",
+    "campaign_name": "Cotton and Jute Bags - 19 Jun 2026",
+    "subject": "Totes they reach for",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1257",
+      "GG1324",
+      "GG1366",
+      "GG1410",
+      "GG1607",
+      "GG1712"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260619-5",
+    "campaign_name": "Desk Tech - 19 Jun 2026",
+    "subject": "Desk tech they keep",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1014",
+      "GG1017",
+      "GG1218",
+      "GG1265",
+      "GG1314",
+      "GG1590"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260619-6",
+    "campaign_name": "Ceramic and Glass Mugs - 19 Jun 2026",
+    "subject": "The cup they keep choosing",
+    "theme": "Premium ceramics",
+    "skus": [
+      "GG1510",
+      "GG1512",
+      "GG1513",
+      "GG1555",
+      "GG1566",
+      "GG1615"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260619-7",
+    "campaign_name": "Event Giveaways - 19 Jun 2026",
+    "subject": "Giveaways the crowd keeps",
+    "theme": "Event giveaways",
+    "skus": [
+      "GG1042",
+      "GG1101",
+      "GG1198",
+      "GG1260",
+      "GG1545",
+      "GG1700"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260619-8",
+    "campaign_name": "Recycled Steel Bottles - 19 Jun 2026",
+    "subject": "Recycled steel, refilled daily",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1135",
+      "GG1140",
+      "GG1147",
+      "GG1149",
+      "GG1150",
+      "GG1158"
+    ]
+  },
+  {
+    "date": "2026-06-19",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260619-9",
+    "campaign_name": "Recycled Paper Stationery - 19 Jun 2026",
+    "subject": "Recycled pages, sharp print",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1201",
+      "GG1204",
+      "GG1222",
+      "GG1228",
+      "GG1282",
+      "GG1295"
+    ]
   }
 ]

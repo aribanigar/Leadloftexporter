@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-19",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Daily carry, your brand",
+      "out": "content/gifts-gulf/2026-06-19/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2112-03",
+          "sku": "GG1088",
+          "name": "Redu"
+        },
+        {
+          "code": "mo2116-03",
+          "sku": "GG1089",
+          "name": "Sharm"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Where good ideas land",
+      "out": "content/gifts-gulf/2026-06-19/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2067-03",
+          "sku": "GG1067",
+          "name": "Olympia"
+        },
+        {
+          "code": "mo2093-15",
+          "sku": "GG1074",
+          "name": "Feltbook"
+        },
+        {
+          "code": "mo2396-03",
+          "sku": "GG1180",
+          "name": "Caratil"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Natural feel, clear logo",
+      "out": "content/gifts-gulf/2026-06-19/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2097-13",
+          "sku": "GG1077",
+          "name": "Origin"
+        },
+        {
+          "code": "mo2159-03",
+          "sku": "GG1104",
+          "name": "Sparta"
+        },
+        {
+          "code": "mo2281-40",
+          "sku": "GG1134",
+          "name": "Pandu"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Daily commute, your logo",
+      "out": "content/gifts-gulf/2026-06-19/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2584-04",
+          "sku": "GG1257",
+          "name": "Hamma"
+        },
+        {
+          "code": "mo2790-13",
+          "sku": "GG1324",
+          "name": "Puri"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "On the desk every day",
+      "out": "content/gifts-gulf/2026-06-19/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3020-03",
+          "sku": "GG1014",
+          "name": "Tech"
+        },
+        {
+          "code": "it3350-03",
+          "sku": "GG1017",
+          "name": "Premier"
+        },
+        {
+          "code": "mo2513-03",
+          "sku": "GG1218",
+          "name": "Wusic"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "The first cup, your brand",
+      "out": "content/gifts-gulf/2026-06-19/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6839-03",
+          "sku": "GG1510",
+          "name": "Matt"
+        },
+        {
+          "code": "mo6840-03",
+          "sku": "GG1512",
+          "name": "Lim"
+        },
+        {
+          "code": "mo6849-03",
+          "sku": "GG1513",
+          "name": "Dublin Colour"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Branded for the booth",
+      "out": "content/gifts-gulf/2026-06-19/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc6540-04",
+          "sku": "GG1042",
+          "name": "Vivi"
+        },
+        {
+          "code": "mo2148-03",
+          "sku": "GG1101",
+          "name": "Alas"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled and refilled",
+      "out": "content/gifts-gulf/2026-06-19/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2283-03",
+          "sku": "GG1135",
+          "name": "Riflow"
+        },
+        {
+          "code": "mo2308-03",
+          "sku": "GG1140",
+          "name": "Phottle"
+        },
+        {
+          "code": "mo2317-03",
+          "sku": "GG1147",
+          "name": "Topaz"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled, still premium",
+      "out": "content/gifts-gulf/2026-06-19/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2469-03",
+          "sku": "GG1201",
+          "name": "Nota"
+        },
+        {
+          "code": "mo2481-01",
+          "sku": "GG1204",
+          "name": "Notie"
+        },
+        {
+          "code": "mo2522-03",
+          "sku": "GG1222",
+          "name": "Strata"
+        }
+      ]
+    }
+  ]
+}
