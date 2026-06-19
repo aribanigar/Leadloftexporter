@@ -19,14 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.277",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.277.zip",
+    latest: true,
+    changes: [
+      "Autopilot enrichment back to v1.0.267 timing. v1.0.276 introduced a visibility-aware retry (5×700ms in background tabs) that pushed the per-tab end-to-end too close to the maybeRunEnrichmentTrigger 18s safety timer — the autopilot tab was being force-closed before Api.syncProfile finished, so profiles opened in the background but never reached the CRM. Reverted to 3×350ms unconditionally (byte-for-byte v1.0.267 background-tab budget) so the safety timer always has comfortable headroom.",
+      "Backend CRM overwrite for location/avatar/company kept (v1.0.276) so re-saves still reflect the canonical /in/ scrape.",
+    ],
+  },
+  {
     version: "1.0.276",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.276.zip",
-    latest: true,
     changes: [
-      "Save Lead now works reliably when the LinkedIn tab is backgrounded. Root cause: Chrome throttles setTimeout to ≥1s in hidden tabs AND LinkedIn pauses some of its React rendering, so the foreground 350ms retry-sleep silently stretched to 1s+ and the contact-info modal's fields hadn't rendered yet by the time the loop ran out. When the tab is hidden, scrapeContactInfo now uses 700ms sleeps + 5 retries (foreground stays at 350ms × 3 — byte-for-byte identical to v1.0.267).",
-      "CRM integration — location, avatar and company now update reliably on a re-save. They were FILL-ONLY in the backend ingest path, which is why some leads showed in the CRM without a location/company even after the extension's panel said 'Saved ✓ (location)' — the row already had a stale value from the initial card-level save and the new accurate scrape was silently dropped. Aligned to OVERWRITE semantics (matching the email/phone behaviour), since the /in/ profile page is the canonical source. Latest scrape wins.",
+      "(superseded by v1.0.277 — visibility-aware retry was over-budgeting the autopilot enrichment tab and tripping its safety timer)",
     ],
   },
   {

@@ -1213,26 +1213,15 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Retry up to N more times if the modal opened but the contents weren't
+    // Retry up to 3 more times if the modal opened but the contents weren't
     // rendered yet. Cheap React fiddly markup — the email/phone anchors
     // can take 1-4 seconds to appear after the dialog mounts. We let the
-    // loop run all retries unless every field is already populated;
+    // loop run all 3 retries unless every field is already populated;
     // bailing on just email+phone (the old behaviour) lost website /
     // address when LinkedIn rendered them in a slightly later React tick.
-    //
-    // Backgrounded-tab adjustment: Chrome throttles setTimeout in hidden
-    // tabs to ≥1s. With the foreground 350ms sleep, every "wait" silently
-    // stretches to a full second AND LinkedIn pauses some of its React
-    // rendering — so the foreground retry budget runs out before fields
-    // appear. When hidden, we use a longer per-retry sleep + 2 extra
-    // attempts so the modal has time to hydrate. Foreground behaviour is
-    // byte-for-byte identical to v1.0.267.
-    const _hidden = document.visibilityState === "hidden";
-    const _retryCount = _hidden ? 5 : 3;
-    const _retrySleep = _hidden ? 700 : 350;
-    for (let attempt = 0; attempt < _retryCount; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       if (data.email && data.phone && data.address) break;
-      await _sleep(_retrySleep);
+      await _sleep(350);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes
