@@ -1093,8 +1093,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 3000,
-    settleMs = 400,
+    timeoutMs = 5000,
+    settleMs = 700,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -1213,16 +1213,23 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Retry up to 3 more times if the modal opened but the contents weren't
-    // rendered yet. Cheap React fiddly markup — the email/phone anchors
-    // can take 1-4 seconds to appear after the dialog mounts. We bail
-    // early once we have something useful (email or phone), capped at
-    // 6s total wait so the user doesn't sit on a hung Save button.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (data.email && data.phone && data.address) break;
-      await _sleep(350);
+    // Retry up to 6 more times if the modal opened but the contents weren't
+    // rendered yet. React renders the modal scaffold first, then attaches the
+    // mailto:/tel: anchors and the website/address blocks in SEPARATE ticks —
+    // typically 0.5-3s apart. The earlier version bailed on the FIRST tick
+    // that produced email OR phone, which is why website/location/title
+    // commonly got dropped: that tick simply hadn't fired yet. We now retry
+    // until we've seen no new fields appear for 2 consecutive polls (the
+    // modal has stabilised) OR all 4 fields are captured. Total cap ~3.5s
+    // beyond the initial settle, so worst case Save UI hangs ~5s.
+    let stableTicks = 0;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (data.email && data.phone && data.address && data.website) break;
+      await _sleep(500);
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
+      const before = (data.email ? 1 : 0) + (data.phone ? 1 : 0) +
+                     (data.website ? 1 : 0) + (data.address ? 1 : 0);
       // Merge — preserve any field we already captured (LinkedIn sometimes
       // remounts the modal and we lose a field we had a moment ago).
       data = {
@@ -1231,8 +1238,23 @@
         website: data.website || next.website,
         address: data.address || next.address,
       };
-      if (data.email || data.phone) break;
+      const after = (data.email ? 1 : 0) + (data.phone ? 1 : 0) +
+                    (data.website ? 1 : 0) + (data.address ? 1 : 0);
+      // Stabilisation check: no new fields appeared this poll. Allow ONE
+      // empty poll (React may render in a stagger), bail after the second.
+      if (after === before) {
+        stableTicks += 1;
+        if (stableTicks >= 2 && (data.email || data.phone)) break;
+      } else {
+        stableTicks = 0;
+      }
     }
+
+    // Small extra settle BEFORE closing the modal — gives any in-flight
+    // React paint a chance to land so the user visually sees what was
+    // captured, and avoids the "page closes too fast" feel. ~300ms is
+    // imperceptible to the user but reliable for slow connections.
+    await _sleep(300);
 
     // Always close the modal when not on the overlay URL directly.
     // When didPushState is true, clicking × triggers LinkedIn's SPA router to

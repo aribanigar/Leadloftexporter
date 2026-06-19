@@ -504,8 +504,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 3000,
-          settleMs: 400,
+          timeoutMs: 5000,
+          settleMs: 700,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);

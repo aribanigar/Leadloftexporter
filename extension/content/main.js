@@ -1267,7 +1267,7 @@
 
       const profile = Scraper.scrapeProfile();
       const contact = await Scraper.scrapeContactInfo({
-        settleMs: 400,
+        settleMs: 700,
         allowPushStateFallback: true,
       });
       if (contact.email) profile.email = contact.email;
@@ -1459,7 +1459,7 @@
       let contact = {};
       try {
         contact = await Scraper.scrapeContactInfo({
-          settleMs: 400,
+          settleMs: 700,
           allowPushStateFallback: true,
         }) || {};
       } catch {}
