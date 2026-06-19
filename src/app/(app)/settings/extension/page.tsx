@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.273",
+    date: "Jun 19, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.273.zip",
+    latest: true,
+    changes: [
+      "CRM sync — location, avatar and company now update reliably on a re-save. They were FILL-ONLY in the backend ingest path, which is why some leads showed in the CRM without a location/company even after the extension's floating panel said 'Saved ✓ (location)': the row already had a stale value (often from the initial card-level save) and the new accurate scrape was silently dropped. Now they OVERWRITE (matching the email/phone behaviour), since the /in/ profile page is the authoritative source.",
+      "Save Lead — no longer accidentally opens the profile-picture lightbox while reading. Root cause: LinkedIn 2026 renamed photo overlay paths from /overlay/photo/ → /details/photo/ (and added /details/profile-picture/), so the avatar-rejection filter inside _findContactInfoLink missed them. When the strict contact-info selector returned nothing, the text/aria-label fallback was returning the avatar anchor instead, and clicking it popped the photo viewer.",
+      "Expanded the avatar filter to cover all 2026 photo paths, structural cues (any element whose ancestor matches [class*='profile-picture'] / [class*='profile-photo'] / [class*='profile-image'] / [class*='top-card__non-self-photo']) and aria-label hints ('Open photo', 'View photo', 'Profile picture').",
+      "The fallback also now requires that any anchor candidate either have NO href OR an href containing 'contact-info' — text alone is no longer enough.",
+    ],
+  },
+  {
     version: "1.0.272",
     date: "Jun 19, 2026",
     size: "247 KB",
     file: "/extensions/leadcaptura-extension-v1.0.272.zip",
-    latest: true,
     changes: [
       "Message All — conversation bubbles now reliably close after each send instead of stacking up. Root cause: _closeMsgOverlay targeted specific class names (.msg-overlay-conversation-bubble) that LinkedIn rotates every few quarters. When the class name changed, the close button query returned zero matches, the bubble stayed open, and the next iteration opened a SECOND bubble alongside it.",
       "Replaced the class-based selector with a semantic aria-label match ('Close your conversation with <Name>') plus a broad structural fallback (any container near the viewport's bottom-right whose class contains 'msg-overlay' / 'conversation-bubble' / 'messaging-bubble'). This survives LinkedIn renaming the bubble container.",

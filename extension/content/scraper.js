@@ -556,9 +556,36 @@
     // whose tooltip happens to contain "contact info" — clicking it
     // opens the avatar lightbox instead of the Contact info modal,
     // which is the bug the user reported during enrichment runs.
+    //
+    // LinkedIn 2026 RENAMED /overlay/ → /details/ for many sub-routes
+    // (including profile-picture / cover-image), so the old href regex
+    // missed them and the fallback was returning the avatar anchor →
+    // clicking it popped the photo viewer. Cover all known photo paths
+    // here AND treat any element whose ancestor is the avatar wrapper
+    // / has an <img> descendant as off-limits.
     function _isAvatarOverlay(n) {
-      const href = (n?.getAttribute?.("href") || "");
-      return /\/overlay\/(photo|edit-photo|cover)/i.test(href);
+      if (!n) return false;
+      const href = (n.getAttribute?.("href") || "");
+      if (/\/(overlay|details)\/(photo|edit-photo|cover|profile-picture|cover-image|profile-image)/i.test(href)) return true;
+      // Structural: any element inside .pv-top-card__non-self-photo-wrapper /
+      // .pv-top-card-profile-picture / [class*='profile-picture'] / a button
+      // whose direct child is the avatar IMG — all these scope to the
+      // avatar area, and the only useful click here is the photo viewer.
+      try {
+        if (n.querySelector?.("img")) {
+          const cls = (n.className?.toString?.() || "").toLowerCase();
+          if (/profile-picture|profile-photo|profile-image/.test(cls)) return true;
+        }
+        const ancestor = n.closest?.(
+          "[class*='profile-picture' i], [class*='profile-photo' i], " +
+          "[class*='profile-image' i], [class*='top-card__non-self-photo' i]"
+        );
+        if (ancestor) return true;
+      } catch {}
+      // Aria-label hints: "Open photo" / "View photo" / "Profile picture"
+      const lbl = (n.getAttribute?.("aria-label") || "").toLowerCase();
+      if (/(open|view|see)\s+photo|profile\s+(picture|photo|image)/i.test(lbl)) return true;
+      return false;
     }
     const strict = [
       "a[href*='/overlay/contact-info/']",
@@ -569,11 +596,24 @@
       const el = document.querySelector(sel);
       if (el && !_isAvatarOverlay(el)) return el;
     }
+    // Fallback: text/aria-label search. Tighter than before — require the
+    // candidate to (a) NOT be the avatar (see expanded check above) AND
+    // (b) if it's an anchor, EITHER carry a /contact-info path in its href
+    // OR have no href at all (button-style anchor). This stops the
+    // photo-overlay anchor from sneaking through on layouts where its
+    // ancestor coincidentally has "Contact info" text nearby.
     return Array.from(document.querySelectorAll("a, button")).find((n) => {
       if (_isAvatarOverlay(n)) return false;
       const txt = (n.textContent || "").trim();
       const lbl = (n.getAttribute("aria-label") || "").trim();
-      return /^contact info$/i.test(txt) || /contact info/i.test(lbl);
+      const textMatch = /^contact info$/i.test(txt) || /contact info/i.test(lbl);
+      if (!textMatch) return false;
+      if (n.tagName === "A") {
+        const href = (n.getAttribute("href") || "").toLowerCase();
+        // Empty href (action button) is fine; any href MUST be contact-info.
+        if (href && !/contact-info/i.test(href)) return false;
+      }
+      return true;
     });
   }
 
