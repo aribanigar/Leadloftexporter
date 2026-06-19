@@ -19,17 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.279",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.279.zip",
+    latest: true,
+    changes: [
+      "Fix 'Timed out' on autopilot enrichment chips. Root cause: the service-worker has its OWN 22-second safety timer (separate from the in-tab one), and v1.0.278's three in-tab changes (30s in-tab ceiling, sync retry-on-failure, 1.5–2s post-sync sleep) made the per-profile in-tab budget exceed 22s on slow profiles — so the service-worker killed the tab and marked the chip 'Timed out' before the in-tab pipeline could finish. Reverted main.js entirely to the v1.0.258/v1.0.267 baseline timings (18s safety, single-shot sync, 80–200ms post-sync) so the in-tab pipeline fits comfortably under the SW ceiling exactly like v1.0.258.",
+      "Kept: backend overwrite for location/avatar/company on re-save, scraper retry-loop early-exit fix, overlay Step 1 override for name/title/company — those are unrelated to the timeout.",
+    ],
+  },
+  {
     version: "1.0.278",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.278.zip",
-    latest: true,
     changes: [
-      "Autopilot enrichment — CRM sync is now resilient. Three changes vs v1.0.277, all inside maybeRunEnrichmentTrigger (the background tab that opens after a per-card Save):",
-      "(1) Safety ceiling 18s → 30s. Slow profiles + Render cold-start were hitting the wire before Api.syncProfile completed; the tab got force-closed mid-fetch and the row never landed in CRM.",
-      "(2) syncProfile now retries up to 2 extra times on transient failure (700ms, then 1400ms backoff). A single network blip during Render warm-up no longer silently drops the entire scrape.",
-      "(3) Post-sync sleep 80–200ms → 1500–2000ms. The tab stays open ~1.5–2s after sync so any keep-alive packet and the backend's response handshake finish before window.close() yanks the renderer. On slow connections the old 80ms was closing the tab before the response was acked.",
-      "Backend CRM overwrite for location/avatar/company kept from v1.0.276 so re-saves still reflect the canonical /in/ scrape.",
+      "(superseded by v1.0.279 — the longer in-tab timings clashed with the SW's 22s safety timer)",
     ],
   },
   {
