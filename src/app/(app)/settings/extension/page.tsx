@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.276",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.276.zip",
+    latest: true,
+    changes: [
+      "Save Lead now works reliably when the LinkedIn tab is backgrounded. Root cause: Chrome throttles setTimeout to ≥1s in hidden tabs AND LinkedIn pauses some of its React rendering, so the foreground 350ms retry-sleep silently stretched to 1s+ and the contact-info modal's fields hadn't rendered yet by the time the loop ran out. When the tab is hidden, scrapeContactInfo now uses 700ms sleeps + 5 retries (foreground stays at 350ms × 3 — byte-for-byte identical to v1.0.267).",
+      "CRM integration — location, avatar and company now update reliably on a re-save. They were FILL-ONLY in the backend ingest path, which is why some leads showed in the CRM without a location/company even after the extension's panel said 'Saved ✓ (location)' — the row already had a stale value from the initial card-level save and the new accurate scrape was silently dropped. Aligned to OVERWRITE semantics (matching the email/phone behaviour), since the /in/ profile page is the canonical source. Latest scrape wins.",
+    ],
+  },
+  {
     version: "1.0.275",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.275.zip",
-    latest: true,
     changes: [
       "Reading profile now always re-scrapes name + title + company name from the canonical /in/<handle> page DOM and OVERRIDES whatever the side-panel had captured (often a partial card-level scrape that missed those three). Email/phone/location/website behaviour unchanged. One-block change to saveCurrentProfile Step 1; everything else remains v1.0.267-baseline + v1.0.274's retry-loop fix.",
     ],
