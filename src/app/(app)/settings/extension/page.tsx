@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.272",
+    date: "Jun 19, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.272.zip",
+    latest: true,
+    changes: [
+      "Message All — conversation bubbles now reliably close after each send instead of stacking up. Root cause: _closeMsgOverlay targeted specific class names (.msg-overlay-conversation-bubble) that LinkedIn rotates every few quarters. When the class name changed, the close button query returned zero matches, the bubble stayed open, and the next iteration opened a SECOND bubble alongside it.",
+      "Replaced the class-based selector with a semantic aria-label match ('Close your conversation with <Name>') plus a broad structural fallback (any container near the viewport's bottom-right whose class contains 'msg-overlay' / 'conversation-bubble' / 'messaging-bubble'). This survives LinkedIn renaming the bubble container.",
+      "Added _closeMsgOverlayAndVerify: re-calls the close every 400ms until the bubbles are actually gone from the DOM (cap 3.5s). Wired into both the post-send teardown AND the pre-next-iteration setup, so stacking is impossible.",
+    ],
+  },
+  {
     version: "1.0.271",
     date: "Jun 19, 2026",
     size: "246 KB",
     file: "/extensions/leadcaptura-extension-v1.0.271.zip",
-    latest: true,
     changes: [
       "Save Lead now reliably captures title/position + company name (in addition to email/phone/location/website that v1.0.269 fixed). Root cause: Step 1 only filled MISSING fields — if the side panel had pre-populated stale values from before LinkedIn finished hydrating the top card, the fresh scrape never overrode them. Also, no re-scrape was ever done AFTER the contact modal closed, so late-hydrated headlines stayed lost.",
       "Step 1 now waits for the h1 to stabilise (≤1.5s) before scraping, and always prefers the canonical /in/ page values for name/headline/title/company.",

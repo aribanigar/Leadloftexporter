@@ -7688,7 +7688,8 @@
   // BOTH the legacy bottom-right bubble AND the new design's centred "New
   // message" dialog (close X at the top-right).
   function _closeMsgOverlay() {
-    // 1) Legacy bubble close buttons.
+    // 1) Legacy bubble close buttons (kept as a fast path — works on most
+    // legacy LinkedIn layouts even if step 2 below covers them too).
     const legacy = document.querySelectorAll(
       ".msg-overlay-conversation-bubble button[aria-label*='Close' i], " +
       ".msg-overlay-conversation-bubble button[data-control-name*='close' i], " +
@@ -7697,7 +7698,56 @@
     );
     for (const b of legacy) { try { b.click(); } catch {} }
 
-    // 2) New dialog: scan all "New message" dialogs and click their X.
+    // 2) CONVERSATION BUBBLES — LinkedIn renames .msg-overlay-conversation-bubble
+    // every few quarters, so anchor on the SEMANTIC aria-label instead of the
+    // class name. "Close your conversation with <Name>" is the stable label.
+    // Without this, when the class name rotates the bubble silently stops
+    // closing and the next Message All iteration stacks another bubble on top.
+    try {
+      const convCloses = document.querySelectorAll(
+        "button[aria-label^='Close your conversation' i], " +
+        "button[aria-label*='Close conversation' i], " +
+        "button[aria-label*='close conversation' i]"
+      );
+      for (const b of convCloses) { try { b.click(); } catch {} }
+    } catch {}
+
+    // 2b) BROAD FALLBACK — for any unknown LinkedIn class rotation, find ALL
+    // ancestor containers near the bottom-right of the viewport that LOOK like
+    // a chat bubble (class name contains "msg" or "conversation" or "bubble",
+    // OR aria-label starts with "Messaging with"), then click any close-ish
+    // button inside. Skip our own overlay.
+    try {
+      const bubbleSelectors = [
+        "[class*='msg-overlay']",
+        "[class*='conversation-bubble']",
+        "[class*='messaging-bubble']",
+        "[aria-label^='Messaging with' i]",
+        "[data-test-conversation-thread]",
+      ];
+      const seen = new Set();
+      for (const sel of bubbleSelectors) {
+        for (const el of document.querySelectorAll(sel)) {
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+          // Climb to the outermost matching ancestor so we don't try to close
+          // the same bubble three times via three nested elements.
+          let outer = el;
+          while (outer.parentElement && (
+            outer.parentElement.className?.toString().match(/msg-overlay|conversation-bubble|messaging-bubble/i) ||
+            outer.parentElement.matches?.("[aria-label^='Messaging with' i]")
+          )) outer = outer.parentElement;
+          if (seen.has(outer)) continue;
+          seen.add(outer);
+          const closes = outer.querySelectorAll(
+            "button[aria-label*='Close' i], button[aria-label*='Dismiss' i], " +
+            "button[data-control-name*='close' i]"
+          );
+          for (const b of closes) { try { (b.closest("button") || b).click(); } catch {} }
+        }
+      }
+    } catch {}
+
+    // 3) New dialog: scan all "New message" dialogs and click their X.
     try {
       const PHRASES = [/^new message$/i, /^write a message/i, /^send a message/i];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
@@ -7731,11 +7781,39 @@
       }
     } catch {}
 
-    // 3) Press Escape on the body — closes any modal dialog as last resort.
+    // 4) Press Escape on the body — closes any modal dialog as last resort.
     try {
       document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
       document.body.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true }));
     } catch {}
+  }
+
+  // Poll-and-verify wrapper: call _closeMsgOverlay repeatedly until the
+  // bubbles actually disappear from the DOM, or until ~3.5s elapses. A
+  // single click sometimes loses the race to LinkedIn's bubble animation,
+  // so retrying every 400ms ensures stacking is impossible.
+  async function _closeMsgOverlayAndVerify(maxMs = 3500) {
+    const start = Date.now();
+    const stillOpen = () => {
+      const sels = [
+        "button[aria-label^='Close your conversation' i]",
+        "button[aria-label*='Close conversation' i]",
+        "[class*='msg-overlay-conversation']",
+        "[aria-label^='Messaging with' i]",
+      ];
+      for (const sel of sels) {
+        for (const el of document.querySelectorAll(sel)) {
+          if (el.closest?.(".lc-overlay-root, #lc-overlay-root, .lc-floating-panel, .lc-toolbar")) continue;
+          const r = el.getBoundingClientRect?.();
+          if (r && r.width > 0 && r.height > 0) return true;
+        }
+      }
+      return false;
+    };
+    do {
+      _closeMsgOverlay();
+      await new Promise((r) => setTimeout(r, 400));
+    } while (stillOpen() && Date.now() - start < maxMs);
   }
 
   // Extract template variables from a connections-page card.
@@ -7806,9 +7884,10 @@
           continue;
         }
 
-        // Close any leftover overlay before starting.
-        _closeMsgOverlay();
-        await sleep(300);
+        // Close any leftover overlay before starting. Verify it's gone — if
+        // a bubble from the PREVIOUS iteration is still up, opening a new
+        // composer here stacks bubbles instead of replacing.
+        await _closeMsgOverlayAndVerify(3500);
 
         // Make the card visible.
         try { card.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
@@ -8046,7 +8125,13 @@
           _lcToast(`✅ ${idx}/${total} sent to ${firstName}`, 1800);
         }
 
-        _closeMsgOverlay();
+        // Close the conversation bubble and VERIFY it's actually gone before
+        // the next iteration. A single click sometimes loses the race to
+        // LinkedIn's slide-out animation, leaving the bubble open — the next
+        // Message All step then opens a SECOND bubble next to it, and the user
+        // sees two/three/four chat tabs stacking up across the screen. Polling
+        // up to 3.5s closes any stragglers reliably.
+        await _closeMsgOverlayAndVerify(3500);
 
         // Human-paced gap before the next card.
         if (i < urls.length - 1 && !state.messageCancel) {
@@ -8057,7 +8142,7 @@
           console.log(`[LeadCaptura] msg in-place ${idx}/${total} threw:`, err);
           failed++;
           _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
-          try { _closeMsgOverlay(); } catch {}
+          try { await _closeMsgOverlayAndVerify(2500); } catch {}
         }
       }
 
