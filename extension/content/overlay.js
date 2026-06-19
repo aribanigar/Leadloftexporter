@@ -8036,11 +8036,46 @@
       // gate the FIRST-page recipient list above; once we move to the
       // next page, we want ALL its cards.)
       if (!loadMore || state.messageCancel) break;
-      let pageBtn = _findShowMoreResultsButton();
-      let pageMode = "loadmore";
-      if (!pageBtn) {
-        pageBtn = _findNextPageButton();
-        pageMode = "next";
+      // INLINED button lookup (no helper function dependency) so this stays
+      // resilient against any closure-scope hiccup. Two LinkedIn page styles
+      // to handle:
+      //   (A) numeric pages + Next pagination button — people-search results.
+      //       Selectors: button.artdeco-pagination__button--next,
+      //                  button[aria-label='Next'], or text "Next" button.
+      //   (B) "Show more results" infinite-scroll — connections / variants.
+      let pageBtn = null;
+      let pageMode = null;
+      try {
+        // Show more results (load-more) — try first since it's cheaper.
+        const moreBtn =
+          document.querySelector("button.scaffold-finite-scroll__load-button") ||
+          Array.from(document.querySelectorAll("button")).find((x) => {
+            const t = (x.textContent || "").replace(/\s+/g, " ").trim();
+            return /^show more results$/i.test(t);
+          });
+        if (moreBtn && !moreBtn.disabled && moreBtn.getAttribute("aria-disabled") !== "true") {
+          pageBtn = moreBtn;
+          pageMode = "loadmore";
+        }
+        if (!pageBtn) {
+          // Next pagination button — page 79 → 80, etc.
+          const nextCands = [
+            document.querySelector("button.artdeco-pagination__button--next"),
+            document.querySelector("button[aria-label='Next']"),
+            ...Array.from(document.querySelectorAll("button")).filter((b) =>
+              /^next\b/i.test((b.textContent || "").replace(/\s+/g, " ").trim())
+            ),
+          ].filter(Boolean);
+          for (const b of nextCands) {
+            if (!b.disabled && b.getAttribute("aria-disabled") !== "true") {
+              pageBtn = b;
+              pageMode = "next";
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[LeadCaptura] pagination button lookup threw:", e?.message);
       }
       if (!pageBtn) break;                       // no more pages → done
       _lcToast(
