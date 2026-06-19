@@ -1355,7 +1355,11 @@
         } catch { /* best-effort */ }
       }
 
-      await Human.sleep(Human.rand(80, 200));
+      // Hold the tab open for ~1.8s after the sync completes so the user can
+      // SEE the profile rendered + data captured before it disappears. The
+      // previous 80-200ms window was so fast the tab looked like a glitch
+      // ("opens and closes too fast"). Cap is the safetyTimer at 18s.
+      await Human.sleep(Human.rand(1500, 2200));
     } catch (e) {
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {

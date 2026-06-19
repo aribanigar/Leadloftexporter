@@ -19,11 +19,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.270",
+    date: "Jun 19, 2026",
+    size: "246 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.270.zip",
+    latest: true,
+    changes: [
+      "Per-card Save background-enrichment tab now stays open ~1.5–2.2s after the data has been captured + synced (was 80–200ms). Previous timing felt like a glitch — the tab flashed open and closed before the user could see the profile had loaded. Safety cap is still 18s.",
+    ],
+  },
+  {
     version: "1.0.269",
     date: "Jun 19, 2026",
     size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.269.zip",
-    latest: true,
     changes: [
       "Save Lead now reliably captures email, phone, website and location. Root cause: the contact-info modal retry loop bailed the moment email OR phone appeared, but LinkedIn renders website + address blocks in a separate React tick 0.5–3s later, so those fields were dropped most of the time.",
       "Fixed by replacing the early-exit with a stability check (keep re-reading until two consecutive polls return no new fields, or all four fields are captured), and increasing the timing budget: modal-find 3s → 5s, initial settle 400ms → 700ms, retry sleep 350ms → 500ms, retry attempts 3 → 6.",
