@@ -439,14 +439,19 @@
 
     // Step 1: refresh base profile fields (name, title, company, location,
     // avatar) from the current DOM. Pure read, no clicks, no side effects.
+    // Name / title / company / headline always OVERRIDE the side-panel's
+    // initial values — we are on the canonical /in/<handle> page so the
+    // live scrape is the source of truth (the side-panel was rendered from
+    // a card-level scrape that often misses these). location / avatar
+    // stay fill-only to preserve any value the user manually corrected.
     try {
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
         const fresh = Scraper.scrapeProfile();
         if (fresh) {
-          for (const k of [
-            "linkedin_url", "full_name", "first_name", "last_name",
-            "headline", "title", "company_name", "location", "avatar_url",
-          ]) {
+          for (const k of ["full_name", "first_name", "last_name", "headline", "title", "company_name"]) {
+            if (fresh[k]) enriched[k] = fresh[k];
+          }
+          for (const k of ["linkedin_url", "location", "avatar_url"]) {
             if (fresh[k] && !enriched[k]) enriched[k] = fresh[k];
           }
         }

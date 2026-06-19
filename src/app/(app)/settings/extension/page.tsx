@@ -19,11 +19,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.275",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.275.zip",
+    latest: true,
+    changes: [
+      "Reading profile now always re-scrapes name + title + company name from the canonical /in/<handle> page DOM and OVERRIDES whatever the side-panel had captured (often a partial card-level scrape that missed those three). Email/phone/location/website behaviour unchanged. One-block change to saveCurrentProfile Step 1; everything else remains v1.0.267-baseline + v1.0.274's retry-loop fix.",
+    ],
+  },
+  {
     version: "1.0.274",
     date: "Jun 19, 2026",
-    size: "247 KB",
+    size: "245 KB",
     file: "/extensions/leadcaptura-extension-v1.0.274.zip",
-    latest: true,
     changes: [
       "Reverted to v1.0.267 behaviour (the good autopilot baseline) and applied a single-line fix for the rare skipping of email/phone/website/location. Root cause was one early-exit inside scrapeContactInfo's retry loop: 'if (data.email || data.phone) break;' was firing the moment EITHER field appeared, before LinkedIn had a chance to render website + address in its next React tick. Removed that line so the loop now always runs all 3 retries unless every field is already populated. No other behavioural changes — autopilot, the avatar filter, headline scraping, the modal close timing all match v1.0.267 exactly.",
     ],
