@@ -19,6 +19,16 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.283",
+    date: "Jun 19, 2026",
+    size: "246 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.283.zip",
+    latest: true,
+    changes: [
+      "Save Lead floating-panel button: Contact info modal now stays open ~1.2s longer after the retry loop so React has time to hydrate website + address blocks (which render in a later tick than email + phone). New optional scrapeContactInfo({ keepOpenMs }) parameter — saveCurrentProfile passes 1200, autopilot enrichment passes nothing (default 0), so background-tab enrichment stays byte-for-byte v1.0.258. Anti-bot pacing untouched.",
+    ],
+  },
+  {
     version: "1.0.282",
     date: "Jun 19, 2026",
     size: "246 KB",

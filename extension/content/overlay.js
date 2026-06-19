@@ -512,6 +512,12 @@
           timeoutMs: 3000,
           settleMs: 400,
           allowPushStateFallback: true,
+          // Foreground floating-panel Save Lead: keep the contact-info modal
+          // open for ~1.2s after the retry loop so React has more time to
+          // hydrate website / address fields (which render in a later tick
+          // than email / phone). Autopilot enrichment background tabs do NOT
+          // pass this — they preserve v1.0.258 byte-for-byte timing.
+          keepOpenMs: 1200,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
         if (contact.email && !enriched.email) enriched.email = contact.email;

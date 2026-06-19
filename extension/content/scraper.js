@@ -1096,6 +1096,7 @@
     timeoutMs = 3000,
     settleMs = 400,
     allowPushStateFallback = false,
+    keepOpenMs = 0,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
       return { email: null, phone: null, website: null, address: null };
@@ -1234,6 +1235,28 @@
       if (data.email || data.phone) break;
     }
 
+    // Optional foreground-only settle BEFORE the close: caller asks us to
+    // hold the modal open for `keepOpenMs` so React has more time to hydrate
+    // any late-arriving fields (the email/phone/website/address blocks render
+    // in separate ticks 0.5-3s apart). Autopilot enrichment passes 0 (default)
+    // to preserve byte-for-byte v1.0.258 timing; saveCurrentProfile from the
+    // foreground floating panel passes ~1200ms so 'closes too fast' goes away.
+    if (keepOpenMs > 0) {
+      const _deadline = Date.now() + keepOpenMs;
+      // Re-poll the modal once per ~300ms during the hold so any field that
+      // appears late still makes it into `data` before we close.
+      while (Date.now() < _deadline) {
+        await _sleep(300);
+        if (data.email && data.phone && data.website && data.address) break;
+        const _now = _scrapeFromContactModal(_findContactModal() || modal);
+        data = {
+          email: data.email || _now.email,
+          phone: data.phone || _now.phone,
+          website: data.website || _now.website,
+          address: data.address || _now.address,
+        };
+      }
+    }
     // Always close the modal when not on the overlay URL directly.
     // When didPushState is true, clicking × triggers LinkedIn's SPA router to
     // navigate back to /in/<handle> — that's the cleanest URL restore path.
