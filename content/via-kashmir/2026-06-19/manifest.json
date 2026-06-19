@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-19",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Cool green valleys above the summer heat",
+      "subject": "Cool green valleys above the summer heat",
+      "campaign_code": "VK-INR-B2C-20260619"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Summer demand - rides and shikaras booking now",
+      "subject": "The next airport run is being booked now",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260619"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "A",
+      "theme": "Dal Lake demand - your boat seen first",
+      "subject": "Tonight's Dal Lake guest picked another boat",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260619"
+    }
+  ]
+}
