@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.269",
+    date: "Jun 19, 2026",
+    size: "245 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.269.zip",
+    latest: true,
+    changes: [
+      "Save Lead now reliably captures email, phone, website and location. Root cause: the contact-info modal retry loop bailed the moment email OR phone appeared, but LinkedIn renders website + address blocks in a separate React tick 0.5–3s later, so those fields were dropped most of the time.",
+      "Fixed by replacing the early-exit with a stability check (keep re-reading until two consecutive polls return no new fields, or all four fields are captured), and increasing the timing budget: modal-find 3s → 5s, initial settle 400ms → 700ms, retry sleep 350ms → 500ms, retry attempts 3 → 6.",
+      "Added a 300ms settle before the modal closes so it no longer visually slams shut and the user briefly sees what was captured.",
+      "New coral/pink LC icon (was blue/purple LL) so it stops visually clashing with the JobsAutoApply extension in the Chrome toolbar.",
+    ],
+  },
+  {
     version: "1.0.267",
     date: "Jun 16, 2026",
     size: "247 KB",
     file: "/extensions/leadcaptura-extension-v1.0.267.zip",
-    latest: true,
     changes: [
       "Sales Nav spotlights now use a brand-new, fully isolated spotlight (own IDs, own state, own teardown) so nothing in the LinkedIn spotlight pipeline can interfere with it. Banner + ring + bouncing arrow at top z-index, visible for 2 seconds with a centred top banner that ALWAYS appears (even if the target rect resolves to 0×0).",
       "Both Connect (step 3) and Send Invitation (step 5) now use the new spotlight. Wait extended to 1300ms so you have time to see it before the click lands.",
