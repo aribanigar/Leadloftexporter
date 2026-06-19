@@ -439,19 +439,14 @@
 
     // Step 1: refresh base profile fields (name, title, company, location,
     // avatar) from the current DOM. Pure read, no clicks, no side effects.
-    // Name / title / company / headline always OVERRIDE the side-panel's
-    // initial values — we are on the canonical /in/<handle> page so the
-    // live scrape is the source of truth (the side-panel was rendered from
-    // a card-level scrape that often misses these). location / avatar
-    // stay fill-only to preserve any value the user manually corrected.
     try {
       if (location.pathname.startsWith("/in/") && Scraper.scrapeProfile) {
         const fresh = Scraper.scrapeProfile();
         if (fresh) {
-          for (const k of ["full_name", "first_name", "last_name", "headline", "title", "company_name"]) {
-            if (fresh[k]) enriched[k] = fresh[k];
-          }
-          for (const k of ["linkedin_url", "location", "avatar_url"]) {
+          for (const k of [
+            "linkedin_url", "full_name", "first_name", "last_name",
+            "headline", "title", "company_name", "location", "avatar_url",
+          ]) {
             if (fresh[k] && !enriched[k]) enriched[k] = fresh[k];
           }
         }
@@ -512,19 +507,6 @@
           timeoutMs: 3000,
           settleMs: 400,
           allowPushStateFallback: true,
-          // Foreground floating-panel Save Lead: keep the contact-info modal
-          // open for ~1.2s after the retry loop so React has more time to
-          // hydrate website / address fields (which render in a later tick
-          // than email / phone). Autopilot enrichment background tabs do NOT
-          // pass this — they preserve v1.0.258 byte-for-byte timing.
-          keepOpenMs: 1200,
-          // PERMANENT FIX for 'Save Lead opens the profile-picture lightbox
-          // on the first click'. Skip the link click entirely and navigate
-          // via history.pushState — DOM click handlers never fire so no
-          // avatar wrapper anchor can intercept. Foreground-only flag;
-          // autopilot background-tab enrichment leaves this off (false)
-          // and keeps byte-for-byte v1.0.258 behaviour.
-          preferPushState: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
         if (contact.email && !enriched.email) enriched.email = contact.email;
@@ -605,15 +587,10 @@
     let result;
     try {
       result = await Api.syncProfile(enriched);
-      // Show ALL six captured fields so the user gets visible confirmation
-      // that name/title/company/email/phone/location/website all landed.
       const fields = [
         enriched.email && "email",
         enriched.phone && "phone",
         enriched.location && "location",
-        enriched.title && "title",
-        enriched.company_name && "company",
-        enriched.company_url && "website",
       ].filter(Boolean);
       const fieldsLabel = fields.length ? ` (${fields.join(" + ")})` : "";
       flashStatus(
