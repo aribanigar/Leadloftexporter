@@ -518,6 +518,13 @@
           // than email / phone). Autopilot enrichment background tabs do NOT
           // pass this — they preserve v1.0.258 byte-for-byte timing.
           keepOpenMs: 1200,
+          // PERMANENT FIX for 'Save Lead opens the profile-picture lightbox
+          // on the first click'. Skip the link click entirely and navigate
+          // via history.pushState — DOM click handlers never fire so no
+          // avatar wrapper anchor can intercept. Foreground-only flag;
+          // autopilot background-tab enrichment leaves this off (false)
+          // and keeps byte-for-byte v1.0.258 behaviour.
+          preferPushState: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
         if (contact.email && !enriched.email) enriched.email = contact.email;

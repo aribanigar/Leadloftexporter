@@ -19,6 +19,19 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.285",
+    date: "Jun 19, 2026",
+    size: "247 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.285.zip",
+    latest: true,
+    changes: [
+      "PERMANENT fix for 'Save Lead opens the profile-picture lightbox on first click, fields not saving on second click'. Root cause: on some LinkedIn 2026 profile layouts the Contact info anchor sits inside / overlaps the avatar's clickable wrapper; a bubbling click event from link.click() is caught by the wrapper's React handler first, which opens the photo lightbox instead of the Contact info overlay. The pushState fallback only fired AFTER the click-then-poll-3s flow timed out, which is why a second click was needed (and even then it raced).",
+      "Fix: scrapeContactInfo now accepts a preferPushState parameter. When set, the function NEVER calls link.click() — it navigates to the Contact info path via history.pushState directly. pushState mutates the URL silently, the SPA router opens the overlay, and zero DOM click handlers fire (the avatar wrapper can never intercept).",
+      "saveCurrentProfile (the floating-panel Save Lead handler) passes preferPushState:true. Autopilot enrichment in background tabs does NOT pass it — keeps byte-for-byte v1.0.258 behaviour.",
+      "Net effect: clicking Save Lead opens Contact info immediately, in one go, with no avatar lightbox anywhere, then captures email + phone + location + title + company + website cleanly.",
+    ],
+  },
+  {
     version: "1.0.284",
     date: "Jun 19, 2026",
     size: "246 KB",
