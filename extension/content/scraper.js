@@ -1231,7 +1231,12 @@
         website: data.website || next.website,
         address: data.address || next.address,
       };
-      if (data.email || data.phone) break;
+      // NOTE: removed the early-exit on email||phone. With the early-exit,
+      // website + address often dropped because they render in a later
+      // React tick than email/phone. Running all 3 retries unconditionally
+      // adds at most ~700ms in the worst case but captures all four fields
+      // reliably — Save Lead now lands email + phone + website + location
+      // in one go.
     }
 
     // Always close the modal when not on the overlay URL directly.

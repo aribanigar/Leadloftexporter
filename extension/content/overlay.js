@@ -8031,7 +8031,11 @@
       // Without (B), "Message everyone" stopped at the end of the current
       // page on the people-search layout because the load-more button
       // simply doesn't exist there.
-      if (!loadMore || userSelected || state.messageCancel) break;
+      // 'Message everyone' tick is dominant — ignore userSelected here so
+      // pagination always advances when ticked. (Pre-selected URLs only
+      // gate the FIRST-page recipient list above; once we move to the
+      // next page, we want ALL its cards.)
+      if (!loadMore || state.messageCancel) break;
       let pageBtn = _findShowMoreResultsButton();
       let pageMode = "loadmore";
       if (!pageBtn) {
