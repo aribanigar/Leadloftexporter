@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — bring your shop online free this monsoon">
+  <defs>
+    <style>
+      .sans { font-family: 'Poppins','Arial Narrow',Arial,sans-serif; }
+      .serif { font-family: 'Georgia','Times New Roman',serif; }
+    </style>
+  </defs>
+
+  <!-- background -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left logo zone: left intentionally blank (~140px square) for manual logo -->
+
+  <!-- eyebrow -->
+  <text x="200" y="150" class="sans" font-size="30" font-weight="600"
+        letter-spacing="10" fill="#FF6B00">QCKSERVE&#160;&#183;&#160;STORE</text>
+
+  <!-- monsoon kicker -->
+  <text x="80" y="300" class="sans" font-size="34" font-weight="500"
+        letter-spacing="2" fill="#BBBBBB">Monsoon&#8217;s here in UP. Your dukaan</text>
+  <text x="80" y="346" class="sans" font-size="34" font-weight="500"
+        letter-spacing="2" fill="#BBBBBB">shouldn&#8217;t wait for foot traffic.</text>
+
+  <!-- oversized headline -->
+  <text x="74" y="520" class="sans" font-size="150" font-weight="800"
+        letter-spacing="-4" fill="#FFFFFF">YOUR</text>
+  <text x="74" y="660" class="sans" font-size="150" font-weight="800"
+        letter-spacing="-4" fill="#FFFFFF">SHOP,</text>
+
+  <!-- italic-serif contrast accent -->
+  <text x="74" y="800" class="serif" font-size="150" font-weight="400"
+        font-style="italic" fill="#FF6B00">online.</text>
+
+  <!-- flat orange price block -->
+  <rect x="74" y="880" width="932" height="250" fill="#FF6B00"/>
+  <text x="120" y="990" class="sans" font-size="58" font-weight="700"
+        fill="#1A1A1A">List your store for</text>
+  <text x="120" y="1085" class="sans" font-size="150" font-weight="800"
+        letter-spacing="-4" fill="#1A1A1A">&#8377;0</text>
+  <text x="500" y="1010" class="sans" font-size="34" font-weight="600"
+        fill="#1A1A1A">Zero commission.</text>
+  <text x="500" y="1055" class="sans" font-size="34" font-weight="600"
+        fill="#1A1A1A">Owner-direct sales.</text>
+  <text x="500" y="1100" class="sans" font-size="34" font-weight="600"
+        fill="#1A1A1A">No middlemen.</text>
+
+  <!-- footer -->
+  <text x="80" y="1270" class="sans" font-size="46" font-weight="700"
+        fill="#FFFFFF">qckserve.in<tspan fill="#FF6B00">/store</tspan></text>
+  <text x="1000" y="1270" class="sans" font-size="28" font-weight="500"
+        text-anchor="end" fill="#888888">India&#8217;s free local marketplace</text>
+</svg>

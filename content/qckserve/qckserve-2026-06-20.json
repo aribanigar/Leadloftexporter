@@ -1,0 +1,56 @@
+{
+  "date": "2026-06-20",
+  "business": "qckserve",
+  "topic": "Bring your shop online free this monsoon",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Monsoon’s here — put your shop online for ₹0",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Put your shop online for &#8377;0</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#f3f3f3; font-family:'Poppins',Arial,sans-serif;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f3f3f3;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:600px; background-color:#ffffff;\">\n\n<!-- Header / logo zone -->\n<tr><td style=\"background-color:#1A1A1A; padding:22px 32px;\">\n<span style=\"font-family:'Poppins',Arial,sans-serif; font-size:22px; font-weight:700; color:#ffffff;\">qckserve.in</span>\n<span style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; font-weight:500; color:#FF6B00; letter-spacing:2px; float:right; padding-top:6px;\">STORE</span>\n</td></tr>\n\n<!-- Hero -->\n<tr><td style=\"background-color:#FF6B00; padding:40px 32px;\">\n<p style=\"margin:0 0 8px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:600; color:#1A1A1A;\">Monsoon&#8217;s arriving across UP this week.</p>\n<p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:38px; line-height:44px; font-weight:800; color:#1A1A1A;\">Put your shop online for <span style=\"font-size:54px;\">&#8377;0</span></p>\n</td></tr>\n\n<!-- Body -->\n<tr><td style=\"padding:36px 32px 8px 32px;\">\n<p style=\"margin:0 0 18px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#333333;\">When the rain keeps customers indoors, they shop on their phones. Don&#8217;t lose the footfall &mdash; bring your store to where buyers already are.</p>\n<p style=\"margin:0 0 18px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#333333;\">On QckServe, listing your shop is genuinely free &mdash; and it stays free:</p>\n</td></tr>\n\n<!-- Value blocks -->\n<tr><td style=\"padding:0 32px;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n<tr><td style=\"background-color:#1A1A1A; padding:18px 20px;\"><span style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff;\">&#10003;&nbsp; Zero commission &mdash; you keep 100% of every sale</span></td></tr>\n<tr><td style=\"height:10px; line-height:10px;\">&nbsp;</td></tr>\n<tr><td style=\"background-color:#1A1A1A; padding:18px 20px;\"><span style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff;\">&#10003;&nbsp; Owner-direct &mdash; buyers reach you, no middlemen</span></td></tr>\n<tr><td style=\"height:10px; line-height:10px;\">&nbsp;</td></tr>\n<tr><td style=\"background-color:#1A1A1A; padding:18px 20px;\"><span style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff;\">&#10003;&nbsp; Free listings &mdash; no setup fee, no monthly charge</span></td></tr>\n</table>\n</td></tr>\n\n<!-- CTA -->\n<tr><td align=\"center\" style=\"padding:36px 32px 20px 32px;\">\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n<td style=\"background-color:#FF6B00;\">\n<a href=\"https://qckserve.in/store\" style=\"display:inline-block; padding:16px 44px; font-family:'Poppins',Arial,sans-serif; font-size:17px; font-weight:700; color:#1A1A1A; text-decoration:none;\">List your shop free &#8594;</a>\n</td>\n</tr></table>\n</td></tr>\n\n<!-- Footer -->\n<tr><td style=\"background-color:#1A1A1A; padding:24px 32px;\">\n<p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:14px; color:#ffffff;\">qckserve.in<span style=\"color:#FF6B00;\">/store</span></p>\n<p style=\"margin:6px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:12px; color:#888888;\">India&#8217;s free local marketplace &mdash; zero commission, owner-direct. Focused on Uttar Pradesh.</p>\n</td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-20.svg",
+      "tags": [
+        "store",
+        "promo",
+        "monsoon"
+      ],
+      "notes": "600px table layout, flat blocks (#FF6B00 / #1A1A1A), no gradients, CTA to qckserve.in/store"
+    },
+    {
+      "channel": "whatsapp",
+      "content": "Baarish aa gayi UP mein ☔ Apni dukaan ab online le aao — bilkul free. Zero commission, koi beech-wala nahi, customer seedha aapse. Aaj hi list karo: qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-20.svg",
+      "tags": [
+        "store",
+        "promo"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Dukaan choti ho ya badi — ab online bhi chalegi 🛍\n\nMonsoon mein customer bahar kam, phone pe zyada. QckServe pe apni shop list karo: ₹0 fees, zero commission, customer seedha aapse baat kare. Koi beech-wala nahi.\n\nLink bio mein → qckserve.in/store\n\n#QckServe #ApniDukaan #UPBusiness #LocalSeller #ZeroCommission",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-20.svg",
+      "tags": [
+        "store",
+        "promo"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "Monsoon season is here. List your shop FREE on QckServe — zero commission, sell direct to buyers. Start now: qckserve.in/store",
+      "tags": [
+        "store",
+        "promo"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-20] Bring your shop online free this monsoon (Image Prompt)",
+      "content": "QckServe Store — ₹0 listing poster (monsoon, UP).\n\nSCENE: A small but proud neighbourhood shop in a Tier-2 Uttar Pradesh town just after first monsoon rain — wet street reflections, glistening shutter, a few raindrops still in the air.\nSUBJECT / POSE: A confident mid-40s Indian shopkeeper (kirana / general store owner) standing in the doorway holding a smartphone toward the viewer, warm half-smile, sleeves rolled, relaxed and in control.\nPHONE UI MOCKUP: On the phone screen, a clean QckServe 'Store' listing card — shop photo thumbnail, shop name, a big flat orange button reading 'List free · ₹0', and a small 'owner-direct' chip. Flat UI, no gradients, crisp.\nCOLOUR SYSTEM: dominant brand orange #FF6B00 and deep charcoal #1A1A1A, secondary accent #ef6723 / #a43d00, neutral wet-grey street, warm skin tones. Flat solid colour blocks only — NO gradients.\nLIGHTING: soft overcast post-rain daylight, gentle rim light on the shopkeeper, subtle reflection glow off the wet ground.\nTYPOGRAPHY HIERARCHY: oversized condensed bold headline space top-right ('YOUR SHOP, ONLINE'), an italic-serif accent word 'free' in orange, small Poppins supporting line, '₹0' as the visual hero numeral.\nEYE FLOW: top-left logo zone → shopkeeper's face → phone screen → ₹0 hero → qckserve.in/store at bottom.\nCAMERA: 35mm, eye-level, shallow depth of field, shop softly bokeh'd behind subject, 4:5 vertical crop.\nPERFORMANCE LAYER: thumb-stopping warmth + a single bold price promise; reads instantly even as a small feed thumbnail.\nLAYOUT: reserve the TOP-LEFT ~140px square logo zone empty — logo placed manually. Keep bottom-left clear for 'qckserve.in/store'.\n--ar 4:5 --style raw --v 6.1",
+      "notes": "midjourney / ideogram — manual render by Ariba; top-left logo zone reserved",
+      "tags": [
+        "store",
+        "image-prompt"
+      ]
+    }
+  ]
+}
