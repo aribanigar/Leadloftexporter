@@ -1,0 +1,23 @@
+{
+  "routine": "content-hub-hudace",
+  "last_run": "2026-06-20",
+  "folder": "hudace",
+  "workspace": "b2236a00-faa2-41d5-8ee7-b6e24d0c4904",
+  "business_id": "49f307c1-7f19-4b0d-845d-3532f77fa92d",
+  "used_industries": [
+    "Retail",
+    "Construction and Real Estate"
+  ],
+  "runs": [
+    {
+      "date": "2026-06-20",
+      "industries": [
+        "Retail",
+        "Construction and Real Estate"
+      ],
+      "emails": 7,
+      "items_seeded": 28,
+      "db_path": "neon-http"
+    }
+  ]
+}
