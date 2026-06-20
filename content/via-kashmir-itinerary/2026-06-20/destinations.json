@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "kerala",    "feat": "goa"},
+  "kashmir": {"photo": "kashmir",   "feat": "kerala"},
+  "saudi":   {"photo": "cappadocia","feat": "maldives"},
+  "dubai":   {"photo": "maldives",  "feat": "alps"}
+}
