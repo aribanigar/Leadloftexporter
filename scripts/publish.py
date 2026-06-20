@@ -16,14 +16,14 @@ SLUG_DEFAULTS = {
         "HUB_BRAND_COLOR": "#00361a",
         "HUB_ACCENT_COLOR": "#9dd3aa",
         "HUB_LOGO_URL": "https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&w=400&output=png",
-        "HUB_WORKSPACE": "2faa195e-5817-4d32-8e6c-350b70ce32c3",
+        "HUB_WORKSPACE": "b2236a00-faa2-41d5-8ee7-b6e24d0c4904",
         "HUB_TONE": "confident",
     },
     "via-kashmir": {
         "HUB_BUSINESS_NAME": "ViaKashmir",
         "HUB_BRAND_COLOR": "#0e6b53",
         "HUB_ACCENT_COLOR": "#008138",
-        "HUB_WORKSPACE": "2faa195e-5817-4d32-8e6c-350b70ce32c3",
+        "HUB_WORKSPACE": "b2236a00-faa2-41d5-8ee7-b6e24d0c4904",
         "HUB_TONE": "vibrant",
     },
 }

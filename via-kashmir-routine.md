@@ -25,7 +25,7 @@ operators to list on viakashmir.in). Vary the lead photo + headline daily; keep 
 - WHATSAPP_NUMBER = `919186051499` → `https://wa.me/919186051499`
 - CONTACT_EMAIL = `contact@viakashmir.in`  CONTACT_PHONE = `+91 91860 51499`
 - Green contact banner with both appears in every email and on every card.
-- HUB_WORKSPACE = `2faa195e-5817-4d32-8e6c-350b70ce32c3`; HUB_BUSINESS_SLUG = `via-kashmir`.
+- HUB_WORKSPACE = `b2236a00-faa2-41d5-8ee7-b6e24d0c4904`; HUB_BUSINESS_SLUG = `via-kashmir`.
 - Logo (live SVG via wsrv): `https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&w=400&output=png`
 - CTA rule: every button → `https://viakashmir.in/`, EXCEPT the B2B list/sign-up button →
   `https://viakashmir.in/sign-up?role=vendor`. Only non-viakashmir.in link allowed is the
