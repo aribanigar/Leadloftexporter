@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-20",
+  "theme": "Recycled and rPET",
+  "season": "Peak summer, event season and H2 onboarding",
+  "design": "A",
+  "campaign_code": "GG-20260620-7",
+  "campaign_name": "Recycled rPET Bags - 20 Jun 2026",
+  "subject": "Recycled bags, daily carry",
+  "skus": [
+    "GG1486",
+    "GG1446",
+    "GG1543",
+    "GG1441",
+    "GG1299",
+    "GG1164"
+  ],
+  "products": [
+    {
+      "name": "Bapal+",
+      "sku": "GG1486",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6703-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1486"
+    },
+    {
+      "name": "Duo Indico",
+      "sku": "GG1446",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6455-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1446"
+    },
+    {
+      "name": "Vernal",
+      "sku": "GG1543",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6976-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1543"
+    },
+    {
+      "name": "Toplo",
+      "sku": "GG1441",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6419-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1441"
+    },
+    {
+      "name": "Litas",
+      "sku": "GG1299",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2698-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1299"
+    },
+    {
+      "name": "Feux",
+      "sku": "GG1164",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2360-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1164"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-20/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-20/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20and%20rpet%20options%20for%20our%20team."
+}

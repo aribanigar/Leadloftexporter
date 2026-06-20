@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-20",
+  "season": "Peak summer, event season and H2 onboarding",
+  "generated_utc": "2026-06-20T02:39:06.090726Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Branded daily hydration",
+      "campaign_code": "GG-20260620-1",
+      "campaign_name": "Steel Bottles and Tumblers - 20 Jun 2026",
+      "subject": "Steel they refuse to bin",
+      "skus": [
+        "GG1498",
+        "GG1342",
+        "GG1329",
+        "GG1183",
+        "GG1302",
+        "GG1371"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Tech and desk",
+      "angle": "Branded tools they keep",
+      "campaign_code": "GG-20260620-2",
+      "campaign_name": "Everyday Desk Tech - 20 Jun 2026",
+      "subject": "Gadgets that earn desk space",
+      "skus": [
+        "GG1026",
+        "GG1274",
+        "GG1035",
+        "GG1099",
+        "GG1195",
+        "GG1110"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Natural materials, clearly yours",
+      "campaign_code": "GG-20260620-3",
+      "campaign_name": "Bamboo Essentials - 20 Jun 2026",
+      "subject": "Bamboo beats plastic, branded",
+      "skus": [
+        "GG1461",
+        "GG1709",
+        "GG1711",
+        "GG1718",
+        "GG1641",
+        "GG1719"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Bags and travel",
+      "angle": "Carried everywhere",
+      "campaign_code": "GG-20260620-4",
+      "campaign_name": "Cotton Totes and Bags - 20 Jun 2026",
+      "subject": "Totes worth the daily haul",
+      "skus": [
+        "GG1586",
+        "GG1691",
+        "GG1613",
+        "GG1128",
+        "GG1443",
+        "GG1518"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Notebooks and writing",
+      "angle": "Where ideas land",
+      "campaign_code": "GG-20260620-5",
+      "campaign_name": "Paper Notebooks and Sets - 20 Jun 2026",
+      "subject": "Pages they keep returning to",
+      "skus": [
+        "GG1659",
+        "GG1638",
+        "GG1594",
+        "GG1558",
+        "GG1484",
+        "GG1105"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Premium glassware",
+      "angle": "The glass they choose",
+      "campaign_code": "GG-20260620-6",
+      "campaign_name": "Glassware Collection - 20 Jun 2026",
+      "subject": "Glassware that earns its shelf",
+      "skus": [
+        "GG1382",
+        "GG1469",
+        "GG1396",
+        "GG1723",
+        "GG1671",
+        "GG1468"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Recycled and rPET",
+      "angle": "Recycled bags, daily carry",
+      "campaign_code": "GG-20260620-7",
+      "campaign_name": "Recycled rPET Bags - 20 Jun 2026",
+      "subject": "Recycled bags, daily carry",
+      "skus": [
+        "GG1486",
+        "GG1446",
+        "GG1543",
+        "GG1441",
+        "GG1299",
+        "GG1164"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Recycled drinkware",
+      "angle": "Recycled bottles, daily carry",
+      "campaign_code": "GG-20260620-8",
+      "campaign_name": "Recycled Steel Drinkware - 20 Jun 2026",
+      "subject": "Recycled steel, built to last",
+      "skus": [
+        "GG1174",
+        "GG1192",
+        "GG1220",
+        "GG1160",
+        "GG1152",
+        "GG1219"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Premium ceramics",
+      "angle": "The cup they choose",
+      "campaign_code": "GG-20260620-9",
+      "campaign_name": "Stoneware Mugs - 20 Jun 2026",
+      "subject": "Mugs they reach for first",
+      "skus": [
+        "GG1578",
+        "GG1666",
+        "GG1591",
+        "GG1625",
+        "GG1416",
+        "GG1584"
+      ]
+    }
+  ]
+}

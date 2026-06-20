@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-20",
+  "theme": "Tech and desk",
+  "season": "Peak summer, event season and H2 onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260620-2",
+  "campaign_name": "Everyday Desk Tech - 20 Jun 2026",
+  "subject": "Gadgets that earn desk space",
+  "skus": [
+    "GG1026",
+    "GG1274",
+    "GG1035",
+    "GG1099",
+    "GG1195",
+    "GG1110"
+  ],
+  "products": [
+    {
+      "name": "Watford",
+      "sku": "GG1026",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc1124-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1026"
+    },
+    {
+      "name": "Retro",
+      "sku": "GG1274",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2630-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1274"
+    },
+    {
+      "name": "Riocolour",
+      "sku": "GG1035",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc3314-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1035"
+    },
+    {
+      "name": "Orio",
+      "sku": "GG1099",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2145-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1099"
+    },
+    {
+      "name": "Flip",
+      "sku": "GG1195",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2445-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1195"
+    },
+    {
+      "name": "Sonora",
+      "sku": "GG1110",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2176-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1110"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-20/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-20/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20tech%20and%20desk%20options%20for%20our%20team."
+}

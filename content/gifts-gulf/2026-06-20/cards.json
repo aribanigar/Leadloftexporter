@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-20",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Desk, gym and trail",
+      "out": "content/gifts-gulf/2026-06-20/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6772-85",
+          "sku": "GG1498",
+          "name": "Cleo"
+        },
+        {
+          "code": "mo2885-07",
+          "sku": "GG1342",
+          "name": "Brace Gradient"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "On the desk every day",
+      "out": "content/gifts-gulf/2026-06-20/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc1124-06",
+          "sku": "GG1026",
+          "name": "Watford"
+        },
+        {
+          "code": "mo2630-03",
+          "sku": "GG1274",
+          "name": "Retro"
+        },
+        {
+          "code": "kc3314-23",
+          "sku": "GG1035",
+          "name": "Riocolour"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Natural feel, clear logo",
+      "out": "content/gifts-gulf/2026-06-20/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6558-40",
+          "sku": "GG1461",
+          "name": "Cairo"
+        },
+        {
+          "code": "mo9914-40",
+          "sku": "GG1709",
+          "name": "Baicoi"
+        },
+        {
+          "code": "mo9926-40",
+          "sku": "GG1711",
+          "name": "Dakai"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Daily commute, your logo",
+      "out": "content/gifts-gulf/2026-06-20/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8450-06",
+          "sku": "GG1586",
+          "name": "Mateusz"
+        },
+        {
+          "code": "mo9845-13",
+          "sku": "GG1691",
+          "name": "Cottonel ++"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Where good ideas land",
+      "out": "content/gifts-gulf/2026-06-20/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9623-03",
+          "sku": "GG1659",
+          "name": "Suber"
+        },
+        {
+          "code": "mo9348-03",
+          "sku": "GG1638",
+          "name": "Neilo Set"
+        },
+        {
+          "code": "mo8712-13",
+          "sku": "GG1594",
+          "name": "Canvas"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "The first pour, your brand",
+      "out": "content/gifts-gulf/2026-06-20/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6158-22",
+          "sku": "GG1382",
+          "name": "Bless"
+        },
+        {
+          "code": "mo6586-01",
+          "sku": "GG1469",
+          "name": "Keen"
+        },
+        {
+          "code": "mo6210-22",
+          "sku": "GG1396",
+          "name": "Venice"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Recycled and carried",
+      "out": "content/gifts-gulf/2026-06-20/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6703-03",
+          "sku": "GG1486",
+          "name": "Bapal+"
+        },
+        {
+          "code": "mo6455-15",
+          "sku": "GG1446",
+          "name": "Duo Indico"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled and refilled",
+      "out": "content/gifts-gulf/2026-06-20/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2383-03",
+          "sku": "GG1174",
+          "name": "Nunavut"
+        },
+        {
+          "code": "mo2423-03",
+          "sku": "GG1192",
+          "name": "Mate"
+        },
+        {
+          "code": "mo2516-03",
+          "sku": "GG1220",
+          "name": "Athena Mid"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "The first cup, your brand",
+      "out": "content/gifts-gulf/2026-06-20/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8316-06",
+          "sku": "GG1578",
+          "name": "Sensa"
+        },
+        {
+          "code": "mo9708-06",
+          "sku": "GG1666",
+          "name": "Kenya"
+        },
+        {
+          "code": "mo8658-06",
+          "sku": "GG1591",
+          "name": "Chalcky"
+        }
+      ]
+    }
+  ]
+}
