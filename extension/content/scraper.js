@@ -1213,14 +1213,19 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Retry up to 3 more times if the modal opened but the contents weren't
-    // rendered yet. Cheap React fiddly markup — the email/phone anchors
-    // can take 1-4 seconds to appear after the dialog mounts. We bail
-    // early once we have something useful (email or phone), capped at
-    // 6s total wait so the user doesn't sit on a hung Save button.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (data.email && data.phone && data.address) break;
-      await _sleep(350);
+    // Re-poll the modal in an organised, human-paced way so React has time
+    // to hydrate ALL four fields (email / phone / website / address) before
+    // we read and close. Previous budget was 3 x 350ms = ~1s total, which
+    // bailed out before LinkedIn finished rendering the later blocks
+    // (website + address commonly appear 0.5-3s AFTER email/phone). New
+    // budget: 6 polls x 600ms = ~3.6s total, with a small randomised
+    // jitter so the cadence doesn't look mechanical to bot-detection. We
+    // still short-circuit the loop the moment all 4 fields are present.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (data.email && data.phone && data.website && data.address) break;
+      // 600ms base + 0-150ms jitter — slower per-tick than v1.0.288's 350ms,
+      // but the cap is bounded so a missing field can't hang the Save button.
+      await _sleep(600 + Math.floor(Math.random() * 150));
       modal = _findContactModal() || modal;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes
@@ -1231,18 +1236,29 @@
         website: data.website || next.website,
         address: data.address || next.address,
       };
-      // NOTE: removed the early-exit on email||phone. With the early-exit,
-      // website + address often dropped because they render in a later
-      // React tick than email/phone. Running all 3 retries unconditionally
-      // adds at most ~700ms in the worst case but captures all four fields
-      // reliably — Save Lead now lands email + phone + website + location
-      // in one go.
     }
+
+    // Gentle settle BEFORE we close the modal — gives the Save Lead UI a
+    // beat to update with the freshly-captured fields, AND lets any
+    // late-mounting field (rare website/address ticks) still slot in
+    // instead of getting truncated by an instant close. ~800ms feels
+    // organised to the user (the panel no longer "flashes" closed).
+    await _sleep(800);
 
     // Always close the modal when not on the overlay URL directly.
     // When didPushState is true, clicking × triggers LinkedIn's SPA router to
     // navigate back to /in/<handle> — that's the cleanest URL restore path.
-    if (!isOverlayUrl) _closeContactModal();
+    if (!isOverlayUrl) {
+      _closeContactModal();
+      // Settle AFTER close so LinkedIn's modal slide-out animation finishes
+      // and the URL restore lands BEFORE saveCurrentProfile races on to the
+      // syncProfile step. Without this, the handoff felt "rushed" — the
+      // Save Lead button reappeared and the floating panel re-flowed at full
+      // speed the instant the modal vanished. ~700ms is the animation length
+      // LinkedIn uses; pacing the close to match it makes the whole flow
+      // feel organised end-to-end.
+      await _sleep(700);
+    }
     return data;
   }
 
