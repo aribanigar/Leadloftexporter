@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe Store — open your free online store before the monsoon">
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left logo zone left blank (~140px square) for manual logo placement -->
+
+  <!-- thin accent rule under the logo zone -->
+  <rect x="80" y="200" width="120" height="8" fill="#FF6B00"/>
+
+  <!-- eyebrow -->
+  <text x="80" y="280" font-family="'Poppins','Arial Narrow',sans-serif" font-size="30" letter-spacing="8" font-weight="600" fill="#ef6723">QCKSERVE&#160;STORE&#160;&#183;&#160;UTTAR&#160;PRADESH</text>
+
+  <!-- oversized headline -->
+  <text x="76" y="430" font-family="'Poppins','Arial Black',sans-serif" font-size="150" font-weight="800" fill="#FFFFFF" letter-spacing="-4">MONSOON</text>
+  <text x="76" y="575" font-family="'Poppins','Arial Black',sans-serif" font-size="150" font-weight="800" fill="#FFFFFF" letter-spacing="-4">IS&#160;HERE.</text>
+  <!-- italic-serif contrast accent -->
+  <text x="80" y="715" font-family="'Georgia','Times New Roman',serif" font-style="italic" font-size="118" font-weight="400" fill="#FF6B00">your shop</text>
+  <text x="76" y="850" font-family="'Poppins','Arial Black',sans-serif" font-size="132" font-weight="800" fill="#FFFFFF" letter-spacing="-3">GOES&#160;ONLINE.</text>
+
+  <!-- the hero: free / ₹0 block -->
+  <rect x="80" y="930" width="920" height="210" fill="#ef6723"/>
+  <text x="120" y="1045" font-family="'Poppins','Arial Black',sans-serif" font-size="138" font-weight="800" fill="#1A1A1A">&#8377;0</text>
+  <text x="400" y="1010" font-family="'Poppins',sans-serif" font-size="46" font-weight="700" fill="#1A1A1A">to list &#183; 0% commission</text>
+  <text x="400" y="1075" font-family="'Poppins',sans-serif" font-size="46" font-weight="700" fill="#1A1A1A">owner-direct, no middlemen</text>
+
+  <!-- supporting line -->
+  <text x="80" y="1230" font-family="'Poppins',sans-serif" font-size="40" font-weight="500" fill="#cfcfcf">Sell raincoats, covers, daily needs &#8212; before the rain keeps</text>
+  <text x="80" y="1282" font-family="'Poppins',sans-serif" font-size="40" font-weight="500" fill="#cfcfcf">customers home. Open your free store today.</text>
+
+  <!-- bottom-left wordmark -->
+  <text x="80" y="1330" font-family="'Poppins','Arial Black',sans-serif" font-size="44" font-weight="800" fill="#FF6B00">qckserve.in<tspan fill="#FFFFFF" font-weight="600">/store</tspan></text>
+</svg>
