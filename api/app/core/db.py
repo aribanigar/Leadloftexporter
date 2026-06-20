@@ -8,6 +8,37 @@ from app.core.config import get_settings
 
 _settings = get_settings()
 
+
+def _normalize_db_url(url: str) -> str:
+    """Coerce the SQLAlchemy URL to the psycopg3 driver no matter how the
+    DATABASE_URL env var is written.
+
+    We only ship `psycopg[binary]` (psycopg3) in requirements.txt — psycopg2
+    is NOT installed. If `DATABASE_URL` arrives with the bare `postgresql://`
+    or `postgres://` scheme (which is what Supabase / Neon dashboards copy by
+    default), SQLAlchemy tries to load psycopg2 and the import dies with
+    `ModuleNotFoundError: No module named 'psycopg2'`. This shim rewrites
+    every Postgres URL to `postgresql+psycopg://…` so the right driver is
+    picked, eliminating an entire class of deploy-time failures.
+
+    Idempotent: a URL already on `postgresql+psycopg://` passes through
+    unchanged.
+    """
+    if not url:
+        return url
+    if url.startswith("postgresql+psycopg://"):
+        return url
+    if url.startswith("postgresql+psycopg2://"):
+        # Force-replace the psycopg2 dialect with psycopg3 — psycopg2 isn't
+        # installed in this image.
+        return "postgresql+psycopg://" + url[len("postgresql+psycopg2://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):  # Heroku-style alias
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
+
+
 # Engine tuned for Supabase's connection pooler (Supavisor). Render's
 # outbound traffic is IPv4-only, and Supabase's *direct* connection
 # (db.<ref>.supabase.co:5432) is IPv6-only, so DATABASE_URL must point at the
@@ -20,7 +51,7 @@ _settings = get_settings()
 # pool_size is kept modest because the Supabase free tier caps total server
 # connections; 10 + 20 overflow = 30 max from one Render instance is safe.
 engine = create_engine(
-    _settings.database_url,
+    _normalize_db_url(_settings.database_url),
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
