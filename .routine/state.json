@@ -1,0 +1,25 @@
+{
+  "used_industries": [
+    "Retail",
+    "Construction and Real Estate"
+  ],
+  "last_run": "2026-06-21",
+  "runs": [
+    {
+      "date": "2026-06-21",
+      "industries": [
+        "Retail",
+        "Construction and Real Estate"
+      ],
+      "items": 24
+    },
+    {
+      "date": "2026-06-21",
+      "industries": [
+        "Retail",
+        "Construction and Real Estate"
+      ],
+      "items": 24
+    }
+  ]
+}
