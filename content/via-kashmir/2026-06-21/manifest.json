@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-21",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Dal Lake at dawn - mirror-still summer mornings",
+      "subject": "Dal Lake at dawn, mirror still and open",
+      "campaign_code": "VK-INR-B2C-20260621"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "theme": "Peak season - rooms filling, get seen first",
+      "subject": "A traveller booked the hotel beside yours today",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260621"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Peak season rides - fill empty days, be found first",
+      "subject": "A golden-hour shikara was just booked without you",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260621"
+    }
+  ]
+}
