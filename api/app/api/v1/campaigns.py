@@ -228,12 +228,10 @@ def _eligible_senders(
 ) -> list[tuple[ConnectedAccount, SenderWarmup]]:
     """Senders this campaign can dispatch through, round-robin ordered.
 
-    WARMUP IS OPT-IN PER INBOX. By default (warmup OFF) a sender has NO cap and
-    is always eligible — campaigns send freely. When a user turns warmup ON for
-    an inbox, that inbox respects today's ramp cap: once it's hit, the inbox is
-    skipped for the rest of the day and its overflow DEFERS to tomorrow (the
-    recipients stay pending and resume after the UTC day rolls over) — it is
-    never failed. Senders with warmup OFF are unaffected.
+    HARDCODED RULE — NO SENDING CAP. Every active inbox is always eligible, no
+    matter how many emails it has sent today or whether warmup is on. There is
+    no per-inbox cap, no daily ceiling, no warmup throttle, and no defer. Any
+    inbox the user adds sends freely and without limit. Do not add a cap here.
 
     Ordered to start at campaign.rotation_index for round-robin fairness so the
     volume spreads evenly across the connected mailboxes.
@@ -243,10 +241,12 @@ def _eligible_senders(
     out: list[tuple[ConnectedAccount, SenderWarmup]] = []
     for a in accts:
         w = _warmup_for_account(db, campaign.workspace_id, a.id)
-        # Campaign sending is DECOUPLED from warmup. Warmup row is still
-        # attached so its counters stay accurate, but it never caps a
-        # campaign send. (Per the user's explicit instruction: "the sending
-        # emails should not be determined with the warmup".)
+        # ── HARDCODED RULE — NO SENDING CAP, EVER (per user directive) ──
+        # Campaign sending is fully DECOUPLED from warmup. Every active inbox is
+        # ALWAYS eligible, regardless of warmup state or how many it has sent
+        # today. Warmup tracks reputation only; it must NEVER throttle, skip, or
+        # defer a send. Do NOT reintroduce any per-inbox / daily / 100-email cap
+        # here or anywhere in the send path.
         out.append((a, w))
 
     # Rotate starting at the campaign's rotation_index so consecutive ticks
@@ -1133,8 +1133,8 @@ def start_campaign(
             f"cannot_start_in_state:{c.status}",
         )
     # Validate at least one ACTIVE sender exists. Block launch ONLY when there
-    # are no/inactive senders. If senders exist but are all warmup-capped for
-    # today, launch is allowed — the campaign defers and resumes tomorrow.
+    # are no/inactive senders. There is NO sending cap (hardcoded rule), so a
+    # campaign with active senders always sends freely with no daily ceiling.
     if not _has_active_senders(db, c):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -1528,13 +1528,8 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
     # only when there are no active senders to dispatch through.
     eligible = _eligible_senders(db, campaign)
     if not eligible:
-        # No sender can send right now. If active senders exist but are all
-        # warmup-capped for today, DEFER to tomorrow (cooldown until next UTC
-        # day) — nothing fails. Otherwise it's a genuine no-sender no-op.
-        if _has_active_senders(db, campaign):
-            _set_cooldown(campaign, _seconds_until_next_utc_day())
-            db.commit()
-            return _stats(campaign, sent=0, failed=0, skipped=0, note="warmup_deferred")
+        # HARDCODED RULE: no sending cap, so `eligible` is empty ONLY when the
+        # campaign has no active sender at all — never a warmup deferral.
         db.commit()
         return _stats(campaign, sent=0, failed=0, skipped=0, note="no_active_senders")
 
@@ -1761,11 +1756,8 @@ def _prepare_tick_batch(
 
     eligible = _eligible_senders(db, campaign)
     if not eligible:
-        # All warmup-capped today → defer to tomorrow (no fail). Else no sender.
-        if _has_active_senders(db, campaign):
-            _set_cooldown(campaign, _seconds_until_next_utc_day())
-            db.commit()
-            return {"jobs": [], "campaign_status": "sending", "note": "warmup_deferred"}
+        # HARDCODED RULE: no sending cap, so this is only ever reached when the
+        # campaign has no active sender at all — never a warmup deferral.
         db.commit()
         return {"jobs": [], "campaign_status": "sending", "note": "no_active_senders"}
 

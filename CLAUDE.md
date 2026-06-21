@@ -115,6 +115,16 @@ The "Add to Playbook" UX in the frontend hits `POST /playbooks/{id}/enroll` with
 
 Daily quotas (`email_limit`, `linkedin_connect_limit`, `linkedin_message_limit`) live on the workspace and are enforced **server-side** in `outreach.py` — the extension never schedules anything itself. Step scheduling jitter goes through `humanise_run_at()` which respects the workspace's outreach time window ±15 min.
 
+> **HARDCODED RULE — NO EMAIL SENDING CAP, EVER (user directive, do not revert).**
+> Campaign email sends must have **no per-inbox cap, no daily ceiling, no warmup
+> throttle, and no "defer to tomorrow"**. Every inbox the user adds sends freely
+> and without limit. `campaigns.py:_eligible_senders` always returns every active
+> sender regardless of warmup state or `sent_today`. Warmup is reputation
+> bookkeeping only — it must never skip, throttle, or defer a send. Do **not**
+> reintroduce a `sent_today >= cap` gate or a `warmup_deferred` cooldown anywhere
+> in the send path. The old behaviour capped campaigns around ~100 emails; that is
+> a bug, not a feature.
+
 ### Dashboard stats
 
 `GET /playbooks/stats/overview?days=N` is a single aggregate endpoint serving the Playbooks dashboard. It counts outbound `EmailMessage` rows by status, treats `is_won` / `interested` / `customer` / `proposal` stages as the "warm cohort" for the Interested number, and returns a daily series (with zero-filled gaps) for the chart. Date range is a lookback window, not arbitrary `from`/`to` — keep it that way unless the UI grows a calendar picker.
