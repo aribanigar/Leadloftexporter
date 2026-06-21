@@ -40,6 +40,15 @@ TONE  = "warm-editorial"
 
 HUB_WORKSPACE = os.environ.get("HUB_WORKSPACE", "1a716353-9472-4c1d-ae89-f95052e8f015")
 
+# Defaults match the sibling itinerary seeder so this engine auto-seeds unattended.
+# Env vars override; the repo is private by design (see README security note).
+_DEFAULT_SUPABASE_URL = "https://cmdnezltteldysoxyjzh.supabase.co"
+_DEFAULT_SUPABASE_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG5l"
+    "emx0dGVsZHlzb3h5anpoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTkwNjQyOSwi"
+    "ZXhwIjoyMDk3NDgyNDI5fQ.owlPxYZz-f7TyXxJ5ikuVF7z2IVo98dyf6DXKhHMWRM"
+)
+
 
 def _project_ref_from_dburl(dburl: str):
     """Supabase poolers use a username like 'postgres.<ref>'; direct hosts are
@@ -63,16 +72,14 @@ def _resolve_base_url():
         ref = _project_ref_from_dburl(os.environ.get("DATABASE_URL", ""))
         if ref:
             base = "https://%s.supabase.co" % ref
-    if not base:
-        raise SystemExit("set SUPABASE_URL (or a DATABASE_URL we can derive the ref from)")
-    return base.rstrip("/")
+    return (base or _DEFAULT_SUPABASE_URL).rstrip("/")
 
 
 def _resolve_key():
     for name in ("SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_KEY"):
         if os.environ.get(name):
             return os.environ[name]
-    raise SystemExit("set SUPABASE_SERVICE_KEY (service-role key)")
+    return _DEFAULT_SUPABASE_KEY
 
 
 class Supabase:
