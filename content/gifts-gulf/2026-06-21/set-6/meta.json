@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-21",
+  "theme": "Notebooks and writing",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "design": "C",
+  "campaign_code": "GG-20260621-6",
+  "campaign_name": "Notebooks and writing - 21 Jun 2026",
+  "subject": "Where plans take shape",
+  "skus": [
+    "GG1617",
+    "GG1289",
+    "GG1582",
+    "GG1524",
+    "GG1288",
+    "GG1664"
+  ],
+  "products": [
+    {
+      "name": "Softnote",
+      "sku": "GG1617",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9108-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1617"
+    },
+    {
+      "name": "Tint",
+      "sku": "GG1289",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2664-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1289"
+    },
+    {
+      "name": "Squared",
+      "sku": "GG1582",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8360-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1582"
+    },
+    {
+      "name": "Everwrite",
+      "sku": "GG1524",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6892-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1524"
+    },
+    {
+      "name": "Tintray",
+      "sku": "GG1288",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2663-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1288"
+    },
+    {
+      "name": "Everwrite",
+      "sku": "GG1664",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9684-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1664"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20notebooks%20and%20writing%20options%20for%20our%20team."
+}

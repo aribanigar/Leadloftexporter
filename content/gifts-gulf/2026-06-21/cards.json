@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-21",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "First day, your brand",
+      "out": "content/gifts-gulf/2026-06-21/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo7756-13",
+          "sku": "GG1568",
+          "name": "Stibox"
+        },
+        {
+          "code": "mo6327-40",
+          "sku": "GG1418",
+          "name": "Panay"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Light to carry, branded",
+      "out": "content/gifts-gulf/2026-06-21/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2157-03",
+          "sku": "GG1102",
+          "name": "Florina"
+        },
+        {
+          "code": "mo2309-03",
+          "sku": "GG1142",
+          "name": "Bergamo"
+        },
+        {
+          "code": "mo2380-03",
+          "sku": "GG1172",
+          "name": "Scribble"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Natural feel, clear logo",
+      "out": "content/gifts-gulf/2026-06-21/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2504-03",
+          "sku": "GG1217",
+          "name": "Koeler"
+        },
+        {
+          "code": "mo9929-13",
+          "sku": "GG1713",
+          "name": "Jute Medium"
+        },
+        {
+          "code": "mo2331-03",
+          "sku": "GG1153",
+          "name": "Calefrio"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Desk, gym and trail",
+      "out": "content/gifts-gulf/2026-06-21/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6700-03",
+          "sku": "GG1483",
+          "name": "Chin Chan"
+        },
+        {
+          "code": "mo6371-40",
+          "sku": "GG1426",
+          "name": "Nanda"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Packed and branded",
+      "out": "content/gifts-gulf/2026-06-21/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2565-03",
+          "sku": "GG1244",
+          "name": "Gave Colour"
+        },
+        {
+          "code": "mo2868-03",
+          "sku": "GG1336",
+          "name": "Zevra Colour"
+        },
+        {
+          "code": "mo6353-99",
+          "sku": "GG1423",
+          "name": "Borealis"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Where plans take shape",
+      "out": "content/gifts-gulf/2026-06-21/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9108-03",
+          "sku": "GG1617",
+          "name": "Softnote"
+        },
+        {
+          "code": "mo2664-01",
+          "sku": "GG1289",
+          "name": "Tint"
+        },
+        {
+          "code": "mo8360-03",
+          "sku": "GG1582",
+          "name": "Squared"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Booth-ready, logo-loud",
+      "out": "content/gifts-gulf/2026-06-21/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9036-06",
+          "sku": "GG1614",
+          "name": "Memosticky"
+        },
+        {
+          "code": "mo9730-13",
+          "sku": "GG1668",
+          "name": "Taske Medium"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Days out, brand on",
+      "out": "content/gifts-gulf/2026-06-21/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6140-13",
+          "sku": "GG1377",
+          "name": "Jump"
+        },
+        {
+          "code": "mo6850-13",
+          "sku": "GG1514",
+          "name": "Tura"
+        },
+        {
+          "code": "mo6749-13",
+          "sku": "GG1494",
+          "name": "Gave"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "The first cup, your brand",
+      "out": "content/gifts-gulf/2026-06-21/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2105-23",
+          "sku": "GG1084",
+          "name": "Abe"
+        },
+        {
+          "code": "mo6545-03",
+          "sku": "GG1459",
+          "name": "Utah Large"
+        },
+        {
+          "code": "mo6413-22",
+          "sku": "GG1437",
+          "name": "Ameland"
+        }
+      ]
+    }
+  ]
+}

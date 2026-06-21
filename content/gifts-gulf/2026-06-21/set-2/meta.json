@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-21",
+  "theme": "Aluminium drinkware",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "design": "B",
+  "campaign_code": "GG-20260621-2",
+  "campaign_name": "Aluminium drinkware - 21 Jun 2026",
+  "subject": "Bottles that travel light",
+  "skus": [
+    "GG1102",
+    "GG1142",
+    "GG1172",
+    "GG1119",
+    "GG1375",
+    "GG1602"
+  ],
+  "products": [
+    {
+      "name": "Florina",
+      "sku": "GG1102",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2157-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1102"
+    },
+    {
+      "name": "Bergamo",
+      "sku": "GG1142",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2309-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1142"
+    },
+    {
+      "name": "Scribble",
+      "sku": "GG1172",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2380-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1172"
+    },
+    {
+      "name": "Rumba",
+      "sku": "GG1119",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2205-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1119"
+    },
+    {
+      "name": "Neilo Clean",
+      "sku": "GG1375",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6138-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1375"
+    },
+    {
+      "name": "Bern",
+      "sku": "GG1602",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8893-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1602"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20aluminium%20drinkware%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-21",
+  "theme": "Eco and sustainable",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "design": "C",
+  "campaign_code": "GG-20260621-3",
+  "campaign_name": "Eco and sustainable - 21 Jun 2026",
+  "subject": "Kind materials, sharp brand",
+  "skus": [
+    "GG1217",
+    "GG1713",
+    "GG1153",
+    "GG1248",
+    "GG1242",
+    "GG1118"
+  ],
+  "products": [
+    {
+      "name": "Koeler",
+      "sku": "GG1217",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2504-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1217"
+    },
+    {
+      "name": "Jute Medium",
+      "sku": "GG1713",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9929-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1713"
+    },
+    {
+      "name": "Calefrio",
+      "sku": "GG1153",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2331-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1153"
+    },
+    {
+      "name": "Orwell",
+      "sku": "GG1248",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2567-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1248"
+    },
+    {
+      "name": "Suma Hand",
+      "sku": "GG1242",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2561-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1242"
+    },
+    {
+      "name": "Bente Colour",
+      "sku": "GG1118",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2197-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1118"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20eco%20and%20sustainable%20options%20for%20our%20team."
+}

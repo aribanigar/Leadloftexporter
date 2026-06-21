@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-21",
+  "theme": "Executive onboarding",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "design": "A",
+  "campaign_code": "GG-20260621-1",
+  "campaign_name": "Executive onboarding - 21 Jun 2026",
+  "subject": "Onboard them like VIPs",
+  "skus": [
+    "GG1568",
+    "GG1418",
+    "GG1537",
+    "GG1503",
+    "GG1477",
+    "GG1623"
+  ],
+  "products": [
+    {
+      "name": "Stibox",
+      "sku": "GG1568",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7756-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1568"
+    },
+    {
+      "name": "Panay",
+      "sku": "GG1418",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6327-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1418"
+    },
+    {
+      "name": "Atera",
+      "sku": "GG1537",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6948-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1537"
+    },
+    {
+      "name": "Sten",
+      "sku": "GG1503",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6798-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1503"
+    },
+    {
+      "name": "Zoco",
+      "sku": "GG1477",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6673-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1477"
+    },
+    {
+      "name": "Cottonel +",
+      "sku": "GG1623",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9267-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1623"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20executive%20onboarding%20options%20for%20our%20team."
+}

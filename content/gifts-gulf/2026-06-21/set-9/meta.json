@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-21",
+  "theme": "Premium ceramics",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "design": "C",
+  "campaign_code": "GG-20260621-9",
+  "campaign_name": "Premium ceramics - 21 Jun 2026",
+  "subject": "The morning mug, branded",
+  "skus": [
+    "GG1084",
+    "GG1459",
+    "GG1437",
+    "GG1394",
+    "GG1349",
+    "GG1385"
+  ],
+  "products": [
+    {
+      "name": "Abe",
+      "sku": "GG1084",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2105-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1084"
+    },
+    {
+      "name": "Utah Large",
+      "sku": "GG1459",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6545-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1459"
+    },
+    {
+      "name": "Ameland",
+      "sku": "GG1437",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6413-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1437"
+    },
+    {
+      "name": "Utah Denim",
+      "sku": "GG1394",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6192-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1394"
+    },
+    {
+      "name": "Boris",
+      "sku": "GG1349",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2912-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1349"
+    },
+    {
+      "name": "Utah Touch",
+      "sku": "GG1385",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6168-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1385"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-21/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20ceramics%20options%20for%20our%20team."
+}

@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-21",
+  "season": "Mid-year, warm season recognition and event cycle",
+  "generated_utc": "2026-06-21T00:55:39.031979Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Executive onboarding",
+      "angle": "First-day welcome kits",
+      "campaign_code": "GG-20260621-1",
+      "campaign_name": "Executive onboarding - 21 Jun 2026",
+      "subject": "Onboard them like VIPs",
+      "skus": [
+        "GG1568",
+        "GG1418",
+        "GG1537",
+        "GG1503",
+        "GG1477",
+        "GG1623"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Aluminium drinkware",
+      "angle": "Lightweight daily carry",
+      "campaign_code": "GG-20260621-2",
+      "campaign_name": "Aluminium drinkware - 21 Jun 2026",
+      "subject": "Bottles that travel light",
+      "skus": [
+        "GG1102",
+        "GG1142",
+        "GG1172",
+        "GG1119",
+        "GG1375",
+        "GG1602"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Natural materials, clearly yours",
+      "campaign_code": "GG-20260621-3",
+      "campaign_name": "Eco and sustainable - 21 Jun 2026",
+      "subject": "Kind materials, sharp brand",
+      "skus": [
+        "GG1217",
+        "GG1713",
+        "GG1153",
+        "GG1248",
+        "GG1242",
+        "GG1118"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Branded daily hydration",
+      "campaign_code": "GG-20260621-4",
+      "campaign_name": "Premium drinkware - 21 Jun 2026",
+      "subject": "Bottles they never lose",
+      "skus": [
+        "GG1483",
+        "GG1426",
+        "GG1249",
+        "GG1648",
+        "GG1455",
+        "GG1409"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Bags and travel",
+      "angle": "Carried everywhere",
+      "campaign_code": "GG-20260621-5",
+      "campaign_name": "Bags and travel - 21 Jun 2026",
+      "subject": "Carried to every gate",
+      "skus": [
+        "GG1244",
+        "GG1336",
+        "GG1423",
+        "GG1609",
+        "GG1527",
+        "GG1789"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "Where plans take shape",
+      "campaign_code": "GG-20260621-6",
+      "campaign_name": "Notebooks and writing - 21 Jun 2026",
+      "subject": "Where plans take shape",
+      "skus": [
+        "GG1617",
+        "GG1289",
+        "GG1582",
+        "GG1524",
+        "GG1288",
+        "GG1664"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event giveaways",
+      "angle": "Handed out, kept around",
+      "campaign_code": "GG-20260621-7",
+      "campaign_name": "Event giveaways - 21 Jun 2026",
+      "subject": "Handouts with staying power",
+      "skus": [
+        "GG1614",
+        "GG1668",
+        "GG1393",
+        "GG1784",
+        "GG1098",
+        "GG1095"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Summer occasions",
+      "angle": "Made for warm days",
+      "campaign_code": "GG-20260621-8",
+      "campaign_name": "Summer occasions - 21 Jun 2026",
+      "subject": "Sorted for sunny days",
+      "skus": [
+        "GG1377",
+        "GG1514",
+        "GG1494",
+        "GG1618",
+        "GG1729",
+        "GG1479"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Premium ceramics",
+      "angle": "The cup they choose",
+      "campaign_code": "GG-20260621-9",
+      "campaign_name": "Premium ceramics - 21 Jun 2026",
+      "subject": "The morning mug, branded",
+      "skus": [
+        "GG1084",
+        "GG1459",
+        "GG1437",
+        "GG1394",
+        "GG1349",
+        "GG1385"
+      ]
+    }
+  ]
+}
