@@ -1,0 +1,37 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "WhatsApp — verified before introduced",
+  "image_query": "muslim bride groom wedding",
+  "cta_url": "https://datekhaas.com/join",
+  "body": "Assalamu alaikum 🤍\n\nThere is a duʻa many of us have made since we were young — for a spouse who brings peace, for a marriage built on mercy and love, for a nikah that begins the right way.\n\nDate Khaas was built for that duʻa.\n\nHere’s what makes it different:\n\n✅ Every profile is verified *before* it ever reaches you\n🔒 Your photos are private by default — you choose who sees them\n👨‍👩‍👧 Invite your wali to join the conversation from day one\n🚫 No fake profiles, no strangers, no shortcuts\n\nThis is not another app asking you to scroll and swipe. It is a careful, dignified path — the way it should be done.\n\nJoin free → https://datekhaas.com/join\n\nMay Allah place barakah in your search. 🤍\n\nReply STOP to opt out.",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+        "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+      },
+      {
+        "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+        "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+      },
+      {
+        "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+        "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+      },
+      {
+        "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+        "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+      },
+      {
+        "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      }
+    ]
+  }
+}

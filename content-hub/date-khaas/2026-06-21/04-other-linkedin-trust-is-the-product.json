@@ -1,0 +1,36 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "LinkedIn — trust is the product",
+  "image_query": "muslim wedding celebration family",
+  "body": "In Muslim matrimony, trust isn’t a feature. It’s the entire product.\n\nHere is what the data shows: 77.8% of Muslim singles now find their spouse through a digital platform. That is not a niche trend — that is how our community finds its other half.\n\nBut the number one reason families still hesitate? They do not trust the platform.\n\nAnd they are right to be cautious.\n\nLeading apps are still reporting fake and married profiles slipping through. Photo privacy is treated as a premium add-on, not a default right. Wali involvement is an afterthought, not a design principle.\n\nAt Date Khaas, we built it the other way around:\n\n→ Verification happens before your profile is ever shown to anyone\n→ Photos are private by default — visible only when you choose\n→ The wali can be part of the conversation from message one\n\nThis is not about features. It is about fiqh.\n\nThe nikah is described as a mithāqan ghalīẓan — a solemn, weighty covenant. If we are serious about honoring that, the platform holding the introductions must be held to the same standard.\n\nIf you are building in the Muslim consumer space, the question worth asking is not “what features do users want?”\n\nIt is: “are we designing for the transaction, or for the trust?”\n\nTrust is not a moat you build after launch. It is the foundation you pour before the first brick goes up.\n\n#MuslimMatrimony #Nikah #IslamicMarriage #TrustAndSafety #HalalMatchmaking",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+        "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+      },
+      {
+        "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+        "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+      },
+      {
+        "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+        "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+      },
+      {
+        "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+        "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+      },
+      {
+        "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      }
+    ]
+  }
+}
