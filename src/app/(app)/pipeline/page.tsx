@@ -66,7 +66,29 @@ export default function PipelinePage() {
 
   const { data: leads, isLoading: leadsLoading, isError: leadsError, refetch: refetchLeads } = useQuery<LeadList>({
     queryKey: ["leads", "pipeline"],
-    queryFn: () => api("/leads?page=1&page_size=200&sort=created_at&direction=desc"),
+    // Fetch ALL leads, not just the first 200 — Pipeline has no pagination
+    // UI, so a hard cap silently hid leads beyond row 200 ("200 of 245" in
+    // the header was actually a truncation, not a deliberate page size).
+    // We grab the first page at the backend max (500), then if `total` is
+    // larger we fan out the remaining pages in parallel and concatenate.
+    // Same LeadList shape comes back so nothing downstream changes.
+    queryFn: async () => {
+      const PAGE_SIZE = 500; // backend allows ge=1 le=500
+      const qs = (p: number) =>
+        `/leads?page=${p}&page_size=${PAGE_SIZE}&sort=created_at&direction=desc`;
+      const first = (await api(qs(1))) as LeadList;
+      const total = first.total ?? first.items.length;
+      if (total <= first.items.length) return first;
+      const pagesNeeded = Math.ceil(total / PAGE_SIZE);
+      if (pagesNeeded <= 1) return first;
+      const rest = await Promise.all(
+        Array.from({ length: pagesNeeded - 1 }, (_, i) =>
+          api(qs(i + 2)) as Promise<LeadList>
+        )
+      );
+      const items = first.items.concat(...rest.map((r) => r.items));
+      return { items, total, page: 1, page_size: items.length };
+    },
     refetchInterval: 8000,
     refetchOnWindowFocus: true,
     retry: 2,
