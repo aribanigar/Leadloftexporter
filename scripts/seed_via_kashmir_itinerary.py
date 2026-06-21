@@ -36,37 +36,66 @@ TONE  = "warm-editorial"
 # --- credentials (real values baked in; env vars override if set) -------------
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://neondb_owner:npg_Dfar3YXQ9AFK@ep-sparkling-grass-ah1zobz0-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+    "postgresql://postgres.cmdnezltteldysoxyjzh:vTqdrCo4vaa4MJzz@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres",
 )
-HUB_WORKSPACE = os.environ.get("HUB_WORKSPACE", "b2236a00-faa2-41d5-8ee7-b6e24d0c4904")
+HUB_WORKSPACE = os.environ.get("HUB_WORKSPACE", "1a716353-9472-4c1d-ae89-f95052e8f015")
+
+_PARAM = re.compile(r"\$(\d+)")
 
 
 def normalize(url: str) -> str:
     return re.sub(r"^(postgres(?:ql)?)\+[a-z0-9]+://", r"\1://", url.strip())
 
 
-class Neon:
+def _is_neon(dsn: str) -> bool:
+    return "neon.tech" in dsn
+
+
+class DB:
+    """Unified DB wrapper: uses Neon HTTPS SQL for neon.tech URLs, psycopg2 otherwise."""
+
     def __init__(self, dsn: str):
-        self.conn = normalize(dsn)
-        host = urlparse(self.conn).hostname
-        if not host:
-            raise SystemExit("DATABASE_URL has no host")
-        self.url = "https://%s/sql" % host
+        self._dsn = normalize(dsn)
+        self._neon = _is_neon(self._dsn)
+        if self._neon:
+            host = urlparse(self._dsn).hostname
+            if not host:
+                raise SystemExit("DATABASE_URL has no host")
+            self._url = "https://%s/sql" % host
+            self._conn = None
+        else:
+            try:
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                self._psycopg2 = psycopg2
+                self._RDC = RealDictCursor
+                self._conn = psycopg2.connect(self._dsn, connect_timeout=20)
+                self._conn.autocommit = True
+            except ImportError:
+                raise SystemExit("psycopg2 missing - run: pip install psycopg2-binary")
 
     def q(self, sql: str, params=None):
-        body = json.dumps({"query": sql, "params": params or []}).encode()
-        req = Request(self.url, data=body, method="POST", headers={
-            "Content-Type": "application/json",
-            "Neon-Connection-String": self.conn,
-            "Neon-Raw-Text-Output": "true",
-        })
-        try:
-            with urlopen(req, timeout=45) as r:
-                return json.loads(r.read())["rows"]
-        except HTTPError as e:
-            raise RuntimeError("DB %s: %s" % (e.code, e.read().decode()[:300]))
-        except URLError as e:
-            raise RuntimeError("DB unreachable: %s" % e)
+        params = params or []
+        if self._neon:
+            body = json.dumps({"query": sql, "params": params}).encode()
+            req = Request(self._url, data=body, method="POST", headers={
+                "Content-Type": "application/json",
+                "Neon-Connection-String": self._dsn,
+                "Neon-Raw-Text-Output": "true",
+            })
+            try:
+                with urlopen(req, timeout=45) as r:
+                    return json.loads(r.read())["rows"]
+            except HTTPError as e:
+                raise RuntimeError("DB %s: %s" % (e.code, e.read().decode()[:300]))
+            except URLError as e:
+                raise RuntimeError("DB unreachable: %s" % e)
+        else:
+            seq = []
+            sql2 = _PARAM.sub(lambda m: (seq.append(params[int(m.group(1)) - 1]), "%s")[1], sql)
+            with self._conn.cursor(cursor_factory=self._RDC) as cur:
+                cur.execute(sql2, seq)
+                return [dict(r) for r in cur.fetchall()] if cur.description else []
 
 
 def repo_root() -> Path:
@@ -91,7 +120,7 @@ def main() -> int:
                           "error": "no content dir: %s" % day}))
         return 4
 
-    n = Neon(DATABASE_URL)
+    n = DB(DATABASE_URL)
     if not n.q("select id from workspaces where id=$1", [HUB_WORKSPACE]):
         print(json.dumps({"engine": SLUG, "date": args.date,
                           "error": "workspace not found: %s" % HUB_WORKSPACE}))
