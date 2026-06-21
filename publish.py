@@ -4,26 +4,19 @@ publish.py — Date Khaas content-hub publisher.
 
 Pipeline:
   1. Read a content bundle (content.json) produced by the daily routine.
-  2. Fetch Muslim-wedding images from the Pixabay API for items that ask for them.
+  2. Fetch Muslim-wedding images from the Pixabay API.
   3. Write each item to disk under content-hub/date-khaas/<date>/ (for git history).
-  4. Seed each item into the Neon content-hub table.
+  4. Seed each item into the Supabase content_assets table via REST API.
   5. Optionally git add/commit/push.
 
-It does NOT hardcode your schema. On connect it:
-  - locates the enum type whose labels match {html_email, whatsapp, caption, sms, other},
-  - finds the table+column that uses that enum (your content table),
-  - reads that table's real columns,
-  - inserts only into columns that exist, casting enum/jsonb columns correctly.
-
-Run `python publish.py --probe` first to print the discovered mapping (no writes).
+Uses the Supabase REST API (HTTPS/443) — no direct Postgres connection needed.
 
 Env (put in .env or export):
-  DATABASE_URL        Neon connection string (required for DB write)
-  HUB_WORKSPACE       workspace UUID (written to a workspace column if one exists)
-  PIXABAY_API_KEY     free key from https://pixabay.com/api/docs/ (required for images)
-  CONTENT_TABLE       (optional) override auto-discovery, e.g. "content_items"
-  CONTENT_TYPE_COLUMN (optional) override, e.g. "type"
-  CONTENT_SLUG        (optional) project/collection slug, default "date-khaas"
+  SUPABASE_URL          e.g. https://cmdnezltteldysoxyjzh.supabase.co  (required)
+  SUPABASE_SERVICE_KEY  service-role JWT or sb_secret_… key             (required)
+  HUB_WORKSPACE         workspace UUID                                   (required)
+  PIXABAY_API_KEY       free key from https://pixabay.com/api/docs/      (for images)
+  CONTENT_SLUG          project slug, default "date-khaas"
 """
 
 import argparse
@@ -33,47 +26,28 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 from pathlib import Path
-
-try:
-    import psycopg
-    from psycopg.types.json import Jsonb
-except ImportError:
-    psycopg = None
 
 try:
     import requests
 except ImportError:
-    requests = None
+    sys.exit("requests not installed. Run: pip install requests")
 
 # ----------------------------------------------------------------------------- #
 # config
 # ----------------------------------------------------------------------------- #
 
-TARGET_ENUM_LABELS = {"html_email", "whatsapp", "caption", "sms", "other"}
-DEFAULT_SLUG = os.environ.get("CONTENT_SLUG", "date-khaas")
-# Current Date Khaas hub workspace. The DB password is NOT stored here — it lives in .env.
+DEFAULT_SLUG      = os.environ.get("CONTENT_SLUG", "date-khaas")
 DEFAULT_WORKSPACE = "1a716353-9472-4c1d-ae89-f95052e8f015"
-ROOT = Path(__file__).resolve().parent
-CONTENT_DIR = ROOT / "content-hub" / "date-khaas"
+ROOT              = Path(__file__).resolve().parent
+CONTENT_DIR       = ROOT / "content-hub" / "date-khaas"
 
-# canonical field -> candidate column names (first that exists in the table wins)
-FIELD_ALIASES = {
-    "workspace":  ["workspace_id", "workspace", "workspaceid", "hub_workspace", "org_id"],
-    "slug":       ["slug", "project", "project_slug", "collection", "folder", "board", "category"],
-    "title":      ["title", "name", "headline", "label"],
-    "subject":    ["subject", "email_subject", "preview_subject"],
-    "body":       ["body", "content", "html", "body_html", "content_html", "markdown", "text", "copy", "message"],
-    "status":     ["status", "state", "stage"],
-    "channel":    ["channel", "platform", "medium"],
-    "image_url":  ["image_url", "image", "media_url", "cover_image", "hero_image", "thumbnail"],
-    "metadata":   ["metadata", "meta", "data", "attributes", "props", "extra"],
-    "created_at": ["created_at", "createdat", "inserted_at", "created"],
-    "updated_at": ["updated_at", "updatedat", "modified_at", "updated"],
-}
+# content_assets column names (discovered via probe; keep in sync if schema changes)
+CONTENT_TABLE = "content_assets"
 
 # ----------------------------------------------------------------------------- #
-# .env loader (no dependency)
+# .env loader
 # ----------------------------------------------------------------------------- #
 
 def load_dotenv(path=".env"):
@@ -89,28 +63,77 @@ def load_dotenv(path=".env"):
 
 
 # ----------------------------------------------------------------------------- #
+# REST helpers
+# ----------------------------------------------------------------------------- #
+
+def rest_headers(key):
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+
+def rest_get(base, path, key, params=None):
+    r = requests.get(f"{base}/rest/v1{path}", headers=rest_headers(key),
+                     params=params, timeout=20)
+    r.raise_for_status()
+    return r.json()
+
+
+def rest_post(base, path, key, body):
+    r = requests.post(f"{base}/rest/v1{path}", headers=rest_headers(key),
+                      json=body, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def rest_patch(base, path, key, body):
+    r = requests.patch(f"{base}/rest/v1{path}", headers=rest_headers(key),
+                       json=body, timeout=20)
+    r.raise_for_status()
+    return r.json()
+
+
+# ----------------------------------------------------------------------------- #
+# schema probe
+# ----------------------------------------------------------------------------- #
+
+def probe_schema(base, key):
+    """Return (columns dict, openapi path entry) for content_assets."""
+    spec = requests.get(f"{base}/rest/v1/", headers=rest_headers(key), timeout=20)
+    spec.raise_for_status()
+    data = spec.json()
+    defn = data.get("definitions", {}).get(CONTENT_TABLE, {})
+    return defn.get("properties", {})
+
+
+def lookup_business_id(base, key, workspace_id, slug):
+    """Return business_id for the given slug in this workspace, or None."""
+    rows = rest_get(base, f"/content_businesses",  key,
+                    params={"workspace_id": f"eq.{workspace_id}",
+                            "slug": f"eq.{slug}",
+                            "select": "id,name,slug"})
+    return rows[0]["id"] if rows else None
+
+
+# ----------------------------------------------------------------------------- #
 # pixabay
 # ----------------------------------------------------------------------------- #
 
 def fetch_pixabay(query, count, out_dir):
-    """Download up to `count` images for `query`. Returns list of dicts."""
+    """Download up to `count` images for `query`. Returns list of metadata dicts."""
     key = os.environ.get("PIXABAY_API_KEY")
     if not key:
         print("  ! PIXABAY_API_KEY not set — skipping image fetch", file=sys.stderr)
         return []
-    if requests is None:
-        print("  ! `requests` not installed — skipping image fetch", file=sys.stderr)
-        return []
 
     out_dir.mkdir(parents=True, exist_ok=True)
     params = {
-        "key": key,
-        "q": query,
-        "image_type": "photo",
-        "orientation": "horizontal",
-        "safesearch": "true",
-        "order": "popular",
-        "per_page": max(3, min(count * 3, 50)),  # over-fetch, then take the best `count`
+        "key": key, "q": query, "image_type": "photo",
+        "orientation": "horizontal", "safesearch": "true",
+        "order": "popular", "per_page": max(3, min(count * 3, 50)),
     }
     r = requests.get("https://pixabay.com/api/", params=params, timeout=30)
     r.raise_for_status()
@@ -129,155 +152,66 @@ def fetch_pixabay(query, count, out_dir):
             img = requests.get(url, timeout=60)
             img.raise_for_status()
             fpath.write_bytes(img.content)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"  ! failed to download {url}: {e}", file=sys.stderr)
             continue
         results.append({
             "local_path": str(fpath.relative_to(ROOT)),
             "remote_url": h.get("largeImageURL"),
-            "page_url": h.get("pageURL"),
-            "author": h.get("user"),
+            "page_url":   h.get("pageURL"),
+            "author":     h.get("user"),
             "pixabay_id": h.get("id"),
-            "tags": h.get("tags"),
-            "license": "Pixabay Content License (free commercial use, no attribution required)",
+            "tags":       h.get("tags"),
+            "has_faces":  any(t.strip() in ("people","person","woman","man","bride","groom")
+                              for t in (h.get("tags") or "").split(",")),
+            "license":    "Pixabay Content License (free commercial use, no attribution required)",
         })
     print(f"  ↳ pixabay '{query}': {len(results)} image(s)")
     return results
 
 
 # ----------------------------------------------------------------------------- #
-# schema discovery
+# row builder
 # ----------------------------------------------------------------------------- #
 
-def discover_schema(cur):
-    """Return (table, type_col, columns) where columns maps name -> info dict."""
-    # 1. enum types and their labels
-    cur.execute("""
-        SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder)
-        FROM pg_type t
-        JOIN pg_enum e ON e.enumtypid = t.oid
-        GROUP BY t.typname;
-    """)
-    enum_types = {row[0]: set(row[1]) for row in cur.fetchall()}
-
-    type_enum = None
-    for name, labels in enum_types.items():
-        if TARGET_ENUM_LABELS & labels:           # overlap with our content types
-            if not type_enum or len(TARGET_ENUM_LABELS & labels) > \
-               len(TARGET_ENUM_LABELS & enum_types[type_enum]):
-                type_enum = name
-    if not type_enum:
-        raise SystemExit("Could not find a content-type enum (html_email/whatsapp/…). "
-                         "Set CONTENT_TABLE and CONTENT_TYPE_COLUMN to override.")
-
-    # 2. which table/column uses that enum
-    override_table = os.environ.get("CONTENT_TABLE")
-    override_col = os.environ.get("CONTENT_TYPE_COLUMN")
-    if override_table and override_col:
-        table, type_col = override_table, override_col
-    else:
-        cur.execute("""
-            SELECT table_name, column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND udt_name = %s
-            ORDER BY table_name;
-        """, (type_enum,))
-        rows = cur.fetchall()
-        if not rows:
-            raise SystemExit(f"No table uses enum '{type_enum}'.")
-        table, type_col = rows[0]
-
-    # 3. full column list for that table, with type info + enum-ness
-    cur.execute("""
-        SELECT c.column_name, c.data_type, c.udt_name, c.is_nullable, c.column_default,
-               COALESCE(t.typtype = 'e', false) AS is_enum
-        FROM information_schema.columns c
-        LEFT JOIN pg_type t ON t.typname = c.udt_name
-        WHERE c.table_schema = 'public' AND c.table_name = %s
-        ORDER BY c.ordinal_position;
-    """, (table,))
-    columns = {}
-    for name, dtype, udt, nullable, default, is_enum in cur.fetchall():
-        columns[name] = {
-            "data_type": dtype, "udt": udt, "nullable": nullable == "YES",
-            "default": default, "is_enum": bool(is_enum),
-            "is_json": udt in ("json", "jsonb"),
-        }
-    return table, type_col, columns, type_enum
-
-
-def pick(columns, aliases):
-    for a in aliases:
-        if a in columns:
-            return a
-    return None
-
-
-# ----------------------------------------------------------------------------- #
-# insert builder
-# ----------------------------------------------------------------------------- #
-
-def build_insert(table, type_col, columns, item, slug, workspace, status):
-    """Return (sql, params). Only touches columns that exist."""
-    canon_value = {
-        "workspace": workspace,
-        "slug": slug,
-        "title": item.get("title"),
-        "subject": item.get("subject"),
-        "body": item.get("body") or item.get("content") or "",
-        "status": item.get("status", status),
-        "channel": item.get("channel"),
-        "image_url": (item.get("images") or [{}])[0].get("remote_url") if item.get("images") else None,
-        "metadata": item.get("metadata") or {},
-        "created_at": dt.datetime.now(dt.timezone.utc),
-        "updated_at": dt.datetime.now(dt.timezone.utc),
-    }
-    # fold useful extras into metadata so nothing is lost on lean schemas
-    md = dict(canon_value["metadata"])
-    for k in ("subject", "preheader", "channel", "format", "images", "research_sources", "cta_url"):
+def build_row(item, workspace_id, business_id, status, now):
+    """Build the dict to POST to content_assets."""
+    tags = dict(item.get("metadata") or {})
+    for k in ("subject", "preheader", "channel", "format", "images", "cta_url"):
         if item.get(k) is not None:
-            md.setdefault(k, item.get(k))
-    md.setdefault("generated_by", "datekhaas-daily-routine")
-    canon_value["metadata"] = md
+            tags.setdefault(k, item[k])
+    tags.setdefault("status", status)
+    tags.setdefault("generated_by", "datekhaas-daily-routine")
 
-    cols, placeholders, params = [], [], []
+    # For AMP emails: content = AMP HTML, amp_content = plain-HTML fallback
+    if item.get("format") == "amp":
+        content     = item.get("body", "")
+        amp_content = item.get("body_fallback")
+    else:
+        content     = item.get("body", "")
+        amp_content = None
 
-    # the content-type column is mandatory and must be cast to the enum
-    type_value = item["type"]
-    type_info = columns.get(type_col, {})
-    cols.append(quote_ident(type_col))
-    placeholders.append(f'%s::"{type_info.get("udt", type_col)}"' if type_info.get("is_enum") else "%s")
-    params.append(type_value)
+    first_image = (item.get("images") or [{}])[0].get("remote_url") if item.get("images") else None
 
-    used = {type_col}
-    for canon, aliases in FIELD_ALIASES.items():
-        col = pick(columns, aliases)
-        if not col or col in used:
-            continue
-        val = canon_value.get(canon)
-        if val is None:
-            continue
-        info = columns[col]
-        if info["is_json"]:
-            placeholders.append("%s")
-            params.append(Jsonb(val))
-        elif info["is_enum"]:
-            placeholders.append(f'%s::"{info["udt"]}"')
-            params.append(val)
-        else:
-            placeholders.append("%s")
-            params.append(val)
-        cols.append(quote_ident(col))
-        used.add(col)
-
-    sql = (f'INSERT INTO {quote_ident(table)} ({", ".join(cols)}) '
-           f'VALUES ({", ".join(placeholders)}) '
-           f'RETURNING {quote_ident(pick(columns, ["id", "uuid", "pk"]) or cols[0].strip(chr(34)))}')
-    return sql, params
-
-
-def quote_ident(name):
-    return '"' + name.replace('"', '""') + '"'
+    row = {
+        "id":           str(uuid.uuid4()),
+        "workspace_id": workspace_id,
+        "business_id":  business_id,
+        "title":        item.get("title"),
+        "type":         item["type"],
+        "content":      content,
+        "subject":      item.get("subject"),
+        "platform":     item.get("channel"),
+        "tags":         tags,
+        "notes":        item.get("preheader") or item.get("format"),
+        "image_url":    first_image,
+        "created_at":   now,
+        "updated_at":   now,
+    }
+    if amp_content:
+        row["amp_content"] = amp_content
+    # strip None values so Postgres uses column defaults
+    return {k: v for k, v in row.items() if v is not None}
 
 
 # ----------------------------------------------------------------------------- #
@@ -298,13 +232,13 @@ def git_commit(message):
     git("add", "content-hub/date-khaas")
     status = git("status", "--porcelain", "content-hub/date-khaas").stdout.strip()
     if not status:
-        print("  ↳ git: nothing to commit")
+        print("  ↳ git: nothing new to commit")
         return None
     git("commit", "-m", message)
     sha = git("rev-parse", "--short", "HEAD").stdout.strip()
     print(f"  ↳ git commit {sha}")
     try:
-        git("push")
+        git("push", "-u", "origin", git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip())
         print("  ↳ git push ok")
     except subprocess.CalledProcessError as e:
         print(f"  ! git push failed (commit is local): {e.stderr.strip()}", file=sys.stderr)
@@ -316,40 +250,47 @@ def git_commit(message):
 # ----------------------------------------------------------------------------- #
 
 def main():
-    ap = argparse.ArgumentParser(description="Date Khaas content-hub publisher")
-    ap.add_argument("--bundle", default="content.json", help="path to content bundle JSON")
-    ap.add_argument("--probe", action="store_true", help="print discovered schema and exit")
-    ap.add_argument("--dry-run", action="store_true", help="build + print SQL, do not write")
-    ap.add_argument("--no-images", action="store_true", help="skip Pixabay fetch")
-    ap.add_argument("--no-git", action="store_true", help="skip git commit")
-    ap.add_argument("--images-per-item", type=int, default=3)
-    ap.add_argument("--status", default="draft")
-    ap.add_argument("--commit-message", default=None)
+    ap = argparse.ArgumentParser(description="Date Khaas content-hub publisher (REST API)")
+    ap.add_argument("--bundle",            default="content.json")
+    ap.add_argument("--probe",             action="store_true",
+                    help="print discovered schema and business list, then exit")
+    ap.add_argument("--dry-run",           action="store_true",
+                    help="build rows + print them, skip DB insert and git")
+    ap.add_argument("--no-images",         action="store_true")
+    ap.add_argument("--no-git",            action="store_true")
+    ap.add_argument("--images-per-item",   type=int, default=3)
+    ap.add_argument("--status",            default="draft")
+    ap.add_argument("--commit-message",    default=None)
+    ap.add_argument("--slug",              default=None,
+                    help="override content slug (default: CONTENT_SLUG env or 'date-khaas')")
     args = ap.parse_args()
 
     load_dotenv()
-    dsn = os.environ.get("DATABASE_URL")
-    workspace = os.environ.get("HUB_WORKSPACE", DEFAULT_WORKSPACE)
 
-    if psycopg is None:
-        sys.exit("psycopg not installed. Run: pip install 'psycopg[binary]'")
+    base      = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    svc_key   = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("ANON_KEY")
+    workspace = os.environ.get("HUB_WORKSPACE", DEFAULT_WORKSPACE)
+    slug      = args.slug or DEFAULT_SLUG
+
+    if not base:
+        sys.exit("SUPABASE_URL not set")
+    if not svc_key:
+        sys.exit("SUPABASE_SERVICE_KEY (or ANON_KEY) not set")
 
     # ---- probe -------------------------------------------------------------- #
     if args.probe:
-        if not dsn:
-            sys.exit("DATABASE_URL not set")
-        with psycopg.connect(dsn, connect_timeout=20, prepare_threshold=None) as conn, conn.cursor() as cur:
-            table, type_col, columns, enum = discover_schema(cur)
-        print(f"content table : {table}")
-        print(f"type column   : {type_col}  (enum: {enum})")
-        print("field mapping :")
-        for canon, aliases in FIELD_ALIASES.items():
-            print(f"  {canon:<11} -> {pick(columns, aliases)}")
-        print("all columns   :")
-        for name, info in columns.items():
-            flags = ",".join(f for f, v in
-                             [("enum", info["is_enum"]), ("json", info["is_json"])] if v)
-            print(f"  {name:<22} {info['data_type']:<26} {flags}")
+        cols = probe_schema(base, svc_key)
+        print(f"content table : {CONTENT_TABLE}")
+        print(f"columns       :")
+        for col, info in cols.items():
+            print(f"  {col:<22} {info.get('format') or info.get('type','?')}")
+        print()
+        biz = rest_get(base, "/content_businesses", svc_key,
+                       params={"workspace_id": f"eq.{workspace}", "select": "id,name,slug"})
+        print(f"businesses in workspace {workspace[:8]}…:")
+        for b in biz:
+            marker = " ← active" if b["slug"] == slug else ""
+            print(f"  {b['id']}  {b['slug']:<28} {b['name']}{marker}")
         return
 
     # ---- load bundle -------------------------------------------------------- #
@@ -357,10 +298,17 @@ def main():
     if not bundle_path.exists():
         sys.exit(f"bundle not found: {bundle_path}")
     bundle = json.loads(bundle_path.read_text())
-    items = bundle["items"] if isinstance(bundle, dict) else bundle
-    today = dt.date.today().isoformat()
+    items  = bundle["items"] if isinstance(bundle, dict) else bundle
+    today  = dt.date.today().isoformat()
     day_dir = CONTENT_DIR / today
     day_dir.mkdir(parents=True, exist_ok=True)
+
+    # ---- look up business --------------------------------------------------- #
+    business_id = lookup_business_id(base, svc_key, workspace, slug)
+    if not business_id:
+        sys.exit(f"No content_business with slug='{slug}' in workspace {workspace}. "
+                 f"Run --probe to list available businesses.")
+    print(f"  ↳ business: {slug} → {business_id}")
 
     # ---- images ------------------------------------------------------------- #
     if not args.no_images:
@@ -374,48 +322,44 @@ def main():
                 cache[q] = fetch_pixabay(q, args.images_per_item, img_dir)
             it["images"] = cache[q]
 
-    # ---- write files for git ------------------------------------------------ #
+    # ---- write files -------------------------------------------------------- #
     for i, it in enumerate(items, 1):
-        stem = f"{i:02d}-{it['type']}-{re.sub(r'[^a-z0-9]+','-', (it.get('title') or 'untitled').lower()).strip('-')}"
+        stem = (f"{i:02d}-{it['type']}-"
+                f"{re.sub(r'[^a-z0-9]+', '-', (it.get('title') or 'untitled').lower()).strip('-')}")
         (day_dir / f"{stem}.json").write_text(json.dumps(it, indent=2, ensure_ascii=False))
         if it.get("body"):
-            ext = "html" if "html" in it["type"] or it.get("format") == "amp" else "txt"
+            ext = "html" if "html" in it.get("type","") or it.get("format") == "amp" else "txt"
             (day_dir / f"{stem}.{ext}").write_text(it["body"])
     print(f"  ↳ wrote {len(items)} item file(s) to {day_dir.relative_to(ROOT)}")
 
-    # ---- DB ----------------------------------------------------------------- #
+    # ---- insert ------------------------------------------------------------- #
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
     inserted = []
-    if not dsn:
-        print("  ! DATABASE_URL not set — skipping DB seed", file=sys.stderr)
-    else:
-        with psycopg.connect(dsn, connect_timeout=20, prepare_threshold=None) as conn:
-            with conn.cursor() as cur:
-                table, type_col, columns, enum = discover_schema(cur)
-                valid = {r for r in TARGET_ENUM_LABELS}  # informational
-                for it in items:
-                    if it["type"] not in TARGET_ENUM_LABELS:
-                        print(f"  ! '{it['type']}' not in enum {sorted(valid)} — "
-                              f"map it to one of those", file=sys.stderr)
-                    sql, params = build_insert(table, type_col, columns, it,
-                                               DEFAULT_SLUG, workspace, args.status)
-                    if args.dry_run:
-                        print("\nDRY RUN SQL:\n" + sql)
-                        print("PARAMS:", [str(p)[:60] for p in params])
-                        continue
-                    cur.execute(sql, params)
-                    rid = cur.fetchone()[0]
-                    inserted.append(rid)
-                    print(f"  ↳ inserted {it['type']:<11} id={rid}")
-            if not args.dry_run:
-                conn.commit()
+    for it in items:
+        row = build_row(it, workspace, business_id, args.status, now)
+        if args.dry_run:
+            print(f"\nDRY RUN row ({it['type']}):")
+            for k, v in row.items():
+                print(f"  {k}: {str(v)[:80]}")
+            continue
+        try:
+            data = rest_post(base, f"/{CONTENT_TABLE}", svc_key, row)
+            rid  = data[0]["id"] if isinstance(data, list) else data.get("id")
+            print(f"  ↳ inserted {it['type']:<12} platform={it.get('channel'):<10} id={rid}")
+            inserted.append(rid)
+        except requests.HTTPError as e:
+            print(f"  ! FAILED {it['type']}: {e.response.status_code} {e.response.text[:200]}",
+                  file=sys.stderr)
 
     # ---- git ---------------------------------------------------------------- #
     if not args.no_git and not args.dry_run:
-        msg = args.commit_message or f"content(date-khaas): daily drop {today} ({len(items)} items)"
+        msg = (args.commit_message
+               or f"content(date-khaas): daily drop {today} ({len(items)} items)")
         git_commit(msg)
 
     if inserted:
-        print(f"\nDone. Seeded {len(inserted)} rows into the content hub.")
+        print(f"\nDone. Seeded {len(inserted)}/{len(items)} rows into {CONTENT_TABLE}.")
+        print("Row IDs:", inserted)
 
 
 if __name__ == "__main__":

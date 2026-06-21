@@ -40,14 +40,64 @@
       "body": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Before he meets your wali, we meet our standards</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f8f5f0;font-family:Helvetica,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f8f5f0;\">\n  <tr>\n    <td align=\"center\" style=\"padding:40px 20px;\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;\">\n\n        <!-- Header -->\n        <tr>\n          <td style=\"background-color:#003527;padding:32px 40px;text-align:center;\">\n            <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#e9c176;letter-spacing:3px;font-weight:normal;\">Date Khaas</p>\n            <p style=\"margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#e9c176;letter-spacing:2px;text-transform:uppercase;opacity:0.75;\">Muslim Matrimony</p>\n          </td>\n        </tr>\n\n        <!-- Hero image -->\n        <tr>\n          <td style=\"padding:0;line-height:0;\">\n            <img src=\"https://datekhaas.com/assets/email/hero-nikah.jpg\" alt=\"A serene Muslim wedding\" width=\"600\" style=\"width:100%;max-width:600px;display:block;height:280px;object-fit:cover;\" />\n          </td>\n        </tr>\n\n        <!-- Opening warmth -->\n        <tr>\n          <td style=\"padding:52px 48px 32px;text-align:center;\">\n            <h1 style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#e9c176;letter-spacing:2px;text-transform:uppercase;font-weight:normal;\">For the heart that is ready</h1>\n            <h2 style=\"margin:0 0 28px;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.25;color:#003527;font-weight:normal;\">There is a calm that comes<br>with knowing.</h2>\n            <p style=\"margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.75;color:#444444;\">That the person you are about to meet is exactly who they say they are. That your photos will only be seen by someone who has earned that trust. That your family is part of the process — not a formality added at the end.</p>\n            <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.75;color:#444444;\">The Messenger of Allah ﷺ described the marriage bond as a <span style=\"font-family:Georgia,'Times New Roman',serif;color:#003527;font-style:italic;\">mithāqan ghalīẓan</span> — a solemn, weighty covenant. At Date Khaas, we believe the path to your nikah should carry that same reverence.</p>\n          </td>\n        </tr>\n\n        <!-- Divider -->\n        <tr>\n          <td style=\"padding:0 48px;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n              <tr><td style=\"border-top:1px solid #e9c176;\"></td></tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Trust pillars -->\n        <tr>\n          <td style=\"padding:36px 48px 0;\">\n            <p style=\"margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#003527;text-align:center;font-weight:normal;\">How we protect your journey</p>\n\n            <!-- Pillar 1 -->\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom:16px;\">\n              <tr>\n                <td style=\"background-color:#f8f5f0;border-left:3px solid #e9c176;padding:20px 24px;\">\n                  <p style=\"margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#003527;font-weight:normal;\">Every profile, verified before you ever see it.</p>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#666666;line-height:1.65;\">We review each profile individually before it goes live. No batch approvals. No shortcuts. If we are not satisfied, you never meet them.</p>\n                </td>\n              </tr>\n            </table>\n\n            <!-- Pillar 2 -->\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom:16px;\">\n              <tr>\n                <td style=\"background-color:#f8f5f0;border-left:3px solid #e9c176;padding:20px 24px;\">\n                  <p style=\"margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#003527;font-weight:normal;\">Your photos, blurred by default. Shared on your terms.</p>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#666666;line-height:1.65;\">Your privacy is the baseline, not a premium tier. You decide who sees your face, and when. On Date Khaas, photo control is a right, not a reward.</p>\n                </td>\n              </tr>\n            </table>\n\n            <!-- Pillar 3 -->\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n              <tr>\n                <td style=\"background-color:#f8f5f0;border-left:3px solid #e9c176;padding:20px 24px;\">\n                  <p style=\"margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#003527;font-weight:normal;\">Your wali, invited from the first conversation.</p>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#666666;line-height:1.65;\">Invite your father, brother, or trusted guardian to follow conversations from day one. This is how it should be — family as a foundation, not a formality.</p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- CTA block -->\n        <tr>\n          <td style=\"padding:44px 48px 52px;text-align:center;\">\n            <p style=\"margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.75;color:#444444;\">You are looking for someone who will be your sukoon — your peace. We are building the platform worthy of that search.</p>\n            <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background-color:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;padding:18px 44px;\">Begin Your Journey</a>\n            <p style=\"margin:20px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#999999;\">Free to join. Verified from the start.</p>\n          </td>\n        </tr>\n\n        <!-- Footer -->\n        <tr>\n          <td style=\"background-color:#003527;padding:28px 40px;text-align:center;\">\n            <p style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#e9c176;font-weight:normal;\">Date Khaas</p>\n            <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#ffffff;opacity:0.6;line-height:1.7;\">You received this because you expressed interest in Date Khaas.<br><a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;text-decoration:none;\">Unsubscribe</a> &nbsp;·&nbsp; <a href=\"https://datekhaas.com/privacy\" style=\"color:#e9c176;text-decoration:none;\">Privacy Policy</a></p>\n          </td>\n        </tr>\n\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
       "metadata": {
         "research_sources": [
-          {"insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.", "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"},
-          {"insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.", "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"},
-          {"insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.", "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"},
-          {"insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.", "source": "https://noblemarriage.com/blog/islamic-marriage-apps"},
-          {"insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.", "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"},
-          {"insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.", "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"}
+          {
+            "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+            "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+          },
+          {
+            "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+            "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+          },
+          {
+            "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+            "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+          },
+          {
+            "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+            "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+          },
+          {
+            "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+            "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+          }
         ]
-      }
+      },
+      "images": [
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-ceremony-8028163.jpg",
+          "remote_url": "https://pixabay.com/get/gc605907873e42d5c90e1ac08f28b0945f05381df2ffe124d11193e697e8143fb80b79b2d44192107953f16e735032c82c582795a79ee3f4c172517473881ffba_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+          "author": "OlcayErtem",
+          "pixabay_id": 8028163,
+          "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-ceremony-4615557.jpg",
+          "remote_url": "https://pixabay.com/get/gb635c19af01d9b405e44e0d60214f54f0a854446b0122b89579eedb5fc12dd032a559551c7a30d923b3ddb3d377431b4da0a1c4a7f631f7c92e2a9d74ef57c8e_1280.jpg",
+          "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+          "author": "OlcayErtem",
+          "pixabay_id": 4615557,
+          "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, male, big, girl, happiness, nature, celebration, ceremony, wife, bouquet, grass",
+          "has_faces": true,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-ceremony-1868868.jpg",
+          "remote_url": "https://pixabay.com/get/g1d9f463f69cb5d16b70f5a7381b87634e992739e7b4d79cb71f6632f08ebe816aea6df9aa0ba54d85213316e2d1703c5e20e6106f20660460a1f330d61febcb5_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-ceremony-champagne-glasses-1868868/",
+          "author": "Pexels",
+          "pixabay_id": 1868868,
+          "tags": "wedding, ceremony, champagne, glasses, newlyweds, marriage, bride and groom, champagne glasses, toast, cheers, celebrate, celebration, wedding ceremony, elegant, bride, formal, groom, love, man, people, woman, wedding, wedding, wedding, wedding, wedding, champagne, champagne, marriage, groom, groom",
+          "has_faces": true,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        }
+      ]
     },
     {
       "type": "html_email",
@@ -62,14 +112,64 @@
       "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Your photos. Your choice. Your nikah.</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f8f5f0;font-family:Helvetica,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f8f5f0;\">\n  <tr>\n    <td align=\"center\" style=\"padding:40px 20px;\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;\">\n        <tr>\n          <td style=\"background-color:#003527;padding:28px 32px;text-align:center;\">\n            <p style=\"margin:0;font-family:Georgia,serif;font-size:26px;color:#e9c176;letter-spacing:3px;font-weight:normal;\">Date Khaas</p>\n            <p style=\"margin:6px 0 0;font-size:11px;color:#e9c176;opacity:0.75;letter-spacing:2px;\">MUSLIM MATRIMONY</p>\n          </td>\n        </tr>\n        <tr>\n          <td style=\"padding:0;line-height:0;\">\n            <img src=\"https://datekhaas.com/assets/email/hero-nikah.jpg\" alt=\"A peaceful nikah ceremony\" width=\"600\" style=\"width:100%;max-width:600px;display:block;\" />\n          </td>\n        </tr>\n        <tr>\n          <td style=\"padding:44px 48px 32px;text-align:center;\">\n            <h2 style=\"margin:0 0 24px;font-family:Georgia,serif;font-size:30px;line-height:1.3;color:#003527;font-weight:normal;\">Your photos. Your choice.<br>Your nikah.</h2>\n            <p style=\"margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.75;color:#444444;\">On Date Khaas, every profile is verified before you see it. Your photos are private by default — a right, not a paid tier. And your wali can be part of conversations from day one.</p>\n            <p style=\"margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.75;color:#444444;\">This is what trust looks like when it's built into the foundation.</p>\n            <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background-color:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;padding:16px 40px;\">Join Free</a>\n          </td>\n        </tr>\n        <tr>\n          <td style=\"background-color:#003527;padding:24px 32px;text-align:center;\">\n            <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.7;\">Date Khaas · <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;text-decoration:none;\">Unsubscribe</a> · <a href=\"https://datekhaas.com/privacy\" style=\"color:#e9c176;text-decoration:none;\">Privacy Policy</a></p>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
       "metadata": {
         "research_sources": [
-          {"insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.", "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"},
-          {"insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.", "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"},
-          {"insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.", "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"},
-          {"insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.", "source": "https://noblemarriage.com/blog/islamic-marriage-apps"},
-          {"insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.", "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"},
-          {"insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.", "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"}
+          {
+            "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+            "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+          },
+          {
+            "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+            "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+          },
+          {
+            "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+            "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+          },
+          {
+            "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+            "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+          },
+          {
+            "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+            "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+          }
         ]
-      }
+      },
+      "images": [
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/nikah-ceremony-7807230.jpg",
+          "remote_url": "https://pixabay.com/get/g3df169395244caf10596ac679c3b32ec3a4bb9f5f5713c033974f833854e0b3860baa834654d24e804ffa389fc9a07649539e020bc4bcb400de7461ef6b71655_1280.jpg",
+          "page_url": "https://pixabay.com/photos/tea-ceremony-ceremony-teatime-japan-7807230/",
+          "author": "mirkostoedter",
+          "pixabay_id": 7807230,
+          "tags": "tea ceremony, ceremony, teatime, japan, china, asia, pottery, teapots, tea ceremony, tea ceremony, tea ceremony, tea ceremony, tea ceremony, teatime, china, china, asia",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/nikah-ceremony-6123746.jpg",
+          "remote_url": "https://pixabay.com/get/gc5f02f3eff086ef5f23ab1ee432503bd0c9af36462252591332b45c6dde0aa7bc2ef4d98899c93b833037b89d1e5a5fd200b24e74bac3323686e7b110186fc29_1280.jpg",
+          "page_url": "https://pixabay.com/photos/teapot-tea-traditional-ceremony-6123746/",
+          "author": "cromagnon130",
+          "pixabay_id": 6123746,
+          "tags": "teapot, tea, traditional, ceremony, tea cups, cups, steam, hot tea, drink, beverage, japanese, asian, tea, tea, tea, tea, tea",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/nikah-ceremony-1869716.jpg",
+          "remote_url": "https://pixabay.com/get/ge02acbec5527a3fe9160f47a21012d83ca7caba34e0b1a8276c797d744f927cd88351c9c596a0810d060a277eb2a7f86df2459183f61611c6409a1a59e47a5b1_1280.jpg",
+          "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
+          "author": "Pexels",
+          "pixabay_id": 1869716,
+          "tags": "tea, cup, pot, tea cup, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        }
+      ]
     },
     {
       "type": "whatsapp",
@@ -81,14 +181,64 @@
       "body": "Assalamu alaikum 🤍\n\nThere is a duʻa many of us have made since we were young — for a spouse who brings peace, for a marriage built on mercy and love, for a nikah that begins the right way.\n\nDate Khaas was built for that duʻa.\n\nHere’s what makes it different:\n\n✅ Every profile is verified *before* it ever reaches you\n🔒 Your photos are private by default — you choose who sees them\n👨‍👩‍👧 Invite your wali to join the conversation from day one\n🚫 No fake profiles, no strangers, no shortcuts\n\nThis is not another app asking you to scroll and swipe. It is a careful, dignified path — the way it should be done.\n\nJoin free → https://datekhaas.com/join\n\nMay Allah place barakah in your search. 🤍\n\nReply STOP to opt out.",
       "metadata": {
         "research_sources": [
-          {"insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.", "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"},
-          {"insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.", "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"},
-          {"insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.", "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"},
-          {"insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.", "source": "https://noblemarriage.com/blog/islamic-marriage-apps"},
-          {"insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.", "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"},
-          {"insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.", "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"}
+          {
+            "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+            "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+          },
+          {
+            "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+            "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+          },
+          {
+            "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+            "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+          },
+          {
+            "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+            "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+          },
+          {
+            "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+            "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+          }
         ]
-      }
+      },
+      "images": [
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-bride-groom-wedding-8028163.jpg",
+          "remote_url": "https://pixabay.com/get/ge13ae5128a6676d1de5d3e0cbe9f9f37542c29930db66933d1474eab67a01fa48d42ce089826667327db0f192034a865370d592aaa7a465293670ada3d808c43_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+          "author": "OlcayErtem",
+          "pixabay_id": 8028163,
+          "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-bride-groom-wedding-7353628.jpg",
+          "remote_url": "https://pixabay.com/get/g321274be211d7bb8a3a9b5d37fa739c927d325e6086c12379c1ef6259e0a8270f355b9b6d854fa42474474e37cd6cdde534ee94b26e3ab0d113b1f34edb09eb8_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353628/",
+          "author": "OlcayErtem",
+          "pixabay_id": 7353628,
+          "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-bride-groom-wedding-7353626.jpg",
+          "remote_url": "https://pixabay.com/get/gc6cba62ee29a1ee5a6c2042c351bc1ce90a17d96720761cb9b837598798178665b8ecbdabff9a2339498d07c46fa72d634df57d1ab2a148f6c05ce93dfc89b38_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353626/",
+          "author": "OlcayErtem",
+          "pixabay_id": 7353626,
+          "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        }
+      ]
     },
     {
       "type": "other",
@@ -99,14 +249,64 @@
       "body": "In Muslim matrimony, trust isn’t a feature. It’s the entire product.\n\nHere is what the data shows: 77.8% of Muslim singles now find their spouse through a digital platform. That is not a niche trend — that is how our community finds its other half.\n\nBut the number one reason families still hesitate? They do not trust the platform.\n\nAnd they are right to be cautious.\n\nLeading apps are still reporting fake and married profiles slipping through. Photo privacy is treated as a premium add-on, not a default right. Wali involvement is an afterthought, not a design principle.\n\nAt Date Khaas, we built it the other way around:\n\n→ Verification happens before your profile is ever shown to anyone\n→ Photos are private by default — visible only when you choose\n→ The wali can be part of the conversation from message one\n\nThis is not about features. It is about fiqh.\n\nThe nikah is described as a mithāqan ghalīẓan — a solemn, weighty covenant. If we are serious about honoring that, the platform holding the introductions must be held to the same standard.\n\nIf you are building in the Muslim consumer space, the question worth asking is not “what features do users want?”\n\nIt is: “are we designing for the transaction, or for the trust?”\n\nTrust is not a moat you build after launch. It is the foundation you pour before the first brick goes up.\n\n#MuslimMatrimony #Nikah #IslamicMarriage #TrustAndSafety #HalalMatchmaking",
       "metadata": {
         "research_sources": [
-          {"insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.", "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"},
-          {"insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.", "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"},
-          {"insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.", "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"},
-          {"insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.", "source": "https://noblemarriage.com/blog/islamic-marriage-apps"},
-          {"insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.", "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"},
-          {"insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.", "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"}
+          {
+            "insight": "77.8% of Muslim singles now use digital platforms to find a spouse, making platform trust the single highest-stakes differentiator in the market.",
+            "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+          },
+          {
+            "insight": "NikahForever — a leading competitor — has documented user complaints that shortlisted profiles were married or fake, and profiles were not cross-verified. This is a credibility gap Date Khaas can own.",
+            "source": "https://muslim-matrimony-nikah-forever-app-for-shaadi.en.softonic.com/android"
+          },
+          {
+            "insight": "Top converting trust signals in Muslim matrimony 2026: photo blur defaults, mandatory ID verification, wali invite features, and aggressive profile moderation — in that order.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Scam avoidance education is circulating widely in the Muslim community: red flags include single-photo profiles, immediate moves to WhatsApp, and any money request. Users are on high guard.",
+            "source": "https://noblemarriage.com/blog/islamic-marriage-apps"
+          },
+          {
+            "insight": "June 2026 is within the active Muslim wedding season (peak months: April–October). NRI diaspora in Gulf, UK, and US are a major active segment.",
+            "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+          },
+          {
+            "insight": "Shaadi.com and NikahForever both claim 'verified profiles' — but verification is not ID-based or pre-approval; photo privacy is often a paid-tier feature, not a default.",
+            "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+          }
         ]
-      }
+      },
+      "images": [
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-celebration-family-5574694.jpg",
+          "remote_url": "https://pixabay.com/get/g4c5a03f7dbcb200c6beb7e6a0361701525ca720db26cb1900c88664c91f3a2989d7d02793ff6b58f900a41c40092a775bef3a3a9a3e2dea3a1d582e436d12c0d_1280.jpg",
+          "page_url": "https://pixabay.com/photos/hand-wedding-marriage-couple-love-5574694/",
+          "author": "lubovlisitsa",
+          "pixabay_id": 5574694,
+          "tags": "hand, wedding, marriage, couple, love, romance, romantic, celebration, family, togetherness, commitment, diamond, honeymoon, relationship, gold, jewelry, fiance, wedding ring, horizontal, touching, bridegroom, girlfriend, matrimons, anniversary, caucasian, happyvalentine's, wedding, wedding, wedding, wedding, family, diamond, honeymoon, honeymoon, honeymoon, gold, jewelry, jewelry, jewelry, jewelry, jewelry, wedding ring, wedding ring, anniversary, anniversary, anniversary",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-celebration-family-4660419.jpg",
+          "remote_url": "https://pixabay.com/get/g03a7216282d6dce81fee16afedc6fe838850bcc77ad4823e8e240c8fdbdb3e6018e336d6a801dbd1e4858b1625b9175fe204afa64dd3abdf6a289f3a24eae6f4_1280.jpg",
+          "page_url": "https://pixabay.com/photos/wedding-love-happy-couple-4660419/",
+          "author": "haryono5",
+          "pixabay_id": 4660419,
+          "tags": "wedding, love, happy birthday, happy, couple, happiness, bride, marriage, romance, people, wife, woman, romantic, married, man, relationship, groom, husband, together, young, bridal, outdoors, party, kiss, dress",
+          "has_faces": true,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        },
+        {
+          "local_path": "content-hub/date-khaas/2026-06-21/images/muslim-wedding-celebration-family-8342763.jpg",
+          "remote_url": "https://pixabay.com/get/g7f903c9a6bac907b9073da296f88469dff7bae93d127a010b80610a96174a36f2efb6aa58e4578577a8aa67d8454470dad842305b40586f4195161b34181ba0a_1280.jpg",
+          "page_url": "https://pixabay.com/photos/couple-wedding-marriage-ring-8342763/",
+          "author": "lekerado",
+          "pixabay_id": 8342763,
+          "tags": "couple, wedding, marriage, ring, family, oath, marriage, marriage, marriage, marriage, marriage",
+          "has_faces": false,
+          "license": "Pixabay Content License (free commercial use, no attribution required)"
+        }
+      ]
     }
   ]
 }
