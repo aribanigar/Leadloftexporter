@@ -534,6 +534,54 @@ def case2_message_sent_list(
     }
 
 
+@router.get("/known-urls")
+def known_linkedin_urls(
+    ctx: AuthContext = Depends(get_extension_context),
+    db: Session = Depends(get_db),
+):
+    """Return every LinkedIn profile URL the workspace already has as a lead,
+    normalized to `/in/<handle>` and lowercased — the exact key shape the
+    extension's local dedupe gate uses. Lets bulk Save All Leads skip
+    profiles already in the CRM upfront (no tab opened, no scrape wasted,
+    no extra "view" recorded against the user's LinkedIn account).
+
+    Covers EVERY source the local cache can't see: CSV imports, web app
+    saves, teammate saves in the same workspace, leads created before the
+    extension started tracking, anything saved from another browser /
+    device / Chrome profile.
+
+    Cap at 50 000 entries (more than any LinkedIn search can surface in one
+    session); newest-first so we keep the freshest if we ever truncate.
+    Pure read — never writes. The `Lead.linkedin_url` column has an index,
+    so this is a single fast scan even at large workspace sizes.
+    """
+    import re
+    rows = (
+        db.query(Lead.linkedin_url)
+        .filter(
+            Lead.workspace_id == ctx.workspace_id,
+            Lead.linkedin_url.isnot(None),
+        )
+        .order_by(Lead.created_at.desc())
+        .limit(50_000)
+        .all()
+    )
+    seen = set()
+    urls = []
+    for (raw,) in rows:
+        if not raw:
+            continue
+        m = re.search(r"/in/([^/?#]+)", raw)
+        if not m:
+            continue
+        norm = ("/in/" + m.group(1)).lower()
+        if norm in seen:
+            continue
+        seen.add(norm)
+        urls.append(norm)
+    return {"ok": True, "count": len(urls), "urls": urls}
+
+
 @router.get("/health")
 def health():
     return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
