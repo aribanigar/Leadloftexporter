@@ -1,0 +1,59 @@
+{
+  "date": "2026-06-21",
+  "business": "qckserve",
+  "topic": "You keep 100% — zero-fee local selling",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "You keep 100% of every sale",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<title>You keep 100%</title>\n<!--[if mso]><style>body,table,td,a{font-family:Arial,sans-serif !important;}</style><![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n<div style=\"display:none;font-size:1px;color:#FCF9F8;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;\">You keep 100% of every sale. Zero commission, free listings, owner-direct on qckserve.in.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n\n  <!-- Wordmark -->\n  <tr><td align=\"left\" style=\"padding:28px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n\n  <!-- HERO: full-bleed orange manifesto band -->\n  <tr><td align=\"center\" style=\"background-color:#ef6723;padding:48px 40px 52px 40px;\">\n    <p style=\"margin:0 0 14px 0;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:18px;line-height:1.4;color:#FFE6D8;\">A small manifesto for local sellers</p>\n    <h1 style=\"margin:0;font-family:'Poppins',Arial,sans-serif;font-size:52px;line-height:1.02;font-weight:800;letter-spacing:-1.5px;color:#FFFFFF;\">You keep 100%.</h1>\n    <p style=\"margin:18px 0 0 0;font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">Zero commission. Free listings. Owner-direct.</p>\n    <p style=\"margin:8px 0 0 0;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:17px;line-height:1.5;color:#FFE6D8;\">Every rupee of the sale stays yours.</p>\n  </td></tr>\n\n  <!-- The one visual device: giant zero -->\n  <tr><td align=\"center\" style=\"background-color:#1A1A1A;padding:44px 40px;\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n      <td align=\"center\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:128px;line-height:1;font-weight:800;letter-spacing:-4px;color:#FF6B00;\">&#8377;0</td>\n    </tr></table>\n    <p style=\"margin:10px 0 0 0;font-family:'Poppins',Arial,sans-serif;font-size:18px;line-height:1.5;font-weight:600;color:#FFFFFF;\">to list. &#8377;0 commission. No cut taken.</p>\n  </td></tr>\n\n  <!-- CTA #1 (within first ~90 words) -->\n  <tr><td align=\"center\" style=\"background-color:#FFFFFF;padding:36px 40px 8px 40px;\">\n    <p style=\"margin:0 0 22px 0;font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.6;color:#1A1A1A;\">Times are tight. Margins are thin. You should not lose a slice of every sale just to be seen. On QckServe you reach local buyers directly &mdash; and keep what you make.</p>\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr>\n      <td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\">\n        <a href=\"https://qckserve.in\" style=\"display:inline-block;padding:16px 36px;font-family:'Poppins',Arial,sans-serif;font-size:17px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List your shop &mdash; free &rarr;</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- Hero poster image band -->\n  <tr><td align=\"center\" style=\"padding:28px 40px 4px 40px;\">\n    <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg\" width=\"520\" alt=\"QckServe poster: You keep 100 percent of what you earn. Zero commission, free listings, owner-direct.\" style=\"display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:14px;\">\n  </td></tr>\n\n  <!-- What \"free\" means: clean checklist -->\n  <tr><td align=\"left\" style=\"background-color:#FCF9F8;padding:36px 44px;\">\n    <p style=\"margin:0 0 18px 0;font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ef6723;\">What free really means</p>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#1A1A1A;\">\n      <tr><td style=\"padding:8px 0;\"><span style=\"color:#ef6723;font-weight:700;\">&#10003;&nbsp;&nbsp;</span>No listing fee. Post as many ads as you like.</td></tr>\n      <tr><td style=\"padding:8px 0;border-top:1px solid #EEE3DD;\"><span style=\"color:#ef6723;font-weight:700;\">&#10003;&nbsp;&nbsp;</span>No commission. The buyer pays you, not us.</td></tr>\n      <tr><td style=\"padding:8px 0;border-top:1px solid #EEE3DD;\"><span style=\"color:#ef6723;font-weight:700;\">&#10003;&nbsp;&nbsp;</span>No middlemen. Talk to buyers owner-direct.</td></tr>\n      <tr><td style=\"padding:8px 0;border-top:1px solid #EEE3DD;\"><span style=\"color:#ef6723;font-weight:700;\">&#10003;&nbsp;&nbsp;</span>Built for UP. Property, vehicles, jobs, services &amp; more.</td></tr>\n    </table>\n  </td></tr>\n\n  <!-- CTA #2 -->\n  <tr><td align=\"center\" style=\"background-color:#1A1A1A;padding:40px;\">\n    <p style=\"margin:0 0 22px 0;font-family:'Poppins',Arial,sans-serif;font-size:22px;line-height:1.4;font-weight:700;color:#FFFFFF;\">Start selling for &#8377;0 today.</p>\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr>\n      <td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\">\n        <a href=\"https://qckserve.in\" style=\"display:inline-block;padding:16px 40px;font-family:'Poppins',Arial,sans-serif;font-size:17px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">Create your free listing &rarr;</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"background-color:#FFFFFF;padding:28px 40px 36px 40px;\">\n    <p style=\"margin:0 0 6px 0;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;color:#1A1A1A;\">qckserve.in</p>\n    <p style=\"margin:0;font-family:'Poppins',Arial,sans-serif;font-size:13px;line-height:1.5;color:#8A8079;\">India&#8217;s free local marketplace &middot; Uttar Pradesh<br>Zero commission. Free listings. Owner-direct.</p>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "manifesto",
+        "zero-fees",
+        "promo"
+      ],
+      "notes": "Sunday General / Manifesto archetype: full-bleed orange hero, giant ₹0 device, dual CTA. Email-client safe (tables, inline styles, bulletproof buttons, 600px)."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "📢 *QckServe pe aapki dukaan = ₹0 kharcha!*\n\nListing free. Commission ZERO. Bina kisi middleman ke, buyer aapse seedha baat karega.\n\nHar sale ka pura paisa aapka. 💪\n\nAaj hi list karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "whatsapp",
+        "hinglish"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Aapki mehnat, aapka pura paisa. 🔥\n\nQckServe pe listing FREE hai aur commission ₹0. UP ke local sellers ke liye — property, gaadi, job, service, dukaan, sab kuch. No middleman, buyer se seedhi baat.\n\nAaj list karo, free mein → qckserve.in\n\n#QckServe #LocalBusiness #UttarPradesh #ZeroCommission #FreeListing",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "instagram",
+        "hinglish"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "QckServe: List your shop FREE. Zero commission, you keep 100% of every sale. Start now: qckserve.in",
+      "tags": [
+        "general",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-21] You keep 100% (Image Prompt)",
+      "content": "Editorial marketplace manifesto poster, flat design, 4:5 vertical.\nSCENE: confident UP small-shop owner (kirana/garments) standing in a warm sunlit storefront, mid-shot, looking to camera with quiet pride.\nSUBJECT: the owner holding a smartphone toward the viewer.\nPHONE-UI MOCKUP: clean QckServe listing screen on the phone — a product card with a bold '₹0 to list · 0% commission' badge, an orange 'List free' button, minimal cards.\nCOLOUR SYSTEM: flat blocking only, NO gradients — brand orange #ef6723 and #FF6B00 accent, deep charcoal #1A1A1A, warm off-white #FCF9F8; one orange accent used sparingly.\nLIGHTING: soft warm directional morning light, gentle shadow, clean.\nTYPE HIERARCHY: oversized extra-bold condensed caps headline 'YOU KEEP 100%', small italic-serif kicker 'a manifesto for local sellers'; mixed weights; tight letter-spacing.\nEYE FLOW: top-left logo zone → face → phone screen → ₹0 badge → CTA bottom.\nCAMERA: 50mm, f4, eye-level, shallow but readable depth.\nPERFORMANCE LAYER: high contrast, thumb-stopping, reads at small size, ad-ready.\nReserve a clean TOP-LEFT square logo zone (empty) — logo placed manually. Bottom-left wordmark space for 'qckserve.in'.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "general",
+        "image-prompt"
+      ],
+      "notes": "AI image generation prompt in QckServe production format. --ar 4:5 --style raw --v 6.1"
+    }
+  ]
+}

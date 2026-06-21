@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe manifesto poster: You keep 100 percent. Zero commission, free listings, owner-direct.">
+  <defs>
+    <style>
+      .serif { font-family: Georgia, 'Times New Roman', serif; }
+      .sans  { font-family: 'Poppins', 'Helvetica Neue', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed orange field (manifesto) -->
+  <rect width="1080" height="1350" fill="#ef6723"/>
+
+  <!-- Top-left logo zone: intentionally blank ~160px square (Ariba places logo manually) -->
+  <!-- (no marks here) -->
+
+  <!-- Italic serif kicker -->
+  <text x="540" y="300" text-anchor="middle" class="serif" font-size="40" font-style="italic" fill="#FFE6D8" letter-spacing="1">A small manifesto for local sellers</text>
+
+  <!-- Hairline separator -->
+  <line x1="430" y1="340" x2="650" y2="340" stroke="#FFFFFF" stroke-width="2" opacity="0.55"/>
+
+  <!-- Oversized headline -->
+  <text x="540" y="510" text-anchor="middle" class="sans" font-size="132" font-weight="800" fill="#FFFFFF" letter-spacing="-4">YOU KEEP</text>
+
+  <!-- The one visual device: giant 100% -->
+  <text x="540" y="720" text-anchor="middle" class="sans" font-size="300" font-weight="800" fill="#1A1A1A" letter-spacing="-10">100%</text>
+  <text x="540" y="800" text-anchor="middle" class="serif" font-size="46" font-style="italic" fill="#FFFFFF">of what you earn. Always.</text>
+
+  <!-- Proof line -->
+  <text x="540" y="940" text-anchor="middle" class="sans" font-size="42" font-weight="600" fill="#FFFFFF" letter-spacing="0.5">Zero commission &#183; Free listings &#183; Owner&#8209;direct</text>
+  <text x="540" y="1000" text-anchor="middle" class="sans" font-size="34" font-weight="400" fill="#FFE6D8">No middlemen taking a cut of your sale.</text>
+
+  <!-- CTA pill (dark band, bulletproof feel) -->
+  <rect x="330" y="1080" width="420" height="96" rx="16" fill="#1A1A1A"/>
+  <text x="540" y="1141" text-anchor="middle" class="sans" font-size="40" font-weight="700" fill="#FFFFFF">List free today</text>
+
+  <!-- Footer wordmark, bottom-left -->
+  <text x="80" y="1290" class="sans" font-size="40" font-weight="700" fill="#1A1A1A">qckserve.in</text>
+  <text x="1000" y="1290" text-anchor="end" class="sans" font-size="28" font-weight="400" fill="#FFE6D8">India&#8217;s free local marketplace</text>
+</svg>
