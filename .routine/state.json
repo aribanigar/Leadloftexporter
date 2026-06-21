@@ -1,0 +1,14 @@
+{
+  "last_run": "2026-06-21",
+  "runs": [
+    {
+      "date": "2026-06-21",
+      "industries": ["Retail", "Education and Research"],
+      "services": ["Social Media", "SEO AEO GEO SRX", "Website Design", "ERP Building", "AI Work Studio", "SchoolOS School ERP"],
+      "items": 24,
+      "db_seeded": false,
+      "db_note": "Postgres ports 5432/6543 to the Supabase pooler are blocked by the environment network policy (only 443 is open); REST path needs a Supabase API key that is not provisioned. batch.json is committed for seeding once connectivity is restored."
+    }
+  ],
+  "industries_used": ["Retail", "Education and Research"]
+}
