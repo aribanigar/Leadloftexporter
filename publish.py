@@ -22,6 +22,7 @@ Platform values seen in DB:           email | whatsapp | linkedin | outreach
 import os
 import sys
 import argparse
+import uuid
 import requests
 
 from build_email import build_email
@@ -86,6 +87,7 @@ def publish(ctype, embed, dry_run):
 
     html = build_email(embed=embed)
     record = {
+        "id":           str(uuid.uuid4()),
         "workspace_id": workspace,
         "business_id":  BUSINESS_ID,
         "type":         ctype,
@@ -93,6 +95,7 @@ def publish(ctype, embed, dry_run):
         "title":        "Creator recruitment — get booked & paid",
         "subject":      "Stop pitching brands in the DMs — let them book you",
         "content":      html,
+        "tags":         [],
     }
 
     print(f"Prepared record: type={ctype} embed={embed} content={len(html):,} bytes")
