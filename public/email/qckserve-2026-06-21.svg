@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe manifesto poster: a free marketplace for all of Uttar Pradesh. Zero fees, always.">
+  <defs>
+    <style>
+      .cond { font-family: 'Arial Narrow','Helvetica Neue',Arial,sans-serif; font-weight: 800; }
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+      .serif { font-family: Georgia,'Times New Roman',serif; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed flat orange field (NEVER a gradient) -->
+  <rect width="1080" height="1350" fill="#ef6723"/>
+
+  <!-- Top-left logo zone left blank (~140px square) — Ariba places the logo manually -->
+
+  <!-- Italic-serif kicker -->
+  <text x="540" y="300" text-anchor="middle" class="serif" font-size="44" fill="#FCF9F8">The season turns. The rules don’t.</text>
+
+  <!-- Oversized centered manifesto headline -->
+  <text x="540" y="470" text-anchor="middle" class="cond" font-size="132" letter-spacing="-3" fill="#FFFFFF">A FREE</text>
+  <text x="540" y="595" text-anchor="middle" class="cond" font-size="132" letter-spacing="-3" fill="#FFFFFF">MARKETPLACE</text>
+  <text x="540" y="720" text-anchor="middle" class="cond" font-size="132" letter-spacing="-3" fill="#1A1A1A">FOR ALL OF UP</text>
+
+  <!-- One memorable visual device: the giant zero -->
+  <text x="540" y="1010" text-anchor="middle" class="cond" font-size="300" fill="#1A1A1A">&#8377;0</text>
+  <text x="540" y="1085" text-anchor="middle" class="sans" font-weight="700" font-size="40" letter-spacing="8" fill="#FCF9F8">TO LIST. ALWAYS.</text>
+
+  <!-- Single supporting line -->
+  <text x="540" y="1170" text-anchor="middle" class="sans" font-size="34" fill="#FCF9F8">Owner-direct. No commission. No middlemen.</text>
+
+  <!-- Hairline separator -->
+  <rect x="120" y="1228" width="840" height="2" fill="#1A1A1A" opacity="0.35"/>
+
+  <!-- Wordmark bottom-left (text only) -->
+  <text x="120" y="1290" class="sans" font-weight="800" font-size="40" fill="#1A1A1A">qckserve.in</text>
+  <text x="960" y="1290" text-anchor="end" class="sans" font-size="30" fill="#FCF9F8">Sell anything. Pay nothing.</text>
+</svg>

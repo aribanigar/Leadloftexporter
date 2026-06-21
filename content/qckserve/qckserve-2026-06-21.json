@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-21",
+  "business": "qckserve",
+  "topic": "A free marketplace for all of UP",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "A free marketplace for all of UP — ₹0 to list, always",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <meta name=\"x-apple-disable-message-reformatting\">\n  <title>A free marketplace for all of UP</title>\n  <!--[if mso]><style>body,table,td{font-family:Arial,sans-serif !important;}</style><![endif]-->\n</head>\n<body style=\"margin:0; padding:0; background-color:#FCF9F8;\">\n  <div style=\"display:none; max-height:0; overflow:hidden; opacity:0; font-size:1px; line-height:1px; color:#FCF9F8;\">\n    ₹0 to list. Always. A free local marketplace for all of Uttar Pradesh.\n  </div>\n\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#FCF9F8;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:600px; border-radius:16px; overflow:hidden; background-color:#FFFFFF;\">\n\n          <!-- Logo zone: text only -->\n          <tr>\n            <td style=\"padding:24px 40px 8px 40px; font-family:Poppins,Arial,sans-serif; font-size:18px; font-weight:700; color:#1A1A1A; letter-spacing:0.5px;\">\n              qckserve.in\n            </td>\n          </tr>\n\n          <!-- HERO: full-bleed flat orange, centered manifesto -->\n          <tr>\n            <td align=\"center\" bgcolor=\"#ef6723\" style=\"background-color:#ef6723; padding:56px 40px 48px 40px; text-align:center;\">\n              <p style=\"margin:0 0 18px 0; font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:20px; color:#FCF9F8;\">\n                The season turns. The rules don’t.\n              </p>\n              <h1 style=\"margin:0; font-family:Poppins,Arial,sans-serif; font-size:52px; line-height:1.02; font-weight:800; letter-spacing:-1.5px; color:#FFFFFF;\">\n                A free marketplace<br>for all of UP\n              </h1>\n              <p style=\"margin:28px 0 0 0; font-family:Poppins,Arial,sans-serif; font-size:96px; line-height:1; font-weight:800; color:#1A1A1A;\">\n                ₹0\n              </p>\n              <p style=\"margin:6px 0 32px 0; font-family:Poppins,Arial,sans-serif; font-size:16px; font-weight:700; letter-spacing:4px; color:#FCF9F8;\">\n                TO LIST. ALWAYS.\n              </p>\n              <!-- Bulletproof CTA -->\n              <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" align=\"center\" style=\"margin:0 auto;\">\n                <tr>\n                  <td align=\"center\" bgcolor=\"#1A1A1A\" style=\"background-color:#1A1A1A; border-radius:12px;\">\n                    <a href=\"https://qckserve.in\" style=\"display:inline-block; padding:16px 34px; font-family:Poppins,Arial,sans-serif; font-size:17px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">\n                      List your shop — free\n                    </a>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- PROOF: dark band, the manifesto in plain lines -->\n          <tr>\n            <td bgcolor=\"#1A1A1A\" style=\"background-color:#1A1A1A; padding:44px 40px;\">\n              <p style=\"margin:0 0 18px 0; font-family:Poppins,Arial,sans-serif; font-size:22px; line-height:1.5; font-weight:600; color:#FFFFFF;\">\n                We believe a market should belong to the people in it.\n              </p>\n              <p style=\"margin:0; font-family:Poppins,Arial,sans-serif; font-size:17px; line-height:1.7; color:#FCF9F8;\">\n                No commission.<br>\n                No listing fees.<br>\n                No middlemen.<br>\n                You talk to the buyer. The buyer talks to you.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Hero poster image band -->\n          <tr>\n            <td style=\"font-size:0; line-height:0;\">\n              <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg\" width=\"600\" alt=\"QckServe: a free marketplace for all of Uttar Pradesh. ₹0 to list, always — owner-direct, no commission.\" style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\">\n            </td>\n          </tr>\n\n          <!-- HOW: light band, what 'free' means -->\n          <tr>\n            <td style=\"padding:44px 40px 16px 40px;\">\n              <p style=\"margin:0 0 22px 0; font-family:Poppins,Arial,sans-serif; font-size:24px; font-weight:800; color:#1A1A1A;\">\n                What “free” actually means\n              </p>\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n                <tr>\n                  <td style=\"padding:0 0 14px 0; font-family:Poppins,Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\">\n                    <span style=\"color:#ef6723; font-weight:800;\">✓</span>&nbsp;&nbsp;List anything — property, vehicle, job, service, or store item.\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding:0 0 14px 0; font-family:Poppins,Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\">\n                    <span style=\"color:#ef6723; font-weight:800;\">✓</span>&nbsp;&nbsp;Keep 100% of what you earn. We take nothing.\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding:0 0 14px 0; font-family:Poppins,Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\">\n                    <span style=\"color:#ef6723; font-weight:800;\">✓</span>&nbsp;&nbsp;Reach buyers across Uttar Pradesh, rain or shine.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Final CTA -->\n          <tr>\n            <td align=\"center\" style=\"padding:16px 40px 48px 40px; text-align:center;\">\n              <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" align=\"center\" style=\"margin:0 auto;\">\n                <tr>\n                  <td align=\"center\" bgcolor=\"#ef6723\" style=\"background-color:#ef6723; border-radius:12px;\">\n                    <a href=\"https://qckserve.in\" style=\"display:inline-block; padding:16px 38px; font-family:Poppins,Arial,sans-serif; font-size:17px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">\n                      Post your first listing — free\n                    </a>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td bgcolor=\"#FCF9F8\" style=\"background-color:#FCF9F8; padding:24px 40px 32px 40px; border-top:1px solid #eee;\">\n              <p style=\"margin:0; font-family:Poppins,Arial,sans-serif; font-size:13px; line-height:1.6; color:#777777;\">\n                qckserve.in — India’s free local marketplace.<br>\n                Sell anything. Pay nothing.\n              </p>\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "manifesto",
+        "promo"
+      ],
+      "notes": "Sunday General / Manifesto archetype. Full-bleed orange, centered type, one CTA. Hook: monsoon reaching UP this week."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "Baarish aa gayi 🌧️ par aapka business rukna nahi chahiye.\nQckServe par apni dukaan, gaadi, property ya service list karein — bilkul FREE.\nNa commission, na beech mein koi. Seedha grahak se baat.\nAaj hi list karein: qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "whatsapp",
+        "hinglish"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Mausam badalta hai. QckServe ka vaada nahi. 🌧️\nUP ka apna free marketplace — ₹0 listing, na commission, na middleman. Dukaan ho, gaadi ho, property ho ya naukri — seedha grahak tak.\nAaj list karein 👉 qckserve.in\n#QckServe #UttarPradesh #LocalBusiness #FreeListing #qckservein",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-21.svg",
+      "tags": [
+        "general",
+        "instagram",
+        "hinglish"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "List your shop, vehicle or service FREE on QckServe. Zero fees, zero commission, owner-direct across UP. Start: qckserve.in",
+      "tags": [
+        "general",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-21] A free marketplace for all of UP (Image Prompt)",
+      "content": "Scene: a warm monsoon-morning street market in small-town Uttar Pradesh, wet pavement reflecting soft light, shutters just opening.\nSubject: a confident local shop owner standing in their doorway holding a smartphone, mid-30s, genuine smile, simple kurta.\nPhone-UI mockup: clean QckServe listing screen on the phone — a 'List for ₹0' primary button, a fresh listing card, no clutter; crisp, legible, modern.\nColour system: flat colour blocking only, NO gradients — QckServe orange #ef6723 / #FF6B00, deep charcoal #1A1A1A, off-white #FCF9F8; orange used as the single accent.\nLighting: soft diffused post-rain daylight, gentle highlights on the phone screen, low contrast shadows.\nType hierarchy: one oversized extra-bold condensed headline 'A FREE MARKETPLACE FOR ALL OF UP', a small italic-serif kicker 'the season turns, the rules don't', and a giant ₹0 device.\nEye flow: from the owner's face → the phone screen → the ₹0 → the headline → bottom-left wordmark.\nCamera: 35mm, eye-level, shallow depth of field, subject sharp, market softly blurred.\nPerformance layer: thumb-stopping, high-contrast, mobile-first composition for a 4:5 feed.\nReserve the TOP-LEFT corner as an empty logo zone (logo placed manually). Show the wordmark 'qckserve.in' bottom-left only — no logo boxes.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "general",
+        "image-prompt"
+      ]
+    }
+  ]
+}
