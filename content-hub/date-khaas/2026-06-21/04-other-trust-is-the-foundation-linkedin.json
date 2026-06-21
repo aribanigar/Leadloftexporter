@@ -1,0 +1,36 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "Trust Is the Foundation — LinkedIn",
+  "image_query": "muslim wedding celebration",
+  "body": "Trust isn’t a feature. It’s the foundation.\n\nIn Muslim matrimony, families don’t just support the process — they’re part of it. The wali. The parents. The community. They’re not obstacles to work around; they’re the scaffolding that makes a marriage last.\n\nYet most matrimony platforms treat trust as an afterthought: a small “verified” badge buried in a profile, a privacy policy no one reads.\n\nAt Date Khaas, we’re building differently:\n\n→ Photos blurred by default — visible only when the member chooses\n→ Every profile verified before the first introduction\n→ Walis invited to conversations from day one\n→ No swipe culture. No casual DMs. Every interaction intentional.\n\nMuslim women especially deserve a platform where modesty is a design principle, not a checkbox.\n\nThis summer Nikah season, we keep asking one question: what would it look like if a matrimony app was built the way a trusted family elder would build it?\n\nWarm. Careful. Unhurried. Rooted in barakah.\n\nThat’s Date Khaas.\n\n#MuslimMatrimony #Nikah #TrustAndSafety #IslamicMarriage #DateKhaas",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Photo blur by default and Wali-friendly defaults are now expected table-stakes features for Muslim matrimony apps in 2026, not premium upsells — platforms that hide them behind paywalls are losing trust-conscious users.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Muslim women cite photo privacy and family-involvement options as their two primary concerns when evaluating matrimony apps — these are conversion drivers, not just features.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever leads with stats ('4M+ active verified members, 70K+ marriages') but communicates no warmth or feeling — the emotional gap is a clear opportunity for a brand-first competitor.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "Summer 2026 is peak Nikah season — Friday evenings after Maghrib are the most-planned ceremony time. Couples and families are actively searching and comparing platforms right now.",
+        "source": "https://symphonyevents.com.au/islamic-wedding-dates-2026-for-nikah/"
+      },
+      {
+        "insight": "Salaam Soulmate research shows that modesty through design — monitored communication, photo controls, family intermediaries — must be a built-in principle, not a settings checkbox.",
+        "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+      },
+      {
+        "insight": "Shaadi.com anchors its brand on '80 Lakh success stories' — a volume-first, transactional position that leaves the entire emotional lane open for a brand rooted in love, barakah, and care.",
+        "source": "https://www.shaadi.com/"
+      }
+    ]
+  }
+}
