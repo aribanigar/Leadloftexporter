@@ -115,15 +115,19 @@ The "Add to Playbook" UX in the frontend hits `POST /playbooks/{id}/enroll` with
 
 Daily quotas (`email_limit`, `linkedin_connect_limit`, `linkedin_message_limit`) live on the workspace and are enforced **server-side** in `outreach.py` — the extension never schedules anything itself. Step scheduling jitter goes through `humanise_run_at()` which respects the workspace's outreach time window ±15 min.
 
-> **HARDCODED RULE — NO EMAIL SENDING CAP, EVER (user directive, do not revert).**
-> Campaign email sends must have **no per-inbox cap, no daily ceiling, no warmup
-> throttle, and no "defer to tomorrow"**. Every inbox the user adds sends freely
-> and without limit. `campaigns.py:_eligible_senders` always returns every active
-> sender regardless of warmup state or `sent_today`. Warmup is reputation
-> bookkeeping only — it must never skip, throttle, or defer a send. Do **not**
-> reintroduce a `sent_today >= cap` gate or a `warmup_deferred` cooldown anywhere
-> in the send path. The old behaviour capped campaigns around ~100 emails; that is
-> a bug, not a feature.
+> **HARDCODED RULE — WARMUP AND CAMPAIGNS ARE FULLY SEPARATE; NO SENDING CAP, EVER.**
+> (User directive, repeated many times — do NOT revert or re-couple.)
+> Warmup and Campaigns are two **independent** features. The campaign send path
+> must **never read or write any warmup state** — it does not fetch a
+> `SenderWarmup` row, does not check `sent_today`, and does not increment warmup
+> counters. `campaigns.py:_eligible_senders` returns **plain `ConnectedAccount`s**
+> (no warmup), and every active inbox is always eligible: **no per-inbox cap, no
+> daily ceiling, no warmup throttle, no "defer to tomorrow."** Warmup keeps its
+> own endpoints/counters/seeding engine (`/senders/{id}/warmup`, `_warmup_*`) as a
+> separate feature for warming inboxes — it just has zero involvement in campaign
+> sending. Do **not** reintroduce warmup into the send path or any `sent_today >=
+> cap` gate / `warmup_deferred` cooldown. The old coupling capped campaigns around
+> ~100 emails; that is a bug, not a feature.
 
 ### Dashboard stats
 

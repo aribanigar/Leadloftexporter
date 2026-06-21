@@ -223,38 +223,24 @@ def _all_workspace_senders(db: Session, workspace_id: str) -> list[ConnectedAcco
     )
 
 
-def _eligible_senders(
-    db: Session, campaign: Campaign
-) -> list[tuple[ConnectedAccount, SenderWarmup]]:
-    """Senders this campaign can dispatch through, round-robin ordered.
+def _eligible_senders(db: Session, campaign: Campaign) -> list[ConnectedAccount]:
+    """Active senders this campaign can dispatch through, round-robin ordered.
 
-    HARDCODED RULE — NO SENDING CAP. Every active inbox is always eligible, no
-    matter how many emails it has sent today or whether warmup is on. There is
-    no per-inbox cap, no daily ceiling, no warmup throttle, and no defer. Any
-    inbox the user adds sends freely and without limit. Do not add a cap here.
+    ── HARDCODED RULE — WARMUP AND CAMPAIGNS ARE FULLY SEPARATE FEATURES ──
+    The campaign send path does NOT read or write any warmup state. Every active
+    inbox is always eligible and sends without limit — no cap, no daily ceiling,
+    no defer. Warmup is its OWN independent feature (its own counters, its own
+    seeding engine); it must never appear in, gate, or be mutated by campaign
+    sending. Do NOT reintroduce warmup (or any cap) here or in the send path.
 
     Ordered to start at campaign.rotation_index for round-robin fairness so the
     volume spreads evenly across the connected mailboxes.
     """
     accts = _campaign_sender_accounts(db, campaign)
-
-    out: list[tuple[ConnectedAccount, SenderWarmup]] = []
-    for a in accts:
-        w = _warmup_for_account(db, campaign.workspace_id, a.id)
-        # ── HARDCODED RULE — NO SENDING CAP, EVER (per user directive) ──
-        # Campaign sending is fully DECOUPLED from warmup. Every active inbox is
-        # ALWAYS eligible, regardless of warmup state or how many it has sent
-        # today. Warmup tracks reputation only; it must NEVER throttle, skip, or
-        # defer a send. Do NOT reintroduce any per-inbox / daily / 100-email cap
-        # here or anywhere in the send path.
-        out.append((a, w))
-
-    # Rotate starting at the campaign's rotation_index so consecutive ticks
-    # advance through the pool.
-    if out:
-        idx = campaign.rotation_index % len(out)
-        out = out[idx:] + out[:idx]
-    return out
+    if accts:
+        idx = campaign.rotation_index % len(accts)
+        accts = accts[idx:] + accts[:idx]
+    return accts
 
 
 def _campaign_sender_accounts(db: Session, campaign: Campaign) -> list[ConnectedAccount]:
@@ -1524,8 +1510,8 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         .update({"status": "pending"}, synchronize_session=False)
     )
 
-    # Build the (sender, warmup) pool. Decoupled from warmup — this is empty
-    # only when there are no active senders to dispatch through.
+    # Active sender pool (no warmup involved). Empty only when there are no
+    # active senders to dispatch through.
     eligible = _eligible_senders(db, campaign)
     if not eligible:
         # HARDCODED RULE: no sending cap, so `eligible` is empty ONLY when the
@@ -1574,9 +1560,9 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             skipped += 1
             continue
 
-        # Round-robin to the next sender. DECOUPLED from warmup — every active
-        # sender can dispatch; a warmup cap never blocks a campaign send.
-        sender, warmup = eligible[rotation_index % len(eligible)]
+        # Round-robin to the next sender. Campaigns are FULLY SEPARATE from
+        # warmup — no warmup row is read or touched here.
+        sender = eligible[rotation_index % len(eligible)]
         rotation_index = (rotation_index + 1) % len(eligible)
 
         # Materialise the EmailMessage row, render merge tags, dispatch.
@@ -1656,8 +1642,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
             if result.ok:
                 r.status = "sent"
                 r.sent_at = datetime.now(timezone.utc)
-                warmup.sent_today += 1
-                warmup.total_sent += 1
+                # NB: campaign sends never touch warmup counters — separate feature.
                 campaign.sent_count = (campaign.sent_count or 0) + 1
                 sent += 1
                 if lead is not None:
@@ -1800,8 +1785,8 @@ def _prepare_tick_batch(
             campaign.skipped_count = (campaign.skipped_count or 0) + 1
             continue
 
-        # Round-robin sender pick — DECOUPLED from warmup (no cap gate).
-        sender = eligible[rotation_index % len(eligible)][0]
+        # Round-robin sender pick — FULLY SEPARATE from warmup.
+        sender = eligible[rotation_index % len(eligible)]
         rotation_index = (rotation_index + 1) % len(eligible)
 
         lead = db.get(Lead, r.lead_id) if r.lead_id else None
@@ -1929,15 +1914,7 @@ def _commit_tick_results(
                 msg.status = "sent"
             campaign.sent_count = (campaign.sent_count or 0) + 1
             sent += 1
-            # Bump warmup counters for the sender that actually sent this email
-            # so the ramp curve advances in real time and `_eligible_senders`
-            # starts skipping it once today's cap is hit.
-            if r.sender_account_id:
-                warmup = _warmup_for_account(
-                    db, campaign.workspace_id, r.sender_account_id
-                )
-                warmup.sent_today = (warmup.sent_today or 0) + 1
-                warmup.total_sent = (warmup.total_sent or 0) + 1
+            # Campaign sends never touch warmup — the two features are separate.
             if r.lead_id:
                 lead = db.get(Lead, r.lead_id)
                 if lead:
