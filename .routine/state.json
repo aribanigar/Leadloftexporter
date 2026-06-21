@@ -11,15 +11,12 @@
         "Retail",
         "Construction and Real Estate"
       ],
-      "items": 24
-    },
-    {
-      "date": "2026-06-21",
-      "industries": [
-        "Retail",
-        "Construction and Real Estate"
-      ],
-      "items": 24
+      "items": 24,
+      "emails": 6,
+      "seeded": true,
+      "seed_method": "rest",
+      "folder": "hudace",
+      "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c"
     }
   ]
 }
