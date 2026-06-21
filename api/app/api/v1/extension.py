@@ -408,6 +408,132 @@ def enroll_batch(
     return {"enrolled": enrolled, "count": len(enrolled)}
 
 
+# ── Case #2 bulk-message 24h sent-history (durable, workspace-scoped) ──────
+#
+# The extension keeps a local 24h sent-history (chrome.storage + linkedin.com
+# localStorage) so it can skip already-messaged profiles on re-runs. That
+# local mirror survives extension version-swaps but is wiped if the user:
+#   • removes the extension AND clears linkedin.com site data,
+#   • switches browsers / machines,
+#   • signs into a different Chrome profile.
+# Mirroring it to the backend gives a single workspace-scoped source of truth
+# the extension can re-hydrate from on a cold install. Stored as a list of
+# {url, ts_ms} in `Workspace.settings["case2_sent_log"]`; capped at 5 000
+# entries and pruned to the last 7 days on every write so the JSONB blob
+# stays small (typical worst case ~100 KB).
+
+_CASE2_LOG_KEY = "case2_sent_log"
+_CASE2_LOG_TTL_MS = 7 * 24 * 60 * 60 * 1000   # keep a week on the server
+_CASE2_LOG_CAP = 5000                          # hard ceiling on entries
+
+
+def _normalize_in_path(url: str) -> Optional[str]:
+    """Reduce any LinkedIn profile URL to `/in/<handle>` (lowercased)."""
+    if not url:
+        return None
+    import re
+    m = re.search(r"/in/([^/?#]+)", str(url))
+    return ("/in/" + m.group(1)).lower() if m else None
+
+
+def _prune_case2_log(entries: list, now_ms: int) -> list:
+    """Drop entries older than the TTL; cap to the most-recent N. Pure."""
+    out = []
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        ts = e.get("ts")
+        url = e.get("url")
+        if not isinstance(ts, (int, float)) or not isinstance(url, str):
+            continue
+        if (now_ms - int(ts)) >= _CASE2_LOG_TTL_MS:
+            continue
+        out.append({"url": url, "ts": int(ts)})
+    # newest first, then cap
+    out.sort(key=lambda e: e["ts"], reverse=True)
+    return out[:_CASE2_LOG_CAP]
+
+
+@router.post("/case2-message-sent")
+def case2_message_sent(
+    body: dict,
+    ctx: AuthContext = Depends(get_extension_context),
+    db: Session = Depends(get_db),
+):
+    """Record that the user just messaged this LinkedIn profile via bulk
+    Message All. The extension fire-and-forgets this on every successful
+    pre-mark, so a fresh install on any device can re-hydrate the local
+    24h dedupe by calling GET /case2-message-sent.
+
+    Body: { "linkedin_url": "<any /in/... URL>", "ts": <optional ms> }
+    Returns: { ok, count } — the new total count after dedupe + prune.
+    """
+    raw_url = (body or {}).get("linkedin_url") or (body or {}).get("url") or ""
+    norm = _normalize_in_path(raw_url)
+    if not norm:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "linkedin_url required")
+    ts_in = (body or {}).get("ts")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    ts = int(ts_in) if isinstance(ts_in, (int, float)) else now_ms
+
+    ws = ctx.workspace
+    settings = dict(ws.settings or {})
+    existing = settings.get(_CASE2_LOG_KEY) or []
+    # Dedupe by URL; keep the newest timestamp.
+    by_url = {}
+    for e in existing:
+        if isinstance(e, dict) and isinstance(e.get("url"), str):
+            prev = by_url.get(e["url"])
+            if not prev or (isinstance(e.get("ts"), (int, float)) and int(e["ts"]) > prev):
+                by_url[e["url"]] = int(e.get("ts") or 0)
+    # Insert / upgrade this URL's timestamp.
+    if ts > by_url.get(norm, 0):
+        by_url[norm] = ts
+    merged = [{"url": u, "ts": t} for u, t in by_url.items()]
+    pruned = _prune_case2_log(merged, now_ms)
+    settings[_CASE2_LOG_KEY] = pruned
+    ws.settings = settings
+    # SQLAlchemy with JSONB needs an explicit attribute reassignment to mark
+    # the column dirty when the dict is mutated in place.
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(ws, "settings")
+    db.commit()
+    return {"ok": True, "count": len(pruned), "url": norm}
+
+
+@router.get("/case2-message-sent")
+def case2_message_sent_list(
+    since_ms: Optional[int] = None,
+    ctx: AuthContext = Depends(get_extension_context),
+    db: Session = Depends(get_db),
+):
+    """Return the workspace's bulk-message sent-history within a window.
+
+    Default window is the last 24h (matches the extension's local TTL).
+    Pass `since_ms` to override (e.g. since_ms=604800000 for 7 days).
+    Response: { ok, ttl_ms, entries: [{url, ts}], urls: ["/in/..."] }
+    where `urls` is a flat list ready to feed the extension's Set-based
+    dedupe gate.
+    """
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    window_ms = int(since_ms) if isinstance(since_ms, int) and since_ms > 0 else 24 * 60 * 60 * 1000
+    existing = (ctx.workspace.settings or {}).get(_CASE2_LOG_KEY) or []
+    entries = [
+        e for e in existing
+        if isinstance(e, dict)
+        and isinstance(e.get("ts"), (int, float))
+        and (now_ms - int(e["ts"])) < window_ms
+        and isinstance(e.get("url"), str)
+    ]
+    entries.sort(key=lambda e: e["ts"], reverse=True)
+    return {
+        "ok": True,
+        "ttl_ms": window_ms,
+        "entries": [{"url": e["url"], "ts": int(e["ts"])} for e in entries],
+        "urls": [e["url"] for e in entries],
+    }
+
+
 @router.get("/health")
 def health():
     return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
