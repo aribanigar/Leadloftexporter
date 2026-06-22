@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Zero brokerage. List your rental free this shifting season.">
+  <defs>
+    <style>
+      .serif  { font-family: Georgia, 'Times New Roman', serif; }
+      .sans   { font-family: 'Poppins', 'Arial Narrow', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left logo zone left blank (~140px) for manual logo placement -->
+
+  <!-- italic-serif kicker -->
+  <text x="80" y="300" class="serif" font-style="italic" font-size="46" fill="#FCF9F8" letter-spacing="0.5">this shifting season,</text>
+
+  <!-- giant Rupee zero hero -->
+  <text x="64" y="720" class="sans" font-size="520" font-weight="800" fill="#FF6B00" letter-spacing="-18">&#8377;0</text>
+  <text x="84" y="800" class="sans" font-size="42" font-weight="700" fill="#FCF9F8" letter-spacing="6">BROKERAGE. EVER.</text>
+
+  <!-- broker fee struck through -->
+  <g>
+    <text x="84" y="892" class="serif" font-style="italic" font-size="40" fill="#8a8a8a">brokers want one month&#8217;s rent.</text>
+    <line x1="84" y1="879" x2="690" y2="879" stroke="#FF6B00" stroke-width="4"/>
+  </g>
+
+  <!-- headline -->
+  <text x="80" y="1010" class="sans" font-size="92" font-weight="800" fill="#FCF9F8" letter-spacing="-2">LIST YOUR FLAT,</text>
+  <text x="80" y="1102" class="sans" font-size="92" font-weight="800" fill="#FCF9F8" letter-spacing="-2">PG OR ROOM</text>
+  <text x="80" y="1194" class="sans" font-size="92" font-weight="800" fill="#FF6B00" letter-spacing="-2">FREE.</text>
+
+  <!-- 4-step timeline -->
+  <g class="sans" font-size="26" font-weight="600" fill="#FCF9F8">
+    <circle cx="92"  cy="1268" r="7" fill="#FF6B00"/><text x="112" y="1276">Snap</text>
+    <circle cx="320" cy="1268" r="7" fill="#FF6B00"/><text x="340" y="1276">Post</text>
+    <circle cx="548" cy="1268" r="7" fill="#FF6B00"/><text x="568" y="1276">They call</text>
+    <circle cx="820" cy="1268" r="7" fill="#FF6B00"/><text x="840" y="1276">You decide</text>
+    <line x1="92" y1="1268" x2="1000" y2="1268" stroke="#3a3a3a" stroke-width="2"/>
+  </g>
+
+  <!-- wordmark bottom-left -->
+  <text x="80" y="1322" class="sans" font-size="34" font-weight="700" fill="#FF6B00" letter-spacing="1">qckserve.in</text>
+</svg>

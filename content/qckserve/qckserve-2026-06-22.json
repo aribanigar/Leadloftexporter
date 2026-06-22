@@ -1,0 +1,59 @@
+{
+  "date": "2026-06-22",
+  "business": "qckserve",
+  "topic": "Free rentals, zero brokerage",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Shifting season is here — list your rental for ₹0",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n  <title>List your rental — free</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#1A1A1A; -webkit-text-size-adjust:100%;\">\n\n  <!-- preheader (hidden) -->\n  <div style=\"display:none; max-height:0; overflow:hidden; opacity:0; font-size:1px; line-height:1px; color:#1A1A1A;\">\n    Shifting season is here. List your flat, PG or room for ₹0 — owner-direct, no brokerage.\n  </div>\n\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#FCF9F8; border-radius:16px; overflow:hidden;\">\n\n          <!-- logo zone: text only -->\n          <tr>\n            <td style=\"padding:28px 40px 8px 40px; background-color:#FCF9F8;\">\n              <span style=\"font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:700; letter-spacing:0.5px; color:#1A1A1A;\">qckserve<span style=\"color:#FF6B00;\">.in</span></span>\n            </td>\n          </tr>\n\n          <!-- HERO BAND: giant ₹0 left, headline right -->\n          <tr>\n            <td style=\"padding:0; background-color:#1A1A1A;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td valign=\"middle\" width=\"230\" style=\"padding:40px 8px 40px 40px;\">\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:120px; line-height:1; font-weight:800; letter-spacing:-4px; color:#FF6B00;\">&#8377;0</div>\n                  </td>\n                  <td valign=\"middle\" style=\"padding:40px 40px 40px 8px;\">\n                    <div style=\"font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:18px; color:#FCF9F8; padding-bottom:8px;\">this shifting season,</div>\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:34px; line-height:1.05; font-weight:800; letter-spacing:-1px; color:#FFFFFF;\">list your rental, free.</div>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- HERO POSTER IMAGE BAND -->\n          <tr>\n            <td style=\"padding:0; background-color:#1A1A1A; font-size:0; line-height:0;\">\n              <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg\" width=\"600\" alt=\"QckServe — Zero brokerage, ever. List your flat, PG or room free at qckserve.in. Snap, post, tenants call you, you decide.\" style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\">\n            </td>\n          </tr>\n\n          <!-- PROOF BAND (light) -->\n          <tr>\n            <td style=\"padding:40px 40px 24px 40px; background-color:#FCF9F8;\">\n              <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:22px; font-weight:800; letter-spacing:-0.5px; color:#1A1A1A; padding-bottom:12px;\">Brokers want a month&#8217;s rent. You owe ₹0.</div>\n              <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:1.6; color:#3a3a3a;\">Post your flat, PG or room in minutes. Tenants call you directly. No agents, no cuts, no waiting — you keep every rupee of the rent.</div>\n            </td>\n          </tr>\n\n          <!-- HOW BAND: 4-step timeline -->\n          <tr>\n            <td style=\"padding:8px 40px 32px 40px; background-color:#FCF9F8;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td width=\"25%\" valign=\"top\" style=\"padding:0 6px 0 0;\">\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; font-weight:800; color:#FF6B00;\">1</div>\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.4; color:#1A1A1A; padding-top:4px;\">Snap a few photos</div>\n                  </td>\n                  <td width=\"25%\" valign=\"top\" style=\"padding:0 6px;\">\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; font-weight:800; color:#FF6B00;\">2</div>\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.4; color:#1A1A1A; padding-top:4px;\">Post it free</div>\n                  </td>\n                  <td width=\"25%\" valign=\"top\" style=\"padding:0 6px;\">\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; font-weight:800; color:#FF6B00;\">3</div>\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.4; color:#1A1A1A; padding-top:4px;\">Tenants call you</div>\n                  </td>\n                  <td width=\"25%\" valign=\"top\" style=\"padding:0 0 0 6px;\">\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; font-weight:800; color:#FF6B00;\">4</div>\n                    <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.4; color:#1A1A1A; padding-top:4px;\">You decide</div>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- CTA BAND (orange) with bulletproof button -->\n          <tr>\n            <td align=\"center\" style=\"padding:40px; background-color:#ef6723;\">\n              <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:800; color:#FFFFFF; padding-bottom:20px;\">Ready before the rush?</div>\n              <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\">\n                <tr>\n                  <td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:12px;\">\n                    <a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block; padding:16px 36px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">List your rental — free &#8594;</a>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- FOOTER -->\n          <tr>\n            <td style=\"padding:28px 40px; background-color:#1A1A1A;\">\n              <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.6; color:#8a8a8a;\">QckServe — India&#8217;s free local marketplace. Zero commission, free listings, owner-direct.</div>\n              <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:13px; color:#FF6B00; padding-top:6px;\">qckserve.in</div>\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "rentals",
+        "promo"
+      ],
+      "notes": "Monday Properties — Big-number hero archetype (giant ₹0, 4-step timeline)."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "🏠 Shifting season shuru ho gaya! Apna flat, PG ya room QckServe par list karein — bilkul free, zero brokerage. Tenant seedhe aapko call karenge, beech mein koi dalaal nahi, pura kiraya aapka. Abhi list karein: qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "rentals",
+        "whatsapp"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Broker ko poore ek mahine ka kiraya? Rehne do.\n\nIs shifting season apna flat, PG ya room QckServe par list karein — bilkul FREE, zero brokerage. Tenant seedhe aapse baat karenge aur pura kiraya aapki jeb mein.\n\nSnap karo → post karo → calls lo. Bas itna hi.\n\n👉 qckserve.in\n\n#QckServe #ZeroBrokerage #RentInUP #PropertyForRent #ShiftingSeason",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "rentals",
+        "instagram"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "Shifting season? List your flat, PG or room on QckServe FREE. Zero brokerage, tenants call you direct. Post now: qckserve.in",
+      "tags": [
+        "properties",
+        "rentals",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-22] Free rentals, zero brokerage (Image Prompt)",
+      "content": "[2026-06-22] Free rentals, zero brokerage (Image Prompt)\n\nSCENE: A bright, airy just-handed-over rental flat in a mid-rise Uttar Pradesh apartment block (Lucknow/Noida feel) — empty living room, morning light, a young landlord standing relaxed by the window holding a phone.\nSUBJECT: Confident 30s Indian property owner, smart-casual kurta-shirt, calm and in control — no broker in sight.\nPHONE-UI MOCKUP: In hand, a clean QckServe listing screen — flat photo thumbnail, big bold '₹0 brokerage' badge, a 'List your rental — free' button, and three incoming tenant calls. Crisp, legible, modern.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — charcoal #1A1A1A walls in shadow, warm off-white #FCF9F8 light, QckServe orange #FF6B00 / #ef6723 as the single accent (badge + button only).\nLIGHTING: soft directional morning daylight from the window, gentle contact shadows, clean and optimistic.\nTYPE HIERARCHY: oversized condensed headline space top-right reading 'ZERO BROKERAGE', smaller italic-serif kicker 'this shifting season', tiny 'qckserve.in' lockup near the bottom.\nEYE FLOW: top-left logo zone → giant ₹0 on the phone → owner's calm face → orange CTA → wordmark.\nCAMERA: 35mm, eye-level, shallow depth of field, phone screen tack-sharp, editorial product-photography polish.\nPERFORMANCE LAYER: thumb-stopping single orange accent, high clarity at small sizes, social-feed ready.\nRESERVE the TOP-LEFT square logo zone empty — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "properties",
+        "image-prompt"
+      ],
+      "notes": "AI image prompt, QckServe production format, --ar 4:5 --style raw --v 6.1"
+    }
+  ]
+}
