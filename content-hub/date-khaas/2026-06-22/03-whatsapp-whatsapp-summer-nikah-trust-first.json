@@ -1,0 +1,61 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "WhatsApp — Summer Nikah: Trust First",
+  "image_query": "muslim bride groom wedding celebration",
+  "cta_url": "https://datekhaas.com/signup",
+  "body": "Assalamu alaikum ✨\n\nThere is someone written for you — and they are looking for you too.\n\nAt *Date Khaas*, we built a space where the search for your soulmate feels the way it should: peaceful, dignified, and guided by trust.\n\n✔ Every profile verified before you see it\n✔ Your photos stay blurred until *you* choose to share\n✔ Your wali or family welcome at every step\n\nNo strangers. No anxiety. Just families who mean well, meeting families who mean well 💚\n\nThis summer, take the step that matters most.\n\n👉 Join Date Khaas: https://datekhaas.com/signup\n\n_Reply STOP to opt out._",
+  "metadata": {
+    "char_count": 562,
+    "research_sources": [
+      {
+        "insight": "June 2026 is peak summer wedding season; Islamic auspicious dates in June–July drive the highest-intent search traffic among Muslim matrimony seekers globally.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Nearly 8 in 10 Muslims globally now use online matchmaking platforms, yet trust remains the #1 barrier to conversion.",
+        "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+      },
+      {
+        "insight": "Photo privacy is Muslim women's top safety concern: blur-by-default controls are proven conversion-critical trust signals.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "Wali/guardian involvement is a genuine product need for diaspora Muslims in UK, USA, Canada.",
+        "source": "https://www.jodimubarak.com/muslim-matrimony/"
+      }
+    ],
+    "faces_in_image": true,
+    "rights_note": "Pixabay free for organic social. Do not use in paid ads featuring faces without rights check."
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-groom-wedding-celebration-1255520.jpg",
+      "remote_url": "https://pixabay.com/get/g559608b6ab9995f935d8de8dd17eb3d2ce997898c627470966a215f33317f99a032a981849d0ec8e9e88d95e6afa224dc0d16318b12fd927053dfa69283ad90c_1280.jpg",
+      "page_url": "https://pixabay.com/photos/bride-groom-wedding-1255520/",
+      "author": "vetonethemi",
+      "pixabay_id": 1255520,
+      "tags": "bride, groom, wedding, wedding photography, bridal gown, bridal dress, couple, pair, together, love, lovers, newlyweds, bridal, wedding dress, marriage, woman, fashion, dress, man, people, elegant, romantic, wife, husband, portrait, wedding, wedding, wedding, wedding, wedding, marriage, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-groom-wedding-celebration-6600904.jpg",
+      "remote_url": "https://pixabay.com/get/g246bb17590a8525c9d19138ed4de8c59f46a604360810424d77a418e9753edd06275b49272a5788c615540a4adbec437503b159d515604b4fc12ad21d511e621_1280.jpg",
+      "page_url": "https://pixabay.com/photos/love-wedding-romance-romantic-6600904/",
+      "author": "OlcayErtem",
+      "pixabay_id": 6600904,
+      "tags": "love, wedding, romance, romantic, couple, bride, groom, marriage, lovers, man, woman, together, relationship, wedding, wedding, wedding, wedding, wedding",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-groom-wedding-celebration-1868868.jpg",
+      "remote_url": "https://pixabay.com/get/g95d8d1f65afc7268b67d71609ca7b541b315409c59f10495c1c2d295309c77ef71231c235f9629f4563aa42b693306807acb97ffe953a5d641343af59b972f5f_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-ceremony-champagne-glasses-1868868/",
+      "author": "Pexels",
+      "pixabay_id": 1868868,
+      "tags": "wedding, ceremony, champagne, glasses, newlyweds, marriage, bride and groom, champagne glasses, toast, cheers, celebrate, celebration, wedding ceremony, elegant, bride, formal, groom, love, man, people, woman, wedding, wedding, wedding, wedding, wedding, champagne, champagne, marriage, groom, groom",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

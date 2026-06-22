@@ -1,0 +1,70 @@
+{
+  "type": "html_email",
+  "format": "standard",
+  "channel": "email",
+  "title": "Marketing Email — Summer Nikah: Verified Families",
+  "subject": "The one written for you deserves to find you safely",
+  "preheader": "Every family on Date Khaas is verified before you ever meet them.",
+  "cta_url": "https://datekhaas.com/signup",
+  "image_query": "muslim wedding nikah ceremony",
+  "body": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Date Khaas — Your journey to nikah</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f9f6f0;font-family:Arial,Helvetica,sans-serif;\">\n<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\" style=\"background-color:#f9f6f0;\">\n  <tr>\n    <td align=\"center\" style=\"padding:40px 20px;\">\n      <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"600\" style=\"max-width:600px;background-color:#ffffff;border-radius:4px;overflow:hidden;\">\n\n        <!-- Header -->\n        <tr>\n          <td align=\"center\" style=\"background-color:#003527;padding:32px 40px;\">\n            <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:700;color:#e9c176;letter-spacing:3px;\">Date Khaas</p>\n            <p style=\"margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#a8c4b8;letter-spacing:2px;text-transform:uppercase;\">Muslim Matrimony</p>\n          </td>\n        </tr>\n\n        <!-- Body -->\n        <tr>\n          <td style=\"padding:48px 48px 0;\">\n            <h1 style=\"margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:700;color:#003527;line-height:1.2;\">There is someone written for you.</h1>\n            <p style=\"margin:0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#3d3d3d;line-height:1.75;\">The Quran speaks of spouses as garments for one another — a closeness that brings calm, warmth, and a sense of coming home. That kind of love is not a dream reserved for a lucky few. It is something Allah has woven into the fabric of your story. The journey to it simply needs to begin in the right place.</p>\n            <p style=\"margin:0 0 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#3d3d3d;line-height:1.75;\">At Date Khaas, we built a space where that journey starts with dignity. Every family you meet has been verified before any introduction is made. Your photos are yours — shared only when you choose, only with families you already trust. And your wali or parents are welcome at every single step.</p>\n          </td>\n        </tr>\n\n        <!-- Gold rule -->\n        <tr>\n          <td style=\"padding:0 48px;\">\n            <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\">\n              <tr><td style=\"border-top:2px solid #e9c176;height:2px;\"></td></tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Trust callouts -->\n        <tr>\n          <td style=\"padding:28px 48px;\">\n            <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\">\n              <tr>\n                <td width=\"48%\" style=\"background-color:#f5f9f7;border-left:3px solid #003527;padding:18px 20px;vertical-align:top;\">\n                  <p style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:#003527;\">Verified Profiles</p>\n                  <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#555555;line-height:1.65;\">Every profile is reviewed before you ever see it. No strangers — only families who mean well.</p>\n                </td>\n                <td width=\"4%\"></td>\n                <td width=\"48%\" style=\"background-color:#faf8f2;border-left:3px solid #e9c176;padding:18px 20px;vertical-align:top;\">\n                  <p style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:#003527;\">Your Photos, Your Terms</p>\n                  <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#555555;line-height:1.65;\">Blurred by default. Share selectively. Your image is yours to give — not ours to expose.</p>\n                </td>\n              </tr>\n              <tr><td colspan=\"3\" height=\"16\"></td></tr>\n              <tr>\n                <td width=\"48%\" style=\"background-color:#faf8f2;border-left:3px solid #e9c176;padding:18px 20px;vertical-align:top;\">\n                  <p style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:#003527;\">Family Welcome</p>\n                  <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#555555;line-height:1.65;\">Your wali, your parents, your family — part of this from day one, exactly as it should be.</p>\n                </td>\n                <td width=\"4%\"></td>\n                <td width=\"48%\" style=\"background-color:#f5f9f7;border-left:3px solid #003527;padding:18px 20px;vertical-align:top;\">\n                  <p style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:#003527;\">Nikah Intent Only</p>\n                  <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#555555;line-height:1.65;\">Built for those seeking marriage — not casual connections. Everyone here intends what you do.</p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Closing copy + CTA -->\n        <tr>\n          <td style=\"padding:0 48px 48px;\">\n            <p style=\"margin:0 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#3d3d3d;line-height:1.75;\">The one written for you is waiting too. This summer, take the step that matters most — and take it in a place that treats your search with the care it deserves.</p>\n            <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n              <tr>\n                <td style=\"border-radius:3px;background-color:#003527;\">\n                  <a href=\"https://datekhaas.com/signup\" style=\"display:inline-block;padding:16px 40px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;color:#e9c176;text-decoration:none;letter-spacing:0.5px;\">Begin Your Journey &rarr;</a>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Divider -->\n        <tr>\n          <td style=\"padding:0 48px;\">\n            <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\">\n              <tr><td style=\"border-top:1px solid #e8e4de;height:1px;\"></td></tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Footer -->\n        <tr>\n          <td style=\"padding:24px 48px 40px;text-align:center;\">\n            <p style=\"margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#003527;font-weight:700;letter-spacing:1px;\">Date Khaas</p>\n            <p style=\"margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#888888;line-height:1.6;\">Where the search for your soulmate begins with barakah.</p>\n            <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;\">You received this because you expressed interest in Date Khaas. &nbsp;<a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#aaaaaa;text-decoration:underline;\">Unsubscribe</a></p>\n          </td>\n        </tr>\n\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "June 2026 is peak summer wedding season; Islamic auspicious dates in June–July drive the highest-intent search traffic among Muslim matrimony seekers globally.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Nearly 8 in 10 Muslims globally now use online matchmaking platforms, yet trust remains the #1 barrier to conversion.",
+        "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+      },
+      {
+        "insight": "Photo privacy is Muslim women's top safety concern: blur-by-default controls are proven conversion-critical trust signals.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever differentiates via picture blurring and manual profile verification; Shaadi.com positions as 'India's Most Trusted'.",
+        "source": "https://tracxn.com/d/companies/nikahforevercom/__Im8zYTNvgSYqDyuA2x5Z7t_A4rgaMaItkYIuhI1L0Ok"
+      },
+      {
+        "insight": "Wali/guardian involvement is a genuine product need for diaspora Muslims in UK, USA, Canada.",
+        "source": "https://www.jodimubarak.com/muslim-matrimony/"
+      },
+      {
+        "insight": "NRI matrimony is growing in 2026 — cross-border introductions require extra verification and privacy controls.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      }
+    ],
+    "faces_in_image": true,
+    "rights_note": "Pixabay free for organic email/social. Do not use in paid ads featuring faces without rights check."
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-nikah-ceremony-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/g2f2cd3d365b0820ddb722dffdef40b129d5bf22173b8b60fb3b091ce04213a4838de62d52e9da97f9aa67cc160b7d05fd086b2799eb7638cf76c97b365a129ce_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-nikah-ceremony-4615557.jpg",
+      "remote_url": "https://pixabay.com/get/gc14505a0d15ca98be6b5bbe7eca8a430058cbc482985c0ae677c1b6c2211263f8e44677762e5238612f3c16703977555d3ee57870335f98c055e376cf04a2741_1280.jpg",
+      "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+      "author": "OlcayErtem",
+      "pixabay_id": 4615557,
+      "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, male, big, girl, happiness, nature, celebration, ceremony, wife, bouquet, grass",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-nikah-ceremony-1868868.jpg",
+      "remote_url": "https://pixabay.com/get/g5d0823f456232152b5028ed994ebc5bf3123d677616bbfd8fd6f164678fa09ccb08a67328d4bc46bfa5582ff9c38ad7172d5bd5be49095aff9e3ec845fd07bc1_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-ceremony-champagne-glasses-1868868/",
+      "author": "Pexels",
+      "pixabay_id": 1868868,
+      "tags": "wedding, ceremony, champagne, glasses, newlyweds, marriage, bride and groom, champagne glasses, toast, cheers, celebrate, celebration, wedding ceremony, elegant, bride, formal, groom, love, man, people, woman, wedding, wedding, wedding, wedding, wedding, champagne, champagne, marriage, groom, groom",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

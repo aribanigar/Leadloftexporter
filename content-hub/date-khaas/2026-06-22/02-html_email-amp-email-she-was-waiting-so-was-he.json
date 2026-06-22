@@ -1,0 +1,71 @@
+{
+  "type": "html_email",
+  "format": "amp",
+  "channel": "email",
+  "title": "AMP Email — She Was Waiting, So Was He",
+  "subject": "She was waiting. So was he. Both deserved to meet safely.",
+  "preheader": "Slide through the journey to nikah — and see how trust makes it possible.",
+  "cta_url": "https://datekhaas.com/signup",
+  "image_query": "muslim bride gold wedding",
+  "body": "<!doctype html>\n<html ⚡4email>\n<head>\n<meta charset=\"UTF-8\">\n<script async src=\"https://cdn.ampproject.org/v0.js\"></script>\n<script async custom-element=\"amp-carousel\" src=\"https://cdn.ampproject.org/v0/amp-carousel-0.1.js\"></script>\n<style amp4email-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style>\n<style amp-custom>\nbody{margin:0;padding:0;background:#f9f6f0;font-family:Arial,Helvetica,sans-serif}\n.wrap{max-width:600px;margin:0 auto;background:#fff}\n.hdr{background:#003527;padding:28px 40px;text-align:center}\n.logo{color:#e9c176;font-family:Georgia,serif;font-size:26px;font-weight:700;letter-spacing:3px;margin:0}\n.sub{color:#a8c4b8;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin:5px 0 0}\n.slide-cap{background:rgba(0,53,39,0.88);color:#e9c176;font-family:Georgia,serif;font-size:14px;padding:14px 22px;position:absolute;bottom:0;left:0;right:0;line-height:1.4}\n.body{padding:36px 40px 32px}\nh1{font-family:Georgia,serif;font-size:26px;color:#003527;margin:0 0 18px;line-height:1.3}\np{font-size:15px;color:#3d3d3d;line-height:1.75;margin:0 0 16px}\n.badge{display:inline-block;background:#003527;color:#e9c176;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:5px 12px;border-radius:2px;margin-bottom:12px;text-transform:uppercase}\n.cta-wrap{text-align:center;margin:24px 0 0}\n.cta{display:inline-block;background:#003527;color:#e9c176;font-weight:700;font-size:15px;padding:15px 36px;text-decoration:none;border-radius:3px;letter-spacing:0.5px}\n.ftr{background:#f5f5f0;padding:20px 40px;text-align:center}\n.ftr p{font-size:11px;color:#999;margin:4px 0}\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n  <div class=\"hdr\">\n    <p class=\"logo\">Date Khaas</p>\n    <p class=\"sub\">Muslim Matrimony</p>\n  </div>\n\n  <amp-carousel type=\"slides\" height=\"300\" layout=\"fixed-height\" autoplay delay=\"4000\" loop=\"true\">\n    <div style=\"position:relative;\">\n      <amp-img src=\"https://cdn.pixabay.com/photo/2016/11/21/16/08/wedding-1845687_1280.jpg\" width=\"600\" height=\"300\" layout=\"fixed\" alt=\"A nikah begins with trust\"></amp-img>\n      <div class=\"slide-cap\">&ldquo;Every family you meet has already been verified &mdash; before we introduce you.&rdquo;</div>\n    </div>\n    <div style=\"position:relative;\">\n      <amp-img src=\"https://cdn.pixabay.com/photo/2017/09/08/20/00/wedding-2729789_1280.jpg\" width=\"600\" height=\"300\" layout=\"fixed\" alt=\"Your photos stay yours\"></amp-img>\n      <div class=\"slide-cap\">&ldquo;Your photos stay blurred until you choose to share them. Always.&rdquo;</div>\n    </div>\n    <div style=\"position:relative;\">\n      <amp-img src=\"https://cdn.pixabay.com/photo/2018/09/25/21/54/wedding-3702788_1280.jpg\" width=\"600\" height=\"300\" layout=\"fixed\" alt=\"Family at every step\"></amp-img>\n      <div class=\"slide-cap\">&ldquo;Your wali, your parents &mdash; welcome from the very first introduction.&rdquo;</div>\n    </div>\n  </amp-carousel>\n\n  <div class=\"body\">\n    <span class=\"badge\">&#10003; Verified Profiles Only</span>\n    <h1>She was waiting. So was he. Both deserved to meet safely.</h1>\n    <p>At Date Khaas, every profile is reviewed before any introduction is ever made. Your photos stay blurred until you decide otherwise. And your family can be part of this from the very first moment.</p>\n    <p>Because the road to nikah should feel like hope &mdash; not anxiety.</p>\n    <div class=\"cta-wrap\">\n      <a href=\"https://datekhaas.com/signup\" class=\"cta\">Find Your Match &rarr;</a>\n    </div>\n  </div>\n\n  <div class=\"ftr\">\n    <p><strong style=\"font-family:Georgia,serif;color:#003527;font-size:13px;\">Date Khaas</strong></p>\n    <p>Where the journey to your soulmate begins with barakah.</p>\n    <p><a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#bbb;\">Unsubscribe</a></p>\n  </div>\n</div>\n</body>\n</html>",
+  "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin:0;padding:0;background:#f9f6f0;font-family:Arial,Helvetica,sans-serif;\">\n<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\" style=\"background:#f9f6f0;\">\n  <tr><td align=\"center\" style=\"padding:40px 20px;\">\n    <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"600\" style=\"max-width:600px;background:#fff;\">\n      <tr><td style=\"background:#003527;padding:28px 40px;text-align:center;\">\n        <p style=\"margin:0;font-family:Georgia,serif;font-size:26px;color:#e9c176;letter-spacing:3px;font-weight:700;\">Date Khaas</p>\n        <p style=\"margin:5px 0 0;font-size:12px;color:#a8c4b8;letter-spacing:2px;text-transform:uppercase;\">Muslim Matrimony</p>\n      </td></tr>\n      <tr><td style=\"padding:36px 40px 32px;\">\n        <p style=\"margin:0 0 10px;display:inline-block;background:#003527;color:#e9c176;font-size:10px;font-weight:700;padding:5px 12px;letter-spacing:1.5px;text-transform:uppercase;\">&#10003; VERIFIED PROFILES ONLY</p>\n        <h1 style=\"font-family:Georgia,serif;font-size:26px;color:#003527;margin:14px 0 18px;line-height:1.3;\">She was waiting. So was he. Both deserved to meet safely.</h1>\n        <p style=\"font-size:15px;color:#3d3d3d;line-height:1.75;margin:0 0 16px;\">At Date Khaas, every profile is reviewed before any introduction is ever made. Your photos stay blurred until you decide otherwise. And your family can be part of this from the very first moment.</p>\n        <p style=\"font-size:15px;color:#3d3d3d;line-height:1.75;margin:0 0 28px;\">Because the road to nikah should feel like hope &mdash; not anxiety.</p>\n        <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n          <tr><td style=\"background:#003527;border-radius:3px;\">\n            <a href=\"https://datekhaas.com/signup\" style=\"display:inline-block;padding:15px 36px;font-weight:700;font-size:15px;color:#e9c176;text-decoration:none;\">Find Your Match &rarr;</a>\n          </td></tr>\n        </table>\n      </td></tr>\n      <tr><td style=\"background:#f5f5f0;padding:20px 40px;text-align:center;\">\n        <p style=\"margin:0 0 4px;font-family:Georgia,serif;color:#003527;font-size:13px;font-weight:600;\">Date Khaas</p>\n        <p style=\"margin:0;font-size:11px;color:#999;\">Where the journey to your soulmate begins with barakah. <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#bbb;\">Unsubscribe</a></p>\n      </td></tr>\n    </table>\n  </td></tr>\n</table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "June 2026 is peak summer wedding season; Islamic auspicious dates in June–July drive the highest-intent search traffic among Muslim matrimony seekers globally.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Nearly 8 in 10 Muslims globally now use online matchmaking platforms, yet trust remains the #1 barrier to conversion.",
+        "source": "https://nikahplus.com/en/blog/muslim-dating-across-cultures/"
+      },
+      {
+        "insight": "Photo privacy is Muslim women's top safety concern: blur-by-default controls are proven conversion-critical trust signals.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever differentiates via picture blurring and manual profile verification; Shaadi.com positions as 'India's Most Trusted'.",
+        "source": "https://tracxn.com/d/companies/nikahforevercom/__Im8zYTNvgSYqDyuA2x5Z7t_A4rgaMaItkYIuhI1L0Ok"
+      },
+      {
+        "insight": "Wali/guardian involvement is a genuine product need for diaspora Muslims in UK, USA, Canada.",
+        "source": "https://www.jodimubarak.com/muslim-matrimony/"
+      },
+      {
+        "insight": "NRI matrimony is growing in 2026 — cross-border introductions require extra verification and privacy controls.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      }
+    ],
+    "faces_in_image": true,
+    "rights_note": "Pixabay free for organic email/social. Do not use in paid ads featuring faces without rights check."
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-gold-wedding-3928295.jpg",
+      "remote_url": "https://pixabay.com/get/g46f53f80c7c915c8e4705181816718844ff3cace92d50895f0bc6f0fb0f7360995dbe1953207ba261616aec6afd92a1f8ba5c2859e9be82ce44a0992cf435aec_1280.jpg",
+      "page_url": "https://pixabay.com/photos/indian-wedding-indian-bride-3928295/",
+      "author": "globalqart",
+      "pixabay_id": 3928295,
+      "tags": "indian wedding, indian bride, bridal makeup, henna, bollywood, marriage, culture, jewellery, design, emotions, gold, woman, fashion, asian, celebration, female, traditional, india, bridal, muslim wedding, indian wedding, indian bride, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bollywood, bollywood, bollywood",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-gold-wedding-5574694.jpg",
+      "remote_url": "https://pixabay.com/get/g3014f577d9d9f59ed4bf501aa3e9f7a840d9ed552e5062f0a66143b95eda97f8068926d75d3010b2641fd0330bf4fcb39a7ab2846d7fc9b1d948b5246cc905b9_1280.jpg",
+      "page_url": "https://pixabay.com/photos/hand-wedding-marriage-couple-love-5574694/",
+      "author": "lubovlisitsa",
+      "pixabay_id": 5574694,
+      "tags": "hand, wedding, marriage, couple, love, romance, romantic, celebration, family, togetherness, commitment, diamond, honeymoon, relationship, gold, jewelry, fiance, wedding ring, horizontal, touching, bridegroom, girlfriend, matrimons, anniversary, caucasian, happyvalentine's, wedding, wedding, wedding, wedding, family, diamond, honeymoon, honeymoon, honeymoon, gold, jewelry, jewelry, jewelry, jewelry, jewelry, wedding ring, wedding ring, anniversary, anniversary, anniversary",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-bride-gold-wedding-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/gc8a616e83efe115c5b6b1e0d11c70db8d6c0382cd78ba9c429e630ba9d7d42cdc6868103204867e6bca93ba2154f58802e5c8614ef5437d1c736615336addbc9_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}
