@@ -1,1 +1,1 @@
-KASH_PLACEHOLDER
+$(python3 -c "import json; d=json.load(open('/tmp/photo_kashmir.json')); print(d['content'],end='')")
