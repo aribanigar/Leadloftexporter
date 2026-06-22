@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe: list your property free this peak season, zero brokerage, owner to owner, qckserve.in">
+  <defs>
+    <style>
+      .cond { font-family: 'Arial Narrow','Helvetica Neue',Arial,sans-serif; font-weight: 800; }
+      .sans { font-family: 'Helvetica Neue',Arial,sans-serif; }
+      .serif { font-family: Georgia,'Times New Roman',serif; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- bottom flat orange band (no gradients) -->
+  <rect x="0" y="1086" width="1080" height="264" fill="#ef6723"/>
+
+  <!-- top-left ~140px logo zone left intentionally blank (logo placed manually) -->
+
+  <!-- italic-serif kicker -->
+  <text x="80" y="250" class="serif" font-size="44" fill="#FCF9F8">Peak house-hunting season is here.</text>
+
+  <!-- oversized condensed headline -->
+  <text x="76" y="430" class="cond" font-size="190" letter-spacing="-4" fill="#FCF9F8">LIST FREE.</text>
+  <text x="76" y="600" class="cond" font-size="190" letter-spacing="-4" fill="#FCF9F8">KEEP THE</text>
+  <text x="76" y="770" class="cond" font-size="190" letter-spacing="-4" fill="#ef6723">BROKERAGE.</text>
+
+  <!-- big-number device: struck "1 month's rent" over a giant ₹0 -->
+  <text x="80" y="940" class="sans" font-size="46" fill="#9a9a9a" text-decoration="line-through">1 month&#8217;s rent to a broker</text>
+  <text x="74" y="1058" class="cond" font-size="150" letter-spacing="-3" fill="#FCF9F8">you pay <tspan fill="#ef6723">&#8377;0</tspan></text>
+
+  <!-- footer on orange band -->
+  <text x="80" y="1180" class="cond" font-size="58" letter-spacing="-1" fill="#1A1A1A">qckserve.in</text>
+  <text x="80" y="1240" class="sans" font-size="34" fill="#1A1A1A">Owner to owner. Free listings, nationwide.</text>
+</svg>
