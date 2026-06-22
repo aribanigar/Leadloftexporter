@@ -5,8 +5,9 @@ seed_via_kashmir_itinerary.py - seed ONE day of ViaKashmir Itinerary
 ViaKashmir engine: it only ever touches the 'via-kashmir-itinerary' business and
 the content/via-kashmir-itinerary/ tree.
 
-Uses the Supabase PostgREST REST API (port 443) — works from routine runners /
-sandboxes that allow only HTTPS egress. Standard library only - no psycopg.
+Connects to the Supabase Postgres database with psycopg2 using DATABASE_URL. Run it from
+an environment that can reach Supabase on port 5432 (or swap in the 6543 transaction
+pooler). Needs psycopg2-binary (see scripts/requirements.txt).
 
 Reads what build_itin.py wrote under:
   content/via-kashmir-itinerary/<date>/<market>/{email.html,email.amp.html,whatsapp.txt,linkedin.txt,meta.json}
@@ -18,11 +19,8 @@ Usage:
 Idempotent: an asset whose (business_id, title) already exists is skipped.
 Prints one JSON object. Exits non-zero only on real DB errors.
 """
-import argparse, datetime as dt, json, os, sys, uuid
+import argparse, datetime as dt, json, os, re, sys, uuid
 from pathlib import Path
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
 
 # --- this engine's fixed identity ---------------------------------------------
 SLUG   = "via-kashmir-itinerary"
@@ -31,72 +29,44 @@ LOGO   = "https://viakashmir.in/logo-colour.svg?v=3"
 BRAND  = "#0e3d2f"
 ACCENT = "#c8a84b"
 TONE   = "warm-editorial"
-
-# --- Supabase credentials (env vars override) ---------------------------------
-SUPABASE_URL = os.environ.get(
-    "SUPABASE_URL",
-    "https://cmdnezltteldysoxyjzh.supabase.co",
-).rstrip("/")
-
-SUPABASE_JWT = os.environ.get(
-    "SUPABASE_SERVICE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG5lemx0dGVsZHlzb3h5anpoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTkwNjQyOSwiZXhwIjoyMDk3NDgyNDI5fQ.owlPxYZz-f7TyXxJ5ikuVF7z2IVo98dyf6DXKhHMWRM",
+PHOTOS_BASE = (
+    "https://wsrv.nl/?url=raw.githubusercontent.com/aribanigar/Leadloftexporter"
+    "/main/content/via-kashmir-itinerary/_assets/photos/{photo}.jpg"
+    "&w=600&output=jpg&q=80"
+)
+CARD_BASE = (
+    "https://raw.githubusercontent.com/aribanigar/Leadloftexporter"
+    "/main/content/via-kashmir-itinerary/{date}/{market}/img/whatsapp.jpg"
 )
 
+# --- credentials (real values baked in; env vars override if set) -------------
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.cmdnezltteldysoxyjzh:vTqdrCo4vaa4MJzz@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres",
+)
 HUB_WORKSPACE = os.environ.get("HUB_WORKSPACE", "1a716353-9472-4c1d-ae89-f95052e8f015")
 
-BASE = SUPABASE_URL + "/rest/v1"
+_PARAM = re.compile(r"\$(\d+)")
 
 
-def _headers(extra=None):
-    h = {
-        "apikey": SUPABASE_JWT,
-        "Authorization": "Bearer " + SUPABASE_JWT,
-        "Content-Type": "application/json",
-    }
-    if extra:
-        h.update(extra)
-    return h
+class DB:
+    def __init__(self, dsn: str):
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+        except ImportError:
+            raise SystemExit("psycopg2 missing - run: pip install psycopg2-binary")
+        self._rd = RealDictCursor
+        self.c = psycopg2.connect(dsn, connect_timeout=20)
+        self.c.autocommit = True
 
-
-def _get(table: str, params: dict) -> list:
-    qs = urlencode(params)
-    url = "%s/%s?%s" % (BASE, table, qs)
-    req = Request(url, headers=_headers())
-    try:
-        with urlopen(req, timeout=30) as r:
-            return json.loads(r.read())
-    except HTTPError as e:
-        raise RuntimeError("GET %s %s: %s" % (table, params, e.read().decode()[:300]))
-    except URLError as e:
-        raise RuntimeError("GET %s unreachable: %s" % (table, e))
-
-
-def _post(table: str, body: dict) -> None:
-    data = json.dumps(body).encode()
-    req = Request("%s/%s" % (BASE, table), data=data, method="POST",
-                  headers=_headers({"Prefer": "return=minimal"}))
-    try:
-        with urlopen(req, timeout=30):
-            pass
-    except HTTPError as e:
-        raise RuntimeError("POST %s: %s" % (table, e.read().decode()[:300]))
-    except URLError as e:
-        raise RuntimeError("POST %s unreachable: %s" % (table, e))
-
-
-def _patch(table: str, params: dict, body: dict) -> None:
-    qs = urlencode(params)
-    data = json.dumps(body).encode()
-    req = Request("%s/%s?%s" % (BASE, table, qs), data=data, method="PATCH",
-                  headers=_headers({"Prefer": "return=minimal"}))
-    try:
-        with urlopen(req, timeout=30):
-            pass
-    except HTTPError as e:
-        raise RuntimeError("PATCH %s %s: %s" % (table, params, e.read().decode()[:300]))
-    except URLError as e:
-        raise RuntimeError("PATCH %s unreachable: %s" % (table, e))
+    def q(self, sql: str, params=None):
+        params = params or []
+        seq = []
+        sql2 = _PARAM.sub(lambda m: (seq.append(params[int(m.group(1)) - 1]), "%s")[1], sql)
+        with self.c.cursor(cursor_factory=self._rd) as cur:
+            cur.execute(sql2, seq)
+            return [dict(r) for r in cur.fetchall()] if cur.description else []
 
 
 def repo_root() -> Path:
@@ -121,72 +91,61 @@ def main() -> int:
                           "error": "no content dir: %s" % day}))
         return 4
 
-    # verify workspace exists
-    rows = _get("workspaces", {"id": "eq.%s" % HUB_WORKSPACE, "select": "id"})
-    if not rows:
+    n = DB(DATABASE_URL)
+    if not n.q("select id from workspaces where id=$1", [HUB_WORKSPACE]):
         print(json.dumps({"engine": SLUG, "date": args.date,
                           "error": "workspace not found: %s" % HUB_WORKSPACE}))
         return 4
 
-    # upsert business
-    rows = _get("content_businesses",
-                {"workspace_id": "eq.%s" % HUB_WORKSPACE,
-                 "slug": "eq.%s" % SLUG,
-                 "select": "id"})
+    rows = n.q("select id from content_businesses where workspace_id=$1 and slug=$2",
+               [HUB_WORKSPACE, SLUG])
     if rows:
         biz, created = rows[0]["id"], False
-        _patch("content_businesses",
-               {"id": "eq.%s" % biz, "workspace_id": "eq.%s" % HUB_WORKSPACE},
-               {"name": NAME, "brand_color": BRAND, "accent_color": ACCENT,
-                "tone": TONE, "logo_url": LOGO})
+        n.q("""update content_businesses
+                 set name=$3, brand_color=$4, accent_color=$5, tone=$6, logo_url=$7
+               where id=$1 and workspace_id=$2""",
+            [biz, HUB_WORKSPACE, NAME, BRAND, ACCENT, TONE, LOGO])
     else:
         biz, created = str(uuid.uuid4()), True
-        _post("content_businesses",
-              {"id": biz, "workspace_id": HUB_WORKSPACE, "name": NAME,
-               "slug": SLUG, "brand_color": BRAND, "accent_color": ACCENT,
-               "tone": TONE, "logo_url": LOGO})
+        n.q("""insert into content_businesses
+                 (id,workspace_id,name,slug,brand_color,accent_color,tone,logo_url)
+               values ($1,$2,$3,$4,$5,$6,$7,$8)""",
+            [biz, HUB_WORKSPACE, NAME, SLUG, BRAND, ACCENT, TONE, LOGO])
 
     rep = {"engine": SLUG, "date": args.date, "business_id": biz,
            "created_business": created, "inserted": 0, "skipped": 0, "failures": []}
 
     for sd in sorted({p.parent for p in day.rglob("meta.json")}):
         m = json.loads(read(sd / "meta.json"))
-        code  = m.get("campaign_code", sd.name)
-        name  = m.get("campaign_name", code)
-        subj  = m.get("subject")
-        track = m.get("track", sd.name)
+        code   = m.get("campaign_code", sd.name)
+        name   = m.get("campaign_name", code)
+        subj   = m.get("subject")
+        track  = m.get("track", sd.name)
         market = m.get("market", track)
+        photo  = m.get("photo", "")
+        date_str = args.date
+        photo_url = PHOTOS_BASE.format(photo=photo) if photo else None
+        card_url  = CARD_BASE.format(date=date_str, market=market) if market else None
         eh, ea = read(sd / "email.html"), read(sd / "email.amp.html")
         wa, li = read(sd / "whatsapp.txt"), read(sd / "linkedin.txt")
-
         jobs = []
         if eh:
-            jobs.append((name, "html_email", eh, subj, None, [code, track, market], ea))
+            jobs.append((name, "html_email", eh, subj, None, [code, track, market], ea, photo_url))
         if wa:
-            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track, market], None))
+            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track, market], None, card_url))
         if li:
-            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track, market], None))
-
-        for title, atype, content, s, plat, tags, amp in jobs:
+            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track, market], None, None))
+        for title, atype, content, s, plat, tags, amp, img_url in jobs:
             try:
-                exists = _get("content_assets",
-                              {"business_id": "eq.%s" % biz,
-                               "title": "eq.%s" % title,
-                               "select": "id",
-                               "limit": "1"})
-                if exists:
+                if n.q("select 1 from content_assets where business_id=$1 and title=$2 limit 1",
+                       [biz, title]):
                     rep["skipped"] += 1
                     continue
-                row = {"id": str(uuid.uuid4()), "workspace_id": HUB_WORKSPACE,
-                       "business_id": biz, "title": title, "type": atype,
-                       "content": content, "tags": tags}
-                if s:
-                    row["subject"] = s
-                if plat:
-                    row["platform"] = plat
-                if amp:
-                    row["amp_content"] = amp
-                _post("content_assets", row)
+                n.q("""insert into content_assets
+                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content,image_url)
+                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)""",
+                    [str(uuid.uuid4()), HUB_WORKSPACE, biz, title, atype, content, s, plat,
+                     json.dumps(tags), amp, img_url])
                 rep["inserted"] += 1
             except Exception as e:
                 rep["failures"].append([title, str(e)])
