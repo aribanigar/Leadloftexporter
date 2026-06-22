@@ -1,0 +1,59 @@
+{
+  "date": "2026-06-22",
+  "business": "qckserve",
+  "topic": "Monsoon Rental Rush — List Your UP Property Free",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "List your UP property free — tenants are hunting this monsoon",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"x-apple-disable-message-reformatting\">\n<title>List your property free this monsoon</title>\n</head>\n<body style=\"margin:0;padding:0;background:#1A1A1A;font-family:'Poppins',Arial,sans-serif;-webkit-text-size-adjust:100%;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:#1A1A1A;\">Tenants are hunting this monsoon. List your UP property for &#8377;0 — owner-direct.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#1A1A1A;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px;max-width:600px;background:#1A1A1A;border-radius:16px;overflow:hidden;\">\n\n  <!-- logo zone: text only -->\n  <tr><td style=\"padding:28px 40px 8px 40px;\">\n    <span style=\"font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;\">qckserve.in</span>\n  </td></tr>\n\n  <!-- big-number hero: giant zero left, headline right -->\n  <tr><td style=\"padding:8px 40px 40px 40px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"200\" valign=\"top\" style=\"width:200px;\">\n        <div style=\"font-size:150px;line-height:0.9;font-weight:800;color:#FF6B00;letter-spacing:-6px;\">&#8377;0</div>\n      </td>\n      <td valign=\"middle\" style=\"padding-left:18px;\">\n        <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FF6B00;margin-bottom:8px;\">the monsoon rental rush</div>\n        <div style=\"font-size:38px;line-height:1.05;font-weight:800;color:#FFFFFF;letter-spacing:-1px;\">List your property free.</div>\n      </td>\n    </tr>\n    </table>\n    <div style=\"font-size:16px;line-height:1.6;color:#E8E2DE;margin-top:22px;\">\n      The rains are here and tenants are searching now.<br>\n      Put your house, flat or shop in front of them today.<br>\n      No brokerage. No listing fee. No middleman.<br>\n      You own the listing. Renters call you direct.\n    </div>\n  </td></tr>\n\n  <!-- bulletproof CTA -->\n  <tr><td style=\"padding:0 40px 36px 40px;\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr><td bgcolor=\"#FF6B00\" style=\"border-radius:12px;\">\n      <a href=\"https://qckserve.in\" style=\"display:inline-block;padding:16px 34px;font-size:17px;font-weight:700;color:#1A1A1A;text-decoration:none;border-radius:12px;\">List your property — free &#8594;</a>\n    </td></tr>\n    </table>\n  </td></tr>\n\n  <!-- hero poster band -->\n  <tr><td style=\"padding:0;\">\n    <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg\" width=\"600\" alt=\"QckServe: list your property free this monsoon — zero brokerage, owner-direct, UP\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\">\n  </td></tr>\n\n  <!-- proof band: light -->\n  <tr><td bgcolor=\"#FCF9F8\" style=\"padding:40px;\">\n    <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FF6B00;margin-bottom:6px;\">why owners trust it</div>\n    <div style=\"font-size:24px;font-weight:800;color:#1A1A1A;letter-spacing:-0.5px;margin-bottom:18px;\">Free really means free.</div>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:15px;color:#1A1A1A;line-height:1.5;\">\n      <tr><td style=\"padding:6px 0;\"><span style=\"color:#FF6B00;font-weight:800;\">&#10003;</span>&nbsp;&nbsp;Zero commission on rent or sale</td></tr>\n      <tr><td style=\"padding:6px 0;\"><span style=\"color:#FF6B00;font-weight:800;\">&#10003;</span>&nbsp;&nbsp;Your number, your terms, direct calls</td></tr>\n      <tr><td style=\"padding:6px 0;\"><span style=\"color:#FF6B00;font-weight:800;\">&#10003;</span>&nbsp;&nbsp;Built for UP — local renters, local reach</td></tr>\n    </table>\n  </td></tr>\n\n  <!-- how: numbered timeline (4 steps), dark -->\n  <tr><td bgcolor=\"#1A1A1A\" style=\"padding:40px;\">\n    <div style=\"font-size:22px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;margin-bottom:22px;\">Listed in 4 steps</div>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n      <tr>\n        <td width=\"44\" valign=\"top\"><div style=\"font-size:30px;font-weight:800;color:#FF6B00;\">1</div></td>\n        <td valign=\"top\" style=\"padding-bottom:18px;color:#E8E2DE;font-size:15px;line-height:1.5;\"><b style=\"color:#fff;\">Open qckserve.in</b><br>Pick Properties. No app, no sign-up wall.</td>\n      </tr>\n      <tr>\n        <td width=\"44\" valign=\"top\"><div style=\"font-size:30px;font-weight:800;color:#FF6B00;\">2</div></td>\n        <td valign=\"top\" style=\"padding-bottom:18px;color:#E8E2DE;font-size:15px;line-height:1.5;\"><b style=\"color:#fff;\">Add a few photos</b><br>Rent, location, what makes it good.</td>\n      </tr>\n      <tr>\n        <td width=\"44\" valign=\"top\"><div style=\"font-size:30px;font-weight:800;color:#FF6B00;\">3</div></td>\n        <td valign=\"top\" style=\"padding-bottom:18px;color:#E8E2DE;font-size:15px;line-height:1.5;\"><b style=\"color:#fff;\">Publish free</b><br>Live in minutes. &#8377;0, always.</td>\n      </tr>\n      <tr>\n        <td width=\"44\" valign=\"top\"><div style=\"font-size:30px;font-weight:800;color:#FF6B00;\">4</div></td>\n        <td valign=\"top\" style=\"color:#E8E2DE;font-size:15px;line-height:1.5;\"><b style=\"color:#fff;\">Renters call you</b><br>Talk direct. Close on your terms.</td>\n      </tr>\n    </table>\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:28px;\">\n    <tr><td bgcolor=\"#FF6B00\" style=\"border-radius:12px;\">\n      <a href=\"https://qckserve.in\" style=\"display:inline-block;padding:15px 32px;font-size:16px;font-weight:700;color:#1A1A1A;text-decoration:none;border-radius:12px;\">Post your listing now &#8594;</a>\n    </td></tr>\n    </table>\n  </td></tr>\n\n  <!-- footer -->\n  <tr><td bgcolor=\"#1A1A1A\" style=\"padding:28px 40px 36px 40px;border-top:1px solid #333;\">\n    <div style=\"font-size:13px;color:#9A9490;line-height:1.6;\">\n      qckserve.in &#183; India's free local marketplace<br>\n      Properties &#183; Vehicles &#183; Jobs &#183; Services &#183; Store &#8212; always &#8377;0 to list.\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "promo",
+        "monsoon"
+      ],
+      "notes": "Big-number hero archetype (giant ₹0 + 4-step timeline). Properties / Monday."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "🌧️ Monsoon aa gaya, tenants ghar dhundh rahe hain!\n\nApni property — ghar, flat ya shop — *FREE* list karein QckServe par.\n₹0 brokerage. ₹0 listing fee. Seedha owner se baat.\n\nAaj hi post karein → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "whatsapp",
+        "monsoon"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Monsoon = rental season 🌧️\n\nTenants UP mein abhi ghar dhundh rahe hain. Aapki property unke saamne honi chahiye.\nList karein bilkul FREE — ₹0 brokerage, ₹0 listing fee, seedha owner se baat. 🔑\n\n2 minute mein live. Bas qckserve.in\n\n#QckServe #PropertyForRent #UttarPradesh #ZeroBrokerage #RentInUP",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-22.svg",
+      "tags": [
+        "properties",
+        "instagram",
+        "monsoon"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "Monsoon rental season is here. List your UP property FREE on QckServe - 0 brokerage, owner-direct. qckserve.in",
+      "tags": [
+        "properties",
+        "sms",
+        "monsoon"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-22] Monsoon Rental Rush — List Your UP Property Free (Image Prompt)",
+      "content": "Editorial real-estate marketing poster, vertical 4:5 — the QckServe “monsoon rental rush” hero.\n\nSCENE: a warm, lived-in UP rooftop terrace at the first monsoon light; wet railing, a few rain droplets catching warm sun, soft grey-blue rain clouds breaking over low-rise Lucknow/Noida rooftops.\nSUBJECT: a relaxed Indian home-owner (40s) leaning on the railing, phone in hand, calm and confident — the look of someone who just listed in 2 minutes.\nPHONE-UI MOCKUP: clean QckServe ‘Properties’ listing card on the screen — a flat with photo thumbnail, rent figure, a bold ₹0 BROKERAGE pill, and a green ‘Publish free’ button. Minimal, modern, legible.\nCOLOUR SYSTEM: charcoal #1A1A1A base, signature orange #FF6B00 accent, warm off-white #FCF9F8 for type, one orange used sparingly as the eye-magnet; FLAT colour blocking, absolutely no gradients.\nLIGHTING: soft diffused post-rain daylight, gentle rim light on the subject, low contrast, premium and clean.\nTYPE HIERARCHY: oversized extra-bold condensed headline ‘LIST YOUR PROPERTY FREE’ with a small italic-serif kicker ‘the monsoon rental rush’; a giant ₹0 as the single memorable device.\nEYE FLOW: giant ₹0 → headline → phone screen → ‘qckserve.in’ lockup bottom-left.\nCAMERA: 35mm, eye-level, shallow depth of field, subject sharp, background softly out of focus.\nPERFORMANCE LAYER: thumb-stopping, high-contrast, social-first composition with generous negative space top-left.\nLOGO: reserve a clean ~140px TOP-LEFT square empty for the brand mark — logo placed manually.\n\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "properties",
+        "image-prompt",
+        "monsoon"
+      ]
+    }
+  ]
+}

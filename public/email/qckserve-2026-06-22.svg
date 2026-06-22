@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — list your property free this monsoon, zero brokerage">
+  <defs>
+    <style>
+      .head { font-family: 'Poppins','Arial Black',sans-serif; font-weight: 800; }
+      .serif { font-family: 'Georgia','Times New Roman',serif; font-style: italic; }
+      .sans { font-family: 'Poppins','Arial',sans-serif; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left logo zone left blank (~140px square) for manual logo placement -->
+
+  <!-- kicker -->
+  <text x="300" y="120" class="serif" font-size="40" fill="#FF6B00">the monsoon rental rush</text>
+
+  <!-- giant ₹0 hero device -->
+  <text x="60" y="560" class="head" font-size="520" fill="#FF6B00" letter-spacing="-12">&#8377;0</text>
+  <text x="70" y="640" class="sans" font-size="34" fill="#FCF9F8" letter-spacing="4" font-weight="600">BROKERAGE &#183; LISTING FEES &#183; MIDDLEMEN</text>
+
+  <!-- headline -->
+  <text x="70" y="780" class="head" font-size="118" fill="#FFFFFF" letter-spacing="-3">LIST YOUR</text>
+  <text x="70" y="900" class="head" font-size="118" fill="#FFFFFF" letter-spacing="-3">PROPERTY</text>
+  <text x="70" y="1020" class="head" font-size="118" fill="#FF6B00" letter-spacing="-3">FREE.</text>
+
+  <!-- sub -->
+  <text x="70" y="1095" class="serif" font-size="44" fill="#FCF9F8">Owner-direct. Tenants are hunting now.</text>
+
+  <!-- orange band CTA -->
+  <rect x="0" y="1170" width="1080" height="180" fill="#FF6B00"/>
+  <text x="70" y="1255" class="head" font-size="58" fill="#1A1A1A" letter-spacing="-1">Post in 2 minutes</text>
+  <text x="70" y="1315" class="sans" font-size="40" fill="#1A1A1A" font-weight="700">qckserve.in</text>
+  <text x="1010" y="1290" class="serif" font-size="48" fill="#1A1A1A" text-anchor="end">UP</text>
+</svg>
