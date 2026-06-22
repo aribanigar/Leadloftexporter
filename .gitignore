@@ -1,3 +1,8 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+
+# CollabMarket publishing routine — generated artifacts (never commit)
+__pycache__/
+collabmarket_email.html
+.env
