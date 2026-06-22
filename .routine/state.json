@@ -1,5 +1,7 @@
 {
-  "last_run": "2026-06-19",
+  "last_run": "2026-06-22",
+  "folder": "hudace",
+  "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c",
   "industries_used": [
     "Construction and Real Estate",
     "Education and Research",
@@ -25,9 +27,16 @@
     "Government",
     "Financial Services"
   ],
-  "next_candidates": [
+  "industries_done": [
+    "Construction and Real Estate",
+    "Education and Research",
+    "Retail",
     "Agribusiness",
     "Consumer Products"
+  ],
+  "next_candidates": [
+    "Life Sciences and Healthcare",
+    "Wholesale Distribution"
   ],
   "run_history": [
     {
@@ -36,6 +45,20 @@
       "items_created": 28,
       "folder": "hudace",
       "business_id": "49f307c1-7f19-4b0d-845d-3532f77fa92d"
+    },
+    {
+      "date": "2026-06-21",
+      "industries": ["Retail", "Construction and Real Estate"],
+      "items_created": 24,
+      "folder": "hudace",
+      "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c"
+    },
+    {
+      "date": "2026-06-22",
+      "industries": ["Agribusiness", "Consumer Products"],
+      "items_created": 24,
+      "folder": "hudace",
+      "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c"
     }
   ]
 }

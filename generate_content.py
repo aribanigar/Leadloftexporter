@@ -1,139 +1,293 @@
 #!/usr/bin/env python3
-"""Generate Hudace content batch - 2026-06-19 - Industries: Construction and Real Estate, Education and Research"""
-import json, os, textwrap
+"""Generate Hudace content batch - 2026-06-22 - Industries: Agribusiness, Consumer Products.
+Six emails (one per marketing service plus a dedicated SchoolOS School ERP email), each with
+a WhatsApp message, a LinkedIn caption, and an outreach message sharing one baked 4:5 card.
+
+All photos and baked cards are 4:5 (1080x1350), downloaded into public/email and referenced by
+their deployed Vercel URL. Pixabay is the search source only; chosen photos are downloaded and
+committed (never hotlinked). Output is region-agnostic. SAP-calm voice: no emojis, no em dashes,
+no exclamation marks.
+"""
+import json, os, textwrap, time
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
 from PIL import Image, ImageDraw, ImageFont
 
-DATE = "2026-06-19"
+DATE = "2026-06-22"
 BASE_URL = "https://leadloftexporter.vercel.app/email"
 EMAIL_DIR = "public/email"
+PIXABAY_KEY = os.environ.get("PIXABAY_API", "56316516-fbb10ad7475940758256bc517")
+
 FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-FONT_REG  = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+FONT_REG = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 
-WHITE  = (255, 255, 255)
-MUTED  = (154, 154, 174)
-BLUE   = (27, 144, 255)
-DARK   = (5, 5, 13)
+WHITE = (255, 255, 255)
+MUTED = (154, 154, 174)
+BLUE = (27, 144, 255)
+DARK = (5, 5, 13)
 
-# ─────────────────────────────────────────────────────────────────────────────
-def make_promo_jpg(bg_file, out_name, headline, sub, bullets, cta):
-    img = Image.open(f"{EMAIL_DIR}/{bg_file}").convert("RGB")
-    img = img.resize((1200, 628), Image.LANCZOS)
-    ov  = Image.new("RGBA", img.size, (5, 5, 13, 185))
-    img = Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
-    d   = ImageDraw.Draw(img)
-    try:
-        fxl = ImageFont.truetype(FONT_BOLD, 54)
-        flg = ImageFont.truetype(FONT_BOLD, 28)
-        fmd = ImageFont.truetype(FONT_REG,  20)
-        fsm = ImageFont.truetype(FONT_REG,  17)
-        fxs = ImageFont.truetype(FONT_REG,  13)
-    except Exception:
-        fxl = flg = fmd = fsm = fxs = ImageFont.load_default()
-    # Wordmark
-    d.text((48, 36), "HUDACE", fill=WHITE, font=flg)
-    d.rectangle([(48, 76), (128, 79)], fill=BLUE)
-    # Headline wrap
-    y = 108
-    lines = textwrap.wrap(headline, width=28)
-    for ln in lines[:2]:
-        d.text((48, y), ln, fill=WHITE, font=fxl)
-        y += 66
-    # Sub
-    if sub:
-        d.text((48, y), sub[:72], fill=MUTED, font=fmd)
-        y += 34
-    y += 6
-    # Bullets
-    for b in bullets[:4]:
-        d.rectangle([(48, y+7), (52, y+19)], fill=BLUE)
-        d.text((62, y), b[:62], fill=WHITE, font=fsm)
-        y += 28
-    # CTA
-    btn_w = 8 + d.textlength(cta, font=fmd) + 8
-    d.rectangle([(48, y+14), (int(48+btn_w+32), int(y+50))], fill=BLUE)
-    d.text((64, y+20), cta, fill=WHITE, font=fmd)
-    # Footer
-    d.text((48, 596), "hudace.com  |  contact@hudace.com  |  +91 82189 29990", fill=MUTED, font=fxs)
+WA_LINK = "https://wa.me/918218929990"
+SITE = "https://hudace.com"
+CARD_W, CARD_H = 1080, 1350  # 4:5
+
+os.makedirs(EMAIL_DIR, exist_ok=True)
+
+
+# -- photo fetch (Pixabay -> download -> center-crop to 4:5) --------------------
+def fetch_photo(query, out_name):
     out_path = f"{EMAIL_DIR}/{out_name}"
-    img.save(out_path, "JPEG", quality=90)
-    print(f"  JPG: {out_name}")
+    if os.path.exists(out_path) and os.path.getsize(out_path) > 20000:
+        print(f"  photo cached: {out_name}")
+        return f"{BASE_URL}/{out_name}"
+    params = urlencode({
+        "key": PIXABAY_KEY, "q": query, "image_type": "photo",
+        "orientation": "vertical", "min_width": 1080, "min_height": 1350,
+        "safesearch": "true", "per_page": 20, "order": "popular",
+    })
+    data = {}
+    for attempt in range(4):
+        try:
+            req = Request(f"https://pixabay.com/api/?{params}", headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=40) as r:
+                data = json.loads(r.read())
+            break
+        except Exception as e:
+            print(f"  pixabay retry {attempt+1} ({query}): {e}")
+            time.sleep(2 * (attempt + 1))
+    hits = data.get("hits", [])
+    if not hits:  # fallback to any orientation
+        params2 = urlencode({"key": PIXABAY_KEY, "q": query, "image_type": "photo",
+                             "safesearch": "true", "per_page": 20, "order": "popular"})
+        try:
+            req = Request(f"https://pixabay.com/api/?{params2}", headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=40) as r:
+                hits = json.loads(r.read()).get("hits", [])
+        except Exception as e:
+            print(f"  pixabay fallback failed ({query}): {e}")
+    if not hits:
+        raise RuntimeError(f"no pixabay results for '{query}'")
+    img_url = hits[0]["largeImageURL"]
+    content = b""
+    for attempt in range(4):
+        try:
+            req = Request(img_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=60) as r:
+                content = r.read()
+            break
+        except Exception as e:
+            print(f"  download retry {attempt+1}: {e}")
+            time.sleep(2 * (attempt + 1))
+    tmp = f"{EMAIL_DIR}/_tmp_{out_name}"
+    with open(tmp, "wb") as f:
+        f.write(content)
+    img = Image.open(tmp).convert("RGB")
+    img = crop_45(img)
+    img.save(out_path, "JPEG", quality=88)
+    os.remove(tmp)
+    print(f"  photo: {out_name} ({len(content)//1024}KB) <- {query}")
     return f"{BASE_URL}/{out_name}"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-def email_html(label, headline, sub, img_url, sections, cta_text):
-    def sec(title, rows):
-        inner = "".join(f"""
-            <tr>
-              <td style="padding:6px 0 6px 16px; border-left:2px solid #1B90FF;">
-                <span style="color:#ffffff;font-size:14px;line-height:1.6;font-family:Arial,sans-serif;">{r}</span>
-              </td>
-            </tr>""" for r in rows)
-        return f"""
-      <tr><td style="padding:32px 40px 0;">
-        <div style="color:#1B90FF;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;font-family:Arial,sans-serif;">{title}</div>
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">{inner}</table>
-      </td></tr>"""
+def crop_45(img, w=CARD_W, h=CARD_H):
+    target = w / h
+    iw, ih = img.size
+    if iw / ih > target:  # too wide, crop sides
+        nw = int(ih * target)
+        img = img.crop(((iw - nw) // 2, 0, (iw - nw) // 2 + nw, ih))
+    else:  # too tall, crop top/bottom
+        nh = int(iw / target)
+        img = img.crop((0, (ih - nh) // 2, iw, (ih - nh) // 2 + nh))
+    return img.resize((w, h), Image.LANCZOS)
 
-    body_rows = "".join(sec(t, rows) for t, rows in sections)
+
+# -- baked promo card (4:5) -----------------------------------------------------
+def make_card(bg_name, out_name, label, headline, bullets, cta="Chat on WhatsApp"):
+    base = Image.open(f"{EMAIL_DIR}/{bg_name}").convert("RGB")
+    base = crop_45(base).convert("RGBA")
+    # darken with a top-to-bottom gradient so text reads
+    grad = Image.new("L", (1, CARD_H), 0)
+    for y in range(CARD_H):
+        grad.putpixel((0, y), int(150 + 80 * (y / CARD_H)))
+    alpha = grad.resize((CARD_W, CARD_H))
+    overlay = Image.new("RGBA", (CARD_W, CARD_H), (5, 5, 13, 255))
+    overlay.putalpha(alpha)
+    img = Image.alpha_composite(base, overlay).convert("RGB")
+    d = ImageDraw.Draw(img)
+    f_word = ImageFont.truetype(FONT_BOLD, 52)
+    f_label = ImageFont.truetype(FONT_BOLD, 30)
+    f_head = ImageFont.truetype(FONT_BOLD, 78)
+    f_bul = ImageFont.truetype(FONT_REG, 40)
+    f_cta = ImageFont.truetype(FONT_BOLD, 40)
+    f_foot = ImageFont.truetype(FONT_REG, 30)
+    M = 84
+    # wordmark
+    d.text((M, 70), "HUDACE", fill=WHITE, font=f_word)
+    wlen = d.textlength("HUDACE", font=f_word)
+    d.rectangle([(M, 138), (M + wlen, 146)], fill=BLUE)
+    # label
+    y = 250
+    d.text((M, y), label.upper(), fill=BLUE, font=f_label)
+    y += 64
+    # headline (wrap)
+    for ln in textwrap.wrap(headline, width=20)[:3]:
+        d.text((M, y), ln, fill=WHITE, font=f_head)
+        y += 92
+    y += 30
+    # bullets
+    for b in bullets[:5]:
+        d.rectangle([(M, y + 12), (M + 8, y + 44)], fill=BLUE)
+        for ln in textwrap.wrap(b, width=34)[:2]:
+            d.text((M + 30, y), ln, fill=WHITE, font=f_bul)
+            y += 52
+        y += 12
+    # CTA pill near bottom
+    cy = CARD_H - 240
+    cta_w = d.textlength(cta, font=f_cta)
+    d.rounded_rectangle([(M, cy), (M + cta_w + 80, cy + 92)], radius=12, fill=BLUE)
+    d.text((M + 40, cy + 24), cta, fill=WHITE, font=f_cta)
+    # contact footer
+    d.text((M, CARD_H - 96), "hudace.com   contact@hudace.com   +91 82189 29990", fill=MUTED, font=f_foot)
+    img.save(f"{EMAIL_DIR}/{out_name}", "JPEG", quality=90)
+    print(f"  card: {out_name}")
+    return f"{BASE_URL}/{out_name}"
+
+
+# -- email HTML (Gmail-safe, dark-mode-safe, dual CTA) --------------------------
+HEAD_STYLE = """
+  <style>
+    @media (prefers-color-scheme: dark) {
+      body, table, td { background-color:#0A0919 !important; color:#ffffff !important; }
+    }
+    [data-ogsc] body, [data-ogsc] table, [data-ogsc] td { background-color:#0A0919 !important; }
+  </style>"""
+
+
+def cta_pair():
+    return f"""
+    <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+      <td width="50%" style="padding:0 6px 0 0;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#1B90FF" style="background:#1B90FF;border-radius:4px;">
+          <tr><td align="center" style="padding:14px 12px;">
+            <a href="{WA_LINK}" style="text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;"><span style="color:#ffffff;">Chat on WhatsApp</span></a>
+          </td></tr>
+        </table>
+      </td>
+      <td width="50%" style="padding:0 0 0 6px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#08080f" style="background:#08080f;border:1px solid #1B90FF;border-radius:4px;">
+          <tr><td align="center" style="padding:14px 12px;">
+            <a href="{SITE}" style="text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;"><span style="color:#ffffff;">Visit Our Website</span></a>
+          </td></tr>
+        </table>
+      </td>
+    </tr></table>"""
+
+
+def deliverables_block(rows):
+    return "".join(f"""
+      <tr><td style="padding:7px 0 7px 16px;border-left:2px solid #1B90FF;">
+        <span style="color:#ffffff;font-size:14px;line-height:1.6;font-family:Arial,sans-serif;">{r}</span>
+      </td></tr>""" for r in rows)
+
+
+def hooks_block(hooks):
+    out = ""
+    for i, (t, txt) in enumerate(hooks, 1):
+        out += f"""
+      <tr><td style="padding:0 0 16px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+          <td valign="top" width="34" style="color:#1B90FF;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">{i}</td>
+          <td valign="top">
+            <div style="color:#ffffff;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;margin-bottom:3px;">{t}</div>
+            <div style="color:#9A9AAE;font-size:13px;line-height:1.6;font-family:Arial,sans-serif;">{txt}</div>
+          </td>
+        </tr></table>
+      </td></tr>"""
+    return out
+
+
+def email_html(label, headline, sub, card_url, body_url, deliverables, scope, proof, future, hooks, closing):
     return f"""<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>{headline}</title></head>
-<body style="margin:0;padding:0;background:#0A0919;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0A0919;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>{headline}</title>{HEAD_STYLE}</head>
+<body style="margin:0;padding:0;background-color:#0A0919;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0A0919" style="background-color:#0A0919;">
 <tr><td align="center" style="padding:0;">
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#0A0919;max-width:600px;">
+<table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#0A0919" style="background-color:#0A0919;max-width:600px;">
 
-  <!-- HEADER -->
-  <tr><td style="padding:28px 40px 24px;border-bottom:1px solid #1a1a2e;">
-    <span style="font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:3px;font-family:Arial,sans-serif;">HUDACE</span>
-    <span style="color:#1B90FF;font-size:11px;letter-spacing:2px;margin-left:10px;font-family:Arial,sans-serif;">AI-NATIVE</span>
+  <!-- HEADER LOGO -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:26px 40px 22px;border-bottom:1px solid #1a1a2e;">
+    <img src="{BASE_URL}/hudace-logo.png" alt="Hudace" height="34" style="display:block;height:34px;width:auto;border:0;">
   </td></tr>
 
-  <!-- HERO TEXT -->
-  <tr><td style="background:#08080f;padding:48px 40px 40px;">
+  <!-- HERO TEXT (live text on dark) -->
+  <tr><td bgcolor="#08080f" style="background-color:#08080f;padding:46px 40px 36px;">
     <div style="color:#1B90FF;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;font-family:Arial,sans-serif;">{label}</div>
-    <h1 style="color:#ffffff;font-size:34px;line-height:1.2;margin:0 0 14px;font-family:Arial,sans-serif;font-weight:bold;">{headline}</h1>
-    <p style="color:#9A9AAE;font-size:15px;line-height:1.65;margin:0 0 28px;font-family:Arial,sans-serif;">{sub}</p>
-    <table cellpadding="0" cellspacing="0" border="0">
-      <tr><td style="background:#1B90FF;border-radius:4px;">
-        <a href="https://hudace.com" style="display:inline-block;padding:14px 30px;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;"><span style="color:#ffffff;">{cta_text}</span></a>
-      </td></tr>
-    </table>
+    <h1 style="color:#ffffff;font-size:32px;line-height:1.22;margin:0 0 14px;font-family:Arial,sans-serif;font-weight:bold;">{headline}</h1>
+    <p style="color:#9A9AAE;font-size:15px;line-height:1.65;margin:0 0 26px;font-family:Arial,sans-serif;">{sub}</p>
+    {cta_pair()}
   </td></tr>
 
-  <!-- HERO PHOTO -->
-  <tr><td style="padding:0;"><img src="{img_url}" alt="Hudace" width="600" style="display:block;width:100%;max-width:600px;height:auto;"></td></tr>
+  <!-- HERO PHOTO (baked 4:5 card) -->
+  <tr><td bgcolor="#05050D" style="background-color:#05050D;padding:0;">
+    <img src="{card_url}" alt="Hudace offer" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
+  </td></tr>
 
-  {body_rows}
+  <!-- DELIVERABLES -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:34px 40px 0;">
+    <div style="color:#1B90FF;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;font-family:Arial,sans-serif;">What You Receive</div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">{deliverables_block(deliverables)}</table>
+  </td></tr>
+
+  <!-- INDUSTRY SCOPE -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:30px 40px 0;">
+    <div style="color:#1B90FF;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;font-family:Arial,sans-serif;">In Your Sector</div>
+    <p style="color:#ffffff;font-size:14px;line-height:1.7;margin:0;font-family:Arial,sans-serif;">{scope}</p>
+  </td></tr>
+
+  <!-- BODY PHOTO -->
+  <tr><td bgcolor="#05050D" style="background-color:#05050D;padding:28px 40px 0;">
+    <img src="{body_url}" alt="Hudace work" width="520" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:6px;margin:0 auto;">
+  </td></tr>
+
+  <!-- WHY IT WORKS -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:30px 40px 0;">
+    <div style="color:#1B90FF;font-size:11px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;margin-bottom:16px;font-family:Arial,sans-serif;">Why It Works</div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">{hooks_block(hooks)}</table>
+  </td></tr>
+
+  <!-- PROOF + FUTURE -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:6px 40px 0;">
+    <p style="color:#9A9AAE;font-size:13px;line-height:1.7;margin:0 0 10px;font-family:Arial,sans-serif;">{proof}</p>
+    <p style="color:#9A9AAE;font-size:13px;line-height:1.7;margin:0;font-family:Arial,sans-serif;">{future}</p>
+  </td></tr>
 
   <!-- DIVIDER -->
-  <tr><td style="padding:32px 40px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="height:1px;background:#1a1a2e;"></td></tr></table></td></tr>
+  <tr><td style="padding:30px 40px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="height:1px;background-color:#1a1a2e;font-size:1px;line-height:1px;">&nbsp;</td></tr></table></td></tr>
 
-  <!-- CONTACT CTA -->
-  <tr><td style="padding:32px 40px 0;">
-    <table cellpadding="0" cellspacing="0" border="0">
-      <tr><td style="background:#1B90FF;border-radius:4px;">
-        <a href="https://hudace.com" style="display:inline-block;padding:14px 30px;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;"><span style="color:#ffffff;">{cta_text}</span></a>
-      </td></tr>
-    </table>
-    <p style="color:#9A9AAE;font-size:13px;margin:18px 0 0;font-family:Arial,sans-serif;">
-      hudace.com &nbsp;|&nbsp; contact@hudace.com &nbsp;|&nbsp; +91 82189 29990
-    </p>
+  <!-- CLOSING + DUAL CTA -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:26px 40px 0;">
+    <p style="color:#ffffff;font-size:15px;line-height:1.6;margin:0 0 22px;font-family:Arial,sans-serif;">{closing}</p>
+    {cta_pair()}
+  </td></tr>
+
+  <!-- SOCIAL ICONS -->
+  <tr><td bgcolor="#0A0919" style="background-color:#0A0919;padding:28px 40px 4px;">
+    <table cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="padding-right:14px;"><a href="https://www.instagram.com/hudaceofficial/"><img src="{BASE_URL}/icon-instagram.png" alt="Instagram" width="30" height="30" style="display:block;border:0;"></a></td>
+      <td style="padding-right:14px;"><a href="https://www.linkedin.com/company/hudace"><img src="{BASE_URL}/icon-linkedin.png" alt="LinkedIn" width="30" height="30" style="display:block;border:0;"></a></td>
+      <td style="padding-right:14px;"><a href="{WA_LINK}"><img src="{BASE_URL}/icon-whatsapp.png" alt="WhatsApp" width="30" height="30" style="display:block;border:0;"></a></td>
+    </tr></table>
   </td></tr>
 
   <!-- FOOTER -->
-  <tr><td style="background:#05050D;padding:28px 40px;border-top:1px solid #1a1a2e;margin-top:40px;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr><td>
-        <p style="color:#9A9AAE;font-size:12px;margin:0 0 6px;font-family:Arial,sans-serif;">
-          <strong style="color:#ffffff;">HUDACE</strong> &nbsp;&middot;&nbsp; hudace.com &nbsp;&middot;&nbsp; contact@hudace.com &nbsp;&middot;&nbsp; +91 82189 29990
-        </p>
-        <p style="color:#444455;font-size:11px;margin:0;font-family:Arial,sans-serif;">
-          <a href="#" style="color:#444455;text-decoration:underline;">Unsubscribe</a>
-        </p>
-      </td></tr>
-    </table>
+  <tr><td bgcolor="#05050D" style="background-color:#05050D;padding:24px 40px 30px;border-top:1px solid #1a1a2e;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td valign="middle" width="46"><img src="{BASE_URL}/hudace-mark.png" alt="Hudace" width="34" height="34" style="display:block;border:0;"></td>
+      <td valign="middle">
+        <p style="color:#9A9AAE;font-size:12px;margin:0 0 5px;font-family:Arial,sans-serif;">hudace.com &middot; contact@hudace.com &middot; +91 82189 29990</p>
+        <p style="color:#444455;font-size:11px;margin:0;font-family:Arial,sans-serif;"><a href="#" style="color:#444455;text-decoration:underline;">Unsubscribe</a></p>
+      </td>
+    </tr></table>
   </td></tr>
 
 </table>
@@ -143,407 +297,249 @@ def email_html(label, headline, sub, img_url, sections, cta_text):
 </html>"""
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-def wa(body, img_url):
-    return body + f"\n\nwa.me/918218929990"
-
-def li(body):
-    return body
-
-def outreach(body):
-    return body
-
-# ─────────────────────────────────────────────────────────────────────────────
-batch = []
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 1: Service-oriented – Construction and Real Estate + Social Media
-# ══════════════════════════════════════════════════════════════════════════════
-img1 = make_promo_jpg(
-    "socialmedia-bg.jpg", "promo-construction-social.jpg",
-    "Social Media for Property and Construction",
-    "12 reels, 20 posts, 2 campaigns monthly",
-    ["12 short-form reels per month", "20 feed posts per month",
-     "2 paid ad campaigns per month", "Full community management"],
-    "Request the Plan"
-)
-
-e1_html = email_html(
-    label="SOCIAL MEDIA MARKETING — CONSTRUCTION AND REAL ESTATE",
-    headline="Social Media That Generates Qualified Project Inquiries",
-    sub="Property developers and contractors that publish consistent, professional social content receive 32 percent more inbound project inquiries on average. Hudace delivers a fully managed social media function at a predictable monthly cost.",
-    img_url=img1,
-    sections=[
-        ("WHAT WE DELIVER EACH MONTH", [
-            "12 short-form reels (15 to 60 seconds) — project walkthroughs, timelapse builds, completed work",
-            "20 feed posts — imagery, stats, and proof points targeting procurement and development decision-makers",
-            "2 paid ad campaigns — lead-gen focused, A/B tested creative, full attribution reporting",
-            "Full community management — responses, DMs, and comment moderation handled by your account team",
-            "Monthly performance report — reach, engagement rate, cost per lead, and next-cycle recommendations",
-        ]),
-        ("INDUSTRY CONTEXT", [
-            "Construction and real estate companies compete for the same procurement teams, investors, and buyers on social platforms. Organic reach alone does not close that gap. A structured content calendar built around project milestones, capability proofs, and client outcomes positions your firm as the default choice before a brief is issued.",
-            "Hudace has delivered social media programs for firms operating across commercial construction, residential development, and infrastructure contracting. In one engagement, a commercial contractor increased project inquiries by 32 percent within 90 days by replacing ad-hoc posting with a structured monthly calendar.",
-        ]),
-        ("FUTURE SCOPE", [
-            "Social media generates the initial awareness. Hudace's SEO, website design, and AI cinematic video capabilities layer into a complete digital pipeline — from first impression to qualified conversation.",
-        ]),
-    ],
-    cta_text="Request the Social Media Plan"
-)
-e1_wa = wa(
-    "Hudace manages social media for construction and real estate firms.\n\n12 reels, 20 posts, 2 ad campaigns every month.\n\nFull community management included. One predictable monthly fee.\n\nReady to see the plan?",
-    img1
-)
-e1_li = li(
-    "Construction and real estate companies that post consistently acquire 32% more inbound inquiries than those that do not.\n\nThe challenge is volume and quality. Twelve reels, twenty posts, and two paid campaigns every month is a full-time function most firms do not have in-house.\n\nHudace delivers it as a managed service.\n\nProject walkthroughs. Timelapse builds. Capability proofs. All produced and published on your behalf.\n\nThe result is a social presence that works as a business development channel, not a communications obligation.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e1_outreach = outreach(
-    "Subject: Social media for [Company Name] — 12 reels and 20 posts monthly\n\nI work with construction and real estate firms to replace ad-hoc social posting with a structured monthly content program.\n\nFor a firm like yours, that means 12 short-form reels, 20 feed posts, and 2 paid ad campaigns delivered each month — fully managed, no internal resource required.\n\nOne of our construction sector clients saw a 32 percent increase in project inquiries within 90 days of launch.\n\nWould a 20-minute call make sense to walk through the specific deliverables?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media", "type": "html_email", "body": e1_html, "image_url": img1},
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media (WhatsApp)", "type": "whatsapp", "body": e1_wa, "image_url": img1},
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e1_li, "image_url": img1},
-    {"title": f"[{DATE}] Construction and Real Estate | Social Media (Outreach)", "type": "other", "body": e1_outreach, "image_url": img1},
+# -- batch content (region-agnostic, SAP-calm) ---------------------------------
+EMAILS = [
+    {
+        "key": "agribusiness-social",
+        "industry": "Agribusiness",
+        "label": "SOCIAL MEDIA - AGRIBUSINESS",
+        "headline": "Social Media That Builds Trust Across the Agricultural Supply Chain",
+        "sub": "Agribusiness buyers, distributors, and growers follow the suppliers who show their work. Hudace runs a fully managed social function so your operation stays visible to the people who place orders.",
+        "bg_query": "agriculture field aerial sunset dark",
+        "body_query": "farm harvest tractor field",
+        "card_head": "Social Media for Agribusiness",
+        "card_bullets": ["6 short-form videos monthly", "12 feed posts, 8 stories", "Community management", "Monthly performance report"],
+        "deliverables": [
+            "6 short-form videos per month",
+            "12 feed posts per month",
+            "8 stories per month",
+            "Captions and hashtag sets",
+            "Content calendar and scheduling",
+            "Community management (comments and DMs)",
+            "Monthly performance report",
+        ],
+        "scope": "In agribusiness the buying cycle runs on confidence in quality, traceability, and consistent supply. A structured calendar built around harvest milestones, processing standards, and field operations turns routine activity into proof that procurement teams and distributors can see before they shortlist a supplier.",
+        "proof": "We have run managed social programs for operations across food production and distribution, replacing irregular posting with a steady calendar that keeps the brand present through every season.",
+        "future": "Social builds the first impression. It layers into SEO, website, and AI cinematic video so awareness moves into a measurable pipeline.",
+        "hooks": [
+            ("Consistency signals reliability", "Six videos and twelve posts a month show an operation that runs on schedule, the same trait buyers want in a supplier."),
+            ("Proof travels further than claims", "Field walkthroughs and process clips let the work speak, which converts better than product descriptions alone."),
+            ("Owned attention compounds", "Managed community response keeps every comment and message warm, so interest does not cool before a conversation starts."),
+        ],
+        "closing": "Tell us your season and we will return a content calendar built for it.",
+    },
+    {
+        "key": "agribusiness-website",
+        "industry": "Agribusiness",
+        "label": "WEBSITE DESIGN - AGRIBUSINESS",
+        "headline": "A Website That Turns Agricultural Buyers Into Enquiries",
+        "sub": "Most agribusiness sites describe the operation. Few are built to capture the buyer. Hudace delivers a fast, mobile-first site engineered to convert distributors, wholesalers, and procurement teams.",
+        "bg_query": "modern greenhouse technology agriculture dark",
+        "body_query": "laptop website design office",
+        "card_head": "Website Design for Agribusiness",
+        "card_bullets": ["Custom multi-page website", "Mobile-first responsive build", "Lead and contact forms", "Analytics and WhatsApp"],
+        "deliverables": [
+            "Custom multi-page website",
+            "Mobile-first responsive build",
+            "Booking, lead, and contact forms",
+            "CMS to edit content yourself",
+            "SEO-ready structure and speed",
+            "Analytics and WhatsApp integration",
+            "Hosting and domain setup",
+            "Launch and handover",
+        ],
+        "scope": "Agribusiness purchases are researched on a phone in the field and approved at a desk. A mobile-first site with clear product, capacity, and certification pages and a WhatsApp path removes friction at both moments, so a serious buyer reaches you on the same visit.",
+        "proof": "We have built and launched sites for operations across production and distribution, pairing clean structure with fast load times so search and buyers both reward the page.",
+        "future": "The site becomes the hub. SEO drives qualified traffic to it and social keeps it warm between purchase cycles.",
+        "hooks": [
+            ("Speed protects the visit", "A fast, mobile-first build keeps a buyer on the page where a slow one loses them before the enquiry."),
+            ("Structure earns the ranking", "An SEO-ready architecture lets search engines place you for the terms procurement teams actually use."),
+            ("Forms turn traffic into pipeline", "Lead, contact, and WhatsApp paths capture intent at the moment it peaks, not days later."),
+        ],
+        "closing": "Send us your current site and we will return a build plan and a launch timeline.",
+    },
+    {
+        "key": "agribusiness-aistudio",
+        "industry": "Agribusiness",
+        "label": "AI WORK STUDIO - AGRIBUSINESS",
+        "headline": "A Cinematic Film of Your Operation, Without a Film Crew",
+        "sub": "Agribusiness sells on scale and standards that a single photo cannot convey. Hudace AI Work Studio produces a cinematic film of your operation in seven working days, with no crew on site.",
+        "bg_query": "cinematic agriculture drone aerial dark moody",
+        "body_query": "film camera production cinematic dark",
+        "card_head": "AI Work Studio for Agribusiness",
+        "card_bullets": ["60-second cinematic film", "Three 15-second social cuts", "Ten AI-generated stills", "Delivered in 7 working days"],
+        "deliverables": [
+            "60-second cinematic film",
+            "Three 15-second social cuts",
+            "Ten AI-generated stills",
+            "Script and concept included",
+            "Delivered in seven working days, no film crew",
+        ],
+        "scope": "A buyer deciding between agricultural suppliers responds to scale, process, and care they can see. A cinematic film communicates capacity and standards in sixty seconds, in a format that travels across sales decks, social, and trade conversations.",
+        "proof": "We have produced cinematic films for operations across production and consumer goods, delivering finished work in days rather than the weeks a traditional shoot requires.",
+        "future": "One film fuels months of content. The social cuts and stills feed the calendar long after delivery.",
+        "hooks": [
+            ("Scale is best shown, not described", "A cinematic sweep conveys capacity in seconds that a specification sheet cannot."),
+            ("Seven days keeps pace with the market", "AI production removes the crew, the location days, and the wait, so the film ships while the opportunity is live."),
+            ("One shoot, many assets", "A film, three cuts, and ten stills give every channel something to run from a single brief."),
+        ],
+        "closing": "Describe your operation and we will return a concept and a delivery date.",
+    },
+    {
+        "key": "consumer-seo",
+        "industry": "Consumer Products",
+        "label": "SEO / AEO / GEO / SRX - CONSUMER PRODUCTS",
+        "headline": "Get Found by Consumer Buyers, in Search and in AI Answers",
+        "sub": "Consumer product demand begins with a query, and increasingly with an AI answer. Hudace optimizes for both, so your brand appears at the moment buyers decide.",
+        "bg_query": "retail shopping consumer products dark moody",
+        "body_query": "analytics dashboard data screen dark",
+        "card_head": "SEO, AEO, GEO and SRX",
+        "card_bullets": ["Technical SEO audit and fixes", "On-page and schema", "Authority and local SEO", "Visibility in AI answers"],
+        "deliverables": [
+            "Technical SEO audit and fixes",
+            "Keyword and intent research",
+            "On-page optimization (titles, meta, headings, schema)",
+            "Content briefs and optimization",
+            "Authority and backlink building",
+            "Local SEO (profile, citations, maps)",
+            "AEO: answer-engine optimization (FAQ, structured answers)",
+            "GEO: visibility inside AI-generated answers",
+            "SRX: search experience and Core Web Vitals",
+            "Monthly ranking and traffic report",
+        ],
+        "scope": "Consumer buyers compare options before they ever reach a brand site. Optimizing the product and category pages for both classic search and AI answer engines means your range is the one quoted when a shopper asks, not a competitor's.",
+        "proof": "We have delivered search programs for consumer brands, improving both ranking positions and the share of AI-generated answers that cite the brand.",
+        "future": "Search creates durable demand. It compounds with a fast website and a steady social presence into a pipeline that does not depend on paid spend alone.",
+        "hooks": [
+            ("Intent is the cheapest demand", "Ranking for what buyers already search means meeting them at the moment of decision, not interrupting them."),
+            ("AI answers are the new front page", "Structured answers and GEO place your brand inside the response, where more buying journeys now begin."),
+            ("Experience is a ranking factor", "Core Web Vitals and SRX work means the pages that rank also convert, so traffic turns into orders."),
+        ],
+        "closing": "Share your domain and we will return an audit summary and the first priorities.",
+    },
+    {
+        "key": "consumer-erp",
+        "industry": "Consumer Products",
+        "label": "ERP BUILDING - CONSUMER PRODUCTS",
+        "headline": "Custom Software That Runs Your Consumer Operation as One System",
+        "sub": "When inventory, orders, and billing live in separate tools, margin leaks between them. Hudace builds custom business software on the Xenon AI platform so your operation runs as one system.",
+        "bg_query": "warehouse logistics inventory dark industrial",
+        "body_query": "software dashboard screen business dark",
+        "card_head": "Custom ERP and SaaS",
+        "card_bullets": ["Discovery and module blueprint", "CRM, inventory, billing modules", "Role-based dashboards", "Web and mobile access"],
+        "deliverables": [
+            "Discovery and module blueprint",
+            "Custom modules (CRM, inventory, billing, HR, and more)",
+            "Role-based access and dashboards",
+            "Workflow automations",
+            "Integrations (payments, messaging, APIs)",
+            "Web and mobile access",
+            "Training and documentation",
+            "Ongoing support and iterations",
+        ],
+        "scope": "Consumer product operations move fast across procurement, stock, fulfilment, and returns. Custom software built to your workflow, with automation across the steps staff repeat daily, removes the manual handoffs where time and accuracy are lost.",
+        "proof": "We have built operational software for distribution and consumer businesses, with reported reductions in administrative overhead once manual steps moved into automated workflows.",
+        "future": "The platform grows with the business. New modules and integrations add without replacing what already works.",
+        "hooks": [
+            ("One system removes the seams", "When CRM, inventory, and billing share data, the gaps where errors and delays hide simply close."),
+            ("Automation returns hours", "Workflows handle the repeated steps, so staff spend time on judgement, not data entry."),
+            ("Built to your process, not a template", "A blueprint drawn from how you actually operate means adoption is fast and the software fits on day one."),
+        ],
+        "closing": "Tell us the workflow that costs you the most time and we will scope a module for it.",
+    },
+    {
+        "key": "schoolos",
+        "industry": None,
+        "label": "SCHOOLOS - SCHOOL ERP",
+        "headline": "Run the Whole School on One Connected Platform",
+        "sub": "When admissions, fees, attendance, and exams sit in separate systems, staff spend their day reconciling them. SchoolOS, the Hudace School ERP, runs every function on one platform with Nectar AI built in.",
+        "bg_query": "school classroom students learning dark",
+        "body_query": "students classroom technology learning",
+        "card_head": "SchoolOS School ERP",
+        "card_bullets": ["Admissions to enrollment", "Fees, exams, attendance", "Parent app and transport", "Management dashboards"],
+        "deliverables": [
+            "Admissions: online enquiry to enrollment",
+            "Student records: profiles, documents, history",
+            "Attendance: daily and period, parent alerts",
+            "Fees: invoices, online payments, reminders, receipts",
+            "Examinations: marks, grading, report cards",
+            "Timetable: classes, teachers, substitutions",
+            "Communication: announcements and parent app",
+            "Transport: routes, vehicles, live tracking",
+            "Library: catalog, issue and return",
+            "HR and payroll: staff and salaries",
+            "Reports: management dashboards",
+        ],
+        "scope": "A school runs on parallel cycles of admissions, academics, finance, and operations. SchoolOS connects them so a fee status, an attendance record, and an exam result all reference the same student, and Nectar AI handles routine admin so staff return to teaching and leadership.",
+        "proof": "We have deployed connected school operations where leadership reported lower administrative overhead and parents reported clearer, more timely communication once records moved onto one platform.",
+        "future": "SchoolOS scales from a single campus to a group, with management dashboards that give leadership one view across every site.",
+        "hooks": [
+            ("One record, no reconciliation", "When fees, attendance, and exams share one student profile, staff stop cross-checking systems and start acting on the data."),
+            ("Parents stay informed automatically", "Alerts, announcements, and the parent app keep families current without a manual message from the office."),
+            ("Leadership sees the whole school", "Management dashboards turn daily operations into decisions, from fee collection to attendance trends, in one view."),
+        ],
+        "closing": "Tell us your campus size and we will return a module rollout plan for your term.",
+    },
 ]
-print("  Email 1 done")
+
+SERVICE_NAME = {
+    "agribusiness-social": "Social Media",
+    "agribusiness-website": "Website Design",
+    "agribusiness-aistudio": "AI Work Studio",
+    "consumer-seo": "SEO / AEO / GEO / SRX",
+    "consumer-erp": "ERP Building",
+    "schoolos": "SchoolOS School ERP",
+}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 2: Service-oriented – Education and Research + SEO/AEO/GEO
-# ══════════════════════════════════════════════════════════════════════════════
-img2 = make_promo_jpg(
-    "seo-bg.jpg", "promo-education-seo.jpg",
-    "Search Visibility for Educational Institutions",
-    "SEO, AEO, GEO and AI search coverage",
-    ["Full site technical SEO audit", "20 priority keyword targets",
-     "4 long-form articles per month", "AI Answers and GEO coverage"],
-    "Request the SEO Audit"
-)
-
-e2_html = email_html(
-    label="SEO / AEO / GEO — EDUCATION AND RESEARCH",
-    headline="Organic Admissions Traffic Through Search Dominance",
-    sub="Educational institutions that appear at the top of organic search results and AI-generated answers attract 40 percent more admissions inquiries without increasing paid media spend. Hudace delivers SEO, AI Engine Optimization, and Geographic search coverage as a single program.",
-    img_url=img2,
-    sections=[
-        ("WHAT WE DELIVER", [
-            "Full technical SEO audit — site architecture, page speed, indexability, and crawl error resolution",
-            "20 priority keyword targets — mapped to admissions, program discovery, and institutional reputation queries",
-            "4 long-form SEO articles per month — written for both human readers and AI answer engines",
-            "AEO (AI Engine Optimization) — structured to appear in ChatGPT, Perplexity, and Google AI Overviews",
-            "GEO (Geographic Engine Optimization) — local and regional search presence for prospective students",
-            "Monthly rank tracking report — keyword positions, traffic delta, and content performance",
-        ]),
-        ("INDUSTRY CONTEXT", [
-            "Search is the primary discovery channel for prospective students and research partners. However, the search landscape has changed materially. AI-generated answers now appear above traditional results for the majority of high-intent educational queries. Institutions optimized for traditional SEO alone are invisible in these new surfaces.",
-            "An academic institution we worked with achieved a 40 percent increase in organic admissions inquiries after a 90-day SEO restructure that combined technical optimization with AI answer targeting.",
-        ]),
-        ("FUTURE SCOPE", [
-            "Search visibility drives awareness. Hudace's website design, social media, and School ERP capabilities extend that visibility into a complete enrollment and operational platform.",
-        ]),
-    ],
-    cta_text="Request the SEO Audit"
-)
-e2_wa = wa(
-    "Hudace runs SEO, AI Engine Optimization, and Geographic search for educational institutions.\n\nTechnical audit, 20 keyword targets, 4 articles/month, AI Answers and GEO coverage.\n\nOne institution saw 40% more organic admissions inquiries in 90 days.\n\nWant the audit?",
-    img2
-)
-e2_li = li(
-    "Most educational institutions have optimized for traditional search.\n\nBut the majority of high-intent queries now surface AI-generated answers above organic results.\n\nIf your institution is not in those answers, it is not in the consideration set.\n\nHudace delivers SEO, AEO (AI Engine Optimization), and GEO (Geographic Engine Optimization) as a single program — 20 keyword targets, 4 articles monthly, full AI answer coverage.\n\nOne institution increased organic admissions inquiries by 40 percent within 90 days.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e2_outreach = outreach(
-    "Subject: SEO and AI search visibility for [Institution Name]\n\nSearch behavior for prospective students has shifted significantly. AI-generated answers now appear above traditional results for most admissions-related queries.\n\nFor [Institution Name], that means being optimized for ChatGPT, Perplexity, and Google AI Overviews is now as important as traditional SEO.\n\nHudace delivers a full program: technical audit, 20 keyword targets, 4 long-form articles monthly, and AI answer coverage — as a managed service.\n\nOne institution saw a 40 percent increase in organic admissions inquiries within 90 days.\n\nWould a brief call make sense?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO", "type": "html_email", "body": e2_html, "image_url": img2},
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (WhatsApp)", "type": "whatsapp", "body": e2_wa, "image_url": img2},
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e2_li, "image_url": img2},
-    {"title": f"[{DATE}] Education and Research | SEO AEO GEO (Outreach)", "type": "other", "body": e2_outreach, "image_url": img2},
-]
-print("  Email 2 done")
+def wa_text(e):
+    bl = "\n".join(f"- {b}" for b in e["card_bullets"])
+    return f"{e['card_head']} from Hudace.\n\n{bl}\n\nOne predictable monthly engagement. Want the full plan?\n\n{WA_LINK}"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 3: Industry-oriented – Construction and Real Estate (multiple services)
-# ══════════════════════════════════════════════════════════════════════════════
-img3 = make_promo_jpg(
-    "construction-bg.jpg", "promo-construction-industry.jpg",
-    "Digital Infrastructure for the Built Environment",
-    "Social, SEO, Web, AI Video — one managed program",
-    ["Social media: 12 reels + 20 posts monthly", "SEO and AI answer coverage",
-     "Conversion-optimized project portfolio site", "AI cinematic project showcase videos"],
-    "Request the Industry Audit"
-)
-
-e3_html = email_html(
-    label="INDUSTRY PROGRAM — CONSTRUCTION AND REAL ESTATE",
-    headline="Digital Infrastructure for the Built Environment",
-    sub="Construction and real estate firms operating across multiple project types and client segments require a digital presence that communicates capability, builds trust with procurement teams, and converts visitors into inquiries. Hudace delivers this as an integrated managed program.",
-    img_url=img3,
-    sections=[
-        ("THE FOUR CAPABILITIES WE DEPLOY", [
-            "Social Media Marketing — 12 reels, 20 posts, and 2 paid campaigns monthly. Project walkthroughs, timelapse content, and capability proofs published consistently across the platforms your buyers use.",
-            "SEO and AI Engine Optimization — Your firm appearing in organic search and AI-generated answers when procurement teams research contractors, developers, and project partners.",
-            "Website Design — A conversion-optimized project portfolio platform built for multi-device, multi-market buyer journeys. Clear capability proof, structured lead capture, and SEO-native architecture.",
-            "AI Cinematic Videos — 30 to 60 second cinematic project showcases, aerial footage narratives, and brand films that document completed work with the production quality that wins enterprise clients.",
-        ]),
-        ("PROOF IN THIS SECTOR", [
-            "Construction and real estate clients operating on a full-stack Hudace program averaged 28 percent more qualified project inquiries within one quarter of deployment. Organic traffic to project portfolio pages increased by an average of 40 percent within 90 days of site relaunch.",
-        ]),
-        ("WHAT HAPPENS AFTER INQUIRY", [
-            "Each Hudace engagement begins with an industry audit — a review of your current digital footprint, competitor visibility, and the highest-value gaps to close first. No retainer commitment required for the audit.",
-        ]),
-    ],
-    cta_text="Request the Industry Audit"
-)
-e3_wa = wa(
-    "Hudace builds full-stack digital programs for construction and real estate firms.\n\nSocial media, SEO, website, and AI cinematic videos — managed as one program.\n\nClients averaged 28% more qualified inquiries within one quarter.\n\nAudit is free. Ready to start?",
-    img3
-)
-e3_li = li(
-    "Construction and real estate firms that win enterprise contracts have one thing in common: their digital presence communicates capability before a brief is issued.\n\nThat means a project portfolio site that ranks, social content that demonstrates expertise, and project films that show what the firm actually builds.\n\nHudace delivers all four capabilities — social media, SEO, website design, and AI cinematic videos — as a single managed program.\n\nFull-stack clients averaged 28% more qualified project inquiries within their first quarter.\n\nThe audit is the starting point. No commitment required.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e3_outreach = outreach(
-    "Subject: Digital program for [Company Name] — from site to social to AI video\n\nI help construction and real estate firms build digital programs that generate qualified project inquiries.\n\nFor a firm operating at your scale, the four capabilities that drive the most impact are: social media content, SEO and AI search visibility, a conversion-optimized project portfolio site, and cinematic project videos.\n\nHudace delivers all four as a managed program. Full-stack clients averaged 28 percent more qualified inquiries within their first quarter.\n\nWe start with a free audit of your current digital position. No retainer required.\n\nWould this be worth 20 minutes?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program", "type": "html_email", "body": e3_html, "image_url": img3},
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (WhatsApp)", "type": "whatsapp", "body": e3_wa, "image_url": img3},
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e3_li, "image_url": img3},
-    {"title": f"[{DATE}] Construction and Real Estate | Industry Program (Outreach)", "type": "other", "body": e3_outreach, "image_url": img3},
-]
-print("  Email 3 done")
+def li_text(e):
+    h = "\n".join(f"{i}. {t}: {txt}" for i, (t, txt) in enumerate(e["hooks"], 1))
+    return (f"{e['headline']}\n\n{e['sub']}\n\n{h}\n\nThe outcome is a function that runs on schedule, not a task that waits for time.\n\n"
+            f"hudace.com | contact@hudace.com | +91 82189 29990")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 4: Industry-oriented – Education and Research (multiple services)
-# ══════════════════════════════════════════════════════════════════════════════
-img4 = make_promo_jpg(
-    "education-bg.jpg", "promo-education-industry.jpg",
-    "Operational and Digital Transformation for Education",
-    "ERP, Social, SEO, Website — one managed program",
-    ["School ERP: deployed in 6 weeks", "Social media for admissions and engagement",
-     "SEO and AI search coverage", "Enrollment-optimized website platform"],
-    "Schedule the Discovery Call"
-)
-
-e4_html = email_html(
-    label="INDUSTRY PROGRAM — EDUCATION AND RESEARCH",
-    headline="Operational and Digital Transformation for Educational Institutions",
-    sub="Educational institutions face concurrent pressure on admissions volume, operational efficiency, and digital visibility. Hudace addresses all three through an integrated program spanning ERP deployment, marketing, and search.",
-    img_url=img4,
-    sections=[
-        ("THE FOUR CAPABILITIES WE DEPLOY", [
-            "School ERP (SchoolOS) — Student Information, LMS, Admissions, Finance, People Management, and Core School operations on one platform. Nectar AI automates routine administration across all modules. Deployed in 6 weeks.",
-            "Social Media Marketing — 12 reels and 20 posts monthly targeting prospective students, parents, and academic partners. Content built around institutional proof points, faculty expertise, and campus life.",
-            "SEO and AI Engine Optimization — Technical SEO, 20 keyword targets, and AI answer coverage. Your institution appearing in the first response when prospective students search for programs.",
-            "Website Design — An enrollment-optimized platform with structured program pages, clear application pathways, and SEO-native architecture. Built for multi-market audiences.",
-        ]),
-        ("PROOF IN THIS SECTOR", [
-            "An academic institution deployed SchoolOS across 6 operational modules in 6 weeks, reducing administrative overhead by 40 percent. A parallel SEO engagement increased organic admissions inquiries by 40 percent within 90 days.",
-        ]),
-        ("STARTING POINT", [
-            "Hudace begins with a discovery call to identify the two or three highest-value gaps — whether that is operational (ERP), visibility (SEO), or brand (social and web). The program scales from a single service to full stack based on institutional priorities.",
-        ]),
-    ],
-    cta_text="Schedule the Discovery Call"
-)
-e4_wa = wa(
-    "Hudace works with educational institutions on ERP, social media, SEO, and web design.\n\nSchoolOS deploys in 6 weeks. SEO drives 40% more organic admissions inquiries in 90 days.\n\nFull program or single service — your choice.\n\nSchedule a call?",
-    img4
-)
-e4_li = li(
-    "Educational institutions face three simultaneous pressures: operational overhead, admissions volume, and digital visibility.\n\nHudace addresses all three.\n\nSchoolOS (our School ERP) handles student information, admissions, finance, LMS, and HR — deployed in 6 weeks, not 2 years.\n\nOur marketing services cover social media, SEO, and website design — built specifically for enrollment and institutional reputation objectives.\n\nAn institution on this combined program reduced administrative overhead by 40% while increasing organic admissions inquiries by 40% within 90 days.\n\nThe discovery call starts the process.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e4_outreach = outreach(
-    "Subject: ERP and marketing program for [Institution Name]\n\nI work with educational institutions on the combination that moves the needle most: operational efficiency and admissions visibility.\n\nSchoolOS is our School ERP — student information, admissions, finance, LMS, and HR on one platform. It deploys in 6 weeks.\n\nAlongside that, we run social media, SEO, and website design programs specifically structured for admissions outcomes.\n\nOne institution reduced administrative overhead by 40 percent while increasing organic admissions inquiries by 40 percent.\n\nWould a 20-minute discovery call make sense?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] Education and Research | Industry Program", "type": "html_email", "body": e4_html, "image_url": img4},
-    {"title": f"[{DATE}] Education and Research | Industry Program (WhatsApp)", "type": "whatsapp", "body": e4_wa, "image_url": img4},
-    {"title": f"[{DATE}] Education and Research | Industry Program (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e4_li, "image_url": img4},
-    {"title": f"[{DATE}] Education and Research | Industry Program (Outreach)", "type": "other", "body": e4_outreach, "image_url": img4},
-]
-print("  Email 4 done")
+def outreach_text(e):
+    return (f"Subject: {e['card_head']} for your operation\n\n"
+            f"Hello,\n\n{e['sub']}\n\nWhat you would receive:\n" +
+            "\n".join(f"- {b}" for b in e["deliverables"][:6]) +
+            f"\n\n{e['proof']}\n\nWould a short call this week work to walk through the plan?\n\n"
+            f"Hudace | hudace.com | contact@hudace.com | +91 82189 29990 | {WA_LINK}")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 5: AI Work Studio
-# ══════════════════════════════════════════════════════════════════════════════
-img5 = make_promo_jpg(
-    "cinema-bg.jpg", "promo-ai-work-studio.jpg",
-    "AI Cinematic Content. Delivered at Scale.",
-    "Videos, photos, ads, and brand films — monthly",
-    ["4 AI cinematic videos per month", "20 AI campaign photos per month",
-     "2 cinematic ad creatives per month", "1 brand film per quarter"],
-    "See the AI Studio Demo"
-)
-
-e5_html = email_html(
-    label="AI WORK STUDIO — CINEMATIC CONTENT",
-    headline="Cinematic AI Content. Enterprise Output. Predictable Monthly Cost.",
-    sub="Enterprise marketing teams that deploy AI cinematic content at scale report 3x more marketing qualified leads and 38 percent faster campaign delivery than teams producing traditional creative. Hudace AI Work Studio delivers this output as a managed monthly service.",
-    img_url=img5,
-    sections=[
-        ("WHAT AI WORK STUDIO DELIVERS EACH MONTH", [
-            "4 AI Cinematic Videos (30 to 90 seconds) — brand films, product showcases, explainer narratives, and campaign hero content produced to broadcast quality",
-            "20 AI Campaign Photos — product imagery, brand lifestyle photography, and visual assets campaign-ready for social, digital, and print",
-            "2 Cinematic Ad Creatives (15 to 30 seconds) — conversion-optimized short-form ads for paid social and digital platforms",
-            "1 Brand Film per quarter — a full narrative brand story (2 to 5 minutes) capturing company identity, capability, and client outcomes",
-        ]),
-        ("THE PRODUCTION CAPABILITY", [
-            "Hudace AI Work Studio combines AI generation, cinematic direction, and post-production grading into a single managed workflow. Brands receive broadcast-quality visual content without the production overhead of a traditional film crew.",
-            "A retail group deployed AI cinematic content across their paid and organic channels and achieved a 3x increase in marketing qualified leads within 90 days. Campaign delivery accelerated by 38 percent compared to their prior production workflow.",
-        ]),
-        ("USE CASES BY INDUSTRY", [
-            "Real estate and construction: project walkthroughs, timelapse builds, and completed-work showcases",
-            "Education: campus experience films, program explainers, and admissions campaign content",
-            "Professional services: capability proofs, client outcome narratives, and conference content",
-            "Consumer brands: product launch films, brand identity content, and seasonal campaign assets",
-        ]),
-    ],
-    cta_text="See the AI Studio Demo"
-)
-e5_wa = wa(
-    "Hudace AI Work Studio delivers cinematic AI content monthly.\n\n4 videos, 20 photos, 2 ad creatives, 1 brand film per quarter.\n\nBroadcast quality. No production crew required.\n\nA retail brand saw 3x more marketing leads in 90 days.\n\nSee the demo?",
-    img5
-)
-e5_li = li(
-    "Enterprise marketing teams need broadcast-quality visual content at a volume traditional production cannot support.\n\nHudace AI Work Studio closes that gap.\n\nFour AI cinematic videos. Twenty campaign photos. Two ad creatives. One brand film per quarter.\n\nDelivered monthly. No production crew. No overruns.\n\nA retail group using this output saw 3x more marketing qualified leads within 90 days and cut campaign delivery time by 38 percent.\n\nIf your brand needs content at scale, this is the model.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e5_outreach = outreach(
-    "Subject: AI cinematic content for [Brand Name] — 4 videos and 20 photos monthly\n\nI run Hudace AI Work Studio — a managed cinematic content service for enterprise marketing teams.\n\nThe monthly output: 4 AI cinematic videos, 20 campaign photos, 2 ad creatives, and a quarterly brand film. All broadcast quality. No production crew or project management required on your side.\n\nA retail group using this model saw 3x more marketing qualified leads in 90 days.\n\nWould it be worth seeing a demo of the output?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content", "type": "html_email", "body": e5_html, "image_url": img5},
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (WhatsApp)", "type": "whatsapp", "body": e5_wa, "image_url": img5},
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e5_li, "image_url": img5},
-    {"title": f"[{DATE}] AI Work Studio | Cinematic Content (Outreach)", "type": "other", "body": e5_outreach, "image_url": img5},
-]
-print("  Email 5 done")
+def main():
+    batch = []
+    failures = []
+    for e in EMAILS:
+        svc = SERVICE_NAME[e["key"]]
+        prefix = f"[{DATE}] {e['industry']} | {svc}" if e["industry"] else f"[{DATE}] {svc}"
+        print(f"\n== {prefix} ==")
+        try:
+            bg = f"bg-{e['key']}.jpg"
+            body = f"body-{e['key']}.jpg"
+            card = f"promo-{e['key']}.jpg"
+            fetch_photo(e["bg_query"], bg)
+            body_url = fetch_photo(e["body_query"], body)
+            card_url = make_card(bg, card, e["label"], e["card_head"], e["card_bullets"])
+            html = email_html(e["label"], e["headline"], e["sub"], card_url, body_url,
+                              e["deliverables"], e["scope"], e["proof"], e["future"], e["hooks"], e["closing"])
+            batch.append({"title": prefix, "type": "html_email", "body": html, "image_url": card_url})
+            batch.append({"title": f"{prefix} (WhatsApp)", "type": "whatsapp", "body": wa_text(e), "image_url": card_url})
+            batch.append({"title": f"{prefix} (LinkedIn)", "type": "caption", "body": li_text(e), "image_url": card_url})
+            batch.append({"title": f"{prefix} (Outreach)", "type": "other", "body": outreach_text(e), "image_url": card_url})
+        except Exception as ex:
+            print(f"  FAILED {prefix}: {ex}")
+            failures.append((prefix, str(ex)))
+    with open("batch.json", "w") as f:
+        json.dump(batch, f, indent=2)
+    print(f"\nWrote batch.json with {len(batch)} items. Failures: {len(failures)}")
+    for p, m in failures:
+        print("  FAIL", p, m)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 6: Market Research
-# ══════════════════════════════════════════════════════════════════════════════
-img6 = make_promo_jpg(
-    "analytics-bg.jpg", "promo-market-research.jpg",
-    "The AI Marketing Infrastructure Opportunity",
-    "Market signals and the window for early movers",
-    ["AI marketing industry at USD 47.32 billion", "AI campaigns deliver 22% higher ROI",
-     "88% of enterprise marketers use AI tools daily", "58% cost reduction from marketing automation"],
-    "Request the Market Brief"
-)
-
-e6_html = email_html(
-    label="MARKET INTELLIGENCE — AI-NATIVE MARKETING",
-    headline="The Window for AI Marketing Infrastructure Is Narrowing",
-    sub="The AI marketing industry has reached USD 47.32 billion. Eighty-eight percent of enterprise marketers now use AI tools daily. The organizations deploying AI marketing infrastructure today are building structural advantages that compound over time. The gap between early movers and late adopters is widening.",
-    img_url=img6,
-    sections=[
-        ("THE MARKET SIGNALS", [
-            "AI marketing industry value: USD 47.32 billion, growing at a rate that doubles the broader marketing technology sector",
-            "AI-driven campaigns deliver 22 percent higher ROI, 32 percent more conversions, and 29 percent lower acquisition costs than traditional methods",
-            "58 percent cost reduction is achievable through full marketing automation — the primary driver of AI marketing adoption at enterprise scale",
-            "28 percent year-on-year revenue growth recorded by clients operating on AI-native marketing programs versus 6 percent for non-AI counterparts",
-        ]),
-        ("THE STRUCTURAL SHIFT UNDERWAY", [
-            "Search is the most visible example. AI-generated answers now surface above organic results for the majority of high-intent commercial queries. Organizations optimized only for traditional search are invisible in these new surfaces. The same pattern is emerging in social algorithm prioritization, paid media auction dynamics, and content distribution.",
-            "This is not a future trend. It is the current state of the discovery landscape. Brands operating on AI-native infrastructure — AI-optimized content, AI cinematic creative, and AI-powered search coverage — are compounding reach while their competitors remain static.",
-        ]),
-        ("THE HUDACE POSITION", [
-            "Hudace is an AI-native marketing and ERP company. Every service — social media, SEO/AEO/GEO, website design, AI cinematic videos, and performance marketing — is built on AI infrastructure from the ground up.",
-            "The market brief documents the specific opportunity by sector and the measurable advantage available to first movers in each.",
-        ]),
-    ],
-    cta_text="Request the Market Brief"
-)
-e6_wa = wa(
-    "AI marketing is at USD 47 billion. Companies using it average 22% higher ROI.\n\nThe window for early movers is open now.\n\nHudace runs AI-native marketing programs: social, SEO, web, AI cinematic video.\n\nWant the market brief?",
-    img6
-)
-e6_li = li(
-    "The AI marketing industry is at USD 47.32 billion.\n\n88% of enterprise marketers use AI tools daily.\n\nAI campaigns deliver 22% higher ROI, 32% more conversions, and 29% lower acquisition costs.\n\nThis is the current state — not a projection.\n\nThe structural shift is in discovery. AI-generated answers now appear above organic results for most commercial queries. Brands not in those answers are invisible at the moment of highest intent.\n\nThe organizations deploying AI marketing infrastructure now are building compounding advantages.\n\nHudace delivers that infrastructure: social, SEO/AEO/GEO, website design, and AI cinematic content — AI-native from the ground up.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e6_outreach = outreach(
-    "Subject: AI marketing infrastructure — the market brief for [Industry]\n\nThe AI marketing market is at USD 47.32 billion. Enterprise clients deploying AI marketing programs are averaging 22 percent higher campaign ROI and 58 percent lower marketing operations costs.\n\nMore importantly, the discovery landscape is shifting. AI-generated answers now surface above organic results for most commercial queries. Brands not optimized for these surfaces are losing visibility at the moment of highest buyer intent.\n\nHudace builds AI-native marketing programs: social media, SEO/AEO/GEO, website design, and AI cinematic content.\n\nWould the market brief for your sector be useful context for a conversation?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure", "type": "html_email", "body": e6_html, "image_url": img6},
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (WhatsApp)", "type": "whatsapp", "body": e6_wa, "image_url": img6},
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e6_li, "image_url": img6},
-    {"title": f"[{DATE}] Market Intelligence | AI Marketing Infrastructure (Outreach)", "type": "other", "body": e6_outreach, "image_url": img6},
-]
-print("  Email 6 done")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EMAIL 7: School ERP
-# ══════════════════════════════════════════════════════════════════════════════
-img7 = make_promo_jpg(
-    "schoolerp-bg.jpg", "promo-school-erp.jpg",
-    "SchoolOS: One Platform for Every School Operation",
-    "6 modules, Nectar AI, deployed in 6 weeks",
-    ["Student Information: academics, timetable, library", "Admissions: inquiry to enrollment, AI follow-up",
-     "Finance: fee tracking, automated notifications", "LMS: digital classroom for teachers and students"],
-    "Book the ERP Demo"
-)
-
-e7_html = email_html(
-    label="SCHOOL ERP — SCHOOLOS",
-    headline="One Platform for Every School Operation. Deployed in 6 Weeks.",
-    sub="SchoolOS is Hudace's School ERP — a unified platform covering every administrative and academic function from admissions to graduation. It deploys in 6 weeks, not the 2-year implementations common to legacy ERP vendors.",
-    img_url=img7,
-    sections=[
-        ("THE SIX MODULES AND WHAT EACH DOES", [
-            "Student Information Module — Academic calendar management, timetable scheduling, curriculum and examination management, library system, transport coordination, and hostel management. Used by: Academic coordinators, registrars, and administrative staff.",
-            "Learning Management System (LMS) — Digital classroom delivery, assignment management, attendance tracking, and learning resource distribution. Used by: Teachers for content delivery, students for coursework access.",
-            "Admissions Module — Full admissions funnel management from initial inquiry through enrollment. Nectar AI (the built-in AI assistant) follows up with prospective families automatically, converting more interest into enrollments with less manual intervention. Used by: Admissions office and administrative coordinators.",
-            "Finance Module — Fee schedule management, payment tracking, automated overdue notifications, and financial reporting. Nectar AI surfaces outstanding fee alerts and priority cases. Used by: Finance department and school administration.",
-            "People Management Module — Staff onboarding, attendance, leave management, payroll coordination, and HR records. Used by: HR department and school leadership.",
-            "Core School Module — Central institutional operations, policy management, school calendar, and cross-department coordination. Used by: School principals and senior leadership.",
-        ]),
-        ("NECTAR AI — ACROSS ALL MODULES", [
-            "Nectar is SchoolOS's built-in AI assistant. It runs across every module: following up with admissions inquiries, surfacing overdue finance cases, flagging HR priorities, and maintaining data accuracy without manual auditing. Routine administration that previously required dedicated staff time is handled automatically.",
-        ]),
-        ("DEPLOYMENT AND PROOF", [
-            "SchoolOS deploys in 6 weeks. Competing ERP implementations in the education sector average 18 to 24 months.",
-            "Institutions operating on SchoolOS report 40 percent reduction in administrative overhead within the first quarter. Admissions conversion rates increase when Nectar AI is active on the inquiry pipeline.",
-        ]),
-    ],
-    cta_text="Book the ERP Demo"
-)
-e7_wa = wa(
-    "SchoolOS by Hudace — School ERP that deploys in 6 weeks.\n\nStudent info, LMS, admissions, finance, HR, and core school on one platform.\n\nNectar AI automates the routine work across every module.\n\n40% less administrative overhead in the first quarter.\n\nBook the demo?",
-    img7
-)
-e7_li = li(
-    "Most school ERP implementations take 18 to 24 months.\n\nSchoolOS deploys in 6 weeks.\n\nSix modules: Student Information, LMS, Admissions, Finance, People Management, and Core School. All connected. All managed from one platform.\n\nNectar AI runs across every module — following up admissions inquiries, flagging overdue fees, surfacing HR priorities — without requiring staff to monitor each system manually.\n\nInstitutions on SchoolOS report 40% less administrative overhead within their first quarter.\n\nIf your school is running operations across disconnected tools, SchoolOS is the consolidation.\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-e7_outreach = outreach(
-    "Subject: School ERP for [School Name] — 6-week deployment\n\nI work with schools to replace disconnected administrative tools with SchoolOS — Hudace's School ERP that covers admissions, student information, finance, LMS, HR, and institutional operations on one platform.\n\nIt deploys in 6 weeks. Most ERP implementations in education take 18 to 24 months.\n\nNectar AI, our built-in AI assistant, handles routine follow-up and administration across every module — so your staff focuses on students rather than systems.\n\nSchools on SchoolOS report 40 percent less administrative overhead within their first quarter.\n\nWould a demo be worthwhile?\n\nhudace.com | contact@hudace.com | +91 82189 29990"
-)
-
-batch += [
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform", "type": "html_email", "body": e7_html, "image_url": img7},
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform (WhatsApp)", "type": "whatsapp", "body": e7_wa, "image_url": img7},
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform (LinkedIn)", "type": "caption", "platform": "linkedin", "body": e7_li, "image_url": img7},
-    {"title": f"[{DATE}] School ERP | SchoolOS Platform (Outreach)", "type": "other", "body": e7_outreach, "image_url": img7},
-]
-print("  Email 7 done")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Write batch.json
-# ══════════════════════════════════════════════════════════════════════════════
-with open("batch.json", "w") as f:
-    json.dump(batch, f, indent=2, ensure_ascii=False)
-print(f"\nDone. {len(batch)} items written to batch.json")
+if __name__ == "__main__":
+    main()
