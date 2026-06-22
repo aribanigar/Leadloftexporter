@@ -4,19 +4,19 @@ routine.py  — CollabMarket content-hub publishing routine
 ==========================================================
     fetch Pixabay images  ->  build the HTML email  ->  publish to content_assets
 
-Safe by default: inspects schema and dry-runs unless you pass --commit.
+Safe by default: dry-runs unless you pass --commit.
 
 SETUP:
-    export DATABASE_URL="postgresql://user:pass@host:5432/postgres"
+    export SUPABASE_URL="https://cmdnezltteldysoxyjzh.supabase.co"
+    export SUPABASE_SERVICE_KEY="sb_secret_..."
     export HUB_WORKSPACE="1a716353-9472-4c1d-ae89-f95052e8f015"
-    export PIXABAY_API_KEY="56316516-fbb10ad7475940758256bc517"
+    export PIXABAY_API_KEY="..."
 
 USAGE:
-    python routine.py                        # inspect + dry-run (no writes)
-    python routine.py --commit               # actually insert the row
-    python routine.py --commit --embed       # embed images as base64
+    python routine.py                  # dry-run (no writes)
+    python routine.py --commit         # insert the row
+    python routine.py --commit --embed # embed images as base64
     python routine.py --commit --type html_email
-    python routine.py --commit --slug my-slug --status published
 """
 
 import os
@@ -36,13 +36,10 @@ def main():
     ap.add_argument("--commit",       action="store_true", help="Write to DB (default: dry-run)")
     ap.add_argument("--embed",        action="store_true", help="Inline images as base64")
     ap.add_argument("--type",         default="html_email")
-    ap.add_argument("--slug",         default="collab-market")
-    ap.add_argument("--status",       default="draft")
     ap.add_argument("--skip-inspect", action="store_true", help="Skip schema print")
     args = ap.parse_args()
 
-    # preflight — DATABASE_URL is what publish.py's _conn() actually reads
-    missing = [k for k in ("DATABASE_URL", "HUB_WORKSPACE", "PIXABAY_API_KEY")
+    missing = [k for k in ("SUPABASE_URL", "SUPABASE_SERVICE_KEY", "HUB_WORKSPACE", "PIXABAY_API_KEY")
                if not os.environ.get(k)]
     if missing:
         sys.exit(f"ERROR: missing env vars: {', '.join(missing)}")
@@ -52,7 +49,7 @@ def main():
 
     # 1. inspect
     if not args.skip_inspect:
-        step(1, "Inspecting content-hub schema")
+        step(1, "Inspecting content_assets schema")
         try:
             pub.inspect()
         except Exception as e:
@@ -69,13 +66,7 @@ def main():
 
     # 3. publish
     step(3, "Publishing" if args.commit else "Dry-run (no DB write)")
-    pub.publish(
-        slug=args.slug,
-        ctype=args.type,
-        embed=args.embed,
-        status=args.status,
-        dry_run=not args.commit,
-    )
+    pub.publish(ctype=args.type, embed=args.embed, dry_run=not args.commit)
 
     print("\n\033[1mDone.\033[0m" + ("" if args.commit
           else "  Re-run with --commit to insert for real."))
