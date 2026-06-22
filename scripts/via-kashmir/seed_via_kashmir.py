@@ -170,17 +170,20 @@ def main() -> int:
         subj = m.get("subject")
         track = m.get("track", sd.name)
         seas = m.get("season", "")
+        # poster card (the email hero rebuilt as a 1080x1350 JPG) — rides along as the
+        # WhatsApp media when the asset is sent from the hub. meta carries the jsDelivr URL.
+        img = m.get("promo_image") or m.get("image")
         eh, ea = read(sd / "email.html"), read(sd / "email.amp.html")
         wa, li = read(sd / "whatsapp.txt"), read(sd / "linkedin.txt")
         jobs = []
         if eh:
             jobs.append((name, "html_email", eh, subj, None,
-                         [code, track] + ([seas] if seas else []), ea))
+                         [code, track] + ([seas] if seas else []), ea, None))
         if wa:
-            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track], None))
+            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track], None, img))
         if li:
-            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track], None))
-        for title, atype, content, s, plat, tags, amp in jobs:
+            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track], None, None))
+        for title, atype, content, s, plat, tags, amp, image_url in jobs:
             try:
                 if title in existing:
                     rep["skipped"] += 1
@@ -189,7 +192,7 @@ def main() -> int:
                          {"id": str(uuid.uuid4()), "workspace_id": HUB_WORKSPACE,
                           "business_id": biz, "title": title, "type": atype,
                           "content": content, "subject": s, "platform": plat,
-                          "tags": tags, "amp_content": amp})
+                          "tags": tags, "amp_content": amp, "image_url": image_url})
                 existing.add(title)
                 rep["inserted"] += 1
             except Exception as e:  # noqa: BLE001
