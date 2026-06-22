@@ -1,0 +1,197 @@
+{
+  "date": "2026-06-22",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Branded steel they keep",
+      "out": "content/gifts-gulf/2026-06-22/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6366-03",
+          "sku": "GG1427",
+          "name": "Tiksi"
+        },
+        {
+          "code": "mo2322-03",
+          "sku": "GG1148",
+          "name": "Walnut"
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Where ideas get written",
+      "out": "content/gifts-gulf/2026-06-22/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6220-01",
+          "sku": "GG1399",
+          "name": "Baobab"
+        },
+        {
+          "code": "mo2158-03",
+          "sku": "GG1103",
+          "name": "Veria"
+        },
+        {
+          "code": "mo2421-13",
+          "sku": "GG1191",
+          "name": "Arbocho"
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Recycled, clearly yours",
+      "out": "content/gifts-gulf/2026-06-22/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2188-03",
+          "sku": "GG1113",
+          "name": "Mare"
+        },
+        {
+          "code": "mo2189-03",
+          "sku": "GG1115",
+          "name": "Mujika"
+        },
+        {
+          "code": "mo2274-03",
+          "sku": "GG1132",
+          "name": "Elnas"
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Carried everywhere, branded",
+      "out": "content/gifts-gulf/2026-06-22/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2126-04",
+          "sku": "GG1094",
+          "name": "Heaven Stripe"
+        },
+        {
+          "code": "mo2245-13",
+          "sku": "GG1127",
+          "name": "Shoppi"
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Giveaways they keep",
+      "out": "content/gifts-gulf/2026-06-22/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6679-03",
+          "sku": "GG1481",
+          "name": "Block"
+        },
+        {
+          "code": "mo8769-13",
+          "sku": "GG1596",
+          "name": "Colopad"
+        },
+        {
+          "code": "mo7818-06",
+          "sku": "GG1570",
+          "name": "Triangulo"
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Day one, done right",
+      "out": "content/gifts-gulf/2026-06-22/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2576-03",
+          "sku": "GG1253",
+          "name": "Camp"
+        },
+        {
+          "code": "mo2684-03",
+          "sku": "GG1294",
+          "name": "Korovin"
+        },
+        {
+          "code": "mo2741-03",
+          "sku": "GG1308",
+          "name": "Day"
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Recycled bottles, reborn",
+      "out": "content/gifts-gulf/2026-06-22/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2164-15",
+          "sku": "GG1106",
+          "name": "Llana"
+        },
+        {
+          "code": "mo2165-15",
+          "sku": "GG1107",
+          "name": "Plana"
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Summer carry, branded",
+      "out": "content/gifts-gulf/2026-06-22/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2555-37",
+          "sku": "GG1238",
+          "name": "Laguna"
+        },
+        {
+          "code": "mo2589-03",
+          "sku": "GG1258",
+          "name": "Osole+ Colour"
+        },
+        {
+          "code": "mo2590-03",
+          "sku": "GG1259",
+          "name": "Osole++ Colour"
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Warm wood, your logo",
+      "out": "content/gifts-gulf/2026-06-22/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6363-40",
+          "sku": "GG1428",
+          "name": "Travis"
+        },
+        {
+          "code": "mo6821-40",
+          "sku": "GG1506",
+          "name": "Naira"
+        },
+        {
+          "code": "mo8200-40",
+          "sku": "GG1571",
+          "name": "Woodave"
+        }
+      ]
+    }
+  ]
+}

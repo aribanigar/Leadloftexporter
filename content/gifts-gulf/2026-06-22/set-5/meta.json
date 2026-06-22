@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-22",
+  "theme": "Event giveaways",
+  "season": "Deep summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260622-5",
+  "campaign_name": "Booth and Event Giveaways - 22 Jun 2026",
+  "subject": "Giveaways worth keeping",
+  "skus": [
+    "GG1481",
+    "GG1596",
+    "GG1570",
+    "GG1388",
+    "GG1387",
+    "GG1386"
+  ],
+  "products": [
+    {
+      "name": "Block",
+      "sku": "GG1481",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6679-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1481"
+    },
+    {
+      "name": "Colopad",
+      "sku": "GG1596",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8769-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1596"
+    },
+    {
+      "name": "Triangulo",
+      "sku": "GG1570",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7818-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1570"
+    },
+    {
+      "name": "Paper Tone L",
+      "sku": "GG1388",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6174-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1388"
+    },
+    {
+      "name": "Paper Tone M",
+      "sku": "GG1387",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6173-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1387"
+    },
+    {
+      "name": "Paper Tone S",
+      "sku": "GG1386",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6172-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1386"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-22/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-22/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}

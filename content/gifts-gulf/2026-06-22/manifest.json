@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-22",
+  "season": "Deep summer, event season and mid-year onboarding",
+  "generated_utc": "2026-06-22T02:16:14.597025Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Branded daily hydration",
+      "campaign_code": "GG-20260622-1",
+      "campaign_name": "Vacuum Steel Drinkware - 22 Jun 2026",
+      "subject": "Steel that sticks around",
+      "skus": [
+        "GG1427",
+        "GG1148",
+        "GG1151",
+        "GG1184",
+        "GG1187",
+        "GG1214"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Notebooks and writing",
+      "angle": "Made for note-takers",
+      "campaign_code": "GG-20260622-2",
+      "campaign_name": "Pens, Notebooks and Sets - 22 Jun 2026",
+      "subject": "Pens they keep clicking",
+      "skus": [
+        "GG1399",
+        "GG1103",
+        "GG1191",
+        "GG1250",
+        "GG1156",
+        "GG1449"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Recycled cotton, clearly yours",
+      "campaign_code": "GG-20260622-3",
+      "campaign_name": "Recycled Cotton Carry - 22 Jun 2026",
+      "subject": "Recycled cotton, clearly yours",
+      "skus": [
+        "GG1113",
+        "GG1115",
+        "GG1132",
+        "GG1138",
+        "GG1141",
+        "GG1173"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Bags and travel",
+      "angle": "Carried everywhere",
+      "campaign_code": "GG-20260622-4",
+      "campaign_name": "Cotton Bags and Totes - 22 Jun 2026",
+      "subject": "Bags built for everywhere",
+      "skus": [
+        "GG1094",
+        "GG1127",
+        "GG1181",
+        "GG1182",
+        "GG1206",
+        "GG1235"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Event giveaways",
+      "angle": "Crowd-friendly and kept",
+      "campaign_code": "GG-20260622-5",
+      "campaign_name": "Booth and Event Giveaways - 22 Jun 2026",
+      "subject": "Giveaways worth keeping",
+      "skus": [
+        "GG1481",
+        "GG1596",
+        "GG1570",
+        "GG1388",
+        "GG1387",
+        "GG1386"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Executive onboarding",
+      "angle": "Welcome them properly",
+      "campaign_code": "GG-20260622-6",
+      "campaign_name": "Soft-Touch Folios and Sets - 22 Jun 2026",
+      "subject": "First day, done right",
+      "skus": [
+        "GG1253",
+        "GG1294",
+        "GG1308",
+        "GG1309",
+        "GG1367",
+        "GG1561"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Recycled and rPET",
+      "angle": "Recycled bags, daily carry",
+      "campaign_code": "GG-20260622-7",
+      "campaign_name": "Recycled rPET Bags - 22 Jun 2026",
+      "subject": "Bottles reborn as bags",
+      "skus": [
+        "GG1106",
+        "GG1107",
+        "GG1133",
+        "GG1139",
+        "GG1189",
+        "GG1210"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Seasonal occasions",
+      "angle": "Summer carry, branded",
+      "campaign_code": "GG-20260622-8",
+      "campaign_name": "Summer Cotton Carry - 22 Jun 2026",
+      "subject": "Summer carry, branded",
+      "skus": [
+        "GG1238",
+        "GG1258",
+        "GG1259",
+        "GG1380",
+        "GG1413",
+        "GG1424"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Natural materials, real branding",
+      "campaign_code": "GG-20260622-9",
+      "campaign_name": "Wood, Bamboo and Natural - 22 Jun 2026",
+      "subject": "Natural materials, branded",
+      "skus": [
+        "GG1428",
+        "GG1506",
+        "GG1571",
+        "GG1434",
+        "GG1577",
+        "GG1603"
+      ]
+    }
+  ]
+}
