@@ -23,12 +23,21 @@ import argparse, datetime as dt, json, os, re, sys, uuid
 from pathlib import Path
 
 # --- this engine's fixed identity ---------------------------------------------
-SLUG  = "via-kashmir-itinerary"
-NAME  = "Via Kashmir Itinerary"
-LOGO  = "https://viakashmir.in/logo-colour.svg?v=3"
-BRAND = "#0e3d2f"
+SLUG   = "via-kashmir-itinerary"
+NAME   = "Via Kashmir Itinerary"
+LOGO   = "https://viakashmir.in/logo-colour.svg?v=3"
+BRAND  = "#0e3d2f"
 ACCENT = "#c8a84b"
-TONE  = "warm-editorial"
+TONE   = "warm-editorial"
+PHOTOS_BASE = (
+    "https://wsrv.nl/?url=raw.githubusercontent.com/aribanigar/Leadloftexporter"
+    "/main/content/via-kashmir-itinerary/_assets/photos/{photo}.jpg"
+    "&w=600&output=jpg&q=80"
+)
+CARD_BASE = (
+    "https://raw.githubusercontent.com/aribanigar/Leadloftexporter"
+    "/main/content/via-kashmir-itinerary/{date}/{market}/img/whatsapp.jpg"
+)
 
 # --- credentials (real values baked in; env vars override if set) -------------
 DATABASE_URL = os.environ.get(
@@ -108,31 +117,35 @@ def main() -> int:
 
     for sd in sorted({p.parent for p in day.rglob("meta.json")}):
         m = json.loads(read(sd / "meta.json"))
-        code  = m.get("campaign_code", sd.name)
-        name  = m.get("campaign_name", code)
-        subj  = m.get("subject")
-        track = m.get("track", sd.name)
+        code   = m.get("campaign_code", sd.name)
+        name   = m.get("campaign_name", code)
+        subj   = m.get("subject")
+        track  = m.get("track", sd.name)
         market = m.get("market", track)
+        photo  = m.get("photo", "")
+        date_str = args.date
+        photo_url = PHOTOS_BASE.format(photo=photo) if photo else None
+        card_url  = CARD_BASE.format(date=date_str, market=market) if market else None
         eh, ea = read(sd / "email.html"), read(sd / "email.amp.html")
         wa, li = read(sd / "whatsapp.txt"), read(sd / "linkedin.txt")
         jobs = []
         if eh:
-            jobs.append((name, "html_email", eh, subj, None, [code, track, market], ea))
+            jobs.append((name, "html_email", eh, subj, None, [code, track, market], ea, photo_url))
         if wa:
-            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track, market], None))
+            jobs.append((name + " - WhatsApp", "whatsapp", wa, None, None, [code, track, market], None, card_url))
         if li:
-            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track, market], None))
-        for title, atype, content, s, plat, tags, amp in jobs:
+            jobs.append((name + " - LinkedIn", "caption", li, None, "linkedin", [code, track, market], None, None))
+        for title, atype, content, s, plat, tags, amp, img_url in jobs:
             try:
                 if n.q("select 1 from content_assets where business_id=$1 and title=$2 limit 1",
                        [biz, title]):
                     rep["skipped"] += 1
                     continue
                 n.q("""insert into content_assets
-                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content)
-                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)""",
+                         (id,workspace_id,business_id,title,type,content,subject,platform,tags,amp_content,image_url)
+                       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)""",
                     [str(uuid.uuid4()), HUB_WORKSPACE, biz, title, atype, content, s, plat,
-                     json.dumps(tags), amp])
+                     json.dumps(tags), amp, img_url])
                 rep["inserted"] += 1
             except Exception as e:
                 rep["failures"].append([title, str(e)])
