@@ -90,8 +90,9 @@ def publish(ctype="html_email", embed=False, dry_run=True,
     business_id = biz["id"]
     workspace_id = biz["workspace_id"]
 
-    today = datetime.date.today().isoformat()
-    title = title or f"[{today}] Creator Recruitment — Get Booked & Paid"
+    # Stable title (no date prefix) so re-runs resolve to the same asset and
+    # update it in place instead of seeding a fresh row every day.
+    title = title or "Creator Recruitment — Get Booked & Paid"
     subject = subject or "Stop pitching brands in the DMs — let them book you"
 
     html = build_email(embed=embed)
@@ -125,18 +126,32 @@ def publish(ctype="html_email", embed=False, dry_run=True,
     existing = find_existing(business_id, title)
     headers = _headers() | {"Prefer": "return=representation"}
 
-    if existing and update:
+    # Idempotent by title: update the first match in place, prune any extra
+    # rows that share the same title, and only insert when none exist. This is
+    # what stops re-runs from piling up near-identical assets in the hub.
+    # (The `update` flag is retained for CLI compatibility but is now the
+    # default behaviour — upsert always.)
+    if existing:
         rid = existing[0]["id"]
         record["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Never rewrite the primary key on update — patch every field except id,
+        # so the row keeps a stable id across re-runs.
+        patch = {k: v for k, v in record.items() if k != "id"}
         url = f"{_base()}/content_assets?id=eq.{rid}"
-        r = requests.patch(url, headers=headers, data=json.dumps(record), timeout=60)
+        r = requests.patch(url, headers=headers, data=json.dumps(patch), timeout=60)
         r.raise_for_status()
-        print(f"UPDATED existing asset id={rid}")
+        removed = 0
+        for dup in existing[1:]:
+            d = requests.delete(f"{_base()}/content_assets?id=eq.{dup['id']}",
+                                headers=_headers(), timeout=30)
+            d.raise_for_status()
+            removed += 1
+        msg = f"UPDATED existing asset id={rid}"
+        if removed:
+            msg += f" (pruned {removed} duplicate row(s) sharing this title)"
+        print(msg)
         return r.json()
     else:
-        if existing and not update:
-            print(f"NOTE: {len(existing)} asset(s) already share this title. "
-                  f"Inserting a new row anyway (pass update=True to overwrite).")
         url = f"{_base()}/content_assets"
         r = requests.post(url, headers=headers, data=json.dumps(record), timeout=60)
         r.raise_for_status()
