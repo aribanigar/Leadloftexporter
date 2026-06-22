@@ -575,19 +575,15 @@ def bulk_send_email(
             "no_email_account_connected",
         )
 
-    daily_cap = int(outreach_settings(ctx.workspace).get("email_limit_per_day", 80))
-    already_today = emails_sent_today(db, ctx.workspace_id)
-
-    # Cap the queue depth at remaining daily budget + the next 24h's budget so
-    # an over-eager bulk send to a 5,000-row pipeline doesn't sit half-stale
-    # for a week. Anything beyond budget × 2 returns as "skipped_over_cap"
-    # and the user is told to come back tomorrow.
-    enqueue_cap = max(0, daily_cap * 2 - already_today)
-    if enqueue_cap == 0:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            f"daily_limit_reached: {already_today}/{daily_cap}",
-        )
+    # HARDCODED RULE (CLAUDE.md): "no per-inbox cap, no daily ceiling, no
+    # warmup throttle, no defer to tomorrow." The campaign send path already
+    # respects this (email_sender.py:316). This manual-composer endpoint had
+    # silently kept a `email_limit_per_day` gate with default 80 — exactly
+    # the kind of hidden throttle the rule warns against. Removed: the
+    # 429 raise is gone, and the per-loop queue counter no longer compares
+    # against a daily cap. The user explicitly asked for the cap to be
+    # removed fully on emails.
+    already_today = emails_sent_today(db, ctx.workspace_id)  # kept for telemetry only
 
     q = (
         db.query(Lead)
@@ -622,9 +618,7 @@ def bulk_send_email(
         if not (lead.email or "").strip():
             skipped_no_email += 1
             continue
-        if queued >= enqueue_cap:
-            skipped_over_cap += 1
-            continue
+        # cap gate removed per CLAUDE.md hardcoded rule
         if ai_mode:
             try:
                 generated = generate_email_for_lead(
@@ -681,9 +675,9 @@ def bulk_send_email(
     return {
         "queued": queued,
         "skipped_no_email": skipped_no_email,
-        "skipped_over_cap": skipped_over_cap,
+        "skipped_over_cap": skipped_over_cap,  # always 0 now — gate removed
         "skipped_recent_dup": skipped_recent_dup,
-        "daily_cap": daily_cap,
+        "daily_cap": 1_000_000,                # sentinel: unlimited
         "daily_sent": already_today,
         "total": len(leads),
     }
@@ -748,11 +742,14 @@ def bulk_status(
         .all()
     )
     counts = {r[0]: r[1] for r in rows}
-    daily_cap = int(outreach_settings(ctx.workspace).get("email_limit_per_day", 80))
+    # daily_cap kept in the response for backwards compatibility with any
+    # existing UI consumer, but it now reports the "unlimited" sentinel
+    # (1_000_000) per the CLAUDE.md hardcoded rule. The send + scheduler
+    # paths no longer gate on it.
     return {
         "queued": counts.get("queued", 0),
         "sent": counts.get("sent", 0) + counts.get("delivered", 0) + counts.get("opened", 0),
         "failed": counts.get("failed", 0) + counts.get("bounced", 0),
-        "daily_cap": daily_cap,
+        "daily_cap": 1_000_000,
         "daily_sent": emails_sent_today(db, ctx.workspace_id),
     }

@@ -251,16 +251,14 @@ def send_queued_emails() -> dict:
                 continue
             settings = outreach_settings(ws)
             per_min = int(settings.get("email_drain_per_minute", 6))
-            daily_cap = int(settings.get("email_limit_per_day", 80))
-            today = emails_sent_today(db, ws.id)
+            # HARDCODED RULE (CLAUDE.md): "no per-inbox cap, no daily
+            # ceiling, no defer to tomorrow." Drain queue at the per-minute
+            # rate without comparing against a daily cap. per-minute pacing
+            # stays (it's the SMTP-burst protection, not a hidden quota).
             for msg in msgs[:per_min]:
-                if today >= daily_cap:
-                    skipped_over_cap += 1
-                    continue
                 result = send_email_message(db, msg, ws)
                 if result.ok:
                     sent += 1
-                    today += 1
             skipped_throttled += max(0, len(msgs) - per_min)
     return {
         "sent": sent,
