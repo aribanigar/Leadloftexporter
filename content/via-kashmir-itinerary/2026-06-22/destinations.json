@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "manali",     "feat": "manali"},
+  "kashmir": {"photo": "kashmir",    "feat": "kashmir"},
+  "saudi":   {"photo": "cappadocia", "feat": "cappadocia"},
+  "dubai":   {"photo": "maldives",   "feat": "maldives"}
+}

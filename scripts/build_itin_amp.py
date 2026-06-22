@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""
+build_itin_amp.py - Generate AMP4Email (email.amp.html) for each market.
+
+Usage:
+  python3 scripts/build_itin_amp.py --date 2026-06-22 --all
+"""
+import argparse, datetime, json, sys
+from pathlib import Path
+
+ROOT = Path(__file__).parent.parent
+CONTENT_BASE = ROOT / "content" / "via-kashmir-itinerary"
+MARKETS = ["india", "kashmir", "saudi", "dubai"]
+
+WSRV = "https://wsrv.nl/?url=raw.githubusercontent.com/aribanigar/Leadloftexporter/main"
+LOGO_URL = "https://wsrv.nl/?url=viakashmir.in/logo-colour.svg&w=400&output=png"
+CTA_URL = "https://viakashmiritinerary.in/signup"
+
+
+def wsrv_photo(tag: str, w: int = 1200) -> str:
+    return f"{WSRV}/content/via-kashmir-itinerary/_assets/photos/{tag}.jpg&w={w}&output=jpg&q=82"
+
+
+def render_amp(meta: dict, hero_tag: str) -> str:
+    subject = meta.get("subject", "ViaKashmir Itinerary Builder")
+    bilingual = meta.get("bilingual", False)
+    market = meta.get("market", "india")
+    hero_url = wsrv_photo(hero_tag, 1200)
+    feat_url = wsrv_photo(meta.get("feat_photo", hero_tag), 800)
+
+    # Load copy from the plain-text files written by build_itin.py
+    mkt_dir = CONTENT_BASE / meta["date"] / market
+    whatsapp_text = (mkt_dir / "whatsapp.txt").read_text(encoding="utf-8") if (mkt_dir / "whatsapp.txt").exists() else ""
+    linkedin_text = (mkt_dir / "linkedin.txt").read_text(encoding="utf-8") if (mkt_dir / "linkedin.txt").exists() else ""
+
+    return f"""<!doctype html>
+<html ⚡4email data-css-strict lang="{meta.get('track','en')}">
+<head>
+<meta charset="utf-8">
+<script async src="https://cdn.ampproject.org/v0.js"></script>
+<script async custom-element="amp-accordion" src="https://cdn.ampproject.org/v0/amp-accordion-0.1.js"></script>
+<style amp4email-boilerplate>body{{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}}@-webkit-keyframes -amp-start{{from{{visibility:hidden}}to{{visibility:visible}}}}</style>
+<style amp-custom>
+body{{margin:0;padding:0;background:#f0ede8;font-family:Arial,Helvetica,sans-serif;}}
+.wrap{{max-width:600px;margin:0 auto;}}
+.logo-bar{{background:#fff;padding:24px 32px;text-align:center;border-radius:12px 12px 0 0;}}
+.logo-bar img{{height:50px;width:auto;display:block;margin:0 auto;}}
+.logo-tag{{font-size:10px;color:#9e9589;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin:6px 0 0;}}
+.hero-img amp-img{{display:block;}}
+.headline{{background:#0e3d2f;padding:32px 36px 36px;}}
+.headline h1{{margin:0 0 12px;font-family:Georgia,serif;font-size:26px;color:#fff;line-height:1.3;}}
+.headline p{{margin:0 0 24px;font-size:15px;color:#a8d5b8;line-height:1.5;}}
+.cta-btn{{display:inline-block;background:#4caf8c;color:#fff;font-weight:700;font-size:15px;padding:13px 30px;border-radius:6px;text-decoration:none;}}
+.accent{{background:#2d7a5f;padding:13px 36px;font-size:13px;font-weight:700;color:#d4f0e4;}}
+.compare{{background:#fff;padding:32px 36px;}}
+.compare h2{{font-family:Georgia,serif;font-size:19px;color:#1a1a1a;margin:0 0 20px;}}
+.col-bad{{background:#fdf5f0;padding:18px;border-radius:8px;border-top:3px solid #c4a882;margin-bottom:16px;}}
+.col-good{{background:#f0f8f4;padding:18px;border-radius:8px;border-top:3px solid #4caf8c;}}
+.col-label{{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 12px;}}
+.col-bad .col-label{{color:#7a5540;}}
+.col-good .col-label{{color:#0e6644;}}
+.col-item{{font-size:13px;color:#444;line-height:1.4;margin:0 0 8px;}}
+.proof{{background:#f8faf8;padding:32px 24px;}}
+.proof h3{{font-family:Georgia,serif;font-size:17px;color:#0e3d2f;text-align:center;margin:0 0 24px;}}
+.proof-item{{padding:0 0 20px;text-align:center;}}
+.proof-icon{{font-size:28px;line-height:1;}}
+.proof-title{{font-family:Georgia,serif;font-size:14px;font-weight:700;color:#0e3d2f;margin:6px 0 4px;}}
+.proof-desc{{font-size:12px;color:#666;line-height:1.45;}}
+.urgency{{background:#c8a84b;padding:18px 36px;font-size:14px;font-weight:700;color:#1a1a1a;line-height:1.45;}}
+.contact{{background:#1a2e25;padding:24px 36px;}}
+.contact-label{{font-size:11px;color:#7eb898;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;margin:0 0 8px;}}
+.contact-links{{font-size:14px;color:#fff;line-height:1.7;}}
+.contact-links a{{color:#c8a84b;text-decoration:none;}}
+.footer{{background:#0a2b1e;padding:18px 36px;border-radius:0 0 12px 12px;text-align:center;font-size:11px;color:#446655;line-height:1.7;}}
+.footer a{{color:#446655;text-decoration:none;}}
+.cta-card{{background:#0e3d2f;padding:36px;}}
+.cta-card h2{{font-family:Georgia,serif;font-size:21px;color:#fff;margin:0 0 12px;}}
+.cta-card p{{font-size:14px;color:#a8d5b8;line-height:1.5;margin:0 0 24px;}}
+.cta-gold{{display:inline-block;background:#c8a84b;color:#1a1a1a;font-weight:700;font-size:15px;padding:13px 30px;border-radius:6px;text-decoration:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="logo-bar">
+  <amp-img src="{LOGO_URL}" width="160" height="54" alt="ViaKashmir" layout="fixed"></amp-img>
+  <p class="logo-tag">Itinerary Builder</p>
+</div>
+
+<div class="hero-img">
+  <amp-img src="{hero_url}" width="600" height="250" layout="responsive" alt="{meta.get('hero_photo','')}"></amp-img>
+</div>
+
+<div class="headline">
+  <h1>Build any client itinerary in about 2 minutes.</h1>
+  <p>Any destination. Looks professional. Client-ready PDF — without the Word struggle.</p>
+  <a href="{CTA_URL}" class="cta-btn">Start Building Free</a>
+</div>
+
+<div class="accent">Any destination. Any client. Quoted in about 2 minutes.</div>
+
+<div class="compare">
+  <h2>Same itinerary. Very different timelines.</h2>
+  <div class="col-bad">
+    <p class="col-label">By Hand</p>
+    <p class="col-item">✗ 15–20 minutes in Word</p>
+    <p class="col-item">✗ Fonts and formatting fighting you</p>
+    <p class="col-item">✗ Client gets a cluttered PDF</p>
+    <p class="col-item">✗ Repeat for every new client</p>
+  </div>
+  <div class="col-good">
+    <p class="col-label">With VKI Builder</p>
+    <p class="col-item">✓ About 2 minutes, start to PDF</p>
+    <p class="col-item">✓ Clean, consistent design every time</p>
+    <p class="col-item">✓ Your agency branding on every page</p>
+    <p class="col-item">✓ Quote and move on</p>
+  </div>
+</div>
+
+<div class="cta-card">
+  <h2>{meta.get("subject","Send the quote first.")}</h2>
+  <p>Two minutes. Any destination on the map. Your brand on it. No complex setup, no learning curve.</p>
+  <a href="{CTA_URL}" class="cta-gold">Try the Builder Free</a>
+</div>
+
+<div class="proof">
+  <h3>Why agents make the switch.</h3>
+  <div class="proof-item"><p class="proof-icon">⚡</p><p class="proof-title">Two minutes.</p><p class="proof-desc">Any destination. Start to client-ready PDF.</p></div>
+  <div class="proof-item"><p class="proof-icon">✦</p><p class="proof-title">Looks like you.</p><p class="proof-desc">Your agency name and brand. Not a generic template.</p></div>
+  <div class="proof-item"><p class="proof-icon">↗</p><p class="proof-title">No learning curve.</p><p class="proof-desc">Use it today. No manual, no training needed.</p></div>
+</div>
+
+<div class="urgency">Speed is not a nice-to-have. The agent who sends the quote first wins the booking.</div>
+
+<div class="contact">
+  <p class="contact-label">Questions?</p>
+  <p class="contact-links">
+    <a href="mailto:contact@viakashmir.in">contact@viakashmir.in</a><br>
+    <a href="https://wa.me/919186051499">WhatsApp: +91 918 605 1499</a>
+  </p>
+</div>
+
+<div class="footer">
+  &copy; 2026 ViaKashmir &middot; <a href="https://viakashmiritinerary.in">viakashmiritinerary.in</a><br>
+  <a href="mailto:contact@viakashmir.in?subject=Unsubscribe">Unsubscribe</a>
+</div>
+
+</div>
+</body>
+</html>"""
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Build AMP4Email for ViaKashmir Itinerary markets.")
+    ap.add_argument("--date", default=datetime.date.today().isoformat())
+    ap.add_argument("--all", action="store_true")
+    ap.add_argument("--market", choices=MARKETS)
+    args = ap.parse_args()
+
+    if not args.all and not args.market:
+        ap.error("Provide --all or --market")
+
+    markets = MARKETS if args.all else [args.market]
+    print(f"[build_amp] Date={args.date}  Markets={markets}")
+
+    for m in markets:
+        meta_path = CONTENT_BASE / args.date / m / "meta.json"
+        if not meta_path.exists():
+            print(f"  [build_amp] SKIP {m}: no meta.json (run build_itin.py first)")
+            continue
+        meta = json.loads(meta_path.read_text())
+        meta["date"] = args.date
+        hero_tag = meta.get("hero_photo", m)
+        amp_html = render_amp(meta, hero_tag)
+        out_path = CONTENT_BASE / args.date / m / "email.amp.html"
+        out_path.write_text(amp_html, encoding="utf-8")
+        print(f"  [build_amp] ✓ {m}/email.amp.html")
+
+    print("[build_amp] Done.")
+
+
+if __name__ == "__main__":
+    main()
