@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-22",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Gulmarg in June - green meadows below, snow line above",
+      "subject": "Gulmarg in June, green below and white above",
+      "campaign_code": "VK-INR-B2C-20260622"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Summer valley drives - book the run before it goes to another cab",
+      "subject": "A summer valley drive was just booked without you",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260622"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "A",
+      "theme": "Peak Dal Lake season - get your boat seen before the guest picks another",
+      "subject": "A summer guest on the Dal just chose another deck",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260622"
+    }
+  ]
+}
