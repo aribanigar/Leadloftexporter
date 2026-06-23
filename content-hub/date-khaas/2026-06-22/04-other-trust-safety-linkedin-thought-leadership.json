@@ -1,0 +1,73 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "Trust & Safety — LinkedIn Thought Leadership",
+  "image_query": "muslim wedding celebration",
+  "body": "The Muslim matrimony space has a trust problem — and it’s not what you think.\n\nIt’s not that people are dishonest. It’s that platforms make promises they can’t keep.\n\n“100% verified” — yet users report married and fake profiles slipping through, no manual moderation confirmed, medium-risk trust scores from independent reviewers.\n\n“30-day money back” — if you’ve sent 10+ interests with zero accepts, one-time per lifetime, fine print everywhere.\n\nWe built Date Khaas for a different standard. Not because trust is a marketing hook, but because the nikah deserves it.\n\nThree things every halal platform should offer by default — not as a premium tier:\n\n→ Photo privacy from day one: blurred until mutual consent, for every member\n→ Wali involvement built in: guardian access, not an afterthought or upsell\n→ Transparent verification: show how profiles are checked, not just claim they are\n\nThe families trusting us are placing something sacred in our hands — a daughter’s safety, a son’s sincerity, a marriage that should last a lifetime.\n\nThat trust isn’t a feature. It’s the floor.\n\nThis Muharram — Islamic New Year 1448 — we’re building something worthy of it.\n\n#MuslimMatrimony #Nikah #HalalTech #IslamicMarriage #TrustAndSafety",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Islamic New Year 1448 AH (1 Muharram) confirmed June 16, 2026 globally — Saudi Arabia, UAE, UK, US all aligned. Today (June 22) is 6 Muharram: the Islamic month of reflection and new beginnings. Muharram is traditionally avoided for weddings but is ideal for 'begin your search with intention' messaging ahead of Safar/Rabi al-Awwal wedding season.",
+        "source": "https://www.arabianbusiness.com/abnews/saudi-arabia-islamic-new-year-1448"
+      },
+      {
+        "insight": "Photo blur as a default (not a premium feature) is now the key differentiator users want in 2026. Zawjni defaults blur for all users; Salams restricts it to $19.99/month Premium. Muslim women specifically want photos visible only after mutual consent — this is a primary trust signal and conversion driver.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Wali (guardian) involvement is the most underused trust signal in Muslim matrimony. Salams Premium offers guardian read-only chat access ($19.99/month). Platforms with transparent family-involvement features see stronger trust from both candidates and parents — it directly addresses 'is this halal?' sign-up hesitation.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims '100% verified profiles' and 'World's No.1 Muslim matrimony site' with 55,000+ matches and 1M+ users. However, user reviews on Trustpilot, SiteJabber, and Google Play report married/fake profiles slipping through, no manual photo moderation confirmed, and Scam Detector gives it a medium-risk trust score of 66/100. Competitor claim to answer: Date Khaas should show HOW verification works rather than claiming perfection.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "Shaadi.com's 30-day 'Match Guarantee' has strict fine print: requires sending 10+ interests with zero accepts, applies only once per profile lifetime, excludes VIP memberships, requires complete profile with photo. Blue tick = government ID + phone verified = claims 40% more matches. A counter-message: quality over quantity — the right match matters more than any refund.",
+        "source": "https://www.shaadi.com/introduction/index/match-guarantee"
+      },
+      {
+        "insight": "NRI Muslim diaspora is the fastest-growing matrimony segment: ~4.5M Muslims in the US, major UK concentrations (London, Birmingham, Manchester), Gulf markets (UAE, KSA, Qatar). NRIs specifically seek partners who share faith AND cultural roots — 'someone who carries the same home in their heart' is a resonant message for this audience.",
+        "source": "https://nikahnamah.com/"
+      }
+    ],
+    "angle": "Begin with intention — your match is already written",
+    "hashtags": [
+      "#MuslimMatrimony",
+      "#Nikah",
+      "#HalalTech",
+      "#IslamicMarriage",
+      "#TrustAndSafety"
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-celebration-3928295.jpg",
+      "remote_url": "https://pixabay.com/get/gb2bee024cc69426107d1027555755f3f0c565bcec27fa32fbf929651a10217df747c13b34fa823e4a26dbc7398aeeb6129f44b7a765ad5dd2b8dfc3444376f42_1280.jpg",
+      "page_url": "https://pixabay.com/photos/indian-wedding-indian-bride-3928295/",
+      "author": "globalqart",
+      "pixabay_id": 3928295,
+      "tags": "indian wedding, indian bride, bridal makeup, henna, bollywood, marriage, culture, jewellery, design, emotions, gold, woman, fashion, asian, celebration, female, traditional, india, bridal, muslim wedding, indian wedding, indian bride, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bollywood, bollywood, bollywood",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-celebration-4615557.jpg",
+      "remote_url": "https://pixabay.com/get/g43a6360574178f82441a6210e3b27f691f6f7d60ab62a5cf029e333f8025f7296bec8c0fb275ad4fb8248882da1d3a24adeb619220d231548b8f1e61d3775809_1280.jpg",
+      "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+      "author": "OlcayErtem",
+      "pixabay_id": 4615557,
+      "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, male, big, girl, happiness, nature, celebration, ceremony, wife, bouquet, grass",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/muslim-wedding-celebration-443600.jpg",
+      "remote_url": "https://pixabay.com/get/gefccdb2e091979f6cafd24d785f1574b3142d9420a63b6ef773ecaf77d294b315eff027b748c384729444692561a94b160e91814ff14b19f84ed9dedaba06173_1280.jpg",
+      "page_url": "https://pixabay.com/photos/couple-wedding-park-newlyweds-443600/",
+      "author": "toanmda",
+      "pixabay_id": 443600,
+      "tags": "couple, wedding, park, newlyweds, wedding day, husband, wife, man, woman, bride, groom, romantic, love, happy, relationship, outdoors, wedding photography, portrait, couple, wedding, wedding, wedding, wedding, wedding, love",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

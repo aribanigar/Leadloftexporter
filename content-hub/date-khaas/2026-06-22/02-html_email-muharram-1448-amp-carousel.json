@@ -1,0 +1,71 @@
+{
+  "type": "html_email",
+  "format": "amp",
+  "channel": "email",
+  "title": "Muharram 1448 — AMP Carousel",
+  "subject": "Your match is already written — begin this Muharram",
+  "preheader": "Verified profiles. Photo privacy. Your wali by your side.",
+  "cta_url": "https://datekhaas.com/start",
+  "image_query": "nikah ceremony",
+  "body": "<!doctype html>\n<html ⚡4email data-css-strict>\n<head>\n  <meta charset=\"UTF-8\">\n  <script async src=\"https://cdn.ampproject.org/v0.js\"></script>\n  <script async custom-element=\"amp-carousel\" src=\"https://cdn.ampproject.org/v0/amp-carousel-0.1.js\"></script>\n  <style amp4email-boilerplate>body{visibility:hidden}</style>\n  <style amp-custom>\n    body{margin:0;padding:0;background:#f7f3ee;font-family:Helvetica,Arial,sans-serif;}\n    .wrap{max-width:600px;margin:0 auto;background:#fff;}\n    .logo-bar{background:#003527;padding:20px;text-align:center;}\n    .logo{font-family:Georgia,serif;font-size:22px;color:#e9c176;letter-spacing:3px;}\n    .slide{position:relative;background:#111;}\n    .slide-img{display:block;width:100%;}\n    .overlay{background:rgba(0,53,39,0.80);padding:20px 24px;}\n    .slide-title{font-family:Georgia,serif;font-size:21px;color:#e9c176;margin:0 0 6px;font-weight:normal;line-height:1.3;}\n    .slide-sub{font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#c8d8c8;margin:0;line-height:1.5;}\n    .cta-block{background:#003527;padding:28px;text-align:center;}\n    .cta-head{font-family:Georgia,serif;font-size:18px;color:#e9c176;margin:0 0 16px;font-weight:normal;}\n    .cta-btn{display:inline-block;background:#e9c176;color:#003527;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;padding:12px 32px;border-radius:4px;}\n    .footer{background:#f0ece6;padding:16px;text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#999;}\n    .footer a{color:#003527;text-decoration:none;}\n  </style>\n</head>\n<body>\n<div class=\"wrap\">\n  <div class=\"logo-bar\"><span class=\"logo\">Date Khaas</span></div>\n\n  <amp-carousel width=\"600\" height=\"380\" layout=\"responsive\" type=\"slides\" autoplay delay=\"3800\" loop>\n\n    <div class=\"slide\">\n      <amp-img src=\"https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/date-khaas/2026-06-22/muslim-wedding-ceremony-1868868.jpg\" width=\"600\" height=\"340\" layout=\"responsive\" alt=\"A blessed nikah\"></amp-img>\n      <div class=\"overlay\">\n        <p class=\"slide-title\">Your match is already written.</p>\n        <p class=\"slide-sub\">This Muharram, begin your search with barakah and intention.</p>\n      </div>\n    </div>\n\n    <div class=\"slide\">\n      <amp-img src=\"https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/date-khaas/2026-06-22/muslim-wedding-ceremony-4615557.jpg\" width=\"600\" height=\"340\" layout=\"responsive\" alt=\"Verified profiles\"></amp-img>\n      <div class=\"overlay\">\n        <p class=\"slide-title\">&#10022; Every profile reviewed.</p>\n        <p class=\"slide-sub\">Not just registered. Not just an OTP. Actually checked &mdash; so you can browse with trust.</p>\n      </div>\n    </div>\n\n    <div class=\"slide\">\n      <amp-img src=\"https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/date-khaas/2026-06-22/muslim-wedding-ceremony-8028163.jpg\" width=\"600\" height=\"340\" layout=\"responsive\" alt=\"Your photos your control\"></amp-img>\n      <div class=\"overlay\">\n        <p class=\"slide-title\">&#10022; Your photos, your say.</p>\n        <p class=\"slide-sub\">Blurred by default for every member. Visible only when you choose &mdash; not locked behind a subscription.</p>\n      </div>\n    </div>\n\n  </amp-carousel>\n\n  <div class=\"cta-block\">\n    <p class=\"cta-head\">Begin your search with intention.</p>\n    <a href=\"https://datekhaas.com/start\" class=\"cta-btn\">Start Now</a>\n  </div>\n\n  <div class=\"footer\">\n    Date Khaas &middot; Muslim Matrimony &middot; <a href=\"https://datekhaas.com/unsubscribe\">Unsubscribe</a>\n  </div>\n</div>\n</body>\n</html>",
+  "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">\n<title>Date Khaas — Begin with Intention</title>\n</head>\n<body style=\"margin:0;padding:0;background:#f7f3ee;font-family:Helvetica,Arial,sans-serif;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n  <tr><td align=\"center\" style=\"padding:24px 16px;\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#fff;border-radius:8px;overflow:hidden;\">\n      <tr><td style=\"background:#003527;padding:20px;text-align:center;\"><span style=\"font-family:Georgia,serif;font-size:22px;color:#e9c176;letter-spacing:3px;\">Date Khaas</span></td></tr>\n      <tr><td style=\"line-height:0;\"><img src=\"https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/date-khaas/2026-06-22/muslim-wedding-ceremony-1868868.jpg\" alt=\"A blessed nikah\" width=\"600\" style=\"width:100%;display:block;\" /></td></tr>\n      <tr><td style=\"padding:32px 40px 24px;\">\n        <h1 style=\"margin:0 0 16px;font-family:Georgia,serif;font-size:26px;font-weight:normal;color:#003527;line-height:1.35;\">Your match is already written.</h1>\n        <p style=\"margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#2d2d2d;line-height:1.7;\">This Muharram &mdash; the first month of Islamic year 1448 &mdash; begin your search with intention and barakah.</p>\n        <p style=\"margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#2d2d2d;line-height:1.7;\"><strong style=\"color:#003527;\">Reviewed profiles. Photos blurred by default. Your wali by your side.</strong></p>\n        <a href=\"https://datekhaas.com/start\" style=\"display:inline-block;background:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;padding:12px 32px;border-radius:4px;\">Begin Your Search</a>\n      </td></tr>\n      <tr><td style=\"background:#f0ece6;padding:16px;text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#999;\">Date Khaas &middot; <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#003527;text-decoration:none;\">Unsubscribe</a></td></tr>\n    </table>\n  </td></tr>\n</table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Islamic New Year 1448 AH (1 Muharram) confirmed June 16, 2026 globally — Saudi Arabia, UAE, UK, US all aligned. Today (June 22) is 6 Muharram: the Islamic month of reflection and new beginnings. Muharram is traditionally avoided for weddings but is ideal for 'begin your search with intention' messaging ahead of Safar/Rabi al-Awwal wedding season.",
+        "source": "https://www.arabianbusiness.com/abnews/saudi-arabia-islamic-new-year-1448"
+      },
+      {
+        "insight": "Photo blur as a default (not a premium feature) is now the key differentiator users want in 2026. Zawjni defaults blur for all users; Salams restricts it to $19.99/month Premium. Muslim women specifically want photos visible only after mutual consent — this is a primary trust signal and conversion driver.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Wali (guardian) involvement is the most underused trust signal in Muslim matrimony. Salams Premium offers guardian read-only chat access ($19.99/month). Platforms with transparent family-involvement features see stronger trust from both candidates and parents — it directly addresses 'is this halal?' sign-up hesitation.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims '100% verified profiles' and 'World's No.1 Muslim matrimony site' with 55,000+ matches and 1M+ users. However, user reviews on Trustpilot, SiteJabber, and Google Play report married/fake profiles slipping through, no manual photo moderation confirmed, and Scam Detector gives it a medium-risk trust score of 66/100. Competitor claim to answer: Date Khaas should show HOW verification works rather than claiming perfection.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "Shaadi.com's 30-day 'Match Guarantee' has strict fine print: requires sending 10+ interests with zero accepts, applies only once per profile lifetime, excludes VIP memberships, requires complete profile with photo. Blue tick = government ID + phone verified = claims 40% more matches. A counter-message: quality over quantity — the right match matters more than any refund.",
+        "source": "https://www.shaadi.com/introduction/index/match-guarantee"
+      },
+      {
+        "insight": "NRI Muslim diaspora is the fastest-growing matrimony segment: ~4.5M Muslims in the US, major UK concentrations (London, Birmingham, Manchester), Gulf markets (UAE, KSA, Qatar). NRIs specifically seek partners who share faith AND cultural roots — 'someone who carries the same home in their heart' is a resonant message for this audience.",
+        "source": "https://nikahnamah.com/"
+      }
+    ],
+    "angle": "Begin with intention — your match is already written",
+    "note_on_images": "AMP carousel amp-img srcs are placeholders; swap in Pixabay CDN URLs from metadata.images before sending."
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/nikah-ceremony-7807230.jpg",
+      "remote_url": "https://pixabay.com/get/gb63fad5b89e62a4816f469759e6cd133649d7692013ec107766654d8b97966d3579aa4d5dbc27044532b3d7835553befaa0a1793d0cf4d99e069563b48325aef_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-ceremony-ceremony-teatime-japan-7807230/",
+      "author": "mirkostoedter",
+      "pixabay_id": 7807230,
+      "tags": "tea ceremony, ceremony, teatime, japan, china, asia, pottery, teapots, tea ceremony, tea ceremony, tea ceremony, tea ceremony, tea ceremony, teatime, china, china, asia",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/nikah-ceremony-6123746.jpg",
+      "remote_url": "https://pixabay.com/get/gc48f4bcd09e486bdf2fff12781c0400045a788cc8ac9ab7ec3a23d272e12a0e9996a22a4ecf29f5653cde9524e8d6511c8bb4ce67722e8f93ed75265c7cbe4de_1280.jpg",
+      "page_url": "https://pixabay.com/photos/teapot-tea-traditional-ceremony-6123746/",
+      "author": "cromagnon130",
+      "pixabay_id": 6123746,
+      "tags": "teapot, tea, traditional, ceremony, tea cups, cups, steam, hot tea, drink, beverage, japanese, asian, tea, tea, tea, tea, tea",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-22/images/nikah-ceremony-1869716.jpg",
+      "remote_url": "https://pixabay.com/get/gd1da78a2657d39c9a14385aa964b1f004f35e254c4653204968a58538ebe25e532ca724ad0eff6c53ac90e23f0c497c4f0fe2e0c8313e3137dcc25ef3f50b1ad_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
+      "author": "Pexels",
+      "pixabay_id": 1869716,
+      "tags": "tea, cup, pot, tea cup, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}
