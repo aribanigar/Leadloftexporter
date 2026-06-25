@@ -1,0 +1,203 @@
+{
+  "date": "2026-06-25",
+  "business": "qckserve",
+  "topic": "QckServe is the free local marketplace — Properties, Vehicles, Jobs, Classifieds, Freelancing. Always ₹0 commission.",
+  "design_archetype": "big-number hero, flat colour blocking (no gradients), QckServe orange #ef6723 + dark #1A1A1A + warm off-white #FCF9F8, Poppins headline + Georgia italic kicker.",
+  "brand": {
+    "name": "QckServe",
+    "wordmark": "qckserve.in",
+    "tagline": "India's Free Local Marketplace",
+    "verticals": ["Properties", "Vehicles", "Jobs", "Classifieds", "Freelancing"],
+    "colors": {
+      "primary": "#ef6723",
+      "primary_dark": "#FF6B00",
+      "ink": "#1A1A1A",
+      "paper": "#FCF9F8",
+      "highlight": "#FFE7D8"
+    },
+    "fonts": {
+      "head": "Poppins",
+      "kicker": "Georgia italic"
+    }
+  },
+  "items": [
+    {
+      "channel": "html_email",
+      "vertical": "properties",
+      "subject": "List your property free — ₹0 brokerage this peak season",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>List your property free — ₹0 brokerage</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">List your property free this peak season. ₹0 brokerage, owner to owner, nationwide.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n  <tr><td style=\"background-color:#ef6723;padding:0;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n    <td width=\"200\" valign=\"middle\" align=\"center\" style=\"padding:40px 0 40px 24px;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:120px;line-height:1;font-weight:800;color:#FFFFFF;letter-spacing:-4px;\">&#8377;0</div>\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FFE7D8;padding-top:6px;\">brokerage</div>\n    </td>\n    <td valign=\"middle\" style=\"padding:40px 32px 40px 20px;\">\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:10px;\">Peak season is here.</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:46px;line-height:1.02;font-weight:800;color:#FFFFFF;letter-spacing:-1.5px;\">List free.<br>Keep the<br>brokerage.</div>\n    </td>\n  </tr></table></td></tr>\n  <tr><td style=\"font-size:0;line-height:0;\"><img src=\"https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/qckserve-2026-06-22.png\" width=\"600\" alt=\"QckServe — list your property free, owner to owner, nationwide.\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\"></td></tr>\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">It&#8217;s peak rental season.<br>Most owners hand a broker a month&#8217;s rent.<br><span style=\"color:#FF8A4C;\">On QckServe you hand over nothing.</span></div></td></tr>\n  <tr><td style=\"background-color:#FFFFFF;padding:40px 40px 8px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:20px;\">How it works — all free</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">1</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Post your property in minutes.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">2</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Add photos and your rent.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">3</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Renters call you direct.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">4</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:8px;\">You pick the tenant. No middleman.</td></tr></table></td></tr>\n  <tr><td align=\"center\" style=\"padding:24px 40px 44px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List your property — free</a></td></tr></table><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;color:#6b6b6b;padding-top:16px;\">Free listings. Zero commission. Nationwide.</div></td></tr>\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India&#8217;s free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/qckserve-2026-06-22.png",
+      "tags": ["properties", "promo", "email"],
+      "notes": "Big-number hero archetype — giant ₹0 + 4-step timeline."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "properties",
+      "content": "Ghar ya flat rent pe dena hai? 🏠 Peak season chal raha hai — broker ko ek mahine ka kiraya kyun do? QckServe pe apni property list karo bilkul free. Zero brokerage, seedha owner se renter, poore India mein. Abhi list karo → qckserve.in",
+      "image_url": "https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/qckserve-2026-06-22.png",
+      "tags": ["properties", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "properties",
+      "platform": "instagram",
+      "content": "Broker ko ek mahine ka rent? Rehne do. 🙌\n\nPeak season hai aur ghar dhoondne wale ready hain. Apni property khud list karo — ₹0 brokerage, owner-direct, poore India mein. Seedhi baat, seedha deal.\n\n👉 qckserve.in\n\n#QckServe #ZeroBrokerage #RentNoBroker #PropertyForRent #ListFree",
+      "image_url": "https://cmdnezltteldysoxyjzh.supabase.co/storage/v1/object/public/email/qckserve-2026-06-22.png",
+      "tags": ["properties", "promo", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "properties",
+      "content": "Renting out your place? List it free on QckServe this peak season. Zero brokerage, owner-direct. Start: qckserve.in",
+      "tags": ["properties", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "properties",
+      "title": "[2026-06-25] Properties — Peak season, ₹0 brokerage (Image Prompt)",
+      "content": "SCENE: Warm, just-cleaned-up urban Indian rental home interior, late-afternoon balcony light, a few moving boxes. SUBJECT: Confident Indian owner in 30s, smart-casual, no broker present. PHONE-UI MOCKUP: QckServe listing screen with bold '₹0 brokerage' badge + 'List your property — free' button. COLOUR: flat blocking, no gradients — charcoal #1A1A1A, off-white #FCF9F8, orange #ef6723 accent only. TYPE: oversized Poppins 'KEEP THE BROKERAGE' top-right + Georgia italic 'peak season is here'. RESERVE top-left logo zone empty. --ar 4:5 --style raw --v 6.1",
+      "tags": ["properties", "image-prompt"],
+      "notes": "QckServe production format, --ar 4:5 --style raw --v 6.1"
+    },
+
+    {
+      "channel": "html_email",
+      "vertical": "vehicles",
+      "subject": "Sell your car free — ₹0 dealer commission",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Sell your car free — ₹0 commission</title></head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">Sell your car free. ₹0 dealer commission, owner to buyer, nationwide.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n  <tr><td style=\"background-color:#ef6723;padding:0;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n    <td width=\"200\" valign=\"middle\" align=\"center\" style=\"padding:40px 0 40px 24px;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:120px;line-height:1;font-weight:800;color:#FFFFFF;letter-spacing:-4px;\">&#8377;0</div>\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FFE7D8;padding-top:6px;\">dealer cut</div>\n    </td>\n    <td valign=\"middle\" style=\"padding:40px 32px 40px 20px;\">\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:10px;\">Skip the showroom.</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:46px;line-height:1.02;font-weight:800;color:#FFFFFF;letter-spacing:-1.5px;\">Sell direct.<br>Keep the<br>full price.</div>\n    </td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">Dealers take ₹40,000 – ₹1,50,000 per used car.<br>Online platforms take their cut too.<br><span style=\"color:#FF8A4C;\">On QckServe the buyer pays you. Full stop.</span></div></td></tr>\n  <tr><td style=\"background-color:#FFFFFF;padding:40px 40px 8px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:20px;\">How it works — all free</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">1</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Post your car, bike or scooter.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">2</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Add photos, kms, your asking price.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">3</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Buyers WhatsApp you direct.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">4</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:8px;\">You close the deal. No middleman.</td></tr></table></td></tr>\n  <tr><td align=\"center\" style=\"padding:24px 40px 44px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in/vehicles\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List your vehicle — free</a></td></tr></table><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;color:#6b6b6b;padding-top:16px;\">Cars · Bikes · Scooters · Commercial. Always ₹0.</div></td></tr>\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India&#8217;s free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "tags": ["vehicles", "promo", "email"],
+      "notes": "Vehicles vertical — sub-theme: dealer cut elimination."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "vehicles",
+      "content": "Gaadi bechni hai? 🚗 Dealer ko ₹50,000 – ₹1,50,000 commission kyun? Apni car, bike ya scooter QckServe pe khud list karo — bilkul free. Buyer aap ko seedha WhatsApp karega. Zero dealer cut. ➜ qckserve.in/vehicles",
+      "tags": ["vehicles", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "vehicles",
+      "platform": "instagram",
+      "content": "Dealer ko gaadi ka commission? Rehne do. 🚗\n\nQckServe pe apni car / bike khud list karo — ₹0 dealer cut, full price seedha aap ke account mein. Photos daalo, price daalo, buyer khud aayega.\n\n👉 qckserve.in/vehicles\n\n#QckServe #ZeroCommission #SellMyCar #UsedCarsIndia #OwnerDirect",
+      "tags": ["vehicles", "promo", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "vehicles",
+      "content": "Selling your car or bike? List free on QckServe. Zero dealer commission, buyer pays YOU. Start: qckserve.in/vehicles",
+      "tags": ["vehicles", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "vehicles",
+      "title": "[2026-06-25] Vehicles — ₹0 dealer cut (Image Prompt)",
+      "content": "SCENE: A clean, mid-priced used sedan / hatchback parked in front of an unbranded urban Indian residential building, golden-hour light. SUBJECT: A satisfied seller in their late 20s/30s holding their phone showing QckServe listing — confident posture, no salesperson, no banner. PHONE-UI: QckServe listing — '₹0 dealer cut' badge top-left, big 'List your vehicle — free' button. COLOUR: flat blocking, no gradients — #1A1A1A shadow, #FCF9F8 light, #ef6723 accent only. TYPE: Poppins headline 'KEEP THE FULL PRICE' top-right + Georgia italic 'skip the showroom'. RESERVE top-left logo zone empty. --ar 4:5 --style raw --v 6.1",
+      "tags": ["vehicles", "image-prompt"]
+    },
+
+    {
+      "channel": "html_email",
+      "vertical": "jobs",
+      "subject": "Hire direct — ₹0 recruiter fee. Post a job free.",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Hire direct — ₹0 recruiter fee</title></head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">Post a job free. ₹0 recruiter fee. Candidates apply direct.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n  <tr><td style=\"background-color:#ef6723;padding:0;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n    <td width=\"200\" valign=\"middle\" align=\"center\" style=\"padding:40px 0 40px 24px;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:120px;line-height:1;font-weight:800;color:#FFFFFF;letter-spacing:-4px;\">&#8377;0</div>\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FFE7D8;padding-top:6px;\">recruiter fee</div>\n    </td>\n    <td valign=\"middle\" style=\"padding:40px 32px 40px 20px;\">\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:10px;\">Hiring locally?</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:46px;line-height:1.02;font-weight:800;color:#FFFFFF;letter-spacing:-1.5px;\">Post free.<br>Talk to<br>candidates.</div>\n    </td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">Recruiters charge 8.33% of the role&#8217;s annual CTC.<br>Job boards charge per-listing fees.<br><span style=\"color:#FF8A4C;\">On QckServe employers and candidates talk direct.</span></div></td></tr>\n  <tr><td style=\"background-color:#FFFFFF;padding:40px 40px 8px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:20px;\">How it works — all free</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">1</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Post the role — title, salary, location.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">2</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">Candidates apply with phone + CV.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">3</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:18px;\">You shortlist. You call. You hire.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">4</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:8px;\">No recruiter takes a cut.</td></tr></table></td></tr>\n  <tr><td align=\"center\" style=\"padding:24px 40px 44px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in/jobs\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">Post a job — free</a></td></tr></table><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;color:#6b6b6b;padding-top:16px;\">Full-time · Part-time · Gig · Apprentice. Always ₹0.</div></td></tr>\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India&#8217;s free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "tags": ["jobs", "promo", "email"],
+      "notes": "Jobs vertical — sub-theme: recruiter fee elimination."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "jobs",
+      "content": "Logo ko hire karna hai? 💼 Recruiter 8.33% commission kyun le? QckServe pe job post karo bilkul free, candidates seedha apply karenge — aap shortlist karo, aap hire karo. Zero middleman. ➜ qckserve.in/jobs",
+      "tags": ["jobs", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "jobs",
+      "platform": "instagram",
+      "content": "Recruiter ko 8.33% CTC? Rehne do. 💼\n\nQckServe pe seedha job post karo — ₹0 fee, candidates khud aayenge, aap apni team khud chuno. Local hiring, owner-direct.\n\n👉 qckserve.in/jobs\n\n#QckServe #HireDirect #ZeroFee #JobsIndia #LocalHiring",
+      "tags": ["jobs", "promo", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "jobs",
+      "content": "Hiring? Post a job free on QckServe. Candidates apply direct. Zero recruiter fee. Start: qckserve.in/jobs",
+      "tags": ["jobs", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "jobs",
+      "title": "[2026-06-25] Jobs — ₹0 recruiter fee (Image Prompt)",
+      "content": "SCENE: A small-to-mid Indian business owner / manager in their workplace (cafe owner, store manager, clinic admin), interviewing a calm prepared candidate across a table, natural daylight. SUBJECT: Both subjects in smart-casual, looking at a phone showing the QckServe job-applications screen. PHONE-UI: 'Job posted — 14 applicants today' card, '₹0 recruiter fee' badge, big 'Post a job — free' CTA. COLOUR: flat blocking — #1A1A1A, #FCF9F8, #ef6723 accent only. TYPE: Poppins headline 'TALK TO CANDIDATES' top-right + Georgia italic 'no recruiter, no cut'. RESERVE top-left logo zone empty. --ar 4:5 --style raw --v 6.1",
+      "tags": ["jobs", "image-prompt"]
+    },
+
+    {
+      "channel": "html_email",
+      "vertical": "classifieds",
+      "subject": "Sell anything locally — ₹0 listing fee",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Sell anything — ₹0 listing fee</title></head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">Sell furniture, electronics, anything. ₹0 listing fee. Local buyers, owner-direct.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n  <tr><td style=\"background-color:#ef6723;padding:0;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n    <td width=\"200\" valign=\"middle\" align=\"center\" style=\"padding:40px 0 40px 24px;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:120px;line-height:1;font-weight:800;color:#FFFFFF;letter-spacing:-4px;\">&#8377;0</div>\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FFE7D8;padding-top:6px;\">listing fee</div>\n    </td>\n    <td valign=\"middle\" style=\"padding:40px 32px 40px 20px;\">\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:10px;\">Moving out? Upgrading?</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:46px;line-height:1.02;font-weight:800;color:#FFFFFF;letter-spacing:-1.5px;\">Sell free.<br>Locally.<br>Today.</div>\n    </td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">Other apps charge to bump your listing.<br>Resellers offer half of what your stuff is worth.<br><span style=\"color:#FF8A4C;\">On QckServe locals find you in minutes.</span></div></td></tr>\n  <tr><td style=\"background-color:#FFFFFF;padding:40px 40px 8px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:20px;\">Anything you own — list it</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Furniture · sofa, bed, dining table.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Electronics · phone, laptop, AC, fridge.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Local services · tutor, plumber, mehndi.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:8px;\">Pet supplies, books, baby gear, cycles.</td></tr></table></td></tr>\n  <tr><td align=\"center\" style=\"padding:24px 40px 44px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in/classifieds\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List your item — free</a></td></tr></table><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;color:#6b6b6b;padding-top:16px;\">No listing fee. No bump fee. Ever.</div></td></tr>\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India&#8217;s free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "tags": ["classifieds", "promo", "email"],
+      "notes": "Classifieds vertical — sub-theme: zero listing fee, anything-to-anyone local."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "classifieds",
+      "content": "Ghar mein extra cheez? 📦 Sofa, AC, fridge, laptop, books — kuch bhi local mein bechna ho, QckServe pe list karo bilkul free. Zero listing fee, zero bump fee, local buyer milega. ➜ qckserve.in/classifieds",
+      "tags": ["classifieds", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "classifieds",
+      "platform": "instagram",
+      "content": "Ghar shift kar rahe ho? Upgrade ho rahe ho? 📦\n\nApne ghar ki extra cheezein QckServe pe list karo — sofa, washing machine, study table, phone, baby gear, kuch bhi. ₹0 listing fee, ₹0 bump fee, local buyer minutes mein.\n\n👉 qckserve.in/classifieds\n\n#QckServe #SellLocal #ZeroFee #ClassifiedsIndia #SecondHand",
+      "tags": ["classifieds", "promo", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "classifieds",
+      "content": "Got something to sell? Furniture, electronics, anything. List free on QckServe. Zero listing fee. Start: qckserve.in/classifieds",
+      "tags": ["classifieds", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "classifieds",
+      "title": "[2026-06-25] Classifieds — ₹0 listing fee (Image Prompt)",
+      "content": "SCENE: A cleaned-up urban Indian living room mid-move — sofa pushed to one wall, a clear coffee table with a few labeled items (a phone, a kettle, a book stack). SUBJECT: A woman in her late 20s photographing one item with her phone, casual outfit, focused. PHONE-UI: QckServe new-listing screen, big 'List your item — free' button, '₹0 listing fee' badge. COLOUR: flat blocking — #1A1A1A, #FCF9F8, #ef6723 accent only. TYPE: Poppins headline 'SELL LOCALLY' top-right + Georgia italic 'no listing fee, no bump fee'. RESERVE top-left logo zone empty. --ar 4:5 --style raw --v 6.1",
+      "tags": ["classifieds", "image-prompt"]
+    },
+
+    {
+      "channel": "html_email",
+      "vertical": "freelancing",
+      "subject": "Hire freelancers direct — ₹0 platform fee",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Hire freelancers direct — ₹0 platform fee</title></head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">Hire freelancers direct. ₹0 platform fee. Client pays freelancer in full.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n  <tr><td style=\"background-color:#ef6723;padding:0;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n    <td width=\"200\" valign=\"middle\" align=\"center\" style=\"padding:40px 0 40px 24px;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:120px;line-height:1;font-weight:800;color:#FFFFFF;letter-spacing:-4px;\">&#8377;0</div>\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:16px;color:#FFE7D8;padding-top:6px;\">platform cut</div>\n    </td>\n    <td valign=\"middle\" style=\"padding:40px 32px 40px 20px;\">\n      <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:10px;\">Tired of 20% cuts?</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:46px;line-height:1.02;font-weight:800;color:#FFFFFF;letter-spacing:-1.5px;\">Hire direct.<br>Pay direct.<br>Keep direct.</div>\n    </td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.5;font-weight:600;color:#FFFFFF;\">Big freelance platforms take 5% – 20% of every payout.<br>That&#8217;s ₹2,000 lost on every ₹10,000 project.<br><span style=\"color:#FF8A4C;\">On QckServe the client pays the freelancer. Full amount.</span></div></td></tr>\n  <tr><td style=\"background-color:#FFFFFF;padding:40px 40px 8px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:20px;\">Talent you can hire today</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Designers, video editors, illustrators.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Developers, full-stack, WordPress, mobile.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">Writers, translators, voice-over artists.</td></tr>\n    <tr><td width=\"44\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:22px;font-weight:800;color:#ef6723;\">•</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#1A1A1A;padding-bottom:8px;\">Local trades · plumbers, electricians, mehndi.</td></tr></table></td></tr>\n  <tr><td align=\"center\" style=\"padding:24px 40px 44px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in/freelancing\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">Find a freelancer — free</a></td></tr></table><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;color:#6b6b6b;padding-top:16px;\">Client → freelancer. No platform in between.</div></td></tr>\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India&#8217;s free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "tags": ["freelancing", "promo", "email"],
+      "notes": "Freelancing vertical — sub-theme: zero platform cut, full payout to freelancer."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "freelancing",
+      "content": "Designer / developer / writer chahiye? 💼 Freelance platforms 20% cut le lete hain. QckServe pe seedha hire karo — client se freelancer tak, beech mein koi nahi, koi cut nahi. ➜ qckserve.in/freelancing",
+      "tags": ["freelancing", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "freelancing",
+      "platform": "instagram",
+      "content": "₹10,000 ka project. Platform 20% le gaya. 🥲\n\nAb nahi.\n\nQckServe pe seedha freelancer hire karo — ya freelancer ho to seedha clients milega. ₹0 platform fee, full payout aap ke account mein.\n\n👉 qckserve.in/freelancing\n\n#QckServe #Freelance #ZeroCut #FreelanceIndia #HireDirect",
+      "tags": ["freelancing", "promo", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "freelancing",
+      "content": "Hiring freelancers (or you ARE one)? Skip the 20% platform cut. QckServe connects client + freelancer direct, free. Start: qckserve.in/freelancing",
+      "tags": ["freelancing", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "freelancing",
+      "title": "[2026-06-25] Freelancing — ₹0 platform cut (Image Prompt)",
+      "content": "SCENE: A young Indian freelancer in a clean home-office — desk with a laptop showing portfolio, a coffee, a window with afternoon light, no clutter. SUBJECT: A freelancer in their late 20s/early 30s mid-call on phone speaker, smiling at progress on their laptop. PHONE-UI: QckServe payout-confirmation screen reading 'Paid ₹10,000 · Platform fee ₹0', big '+ NEW PROJECT' button. COLOUR: flat blocking — #1A1A1A, #FCF9F8, #ef6723 accent only. TYPE: Poppins headline 'KEEP YOUR FULL FEE' top-right + Georgia italic 'no platform in between'. RESERVE top-left logo zone empty. --ar 4:5 --style raw --v 6.1",
+      "tags": ["freelancing", "image-prompt"]
+    }
+  ]
+}
