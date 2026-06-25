@@ -1,0 +1,81 @@
+name: Content Hub — daily routine
+
+# Runs every day at 06:00 UTC.
+#
+# Per user brief: internet-based (not LLM-based) daily content for each
+# Content Hub business — Gifts Gulf, Hudace, Via Kashmir Itinerary,
+# Collab Market, Date Khaas. Pulls fresh items from Google News RSS,
+# picks a hero image (Pixabay listing scrape → Unsplash Source fallback),
+# composes per-channel assets (html_email + AMP body, whatsapp, caption),
+# and inserts via Supabase REST.
+#
+# Image_url is GUARANTEED to be set on every asset (Unsplash Source
+# always returns a redirect when Pixabay is blocked by anti-bot).
+#
+# Manual trigger (workflow_dispatch) lets you re-run on demand from the
+# Actions tab — useful if you ever need to backfill a missed day.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      business:
+        description: 'Single business slug (omit = all)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - gifts-gulf
+          - hudace
+          - via-kashmir-itinerary
+          - collab-market
+          - date-khaas
+      date:
+        description: 'YYYY-MM-DD (omit = today UTC)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: content-hub-daily
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run content routine
+        env:
+          # Same Supabase service key used by go_live.py + publish_qckserve.py.
+          # In CI we read it from a repo secret; locally the script falls
+          # back to the value baked into go_live.py.
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_URL: https://cmdnezltteldysoxyjzh.supabase.co
+        run: |
+          set -eu
+          BIZ="${{ github.event.inputs.business }}"
+          DATE="${{ github.event.inputs.date }}"
+          ARGS=""
+          if [ -n "$BIZ" ]; then
+            ARGS="--business $BIZ"
+          else
+            ARGS="--all"
+          fi
+          if [ -n "$DATE" ]; then
+            ARGS="$ARGS --date $DATE"
+          fi
+          echo "Running: python3 scripts/content_daily_routine.py $ARGS"
+          python3 scripts/content_daily_routine.py $ARGS
