@@ -1,0 +1,87 @@
+# render-free.yaml — FREE-TIER blueprint for the LeadCaptura API only.
+#
+# Use this when you just need login + the CRM working on Render's free
+# plan, with ZERO paid services. It declares runtime: docker explicitly,
+# so a Render "Blueprint" deploy can NEVER fall back to Node/yarn (the bug
+# that caused "uvicorn: command not found" / exit 127 on a manually-created
+# service).
+#
+# HOW TO DEPLOY THIS (one-time, ~3 min, no terminal):
+#   1. Render dashboard → New → Blueprint
+#   2. Connect the repo, pick branch main
+#   3. In the "Blueprint file path" field, type: render-free.yaml
+#   4. Render reads this file, creates ONE web service as Docker
+#   5. It will prompt you for the sync:false env vars below — paste:
+#        DATABASE_URL      = your Postgres External URL
+#        FRONTEND_ORIGINS  = https://leadloftexporter.vercel.app
+#        ANTHROPIC_API_KEY = (your key)
+#        PUBLIC_API_URL    = (the URL Render gives this service)
+#      (the rest are optional — leave blank if you don't use them)
+#   6. Deploy. When live, copy the service URL.
+#   7. Vercel → NEXT_PUBLIC_API_URL = that URL → Redeploy.
+#
+# This service runs Celery-free: outreach scheduler / warmup / content
+# refresh won't run (those need a worker, which free tier doesn't allow),
+# but LOGIN and all sync API endpoints work perfectly. Redis is not
+# required for login — the app boots fine without it.
+
+services:
+  - type: web
+    name: leadcaptura-api
+    runtime: docker
+    repo: https://github.com/aribanigar/Leadloftexporter
+    branch: main
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      # ── Required: paste your Postgres External Database URL ──
+      - key: DATABASE_URL
+        sync: false
+      # ── Required: your frontend origin(s), comma-separated ──
+      - key: FRONTEND_ORIGINS
+        sync: false
+      # ── Required: set to THIS service's public URL after first deploy ──
+      - key: PUBLIC_API_URL
+        sync: false
+      # ── Optional: Redis. Login does NOT need this. Leave blank on free
+      #    tier, or paste an Upstash free-tier URL if you want Celery later. ──
+      - key: REDIS_URL
+        sync: false
+      # ── Optional integrations — paste only the ones you use ──
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-7
+      - key: ANTHROPIC_FAST_MODEL
+        value: claude-haiku-4-5
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: WHISPER_MODEL
+        value: whisper-1
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: SMTP_RELAY_URL
+        value: https://leadloftexporter.vercel.app/api/smtp-relay
+      - key: SMTP_RELAY_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
