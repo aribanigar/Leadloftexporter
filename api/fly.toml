@@ -1,0 +1,79 @@
+# fly.toml — LeadCaptura API on Fly.io
+#
+# Drop-in deployment that mirrors what render.yaml does today. The
+# Dockerfile is unchanged; Fly just runs the same image.
+#
+# To deploy from your laptop (one-time setup):
+#
+#   1. Install flyctl:                     curl -L https://fly.io/install.sh | sh
+#   2. Sign up / login:                    fly auth login
+#   3. From repo root, into the api dir:   cd api && fly launch --copy-config --no-deploy
+#      (flyctl will see this file and use it; pick a region close to your users —
+#       'bom' = Mumbai, 'sin' = Singapore, 'fra' = Frankfurt, 'ord' = Chicago)
+#   4. Add your secrets:                   fly secrets set DATABASE_URL=... REDIS_URL=... \
+#                                              ANTHROPIC_API_KEY=... GOOGLE_CLIENT_ID=... \
+#                                              [every var currently in your Render env]
+#   5. Deploy:                             fly deploy
+#   6. Open the new URL:                   fly open
+#
+# To run a Celery worker as a separate machine:
+#   fly machine clone <web-machine-id> --process worker
+#   fly machine update <new-machine-id> --command 'celery -A app.workers.celery_app worker --loglevel=info'
+#
+# To migrate Postgres data from Render/Neon/Supabase to Fly Postgres:
+#   See scripts/migrate_postgres.sh
+
+app = "leadcaptura-api"
+primary_region = "bom"   # Mumbai — closest to your Indian users. Change as needed.
+
+# ─── Build ─────────────────────────────────────────────────────────────────
+# Reuses the existing api/Dockerfile verbatim. No platform-specific changes.
+[build]
+  dockerfile = "Dockerfile"
+
+# ─── Web service ───────────────────────────────────────────────────────────
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # auto_stop_machines = false  keeps the API always-on so login never has a
+  # cold-start (this is the whole point of moving off Render free tier).
+  # If you want to save money during off-hours later, flip to "stop" and
+  # accept the same 30-60s cold start Render had.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["web"]
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "20s"
+    method = "GET"
+    timeout = "5s"
+    path = "/"
+
+# ─── Machine sizing ────────────────────────────────────────────────────────
+# shared-cpu-1x with 512 MB is enough for FastAPI + SQLAlchemy + bcrypt at
+# your current load. Free allowance covers 3 such machines at this size.
+# Scale up later with `fly scale memory 1024` or `fly scale vm shared-cpu-2x`.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["web"]
+
+# ─── Multi-process layout ──────────────────────────────────────────────────
+# Web serves the FastAPI app on port 8000.
+# Worker runs the Celery worker (no exposed port).
+# Beat runs the Celery beat scheduler (no exposed port).
+# Each runs as a separate Fly machine but shares the same Docker image,
+# the same env vars, and the same Postgres/Redis connections.
+[processes]
+  web = "sh -c 'python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port 8000'"
+  worker = "celery -A app.workers.celery_app worker --loglevel=info --concurrency=2"
+  beat = "celery -A app.workers.celery_app beat --loglevel=info"
+
+# ─── Environment vars baked into the image ────────────────────────────────
+# Secrets (DATABASE_URL, REDIS_URL, API keys) are set via `fly secrets set`
+# and are NOT in this file — they live encrypted in Fly's secret store.
+[env]
+  PYTHONUNBUFFERED = "1"
+  PORT = "8000"
