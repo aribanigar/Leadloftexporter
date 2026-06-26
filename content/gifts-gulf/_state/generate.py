@@ -77,106 +77,113 @@ def verify_image(code):
 
 
 # ===========================================================================
-# DAILY RESEARCH BRIEF (2026-06-22)
-# Deep summer, mid-year mark. H2 onboarding waves and the summer event and
-# conference season run side by side, and teams are sorting mid-year thank-you
-# gifts. Live 2026 signals hold: sustainability is the baseline, not a perk
-# (recycled steel, recycled cotton, rPET, recycled paper, organic cotton,
-# bamboo and wood), plain plastic giveaways are tired, and the gifts that win
-# are quality everyday-carry that lives on the desk, in the bag and on the
-# move, branded subtly rather than loudly. Yesterday leaned on glassware and
-# ceramics, so today rotates to recycled cotton, rPET, wood and natural
-# materials, with steel hydration and desk tech holding their place. All SKUs
-# and subjects are fresh against the last 14 days.
+# DAILY RESEARCH BRIEF (2026-06-26)
+# Late summer, the close of the mid-year quarter. H2 onboarding waves, the
+# summer event and conference season, and mid-year thank-you gifting all run
+# together. Live 2026 signals: sustainability is the baseline, not a perk, and
+# buyers now expect verifiable recycled materials (recycled and stainless
+# steel, organic and recycled cotton, rPET, recycled paper, bamboo, cork and
+# wood); utility wins, so the gifts that land are quality everyday-carry that
+# stays in daily rotation on the desk, in the bag and on the move, branded
+# subtly. Yesterday leaned on vacuum steel, recycled cotton and rPET, so today
+# anchors each set to a single clean material family and lets the material plus
+# the branding benefit carry the copy: stainless steel, recycled paper, wood,
+# bamboo and cork, cotton, desk and tech, soft-touch PU, recycled rPET,
+# aluminium and organic cotton. All 54 SKUs and all 9 subjects are fresh
+# against the last 14 days.
 # ===========================================================================
-SEASON = "Deep summer, event season and mid-year onboarding"
+SEASON = "Late summer, event season and mid-year onboarding"
 
 # Each set is a coherent, material-anchored mix of REAL fresh catalogue SKUs
 # (not used in the last 14 days). The catalogue has no category field and brand
 # names embed the category in compound words, so explicit SKU lists are far
 # more reliable than keyword matching. Every code is HEAD-verified at render.
+# NOTE on selection: the catalogue carries material but not product form, so
+# copy is anchored to the MATERIAL and the branding benefit, never a specific
+# form (no "bottle", "notebook", "bag"), so every line stays true whatever the
+# exact piece is. Each set draws from one clean, fresh material family.
 SETS = [
-    dict(design='A', theme='Premium drinkware',
-         name='Vacuum Steel Drinkware', angle='Branded daily hydration',
-         subject='Steel that sticks around',
-         headline='Steel bottles made for daily carry.',
-         subline='Vacuum steel bottles and tumblers, branded for the everyday.',
-         items=['GG1427', 'GG1148', 'GG1151', 'GG1184', 'GG1187', 'GG1214'],
-         descs=['Branded steel they keep', 'Cold all day, your logo',
-                'Built to last, not bin', 'A logo they pour from',
-                'Refilled, not replaced', 'Daily carry, your brand']),
-    dict(design='B', theme='Notebooks and writing',
-         name='Pens, Notebooks and Sets', angle='Made for note-takers',
-         subject='Pens they keep clicking',
-         headline='Pens and notebooks, branded to you.',
-         subline='Pens, notebooks and writing sets, branded with your logo.',
-         items=['GG1399', 'GG1103', 'GG1191', 'GG1250', 'GG1156', 'GG1449'],
-         descs=['Where ideas get written', 'Smooth writer, your logo',
-                'Cork accent, clean mark', 'Stylus and pen in one',
-                'Pen and notebook set', 'A folio for every meeting']),
-    dict(design='C', theme='Eco and sustainable',
-         name='Recycled Cotton Carry', angle='Recycled cotton, clearly yours',
-         subject='Recycled cotton, clearly yours',
-         headline='Recycled cotton, branded for everyday.',
-         subline='Recycled cotton bags and accessories, branded with your logo.',
-         items=['GG1113', 'GG1115', 'GG1132', 'GG1138', 'GG1141', 'GG1173'],
-         descs=['Recycled, clearly yours', 'Soft fibre, clear print',
-                'Better made, better gift', 'Carried, not binned',
-                'Conscious, never dull', 'A logo they reach for']),
-    dict(design='A', theme='Bags and travel',
-         name='Cotton Bags and Totes', angle='Carried everywhere',
-         subject='Bags built for everywhere',
-         headline='Bags your team carries everywhere.',
-         subline='Cotton totes and bags, printed with your brand.',
-         items=['GG1094', 'GG1127', 'GG1181', 'GG1182', 'GG1206', 'GG1235'],
-         descs=['Carried everywhere, branded', 'Natural fibre, clear print',
-                'A logo on the move', 'Packed and branded',
-                'Carried far, seen often', 'Built to be carried']),
-    dict(design='B', theme='Event giveaways',
-         name='Booth and Event Giveaways', angle='Crowd-friendly and kept',
-         subject='Giveaways worth keeping',
-         headline='Booth gifts that get kept.',
-         subline='Crowd-friendly branded pieces for event tables and welcome desks.',
-         items=['GG1481', 'GG1596', 'GG1570', 'GG1388', 'GG1387', 'GG1386'],
-         descs=['Giveaways they keep', 'Notepad and pencils in one',
-                'Three highlighters in one', 'Branded paper carrier',
-                'Carries the gift, branded', 'Small carrier, big logo']),
-    dict(design='C', theme='Executive onboarding',
-         name='Soft-Touch Folios and Sets', angle='Welcome them properly',
-         subject='First day, done right',
-         headline='Welcome them with something kept.',
-         subline='Soft-touch folios and sets to greet a new hire, branded with your logo.',
-         items=['GG1253', 'GG1294', 'GG1308', 'GG1309', 'GG1367', 'GG1561'],
-         descs=['Day one, done right', 'Soft-touch, debossed logo',
-                'A welcome they keep', 'Made for the first week',
-                'Premium feel, your brand', 'Quiet quality, your logo']),
-    dict(design='A', theme='Recycled and rPET',
-         name='Recycled rPET Bags', angle='Recycled bags, daily carry',
-         subject='Bottles reborn as bags',
-         headline='Recycled bottles, reborn as bags.',
-         subline='Recycled rPET bags built for daily use.',
-         items=['GG1106', 'GG1107', 'GG1133', 'GG1139', 'GG1189', 'GG1210'],
+    dict(design='A', theme='Stainless steel',
+         name='Stainless Steel Gifts', angle='Branded to keep',
+         subject='Steel that earns its keep',
+         headline='Stainless steel, branded to keep.',
+         subline='Premium stainless steel pieces, branded with your logo.',
+         items=['GG1154', 'GG1155', 'GG1157', 'GG1161', 'GG1171', 'GG1263'],
+         descs=['Branded steel they keep', 'Built to last, not bin',
+                'Quality they hold daily', 'A logo on solid steel',
+                'Made to be kept', 'Steel, cleanly branded']),
+    dict(design='B', theme='Recycled paper',
+         name='Recycled Paper Gifts', angle='Made for note-takers',
+         subject='Paper worth filling',
+         headline='Recycled paper, branded clean.',
+         subline='Recycled paper pieces, branded with your logo.',
+         items=['GG1070', 'GG1080', 'GG1224', 'GG1268', 'GG1278', 'GG1279'],
+         descs=['Pages they keep using', 'Recycled paper, clean print',
+                'Made for note-takers', 'Ideas land here',
+                'Branded, not binned', 'Better paper, your logo']),
+    dict(design='C', theme='Wood, bamboo and cork',
+         name='Wood, Bamboo and Cork', angle='Naturally branded',
+         subject='Wood that wears your mark',
+         headline='Wood and bamboo, branded clean.',
+         subline='Wood, bamboo and cork pieces, branded with your logo.',
+         items=['GG1129', 'GG1167', 'GG1207', 'GG1269', 'GG1272', 'GG1273'],
+         descs=['Warm wood, your logo', 'Bamboo, clean mark',
+                'Cork accent, soft touch', 'Natural material, real branding',
+                'Grain that holds a logo', 'Conscious, never dull']),
+    dict(design='A', theme='Cotton',
+         name='Cotton Gifts', angle='Carried and worn',
+         subject='Cotton they keep',
+         headline='Cotton, branded for your team.',
+         subline='Cotton pieces, branded with your logo.',
+         items=['GG1162', 'GG1233', 'GG1444', 'GG1489', 'GG1504', 'GG1517'],
+         descs=['Natural fibre, clear print', 'A logo they keep',
+                'Soft cotton, branded', 'Carried and worn',
+                'Branded, not binned', 'Made to be kept']),
+    dict(design='B', theme='Desk and tech',
+         name='Desk and Tech', angle='Built for the desk',
+         subject='Desk gear they actually use',
+         headline='Desk and tech, branded to keep.',
+         subline='Desk and tech pieces, branded for the workspace.',
+         items=['GG1012', 'GG1019', 'GG1032', 'GG1039', 'GG1040', 'GG1044'],
+         descs=['Earns its desk space', 'Smart desk, your logo',
+                'Built to be used daily', 'A piece they keep',
+                'Branded and handy', 'Desk-ready, brand-ready']),
+    dict(design='C', theme='Soft-touch PU',
+         name='Soft-Touch PU Gifts', angle='Soft-touch, branded',
+         subject='Soft-touch, clearly branded',
+         headline='Soft-touch PU, branded clean.',
+         subline='Soft-touch PU pieces, branded with your logo.',
+         items=['GG1021', 'GG1028', 'GG1029', 'GG1229', 'GG1246', 'GG1266'],
+         descs=['Soft-touch, debossed logo', 'Premium feel, your brand',
+                'A piece they keep', 'Quiet quality, your mark',
+                'Branded, not binned', 'Made to last']),
+    dict(design='A', theme='Recycled rPET',
+         name='Recycled rPET Gifts', angle='Recycled daily carry',
+         subject='Plastic, given a second life',
+         headline='Recycled rPET, branded daily.',
+         subline='Recycled rPET pieces, branded with your logo.',
+         items=['GG1063', 'GG1109', 'GG1111', 'GG1165', 'GG1176', 'GG1186'],
          descs=['Recycled bottles, reborn', 'Eco credentials, daily use',
                 'Carried, not binned', 'A logo they reach for',
-                'Better material, branded', 'Packed and on the move']),
-    dict(design='B', theme='Seasonal occasions',
-         name='Summer Cotton Carry', angle='Summer carry, branded',
-         subject='Summer carry, branded',
-         headline='Summer carry, branded to you.',
-         subline='Lightweight summer carry, printed with your brand.',
-         items=['GG1238', 'GG1258', 'GG1259', 'GG1380', 'GG1413', 'GG1424'],
-         descs=['Summer carry, branded', 'Natural fibre, clear print',
-                'Light, packable, yours', 'A logo for warm days',
-                'Carried all season', 'Built to be carried']),
-    dict(design='C', theme='Eco and sustainable',
-         name='Wood, Bamboo and Natural', angle='Natural materials, real branding',
-         subject='Natural materials, branded',
-         headline='Wood and bamboo, branded clean.',
-         subline='Natural wood and bamboo pieces, branded with your logo.',
-         items=['GG1428', 'GG1506', 'GG1571', 'GG1434', 'GG1577', 'GG1603'],
-         descs=['Warm wood, your logo', 'Bamboo pen, clean mark',
-                'Wooden pencil and ruler', 'Natural learning set',
-                'Art set in a branded box', 'Coloured pencils, kraft box']),
+                'Better material, branded', 'Made to be used']),
+    dict(design='B', theme='Aluminium',
+         name='Aluminium Gifts', angle='Light, branded',
+         subject='Light aluminium, bold branding',
+         headline='Lightweight aluminium, branded clean.',
+         subline='Lightweight aluminium pieces, branded with your logo.',
+         items=['GG1081', 'GG1168', 'GG1209', 'GG1226', 'GG1285', 'GG1286'],
+         descs=['Light aluminium, your logo', 'Built for daily carry',
+                'A logo on light metal', 'Aluminium, clean print',
+                'Made to be kept', 'Branded, not binned']),
+    dict(design='C', theme='Organic cotton',
+         name='Organic Cotton Gifts', angle='Organic, clearly yours',
+         subject='Organic cotton, openly yours',
+         headline='Organic cotton, branded clean.',
+         subline='Organic cotton pieces, branded with your logo.',
+         items=['GG1425', 'GG1471', 'GG1473', 'GG1487', 'GG1488', 'GG1515'],
+         descs=['Organic cotton, openly yours', 'Soft fibre, clear print',
+                'Better made, better gift', 'Carried, not binned',
+                'Conscious, never dull', 'A logo they keep']),
 ]
 
 
@@ -614,12 +621,15 @@ def main():
         cta = wa_url("Hi Gifts Gulf, please share branded %s options for our team."
                      % s["theme"].lower())
         renderer = {"A": render_A, "B": render_B, "C": render_C}[s["design"]]
+        # Visible eyebrow is the short theme angle (2 to 4 words), NEVER the
+        # campaign_name, which embeds the date and stays a hidden DB title only.
+        eyebrow = s["angle"]
         set_dir = os.path.join(day_dir, "set-%d" % n)
         os.makedirs(os.path.join(set_dir, "img"), exist_ok=True)
         open(os.path.join(set_dir, "email.html"), "w").write(
-            renderer(s, prods, cta, campaign_name, subject))
+            renderer(s, prods, cta, eyebrow, subject))
         open(os.path.join(set_dir, "email.amp.html"), "w").write(
-            render_amp(s, prods, cta, campaign_name, subject))
+            render_amp(s, prods, cta, eyebrow, subject))
         open(os.path.join(set_dir, "whatsapp.txt"), "w").write(
             render_whatsapp(s, prods, n))
         open(os.path.join(set_dir, "linkedin.txt"), "w").write(
@@ -644,7 +654,8 @@ def main():
         cards["sets"].append(dict(
             set=n, variant=variant, promo=promo_line,
             out="content/gifts-gulf/%s/set-%d/img/whatsapp.jpg" % (date, n),
-            products=[dict(code=p["code"], sku=p["sku"], name=p["name"])
+            products=[dict(code=p["code"], sku=p["sku"], name=p["name"],
+                           desc=p["desc"], colours=0)
                       for p in prods[:ncard]]))
 
         manifest["sets"].append(dict(

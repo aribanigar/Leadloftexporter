@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-26",
+  "theme": "Aluminium",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260626-8",
+  "campaign_name": "Aluminium Gifts - 26 Jun 2026",
+  "subject": "Light aluminium, bold branding",
+  "skus": [
+    "GG1081",
+    "GG1168",
+    "GG1209",
+    "GG1226",
+    "GG1285",
+    "GG1286"
+  ],
+  "products": [
+    {
+      "name": "Cablong",
+      "sku": "GG1081",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2081-14.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1081"
+    },
+    {
+      "name": "Bern Rose",
+      "sku": "GG1168",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2371-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1168"
+    },
+    {
+      "name": "Edd",
+      "sku": "GG1209",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2488-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1209"
+    },
+    {
+      "name": "Twen",
+      "sku": "GG1226",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2529-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1226"
+    },
+    {
+      "name": "Bergamo ++",
+      "sku": "GG1285",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2653-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1285"
+    },
+    {
+      "name": "Bergamo +",
+      "sku": "GG1286",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2652-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1286"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20aluminium%20options%20for%20our%20team."
+}

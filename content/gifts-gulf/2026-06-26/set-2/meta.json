@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-26",
+  "theme": "Recycled paper",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260626-2",
+  "campaign_name": "Recycled Paper Gifts - 26 Jun 2026",
+  "subject": "Paper worth filling",
+  "skus": [
+    "GG1070",
+    "GG1080",
+    "GG1224",
+    "GG1268",
+    "GG1278",
+    "GG1279"
+  ],
+  "products": [
+    {
+      "name": "Seed Ring",
+      "sku": "GG1070",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2083-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1070"
+    },
+    {
+      "name": "Seed Book",
+      "sku": "GG1080",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2082-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1080"
+    },
+    {
+      "name": "Nota",
+      "sku": "GG1224",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2524-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1224"
+    },
+    {
+      "name": "Chippewa",
+      "sku": "GG1268",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2603-09.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1268"
+    },
+    {
+      "name": "Lyon Set",
+      "sku": "GG1278",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2636-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1278"
+    },
+    {
+      "name": "Lyon",
+      "sku": "GG1279",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2637-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1279"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20paper%20options%20for%20our%20team."
+}

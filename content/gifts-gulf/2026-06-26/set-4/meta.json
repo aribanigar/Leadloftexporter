@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-26",
+  "theme": "Cotton",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "A",
+  "campaign_code": "GG-20260626-4",
+  "campaign_name": "Cotton Gifts - 26 Jun 2026",
+  "subject": "Cotton they keep",
+  "skus": [
+    "GG1162",
+    "GG1233",
+    "GG1444",
+    "GG1489",
+    "GG1504",
+    "GG1517"
+  ],
+  "products": [
+    {
+      "name": "Sunny",
+      "sku": "GG1162",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2345-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1162"
+    },
+    {
+      "name": "Beau",
+      "sku": "GG1233",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2542-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1233"
+    },
+    {
+      "name": "Rassa Coloured",
+      "sku": "GG1444",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6442-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1444"
+    },
+    {
+      "name": "Pantai",
+      "sku": "GG1489",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6720-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1489"
+    },
+    {
+      "name": "Evan",
+      "sku": "GG1504",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6803-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1504"
+    },
+    {
+      "name": "Kecil",
+      "sku": "GG1517",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6867-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1517"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cotton%20options%20for%20our%20team."
+}

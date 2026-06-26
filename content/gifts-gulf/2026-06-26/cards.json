@@ -1,0 +1,245 @@
+{
+  "date": "2026-06-26",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Branded steel they keep",
+      "out": "content/gifts-gulf/2026-06-26/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2332-03",
+          "sku": "GG1154",
+          "name": "Scribi",
+          "desc": "Branded steel they keep",
+          "colours": 0
+        },
+        {
+          "code": "mo2333-03",
+          "sku": "GG1155",
+          "name": "Scribi 2",
+          "desc": "Built to last, not bin",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Pages they keep using",
+      "out": "content/gifts-gulf/2026-06-26/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2083-06",
+          "sku": "GG1070",
+          "name": "Seed Ring",
+          "desc": "Pages they keep using",
+          "colours": 0
+        },
+        {
+          "code": "mo2082-06",
+          "sku": "GG1080",
+          "name": "Seed Book",
+          "desc": "Recycled paper, clean print",
+          "colours": 0
+        },
+        {
+          "code": "mo2524-03",
+          "sku": "GG1224",
+          "name": "Nota",
+          "desc": "Made for note-takers",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Warm wood, your logo",
+      "out": "content/gifts-gulf/2026-06-26/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2251-01",
+          "sku": "GG1129",
+          "name": "Savage",
+          "desc": "Warm wood, your logo",
+          "colours": 0
+        },
+        {
+          "code": "mo2369-40",
+          "sku": "GG1167",
+          "name": "Nawkey",
+          "desc": "Bamboo, clean mark",
+          "colours": 0
+        },
+        {
+          "code": "mo2484-40",
+          "sku": "GG1207",
+          "name": "Llaving",
+          "desc": "Cork accent, soft touch",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Natural fibre, clear print",
+      "out": "content/gifts-gulf/2026-06-26/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2345-03",
+          "sku": "GG1162",
+          "name": "Sunny",
+          "desc": "Natural fibre, clear print",
+          "colours": 0
+        },
+        {
+          "code": "mo2542-03",
+          "sku": "GG1233",
+          "name": "Beau",
+          "desc": "A logo they keep",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Earns its desk space",
+      "out": "content/gifts-gulf/2026-06-26/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it2386-04",
+          "sku": "GG1012",
+          "name": "Lades",
+          "desc": "Earns its desk space",
+          "colours": 0
+        },
+        {
+          "code": "it3441-03",
+          "sku": "GG1019",
+          "name": "Madame",
+          "desc": "Smart desk, your logo",
+          "colours": 0
+        },
+        {
+          "code": "kc2206-16",
+          "sku": "GG1032",
+          "name": "Stanwell",
+          "desc": "Built to be used daily",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Soft-touch, debossed logo",
+      "out": "content/gifts-gulf/2026-06-26/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3750-03",
+          "sku": "GG1021",
+          "name": "Buswe Big",
+          "desc": "Soft-touch, debossed logo",
+          "colours": 0
+        },
+        {
+          "code": "kc2718-33",
+          "sku": "GG1028",
+          "name": "Goal",
+          "desc": "Premium feel, your brand",
+          "colours": 0
+        },
+        {
+          "code": "kc2720-06",
+          "sku": "GG1029",
+          "name": "Relicup",
+          "desc": "A piece they keep",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Recycled bottles, reborn",
+      "out": "content/gifts-gulf/2026-06-26/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2055-03",
+          "sku": "GG1063",
+          "name": "Artic",
+          "desc": "Recycled bottles, reborn",
+          "colours": 0
+        },
+        {
+          "code": "mo2174-03",
+          "sku": "GG1109",
+          "name": "Beta",
+          "desc": "Eco credentials, daily use",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Light aluminium, your logo",
+      "out": "content/gifts-gulf/2026-06-26/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2081-14",
+          "sku": "GG1081",
+          "name": "Cablong",
+          "desc": "Light aluminium, your logo",
+          "colours": 0
+        },
+        {
+          "code": "mo2371-03",
+          "sku": "GG1168",
+          "name": "Bern Rose",
+          "desc": "Built for daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2488-03",
+          "sku": "GG1209",
+          "name": "Edd",
+          "desc": "A logo on light metal",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Organic cotton, openly yours",
+      "out": "content/gifts-gulf/2026-06-26/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6355-03",
+          "sku": "GG1425",
+          "name": "Yuki Colour",
+          "desc": "Organic cotton, openly yours",
+          "colours": 0
+        },
+        {
+          "code": "mo6632-13",
+          "sku": "GG1471",
+          "name": "Nuoro",
+          "desc": "Soft fibre, clear print",
+          "colours": 0
+        },
+        {
+          "code": "mo6636-13",
+          "sku": "GG1473",
+          "name": "Amber Large",
+          "desc": "Better made, better gift",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

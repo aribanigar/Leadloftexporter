@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-26",
+  "season": "Late summer, event season and mid-year onboarding",
+  "generated_utc": "2026-06-26T00:46:46.971867Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Stainless steel",
+      "angle": "Branded to keep",
+      "campaign_code": "GG-20260626-1",
+      "campaign_name": "Stainless Steel Gifts - 26 Jun 2026",
+      "subject": "Steel that earns its keep",
+      "skus": [
+        "GG1154",
+        "GG1155",
+        "GG1157",
+        "GG1161",
+        "GG1171",
+        "GG1263"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Recycled paper",
+      "angle": "Made for note-takers",
+      "campaign_code": "GG-20260626-2",
+      "campaign_name": "Recycled Paper Gifts - 26 Jun 2026",
+      "subject": "Paper worth filling",
+      "skus": [
+        "GG1070",
+        "GG1080",
+        "GG1224",
+        "GG1268",
+        "GG1278",
+        "GG1279"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Wood, bamboo and cork",
+      "angle": "Naturally branded",
+      "campaign_code": "GG-20260626-3",
+      "campaign_name": "Wood, Bamboo and Cork - 26 Jun 2026",
+      "subject": "Wood that wears your mark",
+      "skus": [
+        "GG1129",
+        "GG1167",
+        "GG1207",
+        "GG1269",
+        "GG1272",
+        "GG1273"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Cotton",
+      "angle": "Carried and worn",
+      "campaign_code": "GG-20260626-4",
+      "campaign_name": "Cotton Gifts - 26 Jun 2026",
+      "subject": "Cotton they keep",
+      "skus": [
+        "GG1162",
+        "GG1233",
+        "GG1444",
+        "GG1489",
+        "GG1504",
+        "GG1517"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Desk and tech",
+      "angle": "Built for the desk",
+      "campaign_code": "GG-20260626-5",
+      "campaign_name": "Desk and Tech - 26 Jun 2026",
+      "subject": "Desk gear they actually use",
+      "skus": [
+        "GG1012",
+        "GG1019",
+        "GG1032",
+        "GG1039",
+        "GG1040",
+        "GG1044"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Soft-touch PU",
+      "angle": "Soft-touch, branded",
+      "campaign_code": "GG-20260626-6",
+      "campaign_name": "Soft-Touch PU Gifts - 26 Jun 2026",
+      "subject": "Soft-touch, clearly branded",
+      "skus": [
+        "GG1021",
+        "GG1028",
+        "GG1029",
+        "GG1229",
+        "GG1246",
+        "GG1266"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Recycled rPET",
+      "angle": "Recycled daily carry",
+      "campaign_code": "GG-20260626-7",
+      "campaign_name": "Recycled rPET Gifts - 26 Jun 2026",
+      "subject": "Plastic, given a second life",
+      "skus": [
+        "GG1063",
+        "GG1109",
+        "GG1111",
+        "GG1165",
+        "GG1176",
+        "GG1186"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Aluminium",
+      "angle": "Light, branded",
+      "campaign_code": "GG-20260626-8",
+      "campaign_name": "Aluminium Gifts - 26 Jun 2026",
+      "subject": "Light aluminium, bold branding",
+      "skus": [
+        "GG1081",
+        "GG1168",
+        "GG1209",
+        "GG1226",
+        "GG1285",
+        "GG1286"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Organic cotton",
+      "angle": "Organic, clearly yours",
+      "campaign_code": "GG-20260626-9",
+      "campaign_name": "Organic Cotton Gifts - 26 Jun 2026",
+      "subject": "Organic cotton, openly yours",
+      "skus": [
+        "GG1425",
+        "GG1471",
+        "GG1473",
+        "GG1487",
+        "GG1488",
+        "GG1515"
+      ]
+    }
+  ]
+}

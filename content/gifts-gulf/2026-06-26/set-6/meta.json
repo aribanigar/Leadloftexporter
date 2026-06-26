@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-26",
+  "theme": "Soft-touch PU",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "C",
+  "campaign_code": "GG-20260626-6",
+  "campaign_name": "Soft-Touch PU Gifts - 26 Jun 2026",
+  "subject": "Soft-touch, clearly branded",
+  "skus": [
+    "GG1021",
+    "GG1028",
+    "GG1029",
+    "GG1229",
+    "GG1246",
+    "GG1266"
+  ],
+  "products": [
+    {
+      "name": "Buswe Big",
+      "sku": "GG1021",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3750-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1021"
+    },
+    {
+      "name": "Goal",
+      "sku": "GG1028",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2718-33.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1028"
+    },
+    {
+      "name": "Relicup",
+      "sku": "GG1029",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2720-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1029"
+    },
+    {
+      "name": "Jettag",
+      "sku": "GG1229",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2535-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1229"
+    },
+    {
+      "name": "Folio",
+      "sku": "GG1246",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2569-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1246"
+    },
+    {
+      "name": "Tagsmart",
+      "sku": "GG1266",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2599-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1266"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-26/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20soft-touch%20pu%20options%20for%20our%20team."
+}
