@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" font-family="'Poppins','Segoe UI',Arial,sans-serif">
+  <!-- background -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top orange editorial band -->
+  <rect x="0" y="0" width="1080" height="360" fill="#ef6723"/>
+
+  <!-- reserved ~140px top-left logo square (left blank for manual logo) -->
+  <rect x="64" y="64" width="140" height="140" fill="#ef6723" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="6 8"/>
+
+  <!-- kicker: italic serif accent for contrast -->
+  <text x="240" y="146" font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="40" fill="#1A1A1A">the monsoon rush is here —</text>
+  <text x="240" y="248" font-size="90" font-weight="800" letter-spacing="-3" fill="#FFFFFF">BOOK A LOCAL</text>
+  <text x="240" y="338" font-size="90" font-weight="800" letter-spacing="-3" fill="#FFFFFF">SERVICE PRO</text>
+
+  <!-- the ONE visual device: giant ₹0 -->
+  <text x="64" y="760" font-size="440" font-weight="800" letter-spacing="-18" fill="#FFFFFF">&#8377;0</text>
+  <text x="70" y="850" font-size="46" font-weight="700" letter-spacing="2" fill="#ef6723">TO LIST. ZERO COMMISSION.</text>
+
+  <!-- price-strike contrast line -->
+  <text x="70" y="930" font-size="40" fill="#9a9a9a" text-decoration="line-through">10–20% platform cut</text>
+  <text x="430" y="930" font-size="40" font-weight="700" fill="#FFFFFF">&#8594; you keep 100%</text>
+
+  <!-- 3 editorial proof columns -->
+  <line x1="64" y1="1010" x2="1016" y2="1010" stroke="#3a3a3a" stroke-width="2"/>
+  <text x="64"  y="1080" font-size="34" font-weight="700" fill="#ef6723">Owner-direct</text>
+  <text x="64"  y="1124" font-size="26" fill="#cfcfcf">No middlemen.</text>
+  <text x="64"  y="1156" font-size="26" fill="#cfcfcf">Talk to the pro.</text>
+
+  <text x="410" y="1080" font-size="34" font-weight="700" fill="#ef6723">Waterproofing</text>
+  <text x="410" y="1124" font-size="26" fill="#cfcfcf">Drains, AC, repairs —</text>
+  <text x="410" y="1156" font-size="26" fill="#cfcfcf">find them near you.</text>
+
+  <text x="760" y="1080" font-size="34" font-weight="700" fill="#ef6723">Free, always</text>
+  <text x="760" y="1124" font-size="26" fill="#cfcfcf">List in minutes.</text>
+  <text x="760" y="1156" font-size="26" fill="#cfcfcf">Pay nothing.</text>
+
+  <!-- footer -->
+  <text x="64" y="1290" font-size="40" font-weight="800" letter-spacing="-1" fill="#FFFFFF">qckserve.in</text>
+  <text x="760" y="1290" font-size="28" fill="#9a9a9a">India's free local marketplace</text>
+</svg>
