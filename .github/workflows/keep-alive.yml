@@ -1,0 +1,82 @@
+name: Keep Render API warm
+
+# Pings the Render-hosted FastAPI every 10 minutes so the free-tier web
+# service never spins down. Without this, the container sleeps after 15
+# minutes of inactivity and the next request — typically a login from the
+# CRM — takes 30-60 seconds to cold-start, which is longer than the
+# frontend's HTTP timeout. Users see "can't log in".
+#
+# With this workflow active there is always a request in the last 10
+# minutes, so the container stays warm and login is instant.
+#
+# Cost: zero. GitHub Actions free tier is 2,000 minutes/month for private
+# repos and unlimited for public. This workflow uses ~6 seconds per run,
+# 144 runs/day = ~14 min/day = ~7 hrs/month. Well under any limit.
+#
+# Override the API URL by setting a repository variable named API_URL
+# (Settings → Secrets and variables → Actions → Variables → New). Default
+# is the production Render URL from manifest.json.
+
+on:
+  schedule:
+    # Every 10 minutes — well under Render's 15-min idle spin-down threshold,
+    # giving headroom for GitHub Actions scheduler jitter (free tier can be
+    # ~5-15 min late). Cron syntax is UTC.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Override API URL for this run only'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Render API to keep it warm
+        env:
+          DEFAULT_URL: https://leadloftexporter.onrender.com
+        run: |
+          set -eu
+          # Order of preference: manual-run input → repo variable → default.
+          INPUT_URL="${{ github.event.inputs.url }}"
+          VAR_URL="${{ vars.API_URL }}"
+          API_URL="${INPUT_URL:-${VAR_URL:-$DEFAULT_URL}}"
+          echo "Target: $API_URL"
+
+          # First request after spin-down can take 30-60s. Try up to 3 times
+          # with a 5s gap — anything that isn't a hard network failure
+          # counts as "container woke up" for our purposes (even a 404
+          # response means Render's gateway routed to a live worker).
+          for i in 1 2 3; do
+            START=$(date +%s)
+            CODE=$(curl -sS -o /dev/null \
+              -w "%{http_code}" \
+              --max-time 90 \
+              --connect-timeout 30 \
+              --retry 0 \
+              "$API_URL/" || echo "000")
+            END=$(date +%s)
+            ELAPSED=$((END - START))
+            echo "Attempt $i: HTTP $CODE in ${ELAPSED}s"
+            if [ "$CODE" != "000" ]; then
+              echo "✓ API is awake (HTTP $CODE)"
+              exit 0
+            fi
+            sleep 5
+          done
+          # All 3 attempts hit a hard network failure. Don't fail the
+          # workflow run — that would spam email notifications on every
+          # transient hiccup. The next scheduled run will try again in
+          # 10 minutes.
+          echo "::warning::All 3 ping attempts timed out; container may be down. Next attempt in 10 minutes."
+          exit 0
