@@ -1,0 +1,62 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "Photo Privacy WhatsApp",
+  "image_query": "muslim bride veil",
+  "cta_url": "https://datekhaas.com/join",
+  "body": "Assalamu alaikum 🌿\n\nThere is something different about Date Khaas — and it is the first thing you will notice.\n\n*Your photos are blurred by default.*\n\nNot because we do not trust you. But because your image is an amanah — something to be shared with intention, not browsed by strangers.\n\nOn Date Khaas:\n• Every profile is identity-verified (real documents, not just an email tick)\n• Your photos unlock only when you choose, for someone you trust\n• Invite your wali or a parent to have visibility of your matches\n• All conversations stay on the platform — protected, on record\n\nWe built this for people who want nikah, not just matches. For families who want to walk beside their child. For the one who has been waiting for something real and good.\n\n👉 Join Date Khaas: https://datekhaas.com/join\n\n*May Allah make it easy, and make it beautiful. Ameen.*",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+        "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+      },
+      {
+        "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+        "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+      },
+      {
+        "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+        "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-bride-veil-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/gb47e7da3f80570df32e0d82037754dd7792c16921e4679dd2c5b38519a81f851c99d754ebf9fa02aed20253272643589e8a12b8c0a1b1f6bbc4375cc54c2721d_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-bride-veil-5691595.jpg",
+      "remote_url": "https://pixabay.com/get/g4c6269ceacdc5e5298ff855eaf90dc10e425a73e4d1b605f89f59768e852692faa1a963134e31af246148c0000ccc819da394007b058d7fdcf55d6673aaa4a6e_1280.jpg",
+      "page_url": "https://pixabay.com/photos/girl-bride-fashion-hijab-veil-5691595/",
+      "author": "aceembelif",
+      "pixabay_id": 5691595,
+      "tags": "girl, bride, fashion, hijab, veil, portrait, beauty, beautiful, pretty, woman, young woman, female, pose, muslim, culture, traditional wear",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-bride-veil-437969.jpg",
+      "remote_url": "https://pixabay.com/get/g03074a6d4f34511156b2ac7fc58e68a278c17bb2258659dd1e22f5357c4652d90fa57ef1f57d4c6ec5d843b1984cf040ac61d6c5d3054a3a7a1a93292565dd82_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-bride-veil-wedding-veil-437969/",
+      "author": "Takmeomeo",
+      "pixabay_id": 437969,
+      "tags": "wedding, flower wallpaper, bride, veil, wedding veil, beautiful flowers, nature, flowers, bridal bouquet, love, romantic, marriage, flower background, romance, bridal",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

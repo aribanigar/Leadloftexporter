@@ -1,0 +1,19 @@
+Something we see often in Muslim matrimony: trust is assumed until it is broken.
+
+We built Date Khaas on a different assumption — that trust must be *earned*, feature by feature, before a single introduction is made.
+
+Here is what that looks like in practice:
+
+🔒 **Photos blurred by default** — a profile image is unlocked only when both sides show genuine intent. No browsing. No screenshot culture. Your face is an amanah.
+
+✅ **Identity verification beyond OTP** — real documents are checked so that the name on the profile belongs to the face in the photo.
+
+👨‍👩‍👧 **Wali involvement built in** — a parent or guardian gets read-only visibility of matches. Because in Islam, nikah is never just between two people.
+
+💬 **Conversations stay on platform** — so if something feels wrong, there is a full record to act on.
+
+The matrimony space has trained people to treat catfishing as a cost of doing business. We disagree. Safety is not a premium feature. It is the foundation everything else rests on.
+
+If you are building in the Muslim lifestyle, halal-tech, or trust-and-safety space and thinking about how to design for dignity, I would love to hear how you approach it.
+
+#MuslimMatrimony #Nikah #TrustAndSafety #IslamicMarriage #HalalTech

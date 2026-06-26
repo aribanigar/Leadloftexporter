@@ -1,0 +1,164 @@
+{
+  "date": "2026-06-26",
+  "angle": "Your photos stay yours — until you choose to share them",
+  "research": [
+    {
+      "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+      "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+    },
+    {
+      "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+      "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+    },
+    {
+      "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+      "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+    },
+    {
+      "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+      "source": "https://www.nikahforever.com/"
+    },
+    {
+      "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+      "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+    }
+  ],
+  "items": [
+    {
+      "type": "html_email",
+      "format": "standard",
+      "channel": "email",
+      "title": "Photo Privacy Standard Email",
+      "subject": "Your photos. Your control. Your nikah.",
+      "preheader": "On Date Khaas, your photos are blurred by default — unlocked only when the moment is right.",
+      "cta_url": "https://datekhaas.com/join",
+      "image_query": "muslim wedding couple",
+      "body": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Your photos. Your control. Your nikah.</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f5f3ee;font-family:Helvetica,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f5f3ee;\">\n  <tr>\n    <td align=\"center\" style=\"padding:32px 16px;\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,53,39,0.08);\">\n\n        <!-- HEADER -->\n        <tr>\n          <td style=\"background-color:#003527;padding:28px 40px;text-align:center;\">\n            <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:700;color:#e9c176;letter-spacing:3px;\">Date Khaas</p>\n            <p style=\"margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#a8c4b8;letter-spacing:4px;text-transform:uppercase;\">Muslim Matrimony</p>\n          </td>\n        </tr>\n\n        <!-- HERO IMAGE -->\n        <tr>\n          <td style=\"padding:0;line-height:0;\">\n            <img src=\"https://datekhaas.com/email/hero-wedding.jpg\" alt=\"A beautiful nikah ceremony — golden light, flowers, and the promise of forever\" width=\"600\" style=\"width:100%;max-width:600px;display:block;\" />\n          </td>\n        </tr>\n\n        <!-- HERO COPY -->\n        <tr>\n          <td style=\"padding:48px 40px 32px;text-align:center;\">\n            <h1 style=\"margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:400;color:#003527;line-height:1.3;letter-spacing:-0.5px;\">\n              You deserve a love<br>that begins with safety.\n            </h1>\n            <p style=\"margin:0 0 20px;font-family:Helvetica,Arial,sans-serif;font-size:17px;color:#5a6a7a;line-height:1.75;\">\n              There is a kind of peace — <em>sukoon</em> — in knowing the person reaching out to you is truly who they say they are. That their intentions are as honest as your own longing for a righteous marriage.\n            </p>\n            <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:19px;color:#003527;line-height:1.6;font-style:italic;\">\n              That peace is what we built Date Khaas for.\n            </p>\n          </td>\n        </tr>\n\n        <!-- GOLD DIVIDER -->\n        <tr>\n          <td style=\"padding:0 40px;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"border-top:1px solid #e9c176;\"></td></tr></table>\n          </td>\n        </tr>\n\n        <!-- FEATURE 1 -->\n        <tr>\n          <td style=\"padding:32px 40px 20px;\">\n            <table cellpadding=\"0\" cellspacing=\"0\">\n              <tr>\n                <td style=\"width:40px;vertical-align:top;padding-top:3px;\">\n                  <div style=\"width:28px;height:28px;background-color:#003527;border-radius:50%;text-align:center;line-height:28px;font-size:14px;color:#e9c176;\">&#128274;</div>\n                </td>\n                <td style=\"padding-left:16px;\">\n                  <h2 style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:#003527;\">Your photos stay yours</h2>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#5a6a7a;line-height:1.7;\">\n                    On Date Khaas, your photos are blurred by default. You unlock them only when a conversation feels right — when there is real intent on both sides. Your face is an <em>amanah</em>. We treat it that way.\n                  </p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- FEATURE 2 -->\n        <tr>\n          <td style=\"padding:0 40px 20px;\">\n            <table cellpadding=\"0\" cellspacing=\"0\">\n              <tr>\n                <td style=\"width:40px;vertical-align:top;padding-top:3px;\">\n                  <div style=\"width:28px;height:28px;background-color:#003527;border-radius:50%;text-align:center;line-height:28px;font-size:14px;color:#e9c176;\">&#10003;</div>\n                </td>\n                <td style=\"padding-left:16px;\">\n                  <h2 style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:#003527;\">Every profile, truly verified</h2>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#5a6a7a;line-height:1.7;\">\n                    We go beyond email confirmation. Real documents. Real people. So you never have to wonder if the name and face in front of you belong to the same person.\n                  </p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- FEATURE 3 -->\n        <tr>\n          <td style=\"padding:0 40px 32px;\">\n            <table cellpadding=\"0\" cellspacing=\"0\">\n              <tr>\n                <td style=\"width:40px;vertical-align:top;padding-top:3px;\">\n                  <div style=\"width:28px;height:28px;background-color:#003527;border-radius:50%;text-align:center;line-height:28px;font-size:14px;color:#e9c176;\">&#128106;</div>\n                </td>\n                <td style=\"padding-left:16px;\">\n                  <h2 style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:#003527;\">Your wali walks beside you</h2>\n                  <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#5a6a7a;line-height:1.7;\">\n                    Invite a parent or wali to have read-only visibility of your matches. <em>Nikah</em> is a family matter, and it should feel that way from the very first conversation.\n                  </p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- GOLD DIVIDER -->\n        <tr>\n          <td style=\"padding:0 40px;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"border-top:1px solid #e9c176;\"></td></tr></table>\n          </td>\n        </tr>\n\n        <!-- CTA BLOCK -->\n        <tr>\n          <td style=\"background-color:#003527;padding:44px 40px;text-align:center;\">\n            <p style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#e9c176;font-style:italic;line-height:1.35;\">\n              The one written for you is waiting.\n            </p>\n            <p style=\"margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#a8c4b8;line-height:1.7;\">\n              Begin your journey with intention, privacy, and <em style=\"color:#e9c176;\">barakah</em>.\n            </p>\n            <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background-color:#e9c176;color:#003527;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:16px 44px;border-radius:4px;letter-spacing:1.5px;text-transform:uppercase;\">\n              Create Your Profile\n            </a>\n          </td>\n        </tr>\n\n        <!-- FOOTER -->\n        <tr>\n          <td style=\"padding:24px 40px;text-align:center;background-color:#f9f7f3;\">\n            <p style=\"margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#999;line-height:1.6;\">\n              Date Khaas &middot; Muslim Matrimony &middot;\n              <a href=\"https://datekhaas.com/privacy\" style=\"color:#888;text-decoration:underline;\">Privacy Policy</a> &middot;\n              <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#888;text-decoration:underline;\">Unsubscribe</a>\n            </p>\n            <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#c5a55a;font-style:italic;\">\n              All things begin with Bismillah.\n            </p>\n          </td>\n        </tr>\n\n      </table>\n    </td>\n  </tr>\n</table>\n</body>\n</html>",
+      "metadata": {
+        "research_sources": [
+          {
+            "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+            "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+          },
+          {
+            "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+            "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+          },
+          {
+            "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+            "source": "https://www.nikahforever.com/"
+          },
+          {
+            "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+            "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+          }
+        ]
+      }
+    },
+    {
+      "type": "html_email",
+      "format": "amp",
+      "channel": "email",
+      "title": "Photo Privacy AMP Carousel Email",
+      "subject": "See how Date Khaas keeps your journey private",
+      "preheader": "Verified profiles. Blurred photos. Wali involvement. Your way.",
+      "cta_url": "https://datekhaas.com/join",
+      "image_query": "nikah ceremony flowers",
+      "body": "<!doctype html>\n<html ⚡4email>\n<head>\n  <meta charset=\"utf-8\">\n  <style amp4email-boilerplate>body{visibility:hidden}</style>\n  <script async src=\"https://cdn.ampproject.org/v0.js\"></script>\n  <script async custom-element=\"amp-carousel\" src=\"https://cdn.ampproject.org/v0/amp-carousel-0.1.js\"></script>\n  <style amp-custom>\n    body{margin:0;padding:16px;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;}\n    .wrap{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;}\n    .header{background:#003527;padding:24px 40px;text-align:center;}\n    .logo{margin:0;font-family:Georgia,serif;font-size:28px;color:#e9c176;letter-spacing:3px;}\n    .tagline{margin:6px 0 0;font-size:11px;color:#a8c4b8;letter-spacing:4px;text-transform:uppercase;}\n    .slide-wrap{position:relative;}\n    .badge{position:absolute;top:14px;right:14px;background:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;padding:5px 12px;border-radius:14px;letter-spacing:1px;}\n    .body-section{padding:40px;}\n    .hero-h{font-family:Georgia,serif;font-size:30px;color:#003527;font-weight:400;margin:0 0 16px;line-height:1.3;}\n    .lead{font-size:16px;color:#5a6a7a;line-height:1.75;margin:0 0 24px;}\n    .feature{padding:16px 0;border-bottom:1px solid #f0ebe0;}\n    .feature:last-child{border-bottom:none;}\n    .f-title{font-family:Georgia,serif;font-size:19px;color:#003527;margin:0 0 8px;font-weight:400;}\n    .f-body{margin:0;font-size:15px;color:#666;line-height:1.65;}\n    .cta-block{background:#003527;padding:40px;text-align:center;}\n    .cta-hed{font-family:Georgia,serif;font-size:22px;color:#e9c176;margin:0 0 8px;font-style:italic;}\n    .cta-sub{font-size:14px;color:#a8c4b8;margin:0 0 24px;line-height:1.6;}\n    .cta-btn{display:inline-block;background:#e9c176;color:#003527;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:4px;letter-spacing:1.5px;text-transform:uppercase;}\n  </style>\n</head>\n<body>\n  <div class=\"wrap\">\n    <div class=\"header\">\n      <p class=\"logo\">Date Khaas</p>\n      <p class=\"tagline\">Muslim Matrimony</p>\n    </div>\n\n    <amp-carousel width=\"600\" height=\"340\" layout=\"fixed\" type=\"slides\" autoplay delay=\"3500\" loop=\"true\">\n      <div class=\"slide-wrap\">\n        <amp-img src=\"https://cdn.pixabay.com/photo/2016/11/29/06/15/wedding-1869132_1280.jpg\" width=\"600\" height=\"340\" layout=\"fixed\" alt=\"Nikah ceremony — golden evening light\"></amp-img>\n        <div class=\"badge\">&#10003; Verified Profiles</div>\n      </div>\n      <div class=\"slide-wrap\">\n        <amp-img src=\"https://cdn.pixabay.com/photo/2017/09/01/21/53/wedding-2704215_1280.jpg\" width=\"600\" height=\"340\" layout=\"fixed\" alt=\"Muslim wedding celebration with family\"></amp-img>\n        <div class=\"badge\">&#128274; Photos Private by Default</div>\n      </div>\n      <div class=\"slide-wrap\">\n        <amp-img src=\"https://cdn.pixabay.com/photo/2015/01/02/09/34/wedding-582271_1280.jpg\" width=\"600\" height=\"340\" layout=\"fixed\" alt=\"Wedding flowers and gold rings — the promise of forever\"></amp-img>\n        <div class=\"badge\">&#128106; Wali Involvement</div>\n      </div>\n    </amp-carousel>\n\n    <div class=\"body-section\">\n      <h1 class=\"hero-h\">A marriage that begins with trust</h1>\n      <p class=\"lead\">Every step on Date Khaas is built on one belief: you deserve to feel completely safe before you feel anything else.</p>\n\n      <div class=\"feature\">\n        <h3 class=\"f-title\">Photos blurred by default</h3>\n        <p class=\"f-body\">Your image is revealed only when you choose — to someone who has shown real intention on both sides.</p>\n      </div>\n      <div class=\"feature\">\n        <h3 class=\"f-title\">Identity verified, not just email-confirmed</h3>\n        <p class=\"f-body\">We check real documents so every profile is as honest as the person behind it.</p>\n      </div>\n      <div class=\"feature\">\n        <h3 class=\"f-title\">Invite your wali</h3>\n        <p class=\"f-body\">Let a parent or guardian walk alongside you — read-only visibility, full peace of mind, complete barakah.</p>\n      </div>\n    </div>\n\n    <div class=\"cta-block\">\n      <p class=\"cta-hed\">The one written for you deserves a beginning as beautiful as the marriage.</p>\n      <p class=\"cta-sub\">Draft. Private. Protected. Ready when you are.</p>\n      <a href=\"https://datekhaas.com/join\" class=\"cta-btn\">Begin Your Journey</a>\n    </div>\n  </div>\n</body>\n</html>",
+      "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>A marriage that begins with trust — Date Khaas</title>\n</head>\n<body style=\"margin:0;padding:16px;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;background:#fff;border-radius:8px;overflow:hidden;\">\n<tr><td style=\"background:#003527;padding:24px 40px;text-align:center;\">\n  <p style=\"margin:0;font-family:Georgia,serif;font-size:28px;color:#e9c176;letter-spacing:3px;\">Date Khaas</p>\n  <p style=\"margin:6px 0 0;font-size:11px;color:#a8c4b8;letter-spacing:4px;text-transform:uppercase;\">Muslim Matrimony</p>\n</td></tr>\n<tr><td style=\"padding:40px;text-align:center;\">\n  <h1 style=\"font-family:Georgia,serif;font-size:30px;color:#003527;font-weight:400;margin:0 0 20px;line-height:1.3;\">A marriage that begins with trust</h1>\n  <p style=\"font-size:16px;color:#5a6a7a;line-height:1.75;margin:0 0 12px;\">Photos blurred by default. Profiles identity-verified. Your wali invited. Date Khaas is built so the journey to nikah feels as dignified as the nikah itself.</p>\n  <p style=\"font-size:16px;color:#5a6a7a;line-height:1.75;margin:0 0 24px;\">Every conversation stays on the platform. Every match is real. Every step is yours to control.</p>\n  <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:4px;letter-spacing:1.5px;text-transform:uppercase;\">Begin Your Journey</a>\n</td></tr>\n<tr><td style=\"padding:20px 40px;text-align:center;border-top:1px solid #eee;\">\n  <p style=\"margin:0;font-family:Georgia,serif;font-size:13px;color:#c5a55a;font-style:italic;\">All things begin with Bismillah.</p>\n</td></tr>\n</table>\n</td></tr></table>\n</body>\n</html>",
+      "metadata": {
+        "research_sources": [
+          {
+            "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+            "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+          },
+          {
+            "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+            "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+          },
+          {
+            "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+            "source": "https://www.nikahforever.com/"
+          },
+          {
+            "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+            "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+          }
+        ]
+      }
+    },
+    {
+      "type": "whatsapp",
+      "format": "text",
+      "channel": "whatsapp",
+      "title": "Photo Privacy WhatsApp",
+      "image_query": "muslim bride veil",
+      "cta_url": "https://datekhaas.com/join",
+      "body": "Assalamu alaikum 🌿\n\nThere is something different about Date Khaas — and it is the first thing you will notice.\n\n*Your photos are blurred by default.*\n\nNot because we do not trust you. But because your image is an amanah — something to be shared with intention, not browsed by strangers.\n\nOn Date Khaas:\n• Every profile is identity-verified (real documents, not just an email tick)\n• Your photos unlock only when you choose, for someone you trust\n• Invite your wali or a parent to have visibility of your matches\n• All conversations stay on the platform — protected, on record\n\nWe built this for people who want nikah, not just matches. For families who want to walk beside their child. For the one who has been waiting for something real and good.\n\n👉 Join Date Khaas: https://datekhaas.com/join\n\n*May Allah make it easy, and make it beautiful. Ameen.*",
+      "metadata": {
+        "research_sources": [
+          {
+            "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+            "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+          },
+          {
+            "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+            "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+          },
+          {
+            "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+            "source": "https://www.nikahforever.com/"
+          },
+          {
+            "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+            "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+          }
+        ]
+      }
+    },
+    {
+      "type": "other",
+      "format": "linkedin",
+      "channel": "linkedin",
+      "title": "Trust by Design LinkedIn Post",
+      "image_query": "muslim wedding celebration family",
+      "body": "Something we see often in Muslim matrimony: trust is assumed until it is broken.\n\nWe built Date Khaas on a different assumption — that trust must be *earned*, feature by feature, before a single introduction is made.\n\nHere is what that looks like in practice:\n\n🔒 **Photos blurred by default** — a profile image is unlocked only when both sides show genuine intent. No browsing. No screenshot culture. Your face is an amanah.\n\n✅ **Identity verification beyond OTP** — real documents are checked so that the name on the profile belongs to the face in the photo.\n\n👨‍👩‍👧 **Wali involvement built in** — a parent or guardian gets read-only visibility of matches. Because in Islam, nikah is never just between two people.\n\n💬 **Conversations stay on platform** — so if something feels wrong, there is a full record to act on.\n\nThe matrimony space has trained people to treat catfishing as a cost of doing business. We disagree. Safety is not a premium feature. It is the foundation everything else rests on.\n\nIf you are building in the Muslim lifestyle, halal-tech, or trust-and-safety space and thinking about how to design for dignity, I would love to hear how you approach it.\n\n#MuslimMatrimony #Nikah #TrustAndSafety #IslamicMarriage #HalalTech",
+      "metadata": {
+        "research_sources": [
+          {
+            "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+            "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+          },
+          {
+            "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+            "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+          },
+          {
+            "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+            "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+          },
+          {
+            "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+            "source": "https://www.nikahforever.com/"
+          },
+          {
+            "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+            "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+          }
+        ]
+      }
+    }
+  ]
+}

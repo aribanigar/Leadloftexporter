@@ -1,0 +1,61 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "Trust by Design LinkedIn Post",
+  "image_query": "muslim wedding celebration family",
+  "body": "Something we see often in Muslim matrimony: trust is assumed until it is broken.\n\nWe built Date Khaas on a different assumption — that trust must be *earned*, feature by feature, before a single introduction is made.\n\nHere is what that looks like in practice:\n\n🔒 **Photos blurred by default** — a profile image is unlocked only when both sides show genuine intent. No browsing. No screenshot culture. Your face is an amanah.\n\n✅ **Identity verification beyond OTP** — real documents are checked so that the name on the profile belongs to the face in the photo.\n\n👨‍👩‍👧 **Wali involvement built in** — a parent or guardian gets read-only visibility of matches. Because in Islam, nikah is never just between two people.\n\n💬 **Conversations stay on platform** — so if something feels wrong, there is a full record to act on.\n\nThe matrimony space has trained people to treat catfishing as a cost of doing business. We disagree. Safety is not a premium feature. It is the foundation everything else rests on.\n\nIf you are building in the Muslim lifestyle, halal-tech, or trust-and-safety space and thinking about how to design for dignity, I would love to hear how you approach it.\n\n#MuslimMatrimony #Nikah #TrustAndSafety #IslamicMarriage #HalalTech",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "NRI Muslim diaspora in the Gulf and UK/US is peak-intent in summer 2026 — professionals visiting home seek trusted introductions. Marketing to 'NRI moment' converts.",
+        "source": "https://www.matrimonialsindia.com/nri/muslim-matrimony.htm"
+      },
+      {
+        "insight": "Photo blur is the #1 emerging trust differentiator for Muslim matrimony 2026: Muzz, Salams, AlKhattaba, Oolfa all now offer default or opt-in photo blurring as a modesty and safety feature.",
+        "source": "https://salaamsoulmate.com/blog/respecting-modesty-and-privacy-in-muslim-matrimony-platforms"
+      },
+      {
+        "insight": "Wali (guardian) invite features are now expected by serious users — Salams Premium gives wali read-only chat access; Pure Matrimony and SalafiMatch have built-in wali involvement flows.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Competitor claim to answer: NikahForever claims '100% privacy guaranteed and verified profiles' but verification appears OTP-level. Shaadi.com leans on 'millions of success stories' rather than safety-first messaging.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "Catfishing and romance scams in Muslim matrimony are well-documented — platforms that keep conversations on-platform, mandate video verification, and use AI detection retain more users past the first match.",
+        "source": "https://muzz.com/us/en/blog/community/how-to-spot-a-scammer-on-a-muslim-marriage-app/"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-wedding-celebration-family-5574694.jpg",
+      "remote_url": "https://pixabay.com/get/g0665cbecf49ea44015a59197b8c3b0d1e46f29cc6d507a2a3498bc56fe5f78624d6e0f06d59df2ceb1e96459a3294119052b8bb023c8c386104444b1c5a25a0b_1280.jpg",
+      "page_url": "https://pixabay.com/photos/hand-wedding-marriage-couple-love-5574694/",
+      "author": "lubovlisitsa",
+      "pixabay_id": 5574694,
+      "tags": "hand, wedding, marriage, couple, love, romance, romantic, celebration, family, togetherness, commitment, diamond, honeymoon, relationship, gold, jewelry, fiance, wedding ring, horizontal, touching, bridegroom, girlfriend, matrimons, anniversary, caucasian, happyvalentine's, wedding, wedding, wedding, wedding, family, diamond, honeymoon, honeymoon, honeymoon, gold, jewelry, jewelry, jewelry, jewelry, jewelry, wedding ring, wedding ring, anniversary, anniversary, anniversary",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-wedding-celebration-family-4660419.jpg",
+      "remote_url": "https://pixabay.com/get/g91b001ac3940a27cc55db9af5eee89f21701ab562d21a66ddaa9ec44dbbeb3eb32a931c04f11a558095098f5e45bceefce1ca90a8f57a990085019c61d65d026_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-love-happy-couple-4660419/",
+      "author": "haryono5",
+      "pixabay_id": 4660419,
+      "tags": "wedding, love, happy birthday, happy, couple, happiness, bride, marriage, romance, people, wife, woman, romantic, married, man, relationship, groom, husband, together, young, bridal, outdoors, party, kiss, dress",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-26/images/muslim-wedding-celebration-family-8342763.jpg",
+      "remote_url": "https://pixabay.com/get/gfdaeaaceda1e9da70c3361f36acb0e88bf366ec60e47654d9032ec8733a9403635a9215527beb2d2bb37c85c3e1604540b59ee1eae7b5ad31748b5fa1a437661_1280.jpg",
+      "page_url": "https://pixabay.com/photos/couple-wedding-marriage-ring-8342763/",
+      "author": "lekerado",
+      "pixabay_id": 8342763,
+      "tags": "couple, wedding, marriage, ring, family, oath, marriage, marriage, marriage, marriage, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}
