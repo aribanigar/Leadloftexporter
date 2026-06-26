@@ -44,7 +44,7 @@ jobs:
     steps:
       - name: Ping Render API to keep it warm
         env:
-          DEFAULT_URL: https://leadloftexporter.onrender.com
+          DEFAULT_URL: https://leadloftexporter-1.onrender.com
         run: |
           set -eu
           # Order of preference: manual-run input → repo variable → default.
