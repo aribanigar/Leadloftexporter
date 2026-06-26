@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-26",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "B/A/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "Sonamarg in summer - glaciers above green meadows",
+      "subject": "Sonamarg is all glaciers and green this week",
+      "campaign_code": "VK-INR-B2C-20260626"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "theme": "Peak summer demand - rooms booking before the July rush",
+      "subject": "A traveller booked a Kashmir room today, not yours",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260626"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "theme": "Dal Lake summer nights - guests choosing decks now",
+      "subject": "The lake is booking up without your boat",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260626"
+    }
+  ]
+}

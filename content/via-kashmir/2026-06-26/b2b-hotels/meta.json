@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-26",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (India)",
+  "theme": "Peak summer demand - rooms booking before the July rush",
+  "season": "Peak summer (late June) - Srinagar in the low twenties, every pass to Sonamarg, Gulmarg and Pahalgam open, glaciers still bright above green meadows, the gentle window before the early-July Amarnath rush",
+  "design": "A",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260626",
+  "campaign_name": "Hotels Peak summer demand [INR] - 26 Jun 2026",
+  "subject": "A traveller booked a Kashmir room today, not yours",
+  "items": [
+    "VK-HOTELS-LISTING",
+    "VK-HOTELS-SUMMER",
+    "VK-HOTELS-DEMAND"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-26/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-26/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
