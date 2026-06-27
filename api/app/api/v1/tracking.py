@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.models import Campaign, CampaignRecipient
 
@@ -61,7 +62,10 @@ def track_click(
     rid: str = "",
     db: Session = Depends(get_db),
 ):
-    target = "https://leadloftexporter.onrender.com"
+    # Fallback target if the tracking_id isn't found in the campaign's link
+    # registry (rare). Use the configured public API origin instead of a
+    # hardcoded host so it never points at a dead/old deployment.
+    target = (get_settings().public_api_url or "https://leadloftexporter.onrender.com").rstrip("/")
     try:
         c = db.get(Campaign, campaign_id)
         if c is not None:
