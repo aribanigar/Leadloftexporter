@@ -875,7 +875,11 @@ export default function CampaignDetailPage() {
   const intBounced = campaign.bounced_count;
   const intFailed = campaign.failed_count;
   const intSkipped = campaign.skipped_count;
-  const intQueued = Math.max(intTotal - intDelivered - intFailed - intSkipped, 0);
+  // Queued = recipients still genuinely waiting to send. Subtract bounced too:
+  // a bounced address is permanently undeliverable and will NEVER send, so
+  // leaving it in "Queued" inflated the number (and made it disagree with the
+  // real pending+sending count the Send-Remaining action reports).
+  const intQueued = Math.max(intTotal - intDelivered - intFailed - intSkipped - intBounced, 0);
   const intIssues = intBounced + intFailed;
   // Deliverability = quality of what's been attempted (delivered vs bounced),
   // from the same counters so the gauge agrees with the tiles.
@@ -1093,7 +1097,7 @@ export default function CampaignDetailPage() {
                       minute = 60 * inboxes / pace, and the queue drains in
                       roughly queued / (per-min) minutes. */}
                   {campaign.status === 'sending' && (() => {
-                    const queued = Math.max(0, campaign.total_recipients - campaign.sent_count - campaign.failed_count - campaign.skipped_count);
+                    const queued = Math.max(0, campaign.total_recipients - campaign.sent_count - campaign.failed_count - campaign.skipped_count - campaign.bounced_count);
                     const pace = Math.max(1, campaign.seconds_between_sends || 30);
                     const inboxes = Math.max(1, (campaign.sender_account_ids || []).length);
                     const perMin = Math.max(1, Math.round((60 / pace) * inboxes));
