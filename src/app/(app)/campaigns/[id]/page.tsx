@@ -716,9 +716,29 @@ export default function CampaignDetailPage() {
   const handleSendRemaining = async () => {
     setSending(true);
     try {
-      const res = await api<{ status?: string; remaining?: number; resumed_remaining?: number; message?: string }>(
-        `/campaigns/${id}/send-remaining`, { method: 'POST' }
-      );
+      // The endpoint is idempotent (it only flips state + marks the balance
+      // due-now), so it's safe to retry. Absorb a Render free-tier cold-start
+      // or a brief redeploy by retrying a few times with backoff instead of
+      // surfacing a scary "couldn't reach the server" on the first miss.
+      type SendRemainingRes = { status?: string; remaining?: number; resumed_remaining?: number; message?: string };
+      let res: SendRemainingRes | undefined;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          res = await api<SendRemainingRes>(`/campaigns/${id}/send-remaining`, { method: 'POST' });
+          lastErr = undefined;
+          break;
+        } catch (e) {
+          lastErr = e;
+          // A real client error (4xx) won't fix itself — stop retrying.
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500) break;
+          if (attempt < 3) {
+            setToast({ msg: 'Waking the server… one moment', type: 'success' });
+            await new Promise(r => setTimeout(r, 4000 * (attempt + 1)));
+          }
+        }
+      }
+      if (lastErr || !res) throw lastErr ?? new Error('no_response');
       if (res?.remaining === 0) {
         setToast({ msg: 'Nothing left to send — campaign is already 100% complete', type: 'success' });
         if (res.status) setCampaign(prev => prev ? { ...prev, status: res.status as Campaign['status'] } : prev);
