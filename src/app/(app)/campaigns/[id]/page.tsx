@@ -339,11 +339,11 @@ function CampaignStatusBadge({ performance }: { performance?: Perf }) {
 // ─── Three-dot Menu ───────────────────────────────────────────────────────────
 
 function ActionMenu({
-  campaign, sending, duplicating, onStart, onDuplicate, onCancel, onPause, onResume, onNudge,
+  campaign, sending, duplicating, onStart, onDuplicate, onCancel, onPause, onResume, onNudge, onSendRemaining,
 }: {
   campaign: Campaign; sending: boolean; duplicating: boolean;
   onStart: () => void; onDuplicate: () => void; onCancel: () => void;
-  onPause: () => void; onResume: () => void; onNudge: () => void;
+  onPause: () => void; onResume: () => void; onNudge: () => void; onSendRemaining: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -378,6 +378,12 @@ function ActionMenu({
       label: 'Send Now (reset schedule)',
       icon: 'bolt', color: T.primary,
       onClick: () => { setOpen(false); onNudge(); },
+    }] : []),
+    ...(campaign.status !== 'draft' && campaign.status !== 'scheduled' ? [{
+      label: sending ? 'Sending…' : 'Send Remaining Emails',
+      icon: 'forward_to_inbox', color: T.primary,
+      onClick: () => { setOpen(false); onSendRemaining(); },
+      disabled: sending,
     }] : []),
     {
       label: 'Edit Campaign',
@@ -704,6 +710,37 @@ export default function CampaignDetailPage() {
     }
   };
 
+  // ── Send Remaining — resume a campaign that stopped half-way and dispatch
+  //    only the balance emails so it reaches 100%. Works on any stopped
+  //    campaign (paused, cancelled, failed, stalled, or wrongly "completed").
+  const handleSendRemaining = async () => {
+    setSending(true);
+    try {
+      const res = await api<{ status?: string; remaining?: number; resumed_remaining?: number; message?: string }>(
+        `/campaigns/${id}/send-remaining`, { method: 'POST' }
+      );
+      if (res?.remaining === 0) {
+        setToast({ msg: 'Nothing left to send — campaign is already 100% complete', type: 'success' });
+        if (res.status) setCampaign(prev => prev ? { ...prev, status: res.status as Campaign['status'] } : prev);
+      } else {
+        const n = res?.resumed_remaining;
+        setToast({
+          msg: n
+            ? `Resuming — ${n} remaining email${n === 1 ? '' : 's'} will send`
+            : 'Resuming the remaining emails',
+          type: 'success',
+        });
+        setCampaign(prev => prev ? { ...prev, status: 'sending' } : prev);
+      }
+      await fetchStats(true);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to send remaining';
+      setToast({ msg, type: 'error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   // ── Nudge — reset every pending recipient's send_after to NOW so a
   //    campaign launched on the old pre-stretch schedule (or stalled after a
   //    cooldown) drains immediately at the configured per-sender pace.
@@ -888,6 +925,7 @@ export default function CampaignDetailPage() {
               onPause={handlePause}
               onResume={handleResume}
               onNudge={handleNudge}
+              onSendRemaining={handleSendRemaining}
             />
           </div>
         </div>

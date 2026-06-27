@@ -1193,6 +1193,99 @@ def cancel_campaign(
     return {"status": c.status}
 
 
+@router.post("/{campaign_id}/send-remaining")
+def send_remaining(
+    campaign_id: str,
+    retry_failed: bool = False,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Resume a campaign that stopped half-way and send only the balance emails
+    so the campaign reaches 100%.
+
+    Works on ANY existing campaign regardless of how it stopped — paused,
+    cancelled, failed, stalled in 'sending', or even one that was marked
+    'completed' but still has un-sent recipients. It never re-sends anyone:
+    only recipients still in 'pending'/'sending' are dispatched. Already-'sent'
+    rows are untouched. With ?retry_failed=1 the previously 'failed' recipients
+    are reset to 'pending' and retried too.
+    """
+    c = _own_campaign(db, ctx, campaign_id)
+
+    # Optionally fold prior failures back into the queue for a fresh attempt.
+    if retry_failed:
+        db.query(CampaignRecipient).filter(
+            CampaignRecipient.campaign_id == campaign_id,
+            CampaignRecipient.status == "failed",
+        ).update(
+            {CampaignRecipient.status: "pending", CampaignRecipient.error: None},
+            synchronize_session=False,
+        )
+        db.flush()
+
+    remaining = (
+        db.query(func.count(CampaignRecipient.id))
+        .filter(
+            CampaignRecipient.campaign_id == campaign_id,
+            CampaignRecipient.status.in_(("pending", "sending")),
+        )
+        .scalar()
+        or 0
+    )
+
+    # Nothing left → the campaign really is 100% done.
+    if remaining == 0:
+        if c.status not in ("completed", "cancelled"):
+            c.status = "completed"
+            if c.finished_at is None:
+                c.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        return {
+            "status": c.status,
+            "remaining": 0,
+            "message": "nothing_to_send — campaign already 100% sent",
+        }
+
+    # Need at least one active sender to dispatch the balance.
+    if not _has_active_senders(db, c):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            _no_sender_reason(db, c),
+        )
+
+    # Flip back to sending and clear any stop/cooldown state.
+    c.status = "sending"
+    if c.started_at is None:
+        c.started_at = datetime.now(timezone.utc)
+    c.paused_at = None
+    c.finished_at = None
+    c.error = None
+    # Clear any back-off window so the resume isn't silently skipped.
+    src = dict(c.recipient_sources or {})
+    if "_cooldown_until" in src:
+        src.pop("_cooldown_until", None)
+        c.recipient_sources = src
+    db.flush()
+
+    # Re-drip the balance from NOW: clear stale send_after stamps on the
+    # leftover pending rows so _schedule_recipients re-paces them fresh, then
+    # everything that stopped half-way flows out human-paced.
+    db.query(CampaignRecipient).filter(
+        CampaignRecipient.campaign_id == campaign_id,
+        CampaignRecipient.status == "pending",
+    ).update({CampaignRecipient.send_after: None}, synchronize_session=False)
+    db.commit()
+    try:
+        _schedule_recipients(db, c)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+
+    tick = _process_tick(db, c, ctx_user_id=ctx.user_id)
+    if isinstance(tick, dict):
+        tick["resumed_remaining"] = remaining
+    return tick
+
+
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign(
     campaign_id: str,
