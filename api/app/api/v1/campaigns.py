@@ -41,7 +41,7 @@ import secrets
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_ as sa_or
 from sqlalchemy.orm import Session
@@ -797,6 +797,79 @@ def active_sending(
         .all()
     )
     return {"ids": [r[0] for r in rows]}
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Autonomous server-side drain (no browser, no JWT)
+#
+# On the free tier Render blocks outbound SMTP, so a campaign's emails are
+# dispatched by the Vercel nodemailer relay. These three endpoints let an
+# external scheduler (a GitHub Action → the Vercel /api/cron/drain route) keep
+# every 'sending' campaign draining WITHOUT a browser tab open. They mirror the
+# JWT-guarded prepare-tick / commit-tick, but authenticate with the shared
+# CRON_SECRET (same trust model as /cron/run and the WhatsApp webhook).
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _cron_authorized(token: Optional[str], header_token: Optional[str]) -> bool:
+    secret = (get_settings().cron_secret or "").strip()
+    if not secret:
+        # No secret configured → autonomous drain is DISABLED (these endpoints
+        # send real email, so they must never be open).
+        return False
+    return token == secret or header_token == secret
+
+
+@router.get("/cron/sending")
+def cron_sending_campaigns(
+    token: Optional[str] = Query(default=None),
+    x_cron_token: Optional[str] = Header(default=None, alias="X-Cron-Token"),
+    db: Session = Depends(get_db),
+):
+    """All campaigns currently in 'sending', across every workspace. The Vercel
+    drain route iterates these and dispatches their due batches."""
+    if not _cron_authorized(token, x_cron_token):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_cron_token")
+    rows = (
+        db.query(Campaign.id, Campaign.workspace_id, Campaign.name)
+        .filter(Campaign.status == "sending")
+        .all()
+    )
+    return {"campaigns": [{"id": r[0], "workspace_id": r[1], "name": r[2]} for r in rows]}
+
+
+@router.post("/cron/{campaign_id}/prepare")
+def cron_prepare_tick(
+    campaign_id: str,
+    token: Optional[str] = Query(default=None),
+    x_cron_token: Optional[str] = Header(default=None, alias="X-Cron-Token"),
+    db: Session = Depends(get_db),
+):
+    """Cron-authed sibling of /{id}/prepare-tick — claims the next due batch and
+    returns the jobs WITH sender credentials for the Vercel relay to send."""
+    if not _cron_authorized(token, x_cron_token):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_cron_token")
+    c = db.get(Campaign, campaign_id)
+    if c is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "campaign_not_found")
+    return _prepare_tick_batch(db, c, ctx_user_id=c.user_id)
+
+
+@router.post("/cron/{campaign_id}/commit")
+def cron_commit_tick(
+    campaign_id: str,
+    body: dict,
+    token: Optional[str] = Query(default=None),
+    x_cron_token: Optional[str] = Header(default=None, alias="X-Cron-Token"),
+    db: Session = Depends(get_db),
+):
+    """Cron-authed sibling of /{id}/commit-tick — records send results."""
+    if not _cron_authorized(token, x_cron_token):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_cron_token")
+    c = db.get(Campaign, campaign_id)
+    if c is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "campaign_not_found")
+    return _commit_tick_results(db, c, body.get("results") or [], ctx_user_id=c.user_id)
 
 
 @router.get("/{campaign_id}")

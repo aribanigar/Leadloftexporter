@@ -1,0 +1,73 @@
+name: Drain campaigns (autonomous send)
+
+# Sends queued campaign email WITHOUT anyone keeping a browser tab open.
+#
+# How: this hits the Vercel route /api/cron/drain, which asks the backend which
+# campaigns are 'sending', then dispatches their due batches via nodemailer
+# (Render blocks SMTP, so sending must run from Vercel). Each scheduled run
+# loops for ~5 minutes calling the drain repeatedly, so — combined with the
+# every-5-minute schedule — sending is effectively continuous, tab or no tab.
+#
+# Setup (one time):
+#   1. Vercel → Project → Settings → Environment Variables: add CRON_SECRET
+#      (same value as on Render). Redeploy.
+#   2. GitHub → repo → Settings → Secrets and variables → Actions → Secrets:
+#      add CRON_SECRET (same value).
+#   3. (optional) Variable FRONTEND_URL to override the Vercel origin.
+#
+# Cost: GitHub Actions free tier is plenty (a few minutes per run).
+
+on:
+  schedule:
+    # Every 5 minutes (GitHub's minimum). Real cadence can lag 5-15 min on the
+    # free tier, but each run drains for ~5 min so the gaps stay covered.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'How many minutes this run should keep draining'
+        required: false
+        default: '5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: campaign-drain
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Drain sending campaigns
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DEFAULT_FRONTEND: https://leadloftexporter.vercel.app
+        run: |
+          set -u
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::warning::CRON_SECRET secret not set — skipping. Add it under Settings → Secrets → Actions."
+            exit 0
+          fi
+          VAR_URL="${{ vars.FRONTEND_URL }}"
+          FRONTEND="${VAR_URL:-$DEFAULT_FRONTEND}"
+          DRAIN_URL="${FRONTEND%/}/api/cron/drain"
+          echo "Draining via: $DRAIN_URL"
+
+          # Keep draining for ~RUN_MINUTES, calling the route every ~12s. Each
+          # call sends as many due batches as it can within its own budget.
+          RUN_MINUTES="${{ github.event.inputs.minutes }}"
+          RUN_MINUTES="${RUN_MINUTES:-5}"
+          DEADLINE=$(( $(date +%s) + RUN_MINUTES * 60 ))
+
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            BODY=$(curl -sS -m 70 -X POST \
+              -H "X-Cron-Token: ${CRON_SECRET}" \
+              "$DRAIN_URL" || echo '{"ok":false,"error":"curl_failed"}')
+            echo "$(date -u +%H:%M:%S) → $BODY"
+            sleep 12
+          done
+          echo "Drain window complete."
+          exit 0
