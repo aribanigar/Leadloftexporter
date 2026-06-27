@@ -1459,26 +1459,53 @@ function NewCampaignPageInner() {
         id = String(created.id);
         setCampaignId(id);
       }
-      await api(`/campaigns/${id}/start`, { method: 'POST' });
+
+      // Start the campaign, but make it bullet-proof against the free-tier
+      // cold-start that was the real cause of "cannot_start_in_state:sending":
+      // the first /start landed server-side but the response timed out, so the
+      // UI still thought it was a draft and a second click hit an already-
+      // sending campaign.
+      let launched = false;
+      let startErr: unknown;
+      for (let attempt = 0; attempt < 4 && !launched; attempt++) {
+        try {
+          await api(`/campaigns/${id}/start`, { method: 'POST' });
+          launched = true;
+        } catch (e) {
+          startErr = e;
+          // Already sending/finished → it's effectively launched. Done.
+          if (e instanceof ApiError && /^cannot_start_in_state:/.test(e.message)) {
+            launched = true;
+            break;
+          }
+          // A real client error (4xx other than the state guard) won't fix
+          // itself — stop and surface it.
+          if (e instanceof ApiError && e.status >= 400 && e.status < 500) break;
+          // Cold start / network blip — wait and retry.
+          if (attempt < 3) {
+            setToast({ msg: 'Waking the server… launching', type: 'success' });
+            await new Promise(r => setTimeout(r, 4000 * (attempt + 1)));
+          }
+        }
+      }
+
+      // Last-resort reconciliation: maybe /start DID land but every response
+      // was lost. Ask the server what the real status is before failing.
+      if (!launched) {
+        try {
+          const cur = await api<{ status?: string }>(`/campaigns/${id}`);
+          if (cur?.status && ['sending', 'paused', 'completed'].includes(cur.status)) {
+            launched = true;
+          }
+        } catch { /* fall through to error */ }
+      }
+
+      if (!launched) throw startErr ?? new Error('Failed to launch campaign');
+
       setToast({ msg: 'Campaign launched!', type: 'success' });
       router.push(`/campaigns/${id}`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'Failed to launch campaign';
-      // The campaign was already launched (this builder tab is showing a stale
-      // "DRAFT"). /start refuses a campaign that's already sending/finished —
-      // that's not a failure, the launch is effectively done. Open its report
-      // so the user can manage it (pause / send-remaining / view progress).
-      if (id && e instanceof ApiError && /^cannot_start_in_state:/.test(msg)) {
-        const state = msg.split(':')[1] || '';
-        setToast({
-          msg: state === 'completed'
-            ? 'This campaign has already finished — opening it.'
-            : 'This campaign is already launched — opening it.',
-          type: 'success',
-        });
-        router.push(`/campaigns/${id}`);
-        return;
-      }
       setToast({ msg, type: 'error' });
       setSending(false);
     }
