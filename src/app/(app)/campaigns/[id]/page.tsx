@@ -734,7 +734,9 @@ export default function CampaignDetailPage() {
       }
       await fetchStats(true);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : 'Failed to send remaining';
+      const msg = e instanceof ApiError
+        ? e.message
+        : "Couldn't reach the server — it may be waking up. Try again in a few seconds.";
       setToast({ msg, type: 'error' });
     } finally {
       setSending(false);

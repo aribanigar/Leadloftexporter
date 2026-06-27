@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { TaskAlerts } from "@/components/task-alerts";
 import { NoticeBoard } from "@/components/notice-board";
+import { CampaignAutoSender } from "@/components/campaign-auto-sender";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -36,6 +37,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       <TaskAlerts />
       <NoticeBoard />
+      {/* Keeps every 'sending' campaign draining across in-app navigation and
+          tab-switches, not just while the campaign detail page is open. */}
+      <CampaignAutoSender />
     </div>
   );
 }

@@ -775,6 +775,26 @@ def create_campaign(
     }
 
 
+@router.get("/active-sending")
+def active_sending(
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Lightweight list of campaign ids currently in 'sending' for this
+    workspace. Powers the app-shell background sender, which keeps every active
+    campaign draining no matter which page the user is on. Declared BEFORE
+    /{campaign_id} so the literal path wins the FastAPI match."""
+    rows = (
+        db.query(Campaign.id)
+        .filter(
+            Campaign.workspace_id == ctx.workspace_id,
+            Campaign.status == "sending",
+        )
+        .all()
+    )
+    return {"ids": [r[0] for r in rows]}
+
+
 @router.get("/{campaign_id}")
 def get_campaign(
     campaign_id: str,
