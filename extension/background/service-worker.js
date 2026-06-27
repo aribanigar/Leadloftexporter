@@ -7,7 +7,7 @@
  */
 
 const DEFAULT_SETTINGS = {
-  apiUrl: "https://leadloftexporter.onrender.com",
+  apiUrl: "https://leadloftexporter-1.onrender.com",
   apiKey: "lcx_M0enR28l06REA6X7iWCmMSpQ5jb3M06sJ7FvEJ5NLTI",
   enabled: true,
   // Autopilot defaults ON so bulk-message / connect jobs queued from the CRM
