@@ -453,7 +453,11 @@ def write_set(date, market, preview):
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
-            b = p.chromium.launch(args=["--no-sandbox"])
+            import os as _os
+            _exe = _os.environ.get("CHROMIUM_PATH",
+                "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
+            _kw = {"executable_path": _exe} if _os.path.exists(_exe) else {}
+            b = p.chromium.launch(args=["--no-sandbox"], **_kw)
             pg = b.new_page(viewport={"width": 1080, "height": 1350}, device_scale_factor=2)
             pg.goto(ch.resolve().as_uri()); pg.wait_for_timeout(1500)
             pg.screenshot(path=str(out / "img" / "whatsapp.jpg"), clip={"x":0,"y":0,"width":1080,"height":1350})

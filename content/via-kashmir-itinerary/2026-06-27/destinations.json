@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "kerala",    "feat": "rajasthan",  "place": "Kerala",        "region": "South India"},
+  "kashmir": {"photo": "kashmir",   "feat": "himalaya",   "place": "Kashmir",       "region": "North India"},
+  "saudi":   {"photo": "alps",      "feat": "cappadocia", "place": "Swiss Alps",    "region": "Europe"},
+  "dubai":   {"photo": "georgia",   "feat": "thailand",   "place": "Georgia",       "region": "Eastern Europe"}
+}
