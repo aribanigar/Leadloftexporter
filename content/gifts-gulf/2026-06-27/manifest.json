@@ -1,0 +1,160 @@
+{
+  "date": "2026-06-27",
+  "season": "Late summer, event season and mid-year onboarding",
+  "generated_utc": "2026-06-27T00:40:39.055510Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Executive onboarding",
+      "angle": "Day one, branded",
+      "campaign_code": "GG-20260627-1",
+      "campaign_name": "Executive Onboarding - 27 Jun 2026",
+      "subject": "Day one they remember",
+      "skus": [
+        "GG1532",
+        "GG1520",
+        "GG1542",
+        "GG1679",
+        "GG1319",
+        "GG1290"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Eco and sustainable",
+      "angle": "Made from recycled",
+      "campaign_code": "GG-20260627-2",
+      "campaign_name": "Eco And Sustainable - 27 Jun 2026",
+      "subject": "Recycled, and clearly yours",
+      "skus": [
+        "GG1534",
+        "GG1091",
+        "GG1548",
+        "GG1069",
+        "GG1478",
+        "GG1121"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "For note-takers",
+      "campaign_code": "GG-20260627-3",
+      "campaign_name": "Notebooks And Writing - 27 Jun 2026",
+      "subject": "Pages worth keeping",
+      "skus": [
+        "GG1697",
+        "GG1587",
+        "GG1508",
+        "GG1702",
+        "GG1721",
+        "GG1562"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Event giveaways",
+      "angle": "Hand them out",
+      "campaign_code": "GG-20260627-4",
+      "campaign_name": "Event Giveaways - 27 Jun 2026",
+      "subject": "Giveaways they keep",
+      "skus": [
+        "GG1747",
+        "GG1761",
+        "GG1791",
+        "GG1432",
+        "GG1521",
+        "GG1681"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Tech and desk",
+      "angle": "Built for the desk",
+      "campaign_code": "GG-20260627-5",
+      "campaign_name": "Tech And Desk - 27 Jun 2026",
+      "subject": "Desk pieces they keep",
+      "skus": [
+        "GG1642",
+        "GG1402",
+        "GG1628",
+        "GG1643",
+        "GG1553",
+        "GG1440"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Conscious gifting",
+      "angle": "Recycled daily carry",
+      "campaign_code": "GG-20260627-6",
+      "campaign_name": "Conscious Gifting - 27 Jun 2026",
+      "subject": "A second life, branded",
+      "skus": [
+        "GG1435",
+        "GG1384",
+        "GG1252",
+        "GG1323",
+        "GG1292",
+        "GG1353"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Premium thank-you",
+      "angle": "A proper thank-you",
+      "campaign_code": "GG-20260627-7",
+      "campaign_name": "Premium Thank You - 27 Jun 2026",
+      "subject": "Say thanks, branded well",
+      "skus": [
+        "GG1438",
+        "GG1398",
+        "GG1601",
+        "GG1320",
+        "GG1462",
+        "GG1573"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Wellness and recharge",
+      "angle": "On the move",
+      "campaign_code": "GG-20260627-8",
+      "campaign_name": "Wellness And Recharge - 27 Jun 2026",
+      "subject": "Keep them moving",
+      "skus": [
+        "GG1108",
+        "GG1404",
+        "GG1549",
+        "GG1092",
+        "GG1733",
+        "GG1732"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Seasonal occasions",
+      "angle": "Mark the moment",
+      "campaign_code": "GG-20260627-9",
+      "campaign_name": "Seasonal Occasions - 27 Jun 2026",
+      "subject": "Mark the season, branded",
+      "skus": [
+        "GG1787",
+        "GG1588",
+        "GG1657",
+        "GG1528",
+        "GG1624",
+        "GG1788"
+      ]
+    }
+  ]
+}

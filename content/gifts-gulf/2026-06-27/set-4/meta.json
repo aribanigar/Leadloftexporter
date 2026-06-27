@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Event giveaways",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "A",
+  "campaign_code": "GG-20260627-4",
+  "campaign_name": "Event Giveaways - 27 Jun 2026",
+  "subject": "Giveaways they keep",
+  "skus": [
+    "GG1747",
+    "GG1761",
+    "GG1791",
+    "GG1432",
+    "GG1521",
+    "GG1681"
+  ],
+  "products": [
+    {
+      "name": "Regent Fit Women",
+      "sku": "GG1747",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s02758-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1747"
+    },
+    {
+      "name": "Planet Women",
+      "sku": "GG1761",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03575-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1761"
+    },
+    {
+      "name": "Slam Kids",
+      "sku": "GG1791",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s13255-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1791"
+    },
+    {
+      "name": "Respect",
+      "sku": "GG1432",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6379-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1432"
+    },
+    {
+      "name": "Kecil Large",
+      "sku": "GG1521",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6869-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1521"
+    },
+    {
+      "name": "Menorca",
+      "sku": "GG1681",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9813-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1681"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}

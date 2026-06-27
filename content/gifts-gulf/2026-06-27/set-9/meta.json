@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Seasonal occasions",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "C",
+  "campaign_code": "GG-20260627-9",
+  "campaign_name": "Seasonal Occasions - 27 Jun 2026",
+  "subject": "Mark the season, branded",
+  "skus": [
+    "GG1787",
+    "GG1588",
+    "GG1657",
+    "GG1528",
+    "GG1624",
+    "GG1788"
+  ],
+  "products": [
+    {
+      "name": "Imperial",
+      "sku": "GG1787",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s11500-ag.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1787"
+    },
+    {
+      "name": "Colored",
+      "sku": "GG1588",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8484-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1588"
+    },
+    {
+      "name": "Pecas",
+      "sku": "GG1657",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9614-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1657"
+    },
+    {
+      "name": "Osole+",
+      "sku": "GG1528",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6900-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1528"
+    },
+    {
+      "name": "Cottonel Colour +",
+      "sku": "GG1624",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9268-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1624"
+    },
+    {
+      "name": "New Supreme Kids",
+      "sku": "GG1788",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s13249-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1788"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20seasonal%20occasions%20options%20for%20our%20team."
+}

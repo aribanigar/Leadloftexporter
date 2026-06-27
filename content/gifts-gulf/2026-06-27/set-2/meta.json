@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Eco and sustainable",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260627-2",
+  "campaign_name": "Eco And Sustainable - 27 Jun 2026",
+  "subject": "Recycled, and clearly yours",
+  "skus": [
+    "GG1534",
+    "GG1091",
+    "GG1548",
+    "GG1069",
+    "GG1478",
+    "GG1121"
+  ],
+  "products": [
+    {
+      "name": "Ivalo",
+      "sku": "GG1534",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6938-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1534"
+    },
+    {
+      "name": "Breta",
+      "sku": "GG1091",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2118-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1091"
+    },
+    {
+      "name": "Side",
+      "sku": "GG1548",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6991-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1548"
+    },
+    {
+      "name": "Curvy Bam",
+      "sku": "GG1069",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2085-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1069"
+    },
+    {
+      "name": "Zoco Colour",
+      "sku": "GG1478",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6674-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1478"
+    },
+    {
+      "name": "Curvy C",
+      "sku": "GG1121",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2222-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1121"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20eco%20and%20sustainable%20options%20for%20our%20team."
+}

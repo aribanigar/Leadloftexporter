@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Wellness and recharge",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260627-8",
+  "campaign_name": "Wellness And Recharge - 27 Jun 2026",
+  "subject": "Keep them moving",
+  "skus": [
+    "GG1108",
+    "GG1404",
+    "GG1549",
+    "GG1092",
+    "GG1733",
+    "GG1732"
+  ],
+  "products": [
+    {
+      "name": "Irea",
+      "sku": "GG1108",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2170-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1108"
+    },
+    {
+      "name": "Twing",
+      "sku": "GG1404",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6250-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1404"
+    },
+    {
+      "name": "Eiger",
+      "sku": "GG1549",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6995-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1549"
+    },
+    {
+      "name": "Idolunch",
+      "sku": "GG1092",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2119-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1092"
+    },
+    {
+      "name": "Spider",
+      "sku": "GG1733",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s01168-as.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1733"
+    },
+    {
+      "name": "Sporty Kids",
+      "sku": "GG1732",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s01166-ag.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1732"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20wellness%20and%20recharge%20options%20for%20our%20team."
+}

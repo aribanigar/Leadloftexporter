@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Tech and desk",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "B",
+  "campaign_code": "GG-20260627-5",
+  "campaign_name": "Tech And Desk - 27 Jun 2026",
+  "subject": "Desk pieces they keep",
+  "skus": [
+    "GG1642",
+    "GG1402",
+    "GG1628",
+    "GG1643",
+    "GG1553",
+    "GG1440"
+  ],
+  "products": [
+    {
+      "name": "Bern Bamboo",
+      "sku": "GG1642",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9482-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1642"
+    },
+    {
+      "name": "Thursday",
+      "sku": "GG1402",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6240-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1402"
+    },
+    {
+      "name": "Bierpon",
+      "sku": "GG1628",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9298-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1628"
+    },
+    {
+      "name": "Rio Bamboo",
+      "sku": "GG1643",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9485-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1643"
+    },
+    {
+      "name": "Sumatra",
+      "sku": "GG1553",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7318-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1553"
+    },
+    {
+      "name": "Coco",
+      "sku": "GG1440",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6418-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1440"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20tech%20and%20desk%20options%20for%20our%20team."
+}

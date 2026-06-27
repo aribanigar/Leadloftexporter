@@ -1,0 +1,245 @@
+{
+  "date": "2026-06-27",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Kept long after day one",
+      "out": "content/gifts-gulf/2026-06-27/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6934-03",
+          "sku": "GG1532",
+          "name": "Inari",
+          "desc": "Kept long after day one",
+          "colours": 0
+        },
+        {
+          "code": "mo6872-03",
+          "sku": "GG1520",
+          "name": "Belo Lux",
+          "desc": "Premium feel, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Recycled, not wasted",
+      "out": "content/gifts-gulf/2026-06-27/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6938-03",
+          "sku": "GG1534",
+          "name": "Ivalo",
+          "desc": "Recycled, not wasted",
+          "colours": 0
+        },
+        {
+          "code": "mo2118-03",
+          "sku": "GG1091",
+          "name": "Breta",
+          "desc": "Verified recycled materials",
+          "colours": 0
+        },
+        {
+          "code": "mo6991-03",
+          "sku": "GG1548",
+          "name": "Side",
+          "desc": "Better material, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Ideas land here",
+      "out": "content/gifts-gulf/2026-06-27/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9859-03",
+          "sku": "GG1697",
+          "name": "Sonora Pluscork",
+          "desc": "Ideas land here",
+          "colours": 0
+        },
+        {
+          "code": "mo8476-03",
+          "sku": "GG1587",
+          "name": "Eduar",
+          "desc": "Recycled paper, clean print",
+          "colours": 0
+        },
+        {
+          "code": "mo6835-03",
+          "sku": "GG1508",
+          "name": "Arpu",
+          "desc": "For daily note-takers",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Handed out, kept for good",
+      "out": "content/gifts-gulf/2026-06-27/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s02758-db",
+          "sku": "GG1747",
+          "name": "Regent Fit Women",
+          "desc": "Handed out, kept for good",
+          "colours": 0
+        },
+        {
+          "code": "s03575-bk",
+          "sku": "GG1761",
+          "name": "Planet Women",
+          "desc": "Soft cotton, branded",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Earns its desk space",
+      "out": "content/gifts-gulf/2026-06-27/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9482-40",
+          "sku": "GG1642",
+          "name": "Bern Bamboo",
+          "desc": "Earns its desk space",
+          "colours": 0
+        },
+        {
+          "code": "mo6240-03",
+          "sku": "GG1402",
+          "name": "Thursday",
+          "desc": "Warm wood, your logo",
+          "colours": 0
+        },
+        {
+          "code": "mo9298-40",
+          "sku": "GG1628",
+          "name": "Bierpon",
+          "desc": "Bamboo, clean mark",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Recycled bottles, reborn",
+      "out": "content/gifts-gulf/2026-06-27/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6409-26",
+          "sku": "GG1435",
+          "name": "Rio Rpet",
+          "desc": "Recycled bottles, reborn",
+          "colours": 0
+        },
+        {
+          "code": "mo6167-03",
+          "sku": "GG1384",
+          "name": "Montecool",
+          "desc": "Eco credentials, daily use",
+          "colours": 0
+        },
+        {
+          "code": "mo2575-03",
+          "sku": "GG1252",
+          "name": "Tottle",
+          "desc": "Carried, not binned",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Light aluminium, your logo",
+      "out": "content/gifts-gulf/2026-06-27/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6417-16",
+          "sku": "GG1438",
+          "name": "Melis",
+          "desc": "Light aluminium, your logo",
+          "colours": 0
+        },
+        {
+          "code": "mo6214-03",
+          "sku": "GG1398",
+          "name": "Inkless",
+          "desc": "A thank-you they keep",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Made for the move",
+      "out": "content/gifts-gulf/2026-06-27/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2170-03",
+          "sku": "GG1108",
+          "name": "Irea",
+          "desc": "Made for the move",
+          "colours": 0
+        },
+        {
+          "code": "mo6250-06",
+          "sku": "GG1404",
+          "name": "Twing",
+          "desc": "Kept in daily rotation",
+          "colours": 0
+        },
+        {
+          "code": "mo6995-03",
+          "sku": "GG1549",
+          "name": "Eiger",
+          "desc": "Light, durable, branded",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Mark the moment, branded",
+      "out": "content/gifts-gulf/2026-06-27/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s11500-ag",
+          "sku": "GG1787",
+          "name": "Imperial",
+          "desc": "Mark the moment, branded",
+          "colours": 0
+        },
+        {
+          "code": "mo8484-03",
+          "sku": "GG1588",
+          "name": "Colored",
+          "desc": "Soft cotton, clear print",
+          "colours": 0
+        },
+        {
+          "code": "mo9614-03",
+          "sku": "GG1657",
+          "name": "Pecas",
+          "desc": "Natural fibre, your logo",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Premium thank-you",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "A",
+  "campaign_code": "GG-20260627-7",
+  "campaign_name": "Premium Thank You - 27 Jun 2026",
+  "subject": "Say thanks, branded well",
+  "skus": [
+    "GG1438",
+    "GG1398",
+    "GG1601",
+    "GG1320",
+    "GG1462",
+    "GG1573"
+  ],
+  "products": [
+    {
+      "name": "Melis",
+      "sku": "GG1438",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6417-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1438"
+    },
+    {
+      "name": "Inkless",
+      "sku": "GG1398",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6214-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1398"
+    },
+    {
+      "name": "Aosta",
+      "sku": "GG1601",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8857-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1601"
+    },
+    {
+      "name": "Mukava",
+      "sku": "GG1320",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2777-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1320"
+    },
+    {
+      "name": "Dana",
+      "sku": "GG1462",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6560-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1462"
+    },
+    {
+      "name": "Quim",
+      "sku": "GG1573",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8211-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1573"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20thank-you%20options%20for%20our%20team."
+}

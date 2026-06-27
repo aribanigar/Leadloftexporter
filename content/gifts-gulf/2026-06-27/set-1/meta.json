@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-27",
+  "theme": "Executive onboarding",
+  "season": "Late summer, event season and mid-year onboarding",
+  "design": "A",
+  "campaign_code": "GG-20260627-1",
+  "campaign_name": "Executive Onboarding - 27 Jun 2026",
+  "subject": "Day one they remember",
+  "skus": [
+    "GG1532",
+    "GG1520",
+    "GG1542",
+    "GG1679",
+    "GG1319",
+    "GG1290"
+  ],
+  "products": [
+    {
+      "name": "Inari",
+      "sku": "GG1532",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6934-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1532"
+    },
+    {
+      "name": "Belo Lux",
+      "sku": "GG1520",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6872-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1520"
+    },
+    {
+      "name": "Aira",
+      "sku": "GG1542",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6971-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1542"
+    },
+    {
+      "name": "Patago",
+      "sku": "GG1679",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9810-12.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1679"
+    },
+    {
+      "name": "Miyerba",
+      "sku": "GG1319",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2776-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1319"
+    },
+    {
+      "name": "Geiser",
+      "sku": "GG1290",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2671-77.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1290"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-27/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20executive%20onboarding%20options%20for%20our%20team."
+}
