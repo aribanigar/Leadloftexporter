@@ -1894,9 +1894,11 @@ def _prepare_tick_batch(
     # round-trip, those rows are stuck at "sending" forever — they're not
     # picked up again (next tick filters status=="pending") and the campaign
     # silently stalls with all remaining recipients perpetually "Queued".
-    # Anything older than 5 minutes in "sending" is unambiguously stuck → reset
-    # to pending so the next tick retries it.
-    reclaim_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Anything older than 2 minutes in "sending" is unambiguously stuck (a real
+    # in-flight send + commit completes in seconds) → reset to pending so the
+    # next tick retries it quickly. Short window = fast self-heal if a Vercel
+    # send invocation ever times out before committing.
+    reclaim_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
     (
         db.query(CampaignRecipient)
         .filter(
@@ -1933,7 +1935,12 @@ def _prepare_tick_batch(
             ),
         )
         .order_by(CampaignRecipient.send_after.asc().nullsfirst())
-        .limit(int(campaign.batch_size or 8))
+        # Cap the Vercel-path batch small so a single serverless invocation
+        # (SMTP send + best-effort IMAP-to-Sent + commit) reliably finishes
+        # within the function time limit. A bigger batch overran the budget and
+        # the function was killed before commit-tick, stalling the campaign. The
+        # browser polls every 3s, so a small batch still drains quickly.
+        .limit(min(int(campaign.batch_size or 8), 4))
         .with_for_update(skip_locked=True)
         .all()
     )

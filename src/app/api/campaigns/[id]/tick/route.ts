@@ -114,9 +114,11 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
       requireTLS: !useImplicitTls,
       auth: { user: username, pass: password },
       tls: { rejectUnauthorized: false },
-      connectionTimeout: 15_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 20_000,
+      // Fail FAST on a dead/slow connection so one bad send can't eat the
+      // whole serverless time-budget and kill the function before commit-tick.
+      connectionTimeout: 8_000,
+      greetingTimeout: 6_000,
+      socketTimeout: 12_000,
     });
     try {
       // AMP for Email: attach as text/x-amp-html alternative. Gmail (web,
@@ -154,9 +156,13 @@ async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: string }> 
             err ? reject(err) : resolve(message),
           );
         });
+        // Best-effort copy to Sent — hard-capped at 2s so it can never eat the
+        // serverless budget. Without this cap, a slow IMAP server added up to
+        // 9s PER email, blowing past the function time limit before commit-tick
+        // ran — so nothing was recorded as sent and the campaign stalled.
         await Promise.race([
           appendToSentFolder(send_config.smtp, raw),
-          new Promise<void>((resolve) => setTimeout(resolve, 9000)),
+          new Promise<void>((resolve) => setTimeout(resolve, 2000)),
         ]);
       } catch { /* best-effort copy to Sent */ }
       return { ok: true };
@@ -263,7 +269,14 @@ export async function POST(
     });
   }
 
-  // Step 2: send each job (sequential to avoid SMTP rate-limit hammering)
+  // Step 2: send each job (sequential to avoid SMTP rate-limit hammering).
+  // Hard wall-clock budget: stop starting NEW sends once we're close to the
+  // serverless time limit, so we ALWAYS have time to POST results to
+  // commit-tick. Any job we didn't get to stays "sending" and is reclaimed by
+  // the next prepare-tick — far better than the whole function timing out and
+  // committing nothing. The browser polls again in 3s and picks up the rest.
+  const SEND_BUDGET_MS = 40_000;
+  const startedAt = Date.now();
   const results: Array<{
     recipient_id: string;
     message_id: string;
@@ -272,12 +285,23 @@ export async function POST(
   }> = [];
 
   for (const job of prepared.jobs) {
+    if (Date.now() - startedAt > SEND_BUDGET_MS) break;
     const r = await sendJob(job);
     results.push({
       recipient_id: job.recipient_id,
       message_id: job.message_id,
       ok: r.ok,
       error: r.error ?? null,
+    });
+  }
+
+  // Nothing actually sent (e.g. the very first send ate the budget) — return
+  // without committing so the rows stay claimable.
+  if (results.length === 0) {
+    return NextResponse.json({
+      status: prepared.campaign_status,
+      this_tick: { sent: 0, failed: 0, skipped: 0 },
+      note: "no_sends_this_tick",
     });
   }
 
