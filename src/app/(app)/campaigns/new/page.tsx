@@ -1449,8 +1449,9 @@ function NewCampaignPageInner() {
       return;
     }
     setSending(true);
+    // Hoisted so the catch can still navigate to the campaign that was created.
+    let id = campaignId;
     try {
-      let id = campaignId;
       if (id) {
         await api(`/campaigns/${id}/${''}`.replace(/\/$/, ''), { method: 'PATCH', body: buildPatchBody() });
       } else {
@@ -1462,7 +1463,23 @@ function NewCampaignPageInner() {
       setToast({ msg: 'Campaign launched!', type: 'success' });
       router.push(`/campaigns/${id}`);
     } catch (e) {
-      setToast({ msg: e instanceof ApiError ? e.message : 'Failed to launch campaign', type: 'error' });
+      const msg = e instanceof ApiError ? e.message : 'Failed to launch campaign';
+      // The campaign was already launched (this builder tab is showing a stale
+      // "DRAFT"). /start refuses a campaign that's already sending/finished —
+      // that's not a failure, the launch is effectively done. Open its report
+      // so the user can manage it (pause / send-remaining / view progress).
+      if (id && e instanceof ApiError && /^cannot_start_in_state:/.test(msg)) {
+        const state = msg.split(':')[1] || '';
+        setToast({
+          msg: state === 'completed'
+            ? 'This campaign has already finished — opening it.'
+            : 'This campaign is already launched — opening it.',
+          type: 'success',
+        });
+        router.push(`/campaigns/${id}`);
+        return;
+      }
+      setToast({ msg, type: 'error' });
       setSending(false);
     }
   };
