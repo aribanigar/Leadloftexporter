@@ -350,7 +350,11 @@ def _is_hard_bounce(error: str) -> bool:
     return any(s in e for s in recipient_bounce)
 
 
-_COOLDOWN_SECONDS = 90  # back-off window after a sender rate-limits us
+_COOLDOWN_SECONDS = 20  # short back-off after a sender rate-limits us — keep it
+# brief so the campaign keeps grinding through the queue near-continuously
+# instead of napping for a long stretch. Recipients that hit the rate limit are
+# never lost (they stay 'pending' and retry on the next tick); the cool-down
+# only paces retries enough to let the sender's rate window breathe.
 
 
 def _is_transient(error: str) -> bool:
