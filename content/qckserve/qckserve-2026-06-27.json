@@ -1,0 +1,63 @@
+{
+  "date": "2026-06-27",
+  "business": "qckserve",
+  "topic": "Sale season — list your shop free",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Sell to all of India — free this sale season.",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-27.svg",
+      "tags": [
+        "store",
+        "sale",
+        "promo"
+      ],
+      "notes": "Saturday / Store. Product-grid archetype: tidy product cards with a price-strike device (List fee struck -> ₹0) plus a big 0% commission number. Flat orange/dark/light blocking, no gradients. Anchor: monsoon end-of-season sale wave + the national push to get India's ~1.4 crore local shops online. National, not city-scoped.",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<title>List your shop free on QckServe — ₹0 fees, 0% commission</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#FCF9F8; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;\">\n<div style=\"display:none; max-height:0; overflow:hidden; opacity:0; font-size:1px; line-height:1px; color:#FCF9F8;\">Sell to all of India — free. ₹0 to list, 0% commission, owner-direct. Open your free shop this sale season.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#FFFFFF; border-radius:16px; overflow:hidden;\">\n\n  <!-- logo zone: text only -->\n  <tr><td style=\"padding:24px 40px 12px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; letter-spacing:0.5px; color:#1A1A1A;\">qckserve.in</td></tr>\n\n  <!-- HERO: flat orange band, oversized headline + italic-serif kicker -->\n  <tr><td style=\"background-color:#ef6723; padding:36px 40px 40px 40px;\">\n    <p style=\"margin:0 0 10px 0; font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:20px; line-height:1.2; color:#1A1A1A;\">the sale season is on —</p>\n    <h1 style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:52px; line-height:1.02; font-weight:800; letter-spacing:-1.5px; color:#FFFFFF;\">Sell local.<br>Pay &#8377;0.</h1>\n    <p style=\"margin:18px 0 28px 0; font-family:'Poppins',Arial,sans-serif; font-size:18px; line-height:1.5; color:#FFFFFF;\">List your shop free. Keep every rupee you earn.</p>\n    <!-- bulletproof button -->\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n      <td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:12px;\">\n        <a href=\"https://qckserve.in\" style=\"display:inline-block; padding:16px 30px; font-family:'Poppins',Arial,sans-serif; font-size:17px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">List your shop — free</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- hero poster image with descriptive alt (reads fine with images off) -->\n  <tr><td style=\"font-size:0; line-height:0;\">\n    <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-27.svg\" width=\"600\" alt=\"QckServe — sell local, pay ₹0. Free product listings, 0% commission, owner-direct.\" style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\">\n  </td></tr>\n\n  <!-- PROOF: dark band, big number device -->\n  <tr><td style=\"background-color:#1A1A1A; padding:40px 40px 36px 40px; text-align:center;\">\n    <p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:72px; line-height:1; font-weight:800; letter-spacing:-2px; color:#FFFFFF;\">0%</p>\n    <p style=\"margin:6px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:18px; font-weight:700; letter-spacing:1px; color:#ef6723;\">COMMISSION. EVER.</p>\n    <p style=\"margin:14px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:1.5; color:#cfcfcf;\">Big sale platforms take a cut of every order. QckServe takes nothing.</p>\n  </td></tr>\n\n  <!-- DEVICE: product grid with price-strike -->\n  <tr><td style=\"background-color:#FCF9F8; padding:36px 40px 12px 40px;\">\n    <p style=\"margin:0 0 20px 0; font-family:'Poppins',Arial,sans-serif; font-size:14px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#ef6723;\">What it costs to list</p>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\n      <td width=\"33%\" valign=\"top\" style=\"padding:0 6px 0 0;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FFFFFF; border-radius:14px;\"><tr><td style=\"padding:16px; text-align:center;\">\n          <p style=\"margin:0 0 10px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A;\">Sarees</p>\n          <p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:14px; color:#9a9a9a; text-decoration:line-through;\">List fee</p>\n          <p style=\"margin:2px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:26px; font-weight:800; color:#ef6723;\">&#8377;0</p>\n        </td></tr></table>\n      </td>\n      <td width=\"33%\" valign=\"top\" style=\"padding:0 3px;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FFFFFF; border-radius:14px;\"><tr><td style=\"padding:16px; text-align:center;\">\n          <p style=\"margin:0 0 10px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A;\">Gadgets</p>\n          <p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:14px; color:#9a9a9a; text-decoration:line-through;\">List fee</p>\n          <p style=\"margin:2px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:26px; font-weight:800; color:#ef6723;\">&#8377;0</p>\n        </td></tr></table>\n      </td>\n      <td width=\"33%\" valign=\"top\" style=\"padding:0 0 0 6px;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FFFFFF; border-radius:14px;\"><tr><td style=\"padding:16px; text-align:center;\">\n          <p style=\"margin:0 0 10px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A;\">Home goods</p>\n          <p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:14px; color:#9a9a9a; text-decoration:line-through;\">List fee</p>\n          <p style=\"margin:2px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:26px; font-weight:800; color:#ef6723;\">&#8377;0</p>\n        </td></tr></table>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- HOW: numbered, one idea per line -->\n  <tr><td style=\"background-color:#FCF9F8; padding:20px 40px 8px 40px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n      <tr><td style=\"padding:8px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\"><span style=\"color:#ef6723; font-weight:800;\">1.</span>&nbsp; Add your products — free, in minutes.</td></tr>\n      <tr><td style=\"border-top:1px solid #ececec; padding:8px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\"><span style=\"color:#ef6723; font-weight:800;\">2.</span>&nbsp; Buyers message you direct. No middlemen.</td></tr>\n      <tr><td style=\"border-top:1px solid #ececec; padding:8px 0; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:1.5; color:#1A1A1A;\"><span style=\"color:#ef6723; font-weight:800;\">3.</span>&nbsp; You keep 100% of every sale.</td></tr>\n    </table>\n  </td></tr>\n\n  <!-- FINAL CTA -->\n  <tr><td style=\"background-color:#FCF9F8; padding:28px 40px 40px 40px; text-align:center;\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr>\n      <td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:12px;\">\n        <a href=\"https://qckserve.in\" style=\"display:inline-block; padding:16px 34px; font-family:'Poppins',Arial,sans-serif; font-size:17px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">Open your free shop today</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- footer -->\n  <tr><td style=\"background-color:#1A1A1A; padding:22px 40px; text-align:center;\">\n    <p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:700; color:#FFFFFF;\">qckserve.in</p>\n    <p style=\"margin:6px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:12px; color:#9a9a9a;\">India's free local marketplace · Zero fees, owner-direct, nationwide.</p>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>"
+    },
+    {
+      "channel": "whatsapp",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-27.svg",
+      "tags": [
+        "store",
+        "sale",
+        "promo"
+      ],
+      "notes": "Hinglish, India B2C, one emoji, ends with qckserve.in.",
+      "content": "Sale season ON hai! 🛍️ Apni dukaan ka poora stock online bechein — bilkul free. ₹0 listing, 0% commission, seedha customer se baat. Profit pura aapka. Apni free shop banaiye: qckserve.in"
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-27.svg",
+      "tags": [
+        "store",
+        "sale",
+        "promo"
+      ],
+      "notes": "Instagram, Hinglish, hook + 5 hashtags.",
+      "content": "Apni dukaan, ab poore India tak.\nSale season mein bechna hai? List karo — bilkul FREE. ₹0 commission, seedha customer se baat, koi beech-wala nahi. Profit pura aapka.\nAaj hi shuru karein 👉 qckserve.in\n\n#QckServe #LocalShops #ZeroCommission #SellOnline #SaleSeason"
+    },
+    {
+      "channel": "sms",
+      "tags": [
+        "store",
+        "sale",
+        "promo"
+      ],
+      "notes": "One line, <160 chars, English, with qckserve.in.",
+      "content": "Sale season is on. List your shop free on QckServe - Rs.0 fees, 0% commission, keep every rupee. Start: qckserve.in"
+    },
+    {
+      "channel": "other",
+      "title": "[2026-06-27] Sale season — list your shop free (Image Prompt)",
+      "tags": [
+        "store",
+        "sale",
+        "image-prompt"
+      ],
+      "notes": "AI image prompt in QckServe production format. --ar 4:5 --style raw --v 6.1.",
+      "content": "Scene: a warm, editorial product-marketplace hero for India's sale season — a tidy flat-lay grid of local-shop products (handloom sarees, a smartphone, brass home decor, packaged snacks) on a clean studio surface, premium catalogue feel.\nSubject: the products arranged as a neat 3-up card grid, each item on its own rounded card, conveying \"any local shop, online\".\nPhone-UI mockup: a smartphone in frame showing the QckServe storefront — a product listing with a bold \"List fee ₹0\" badge and a \"0% commission\" tag, clean rounded cards, message-seller button.\nColour system: flat blocking only, NO gradients — orange #ef6723 / #FF6B00 accents, dark #1A1A1A panels, light #FCF9F8 / #FFFFFF base; one accent used sparingly.\nLighting: soft diffused studio softbox, gentle shadows, bright and trustworthy.\nType hierarchy: ONE oversized extra-bold Poppins headline 'SELL LOCAL. PAY ₹0.' paired with a smaller italic-serif kicker 'the sale season is on'; condensed supporting labels.\nEye flow: top-left logo zone → headline → phone storefront → ₹0 price-strike device → qckserve.in.\nCamera: 50mm, slight top-down 15°, shallow depth of field on the phone, 4:5 portrait.\nPerformance layer: thumb-stopping high contrast, the giant ₹0 readable at a glance in feed.\nReserve the TOP-LEFT logo zone empty (~140px square) — logo placed manually. qckserve.in lockup bottom-left.\n--ar 4:5 --style raw --v 6.1"
+    }
+  ]
+}

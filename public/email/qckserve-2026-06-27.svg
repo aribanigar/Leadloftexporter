@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" font-family="'Poppins','Segoe UI',Arial,sans-serif">
+  <!-- background -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top orange editorial band -->
+  <rect x="0" y="0" width="1080" height="372" fill="#ef6723"/>
+
+  <!-- reserved ~140px top-left logo square (left blank for manual logo) -->
+  <rect x="64" y="64" width="140" height="140" fill="#ef6723" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="6 8"/>
+
+  <!-- kicker: italic serif accent for contrast -->
+  <text x="240" y="150" font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="40" fill="#1A1A1A">the sale season is on —</text>
+  <text x="240" y="256" font-size="92" font-weight="800" letter-spacing="-3" fill="#FFFFFF">SELL LOCAL.</text>
+  <text x="240" y="348" font-size="92" font-weight="800" letter-spacing="-3" fill="#FFFFFF">PAY &#8377;0.</text>
+
+  <!-- the ONE visual device: a tidy product grid with a price-strike on the listing fee -->
+  <!-- card 1 -->
+  <rect x="64"  y="452" width="296" height="300" rx="16" fill="#222222" stroke="#3a3a3a" stroke-width="2"/>
+  <rect x="88"  y="476" width="248" height="150" rx="10" fill="#ef6723"/>
+  <text x="112" y="566" font-size="56" font-weight="800" fill="#FFFFFF">Sarees</text>
+  <text x="88"  y="676" font-size="30" fill="#9a9a9a" text-decoration="line-through">List fee</text>
+  <text x="88"  y="724" font-size="48" font-weight="800" fill="#FFFFFF">&#8377;0</text>
+
+  <!-- card 2 -->
+  <rect x="392" y="452" width="296" height="300" rx="16" fill="#222222" stroke="#3a3a3a" stroke-width="2"/>
+  <rect x="416" y="476" width="248" height="150" rx="10" fill="#FCF9F8"/>
+  <text x="440" y="566" font-size="52" font-weight="800" fill="#1A1A1A">Gadgets</text>
+  <text x="416" y="676" font-size="30" fill="#9a9a9a" text-decoration="line-through">List fee</text>
+  <text x="416" y="724" font-size="48" font-weight="800" fill="#FFFFFF">&#8377;0</text>
+
+  <!-- card 3 -->
+  <rect x="720" y="452" width="296" height="300" rx="16" fill="#222222" stroke="#3a3a3a" stroke-width="2"/>
+  <rect x="744" y="476" width="248" height="150" rx="10" fill="#ef6723"/>
+  <text x="768" y="566" font-size="52" font-weight="800" fill="#FFFFFF">Home</text>
+  <text x="744" y="676" font-size="30" fill="#9a9a9a" text-decoration="line-through">List fee</text>
+  <text x="744" y="724" font-size="48" font-weight="800" fill="#FFFFFF">&#8377;0</text>
+
+  <!-- the headline number -->
+  <text x="64" y="940" font-size="190" font-weight="800" letter-spacing="-8" fill="#FFFFFF">0% <tspan font-size="120" fill="#ef6723">commission</tspan></text>
+  <text x="70" y="1006" font-size="40" font-weight="700" letter-spacing="1" fill="#ef6723">YOU KEEP EVERY RUPEE YOU EARN.</text>
+
+  <!-- 3 editorial proof columns -->
+  <line x1="64" y1="1066" x2="1016" y2="1066" stroke="#3a3a3a" stroke-width="2"/>
+  <text x="64"  y="1132" font-size="34" font-weight="700" fill="#ef6723">Free to list</text>
+  <text x="64"  y="1174" font-size="26" fill="#cfcfcf">Add your products</text>
+  <text x="64"  y="1206" font-size="26" fill="#cfcfcf">in minutes.</text>
+
+  <text x="410" y="1132" font-size="34" font-weight="700" fill="#ef6723">Owner-direct</text>
+  <text x="410" y="1174" font-size="26" fill="#cfcfcf">Buyers message you.</text>
+  <text x="410" y="1206" font-size="26" fill="#cfcfcf">No middlemen.</text>
+
+  <text x="760" y="1132" font-size="34" font-weight="700" fill="#ef6723">Nationwide</text>
+  <text x="760" y="1174" font-size="26" fill="#cfcfcf">Shoppers across</text>
+  <text x="760" y="1206" font-size="26" fill="#cfcfcf">India find you.</text>
+
+  <!-- footer -->
+  <text x="64" y="1300" font-size="40" font-weight="800" letter-spacing="-1" fill="#FFFFFF">qckserve.in</text>
+  <text x="688" y="1300" font-size="28" fill="#9a9a9a">India's free local marketplace</text>
+</svg>
