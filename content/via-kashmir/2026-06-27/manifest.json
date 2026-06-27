@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-27",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Pahalgam in summer - the Lidder running cold and the valleys green",
+      "subject": "Pahalgam is green and the Lidder is running cold",
+      "campaign_code": "VK-INR-B2C-20260627"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "B",
+      "theme": "Peak summer demand - rooms filling before the early-July rush",
+      "subject": "A mountain stay was booked this morning, not yours",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260627"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "C",
+      "theme": "Summer airport runs and golden-hour shikaras - filling empty days",
+      "subject": "A summer airport run just went to another cab",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260627"
+    }
+  ]
+}
