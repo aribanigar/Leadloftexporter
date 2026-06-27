@@ -533,6 +533,9 @@ export default function CampaignDetailPage() {
   const [page, setPage] = useState(1);
   const [sending, setSending] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  // Why a 'sending' campaign isn't actually dispatching (surfaced from the tick
+  // response note) — e.g. no active sender, or a brief rate-limit cooldown.
+  const [tickNote, setTickNote] = useState<string | null>(null);
   const [selectedLinkUrl, setSelectedLinkUrl] = useState<string | null>(null);
   const [showAllLinks, setShowAllLinks] = useState(false);
 
@@ -619,7 +622,10 @@ export default function CampaignDetailPage() {
         },
         body: '{}',
       });
-      const r = await res.json() as { status?: string };
+      const r = await res.json() as { status?: string; note?: string };
+      // Surface WHY nothing is sending (no active sender, cooldown, …) so a
+      // 'Sending… 0 delivered' campaign never sits there silently.
+      setTickNote(r.note ?? null);
       // Refresh status + counters cheaply via the full campaign read.
       await fetchCampaign();
       await fetchStats(true);
@@ -958,6 +964,27 @@ export default function CampaignDetailPage() {
       </div>
 
       <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '28px 20px' }}>
+
+        {/* ═══ Send-blocked banner ════════════════════════════════════
+            The campaign says 'Sending' but nothing is going out. Tell the
+            user WHY instead of leaving them staring at 'Sending… 0'. */}
+        {campaign.status === 'sending' && tickNote === 'no_active_senders' && (
+          <div style={{
+            backgroundColor: 'rgba(220,38,38,0.08)',
+            border: '1px solid rgba(220,38,38,0.30)',
+            borderRadius: '12px', padding: '14px 18px', marginBottom: '20px',
+            display: 'flex', alignItems: 'flex-start', gap: '12px',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#dc2626' }}>error</span>
+            <div style={{ fontSize: '13px', color: '#7f1d1d', lineHeight: 1.5 }}>
+              <strong>No active sender — nothing can send.</strong> This campaign is set to send
+              from <strong>{campaign.from_email || 'an inbox'}</strong>, but that mailbox isn’t a
+              connected, active sender. Connect it (or pick an already-connected inbox) in{' '}
+              <a href="/settings/email" style={{ color: '#b91c1c', fontWeight: 700, textDecoration: 'underline' }}>Settings → Senders</a>,
+              then press <strong>⋮ → Send Remaining</strong>. (Bounced/queued counts won’t move until a sender is active.)
+            </div>
+          </div>
+        )}
 
         {/* ═══ Campaign Meta Info Bar ══════════════════════════════ */}
         <div style={{
