@@ -1,0 +1,37 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "WhatsApp — Privacy & destined match",
+  "image_query": "muslim couple wedding",
+  "cta_url": "https://datekhaas.com/join",
+  "body": "Assalamu alaikum wa rahmatullahi wa barakatuh 🌿\n\nThere is someone written for you. And you deserve to find them in a way that honours that.\n\n✨ *Date Khaas* is a Muslim matrimony app built on three promises:\n\n🔒 *Your photos are private.* Blurred by default — unlocked only by your choice, one person at a time.\n\n✔️ *Every profile is verified.* ID-checked and selfie-matched before they can reach you. Real people only.\n\n👨‍👩‍👧 *Your wali is welcome.* Invite your father or brother to follow your journey with you — because a nikah is never just two people.\n\nWe are in peak wedding season right now. Thousands of families are searching with their children on Date Khaas this month.\n\nBegin yours → https://datekhaas.com/join\n\n_Reply STOP to opt out._",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim wedding season peaks May–July 2026; highest-intent period for matrimony sign-ups.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "77.8% of Muslim singles use matchmaking apps; photo privacy and ID verification are top concerns.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Wali invite is now an explicit in-app feature; family-involvement signals drive trust.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "NikahForever claims '4M verified users, 70K marriages'; Shaadi.com claims '80 lakh success stories' + blue-tick screening.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "ShadiAmour UK markets '500+ verified halal marriages in UK 2026' targeting NRI diaspora.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Verification framed as a dignity signal converts better than security-language in faith-aware copy.",
+        "source": "https://nikahnamah.com/blog-detail/verified-matrimony-profiles-nikah-safe-search"
+      }
+    ]
+  }
+}

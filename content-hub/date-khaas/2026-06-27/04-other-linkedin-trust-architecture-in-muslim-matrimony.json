@@ -1,0 +1,36 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "LinkedIn — Trust architecture in Muslim matrimony",
+  "image_query": "muslim wedding celebration family",
+  "body": "The Muslim matrimony space has a trust problem — not because platforms are dishonest, but because the stakes are uniquely high.\n\nWhen you're looking for a spouse, you're not evaluating a product. You're considering handing the most intimate part of your life to a person you've only ever seen through a screen. That asymmetry of vulnerability is enormous.\n\nCompetitors have responded with volume: 4 million verified users. 80 lakh success stories. Those numbers are reassuring. But they answer the wrong question.\n\nThe question a young Muslim woman asks is not \"How many people used this app?\"\n\nShe asks: *\"Is the person reaching out to me actually who they say they are?\"*\nHer father asks: *\"Can I trust this process with my daughter?\"*\n\nAt Date Khaas, we built the trust architecture around those two questions — not the headline metrics:\n\n→ Photos blurred by default. Unlocked one person at a time, by the user.\n→ ID verification and selfie matching before anyone can initiate contact.\n→ Wali accounts — guardians get read access to their family member's conversations.\n\nWe are in peak wedding season right now. Families are searching. And the app they trust enough to use is the one that treats verification as a dignity signal, not just a security checkbox.\n\nThat's the product we're building.\n\n#MuslimMatrimony #Nikah #TrustAndSafety #HalalTech #DateKhaas",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim wedding season peaks May–July 2026; highest-intent period for matrimony sign-ups.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "77.8% of Muslim singles use matchmaking apps; photo privacy and ID verification are top concerns.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "Wali invite is now an explicit in-app feature; family-involvement signals drive trust.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      },
+      {
+        "insight": "NikahForever claims '4M verified users, 70K marriages'; Shaadi.com claims '80 lakh success stories' + blue-tick screening.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "ShadiAmour UK markets '500+ verified halal marriages in UK 2026' targeting NRI diaspora.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Verification framed as a dignity signal converts better than security-language in faith-aware copy.",
+        "source": "https://nikahnamah.com/blog-detail/verified-matrimony-profiles-nikah-safe-search"
+      }
+    ]
+  }
+}

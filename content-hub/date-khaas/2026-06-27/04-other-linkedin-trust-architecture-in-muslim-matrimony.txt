@@ -1,0 +1,22 @@
+The Muslim matrimony space has a trust problem — not because platforms are dishonest, but because the stakes are uniquely high.
+
+When you're looking for a spouse, you're not evaluating a product. You're considering handing the most intimate part of your life to a person you've only ever seen through a screen. That asymmetry of vulnerability is enormous.
+
+Competitors have responded with volume: 4 million verified users. 80 lakh success stories. Those numbers are reassuring. But they answer the wrong question.
+
+The question a young Muslim woman asks is not "How many people used this app?"
+
+She asks: *"Is the person reaching out to me actually who they say they are?"*
+Her father asks: *"Can I trust this process with my daughter?"*
+
+At Date Khaas, we built the trust architecture around those two questions — not the headline metrics:
+
+→ Photos blurred by default. Unlocked one person at a time, by the user.
+→ ID verification and selfie matching before anyone can initiate contact.
+→ Wali accounts — guardians get read access to their family member's conversations.
+
+We are in peak wedding season right now. Families are searching. And the app they trust enough to use is the one that treats verification as a dignity signal, not just a security checkbox.
+
+That's the product we're building.
+
+#MuslimMatrimony #Nikah #TrustAndSafety #HalalTech #DateKhaas
