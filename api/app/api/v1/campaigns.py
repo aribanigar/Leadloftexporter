@@ -1260,30 +1260,105 @@ def send_remaining(
     c.paused_at = None
     c.finished_at = None
     c.error = None
-    # Clear any back-off window so the resume isn't silently skipped.
+    # Clear any back-off window so the resume isn't silently skipped — a stale
+    # cooldown (e.g. left by an earlier rate-limit) would make every tick
+    # return "cooling_down" and nothing would send.
     src = dict(c.recipient_sources or {})
     if "_cooldown_until" in src:
         src.pop("_cooldown_until", None)
         c.recipient_sources = src
-    db.flush()
 
-    # Re-drip the balance from NOW: clear stale send_after stamps on the
-    # leftover pending rows so _schedule_recipients re-paces them fresh, then
-    # everything that stopped half-way flows out human-paced.
+    # Make the WHOLE balance due NOW so the browser send-loop (the 3s poll →
+    # prepare-tick/commit-tick via the Vercel nodemailer relay) starts draining
+    # it immediately at the campaign's batch pace, instead of re-dripping over
+    # another hour.
+    now = datetime.now(timezone.utc)
     db.query(CampaignRecipient).filter(
         CampaignRecipient.campaign_id == campaign_id,
         CampaignRecipient.status == "pending",
-    ).update({CampaignRecipient.send_after: None}, synchronize_session=False)
-    db.commit()
-    try:
-        _schedule_recipients(db, c)
-    except Exception:  # noqa: BLE001
-        db.rollback()
+    ).update({CampaignRecipient.send_after: now}, synchronize_session=False)
 
-    tick = _process_tick(db, c, ctx_user_id=ctx.user_id)
-    if isinstance(tick, dict):
-        tick["resumed_remaining"] = remaining
-    return tick
+    # Reclaim recipients orphaned in "sending" (claimed by a prior tick but
+    # never committed) so they re-enter the queue now. Only touch rows that
+    # have been stuck > 2 min, so a genuinely in-flight batch is never
+    # double-sent.
+    stale_cutoff = now - timedelta(minutes=2)
+    db.query(CampaignRecipient).filter(
+        CampaignRecipient.campaign_id == campaign_id,
+        CampaignRecipient.status == "sending",
+        CampaignRecipient.updated_at < stale_cutoff,
+    ).update(
+        {CampaignRecipient.status: "pending", CampaignRecipient.send_after: now},
+        synchronize_session=False,
+    )
+
+    # IMPORTANT: do NOT send inline here. Render blocks outbound SMTP, so an
+    # inline _process_tick would hang on connection timeouts (stuck "Sending…")
+    # and trip a 90s cooldown that stalls the real send path. The browser's 3s
+    # poll owns the actual sending.
+    db.commit()
+    return {
+        "status": "sending",
+        "remaining": remaining,
+        "resumed_remaining": remaining,
+        "message": f"resuming — {remaining} remaining email(s) will send",
+    }
+
+
+@router.post("/{campaign_id}/nudge")
+def nudge_campaign(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Reset every pending recipient's send_after to NOW so a campaign launched
+    on an old/stretched schedule (or stalled after a cooldown) drains
+    immediately at the configured per-sender batch pace.
+
+    Powers the "Send Now (reset schedule)" action. Like send-remaining it does
+    NOT send inline (Render blocks SMTP — the browser poll owns sending); it
+    only makes the queue due now and lets the 3s poll dispatch via nodemailer.
+    """
+    c = _own_campaign(db, ctx, campaign_id)
+
+    # A paused campaign should resume when explicitly nudged.
+    if c.status == "paused":
+        c.status = "sending"
+        c.paused_at = None
+
+    now = datetime.now(timezone.utc)
+    nudged = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign_id,
+            CampaignRecipient.status == "pending",
+        )
+        .update({CampaignRecipient.send_after: now}, synchronize_session=False)
+    )
+
+    # Reclaim stale "sending" rows (>2 min) back into the queue, due now.
+    stale_cutoff = now - timedelta(minutes=2)
+    nudged += (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign_id,
+            CampaignRecipient.status == "sending",
+            CampaignRecipient.updated_at < stale_cutoff,
+        )
+        .update(
+            {CampaignRecipient.status: "pending", CampaignRecipient.send_after: now},
+            synchronize_session=False,
+        )
+    )
+
+    # Clear any back-off so the next tick isn't skipped.
+    src = dict(c.recipient_sources or {})
+    if "_cooldown_until" in src:
+        src.pop("_cooldown_until", None)
+        c.recipient_sources = src
+
+    db.commit()
+    return {"nudged": int(nudged or 0), "ticked": False}
 
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
