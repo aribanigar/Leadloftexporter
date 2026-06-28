@@ -1,0 +1,65 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "Trust Before Introduction — LinkedIn Thought Leadership",
+  "image_query": "muslim wedding celebration",
+  "body": "The matrimony app industry has a trust problem — and it's not the one most people talk about.\n\nWe obsess over scam detection and fake profiles (rightly so). But the deeper issue is this: most platforms introduce two families before anyone has actually verified who they're speaking to.\n\nThat creates a very human kind of harm. Families invest hope, time, and emotional energy in an introduction — only to discover, weeks later, that something about the profile didn't add up.\n\nAt Date Khaas, we built the verification step before the introduction, not after. Every profile is reviewed by a real person before it goes live. Photos are blurred by default. Wali involvement is woven into the process from the start — not as an afterthought, but as a design principle.\n\nThis isn't just about safety (though it is that). It's about dignity. The search for a life partner deserves to begin with the quiet confidence that the people you're meeting have already been vouched for.\n\nAs wedding season peaks this summer, we're seeing what happens when trust comes first: families engage more deeply, introductions feel safer, and the whole process carries the weight it deserves.\n\nIf you're building in the matrimony space — or thinking about Muslim-consumer digital products — the lesson is simple: trust is not a feature you bolt on. It's the foundation you build on.\n\nAlhamdulillah for every nikah that begins with honesty.\n\n#MuslimMatrimony #Nikah #TrustAndSafety #HalalTech #DateKhaas",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles use digital matchmaking platforms in 2026; trust is the conversion barrier.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "Islamic wedding season peaks June–August 2026 — prime timing for matrimony campaigns.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Verified identity (selfie + ID + manual review) is now table stakes across Muzz, Salams, Nikkahmee.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims 4M+ verified users and 70K+ marriages — Date Khaas differentiates on quality over volume.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "NRI cross-border matching accelerating; wali/family involvement remains core.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      },
+      {
+        "insight": "Photo blur defaults and aggressive moderation are top safety features Muslim women seek.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-celebration-3928295.jpg",
+      "remote_url": "https://pixabay.com/get/g90a6a179457ce1233134ba409d586ad6aca48461aed6a1db5bd0c21047e5c502d3634b0d64e9a309b7dc27e614dac9a3078752c26fa6ee9bbf29efbd8703ffc0_1280.jpg",
+      "page_url": "https://pixabay.com/photos/indian-wedding-indian-bride-3928295/",
+      "author": "globalqart",
+      "pixabay_id": 3928295,
+      "tags": "indian wedding, indian bride, bridal makeup, henna, bollywood, marriage, culture, jewellery, design, emotions, gold, woman, fashion, asian, celebration, female, traditional, india, bridal, muslim wedding, indian wedding, indian bride, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bollywood, bollywood, bollywood",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-celebration-4615557.jpg",
+      "remote_url": "https://pixabay.com/get/gb72c34c40c02f27a1632909d116ceacabd8a96f6bfeca1d7b7fc6cadb0248900f629a7432264e67f318b532a1f879ea3f8b8bbfd78d1b7128f673aee278cf5c2_1280.jpg",
+      "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+      "author": "OlcayErtem",
+      "pixabay_id": 4615557,
+      "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, nature, male, big, girl, happiness, celebration, ceremony, wife, bouquet, grass",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-celebration-443600.jpg",
+      "remote_url": "https://pixabay.com/get/g38dd56323e3a08eebb9c806b8151cd9a4b322c92572e0c32f620772a5ad8a468c3a1666309954a78e1bc600d26fd601ee0f24327148681e3287df9a6eb1aba86_1280.jpg",
+      "page_url": "https://pixabay.com/photos/couple-wedding-park-newlyweds-443600/",
+      "author": "toanmda",
+      "pixabay_id": 443600,
+      "tags": "couple, wedding, park, newlyweds, wedding day, husband, wife, man, woman, bride, groom, romantic, love, happy, relationship, outdoors, wedding photography, portrait, couple, wedding, wedding, wedding, wedding, wedding, love",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

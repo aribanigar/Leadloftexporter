@@ -1,0 +1,69 @@
+{
+  "type": "html_email",
+  "format": "amp",
+  "channel": "email",
+  "title": "Verified Gallery — AMP Email",
+  "subject": "Your photos. Your pace. Your nikah — with everyone verified first.",
+  "preheader": "See what trust looks like on Date Khaas.",
+  "cta_url": "https://datekhaas.com/join",
+  "image_query": "nikah ceremony",
+  "body": "<!doctype html>\n<html ⚡4email>\n<head>\n  <meta charset=\"utf-8\">\n  <style amp4email-boilerplate>body{visibility:hidden}</style>\n  <script async src=\"https://cdn.ampproject.org/v0.js\"></script>\n  <script async custom-element=\"amp-carousel\" src=\"https://cdn.ampproject.org/v0/amp-carousel-0.1.js\"></script>\n  <style amp-custom>\n    body { margin:0; padding:0; background-color:#f5f0e8; font-family:Helvetica,Arial,sans-serif; }\n    .container { max-width:600px; margin:0 auto; background:#fff; }\n    .header { background-color:#003527; padding:28px 32px; text-align:center; }\n    .header-title { margin:0; font-family:Georgia,serif; font-size:28px; color:#e9c176; letter-spacing:3px; font-weight:normal; }\n    .header-sub { margin:8px 0 0; font-size:12px; color:#4a8a6a; letter-spacing:1px; text-transform:uppercase; }\n    .slide { background:linear-gradient(135deg,#003527 0%,#005a3e 100%); height:280px; display:flex; align-items:center; justify-content:center; padding:32px; box-sizing:border-box; }\n    .slide-text { font-family:Georgia,serif; font-size:22px; color:#e9c176; text-align:center; line-height:1.4; }\n    .slide-sub { font-family:Helvetica,Arial,sans-serif; font-size:14px; color:#a8d4bc; text-align:center; margin-top:12px; }\n    .slide-2 { background:linear-gradient(135deg,#002a1e 0%,#004030 100%); }\n    .slide-3 { background:linear-gradient(135deg,#001a12 0%,#003527 100%); }\n    .badges { padding:28px 32px; text-align:center; background:#f9f6ef; }\n    .badge { display:inline-block; border:1px solid #e9c176; color:#003527; font-size:12px; font-family:Helvetica,Arial,sans-serif; padding:6px 14px; margin:4px; background:#fff; }\n    .body-copy { padding:32px 40px; }\n    .body-copy p { font-family:Helvetica,Arial,sans-serif; font-size:15px; color:#444; line-height:1.8; margin:0 0 16px; }\n    .cta-wrap { text-align:center; padding:8px 40px 44px; }\n    .cta { display:inline-block; background-color:#003527; color:#e9c176; font-family:Helvetica,Arial,sans-serif; font-size:15px; font-weight:bold; text-decoration:none; padding:16px 44px; }\n    .footer { background-color:#003527; padding:24px 40px; text-align:center; }\n    .footer p { margin:0 0 6px; font-family:Helvetica,Arial,sans-serif; font-size:12px; color:#4a7a60; }\n    .footer a { color:#e9c176; text-decoration:none; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n\n    <div class=\"header\">\n      <p class=\"header-title\">Date Khaas</p>\n      <p class=\"header-sub\">Muslim Matrimony</p>\n    </div>\n\n    <amp-carousel width=\"600\" height=\"280\" layout=\"fixed\" type=\"slides\" autoplay delay=\"4000\" loop>\n      <div class=\"slide\">\n        <div>\n          <p class=\"slide-text\">&ldquo;He created for you mates, that you may find tranquillity in them.&rdquo;</p>\n          <p class=\"slide-sub\">Ar-Rum 30:21</p>\n        </div>\n      </div>\n      <div class=\"slide slide-2\">\n        <div>\n          <p class=\"slide-text\">Every profile is verified by hand before introductions begin.</p>\n          <p class=\"slide-sub\">Your peace of mind is not an afterthought &mdash; it is the foundation.</p>\n        </div>\n      </div>\n      <div class=\"slide slide-3\">\n        <div>\n          <p class=\"slide-text\">Your photos stay private until you choose to share them.</p>\n          <p class=\"slide-sub\">Your story unfolds at your pace, with your wali beside you.</p>\n        </div>\n      </div>\n    </amp-carousel>\n\n    <div class=\"badges\">\n      <span class=\"badge\">&checkmark; Identity Verified</span>\n      <span class=\"badge\">&checkmark; Photos Private</span>\n      <span class=\"badge\">&checkmark; Wali Involved</span>\n      <span class=\"badge\">&checkmark; No Fake Profiles</span>\n    </div>\n\n    <div class=\"body-copy\">\n      <p>This summer, as nikah ceremonies fill our communities with barakah and joy, your own story is ready to begin. What it needs is a space where the search is as honourable as the intention.</p>\n      <p>On Date Khaas, trust is not a feature &mdash; it is the first thing we build. Because the one written for you deserves to be introduced to the real you, and you to them.</p>\n    </div>\n\n    <div class=\"cta-wrap\">\n      <a href=\"https://datekhaas.com/join\" class=\"cta\">Begin your search &rarr;</a>\n    </div>\n\n    <div class=\"footer\">\n      <p>Date Khaas &middot; Muslim Matrimony</p>\n      <p><a href=\"https://datekhaas.com/unsubscribe\">Unsubscribe</a></p>\n    </div>\n\n  </div>\n</body>\n</html>",
+  "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>Date Khaas</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f5f0e8;font-family:Helvetica,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f5f0e8;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 16px;\">\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;\">\n          <tr>\n            <td align=\"center\" style=\"background-color:#003527;padding:28px 32px;\">\n              <p style=\"margin:0;font-family:Georgia,serif;font-size:28px;color:#e9c176;letter-spacing:3px;font-weight:normal;\">Date Khaas</p>\n              <p style=\"margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#4a8a6a;letter-spacing:1px;text-transform:uppercase;\">Muslim Matrimony</p>\n            </td>\n          </tr>\n          <tr>\n            <td style=\"background:linear-gradient(135deg,#003527 0%,#005a3e 100%);padding:48px 40px;text-align:center;\">\n              <p style=\"margin:0 0 12px;font-family:Georgia,serif;font-size:20px;color:#e9c176;font-style:italic;\">&ldquo;He created for you mates, that you may find tranquillity in them.&rdquo;</p>\n              <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#a8d4bc;\">&mdash; Ar-Rum 30:21</p>\n            </td>\n          </tr>\n          <tr>\n            <td style=\"padding:8px 24px;text-align:center;background-color:#f9f6ef;\">\n              <span style=\"display:inline-block;border:1px solid #e9c176;color:#003527;font-size:12px;font-family:Helvetica,Arial,sans-serif;padding:6px 14px;margin:4px;background:#fff;\">&checkmark; Identity Verified</span>\n              <span style=\"display:inline-block;border:1px solid #e9c176;color:#003527;font-size:12px;font-family:Helvetica,Arial,sans-serif;padding:6px 14px;margin:4px;background:#fff;\">&checkmark; Photos Private</span>\n              <span style=\"display:inline-block;border:1px solid #e9c176;color:#003527;font-size:12px;font-family:Helvetica,Arial,sans-serif;padding:6px 14px;margin:4px;background:#fff;\">&checkmark; Wali Involved</span>\n              <span style=\"display:inline-block;border:1px solid #e9c176;color:#003527;font-size:12px;font-family:Helvetica,Arial,sans-serif;padding:6px 14px;margin:4px;background:#fff;\">&checkmark; No Fake Profiles</span>\n            </td>\n          </tr>\n          <tr>\n            <td style=\"padding:36px 40px;\">\n              <p style=\"margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#444;line-height:1.8;\">This summer, as nikah ceremonies fill our communities with barakah, your own story is ready to begin. On Date Khaas, every profile is verified by hand before introductions start &mdash; your peace of mind is the foundation, not an afterthought.</p>\n            </td>\n          </tr>\n          <tr>\n            <td align=\"center\" style=\"padding:8px 40px 44px;\">\n              <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background-color:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;padding:16px 44px;\">Begin your search &rarr;</a>\n            </td>\n          </tr>\n          <tr>\n            <td style=\"background-color:#003527;padding:24px 40px;text-align:center;\">\n              <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#4a7a60;\">Date Khaas &middot; Muslim Matrimony &middot; <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;\">Unsubscribe</a></p>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles use digital matchmaking platforms in 2026; trust is the conversion barrier.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "Islamic wedding season peaks June–August 2026 — prime timing for matrimony campaigns.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Verified identity (selfie + ID + manual review) is now table stakes across Muzz, Salams, Nikkahmee.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims 4M+ verified users and 70K+ marriages — Date Khaas differentiates on quality over volume.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "NRI cross-border matching accelerating; wali/family involvement remains core.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      },
+      {
+        "insight": "Photo blur defaults and aggressive moderation are top safety features Muslim women seek.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/nikah-ceremony-7807230.jpg",
+      "remote_url": "https://pixabay.com/get/g8a36a6c7b3c32c9410a71251b989e5634550b6f0edb1bf9912aa40ee60b4845d9a621fb40e6e2024064a74cef552aaa078cdd68e519da67a7338387248f65455_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-ceremony-ceremony-teatime-japan-7807230/",
+      "author": "mirkostoedter",
+      "pixabay_id": 7807230,
+      "tags": "tea ceremony, ceremony, teatime, japan, china, asia, pottery, teapots, tea ceremony, tea ceremony, tea ceremony, tea ceremony, tea ceremony, teatime, china, china, asia",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/nikah-ceremony-6123746.jpg",
+      "remote_url": "https://pixabay.com/get/g9a7edc6f32f4ec410c870a0efdc83fa90e53a152c3eb9f3f478b0d4928984527781f47242e89346dd1bda3b0f76822a353dc45cb215ddccc1f21be054dd9181c_1280.jpg",
+      "page_url": "https://pixabay.com/photos/teapot-tea-traditional-ceremony-6123746/",
+      "author": "cromagnon130",
+      "pixabay_id": 6123746,
+      "tags": "teapot, tea, traditional, ceremony, tea cups, cups, steam, hot tea, drink, beverage, japanese, asian, tea, tea, tea, tea, tea",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/nikah-ceremony-1869716.jpg",
+      "remote_url": "https://pixabay.com/get/gbb2ae6a5cef303e75c67da4bb5c52f0d9a53ab4d489048610286d667be55dc6f92340623b87a59e5934a380a89cb8dd4b0bffa84b4c6250911834a7417f417c8_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
+      "author": "Pexels",
+      "pixabay_id": 1869716,
+      "tags": "tea, cup, pot, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, tea cup, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

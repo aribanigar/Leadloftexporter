@@ -1,0 +1,66 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "Verified Before Introduced — WhatsApp",
+  "image_query": "muslim bride groom wedding",
+  "cta_url": "https://datekhaas.com/join",
+  "body": "Assalamu alaikum\n\nSomeone is waiting for you — already written in your story, already searching. What they deserve is to find you somewhere safe.\n\nOn Date Khaas, every profile is verified by hand before your family is ever introduced. Your photos stay private until *you* choose to share them. Your wali is part of the process from the beginning.\n\nThis summer, as nikah ceremonies fill our communities with barakah, let yours begin — with confidence, not uncertainty.\n\n✨ Join us: https://datekhaas.com/join\n\n\"And of His signs is that He created for you from yourselves mates that you may find tranquillity in them.\" — Ar-Rum 30:21",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles use digital matchmaking platforms in 2026; trust is the conversion barrier.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "Islamic wedding season peaks June–August 2026 — prime timing for matrimony campaigns.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Verified identity (selfie + ID + manual review) is now table stakes across Muzz, Salams, Nikkahmee.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims 4M+ verified users and 70K+ marriages — Date Khaas differentiates on quality over volume.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "NRI cross-border matching accelerating; wali/family involvement remains core.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      },
+      {
+        "insight": "Photo blur defaults and aggressive moderation are top safety features Muslim women seek.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-bride-groom-wedding-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/gd513064937f74c06c4539f51867af5a5911f9d93652cadb0fb8d8b2b239fd52f9c1d88983a4a763b3ec5c4f84fcf1264d19cb64065098fd5e11f4cceb027d82f_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-bride-groom-wedding-7353628.jpg",
+      "remote_url": "https://pixabay.com/get/g2ed18ffcd36f530e242834074ac52fa832fff36d1a40a7a444ae68ab253635be6bd8ae7d45c8427828eca52e139120c630b8e55cfd21d15ab6c04b5513cd6787_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353628/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353628,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-bride-groom-wedding-7353626.jpg",
+      "remote_url": "https://pixabay.com/get/g7d35adf69fb3adcf8c0759d09fdea31384d27f6f69214834f12326759aa9752ec898d3549253a7610a7b0ebdf26776820228f24774e2a0c469618429beb9fce6_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353626/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353626,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

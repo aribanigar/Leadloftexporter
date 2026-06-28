@@ -1,0 +1,68 @@
+{
+  "type": "html_email",
+  "format": "standard",
+  "channel": "email",
+  "title": "Verified Before Introduced — Summer Email",
+  "subject": "The one written for you is waiting — and we've made sure they're real",
+  "preheader": "Every profile on Date Khaas is verified by hand before a single introduction.",
+  "cta_url": "https://datekhaas.com/join",
+  "image_query": "muslim wedding couple",
+  "body": "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>Date Khaas</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f5f0e8;font-family:Helvetica,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f5f0e8;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 16px;\">\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;\">\n\n          <!-- Header -->\n          <tr>\n            <td align=\"center\" style=\"background-color:#003527;padding:28px 32px;\">\n              <p style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#e9c176;letter-spacing:3px;font-weight:normal;\">Date Khaas</p>\n              <p style=\"margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#4a8a6a;letter-spacing:1px;text-transform:uppercase;\">Muslim Matrimony</p>\n            </td>\n          </tr>\n\n          <!-- Hero image band -->\n          <tr>\n            <td style=\"background-color:#003527;padding:0 0 40px;text-align:center;\">\n              <div style=\"background:linear-gradient(135deg,#003527 0%,#005a3e 60%,#003527 100%);padding:48px 40px;\">\n                <p style=\"margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#e9c176;letter-spacing:2px;text-transform:uppercase;\">Summer 2026</p>\n                <h1 style=\"margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:36px;color:#ffffff;font-weight:normal;line-height:1.25;\">There is someone<br><em style=\"color:#e9c176;\">written for you.</em></h1>\n                <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#a8d4bc;line-height:1.6;\">And before you ever know their name,<br>we've already made sure they're real.</p>\n              </div>\n            </td>\n          </tr>\n\n          <!-- Opening copy -->\n          <tr>\n            <td style=\"padding:44px 44px 28px;\">\n              <p style=\"margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#003527;line-height:1.5;font-style:italic;\">&ldquo;And of His signs is that He created for you from yourselves mates that you may find tranquillity in them.&rdquo;</p>\n              <p style=\"margin:0 0 4px;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#999;\">&mdash; Ar-Rum 30:21</p>\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:0 44px 28px;\">\n              <p style=\"margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#444;line-height:1.8;\">The longing for a loving marriage — for the <em>sukoon</em> that comes from finding someone who steadies you — is one of the most quietly beautiful hopes a person carries. You deserve to pursue it with confidence, not caution.</p>\n              <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#444;line-height:1.8;\">That is why at Date Khaas, we review every profile by hand before a single introduction is ever made. By the time you know someone's name, we already know they are who they say they are.</p>\n            </td>\n          </tr>\n\n          <!-- Trust box -->\n          <tr>\n            <td style=\"padding:0 44px 32px;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td style=\"background-color:#f0f7f4;border-left:4px solid #e9c176;padding:28px;\">\n                    <p style=\"margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#003527;font-weight:bold;text-transform:uppercase;letter-spacing:1px;\">Verified before you're introduced</p>\n                    <p style=\"margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;\">&checkmark;&nbsp; Identity confirmed before your first message</p>\n                    <p style=\"margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;\">&checkmark;&nbsp; Photos private by default — shared only when you choose</p>\n                    <p style=\"margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;\">&checkmark;&nbsp; Wali and family involvement built into every introduction</p>\n                    <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;\">&checkmark;&nbsp; No fake profiles. No bots. No grey areas.</p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Second body copy -->\n          <tr>\n            <td style=\"padding:0 44px 28px;\">\n              <p style=\"margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#444;line-height:1.8;\">This summer, as nikah ceremonies fill our communities with barakah, let yours begin — not with uncertainty, but with the quiet peace that comes from knowing: the search is in safe hands.</p>\n              <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:16px;color:#444;line-height:1.8;\">Date Khaas is not a place for casual scrolling. It is a space where every introduction carries intention, where your family's trust matters as much as your own longing. We hold both with care.</p>\n            </td>\n          </tr>\n\n          <!-- CTA -->\n          <tr>\n            <td align=\"center\" style=\"padding:8px 44px 52px;\">\n              <a href=\"https://datekhaas.com/join\" style=\"display:inline-block;background-color:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:bold;text-decoration:none;padding:18px 48px;letter-spacing:0.5px;\">Begin your search &rarr;</a>\n              <p style=\"margin:16px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#aaa;\">Always free to join. Every profile reviewed before you see it.</p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color:#003527;padding:28px 44px;text-align:center;\">\n              <p style=\"margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#e9c176;letter-spacing:1px;\">Date Khaas</p>\n              <p style=\"margin:0 0 12px;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#4a7a60;\">Muslim Matrimony &mdash; With Intention</p>\n              <p style=\"margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#4a7a60;\">You are receiving this because you subscribed to Date Khaas updates. <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;text-decoration:none;\">Unsubscribe</a></p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "77.8% of Muslim singles use digital matchmaking platforms in 2026; trust is the conversion barrier.",
+        "source": "https://www.accio.com/business/muslim-wedding-latest"
+      },
+      {
+        "insight": "Islamic wedding season peaks June–August 2026 — prime timing for matrimony campaigns.",
+        "source": "https://www.shaadidukaan.com/blog/islamic-wedding-dates-2026.html"
+      },
+      {
+        "insight": "Verified identity (selfie + ID + manual review) is now table stakes across Muzz, Salams, Nikkahmee.",
+        "source": "https://purematrimony.com/muslim-marriage-apps-safety-faq"
+      },
+      {
+        "insight": "NikahForever claims 4M+ verified users and 70K+ marriages — Date Khaas differentiates on quality over volume.",
+        "source": "https://www.nikahforever.com/"
+      },
+      {
+        "insight": "NRI cross-border matching accelerating; wali/family involvement remains core.",
+        "source": "https://blog.nrimb.com/tips-for-finding-nri-matches-for-arranged-marriage-through-matrimony-services-in-2026/"
+      },
+      {
+        "insight": "Photo blur defaults and aggressive moderation are top safety features Muslim women seek.",
+        "source": "https://zawjni.com/en/blog/%D9%85%D9%88%D9%82%D8%B9-%D9%85%D8%B3%D9%84%D9%85%D8%A9-%D9%84%D9%84%D8%B2%D9%88%D8%A7%D8%AC-%D8%A7%D9%84%D9%85%D8%AC%D8%A7%D9%86%D9%8A"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-couple-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/g0c37aad46f3ff9946d3869e2e94aff55c4f60032c258e165140bbff2ed68b81f00abc9c3a95d95d31c1885763469ec8887626d8c227a7d757adc7aeebf6187a8_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-couple-7353628.jpg",
+      "remote_url": "https://pixabay.com/get/gcc8fc9a5ae59675937e3e9431a01300e5a7f7e53edc0fffbe20c0d50fa378da787c7eb4d8df343ebaaa0cb4a263fa8b980c4cff743bd998037d69babfe594f0c_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353628/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353628,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-28/images/muslim-wedding-couple-7353626.jpg",
+      "remote_url": "https://pixabay.com/get/g3dbdb4a8881e017b826c98a1308395cdbb622197619c48ce3c476477a06abd542b079ef6408a4ccfdf47ab7507ca8c6017a04b7a358cc0d47d1fbbc1d8959aee_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353626/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353626,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}
