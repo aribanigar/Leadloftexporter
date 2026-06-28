@@ -879,11 +879,11 @@ def get_campaign(
     db: Session = Depends(get_db),
 ):
     c = _own_campaign(db, ctx, campaign_id)
-    return _campaign_dict(c)
+    return _campaign_dict(c, db)
 
 
-def _campaign_dict(c: Campaign) -> dict:
-    return {
+def _campaign_dict(c: Campaign, db: Session | None = None) -> dict:
+    d: dict = {
         "id": c.id,
         "name": c.name,
         "subject": c.subject,
@@ -926,6 +926,17 @@ def _campaign_dict(c: Campaign) -> dict:
         "error": c.error,
         "created_at": c.created_at,
     }
+    if db is not None:
+        d["queued_count"] = (
+            db.query(func.count(CampaignRecipient.id))
+            .filter(
+                CampaignRecipient.campaign_id == c.id,
+                CampaignRecipient.status.in_(("pending", "sending")),
+            )
+            .scalar()
+            or 0
+        )
+    return d
 
 
 @router.patch("/{campaign_id}")
@@ -1330,8 +1341,12 @@ def send_remaining(
         or 0
     )
 
-    # Nothing left → the campaign really is 100% done.
+    # Nothing left → the campaign really is 100% done. Reconcile counters first
+    # so that drifted counter columns (e.g. bounced_count=0 but 23 bounced rows)
+    # are fixed before the UI polls again — eliminating the "23 Queued but nothing
+    # left to send" discrepancy.
     if remaining == 0:
+        _reconcile_counters(db, c)
         if c.status not in ("completed", "cancelled"):
             c.status = "completed"
             if c.finished_at is None:
@@ -2239,6 +2254,26 @@ def _commit_tick_results(
     return _stats(campaign, sent=sent, failed=failed, skipped=skipped)
 
 
+def _reconcile_counters(db: Session, campaign: Campaign) -> None:
+    """Re-sync campaign counter columns from actual CampaignRecipient row states.
+
+    Counter columns can drift when a serverless function is killed mid-commit
+    (the rows transition but the increment never lands) or when orphaned 'sending'
+    rows are reclaimed. This ensures the UI tiles always agree with reality.
+    """
+    rows = (
+        db.query(CampaignRecipient.status, func.count(CampaignRecipient.id))
+        .filter(CampaignRecipient.campaign_id == campaign.id)
+        .group_by(CampaignRecipient.status)
+        .all()
+    )
+    counts: dict[str, int] = {s: n for s, n in rows}
+    campaign.sent_count = counts.get("sent", 0)
+    campaign.failed_count = counts.get("failed", 0)
+    campaign.skipped_count = counts.get("skipped", 0)
+    campaign.bounced_count = counts.get("bounced", 0)
+
+
 def _maybe_finalize(db: Session, campaign: Campaign) -> None:
     remaining = (
         db.query(func.count(CampaignRecipient.id))
@@ -2250,6 +2285,7 @@ def _maybe_finalize(db: Session, campaign: Campaign) -> None:
         or 0
     )
     if remaining == 0:
+        _reconcile_counters(db, campaign)
         campaign.status = "completed"
         campaign.finished_at = datetime.now(timezone.utc)
 
