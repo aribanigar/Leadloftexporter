@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Hudace content batch - 2026-06-22 - Industries: Agribusiness, Consumer Products.
+"""Generate Hudace content batch - 2026-06-28 - Industries: Financial Services, Telecommunications.
 Six emails (one per marketing service plus a dedicated SchoolOS School ERP email), each with
 a WhatsApp message, a LinkedIn caption, and an outreach message sharing one baked 4:5 card.
 
@@ -13,7 +13,7 @@ from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from PIL import Image, ImageDraw, ImageFont
 
-DATE = "2026-06-22"
+DATE = "2026-06-28"
 BASE_URL = "https://leadloftexporter.vercel.app/email"
 EMAIL_DIR = "public/email"
 PIXABAY_KEY = os.environ.get("PIXABAY_API", "56316516-fbb10ad7475940758256bc517")
@@ -300,98 +300,12 @@ def email_html(label, headline, sub, card_url, body_url, deliverables, scope, pr
 # -- batch content (region-agnostic, SAP-calm) ---------------------------------
 EMAILS = [
     {
-        "key": "agribusiness-social",
-        "industry": "Agribusiness",
-        "label": "SOCIAL MEDIA - AGRIBUSINESS",
-        "headline": "Social Media That Builds Trust Across the Agricultural Supply Chain",
-        "sub": "Agribusiness buyers, distributors, and growers follow the suppliers who show their work. Hudace runs a fully managed social function so your operation stays visible to the people who place orders.",
-        "bg_query": "agriculture field aerial sunset dark",
-        "body_query": "farm harvest tractor field",
-        "card_head": "Social Media for Agribusiness",
-        "card_bullets": ["6 short-form videos monthly", "12 feed posts, 8 stories", "Community management", "Monthly performance report"],
-        "deliverables": [
-            "6 short-form videos per month",
-            "12 feed posts per month",
-            "8 stories per month",
-            "Captions and hashtag sets",
-            "Content calendar and scheduling",
-            "Community management (comments and DMs)",
-            "Monthly performance report",
-        ],
-        "scope": "In agribusiness the buying cycle runs on confidence in quality, traceability, and consistent supply. A structured calendar built around harvest milestones, processing standards, and field operations turns routine activity into proof that procurement teams and distributors can see before they shortlist a supplier.",
-        "proof": "We have run managed social programs for operations across food production and distribution, replacing irregular posting with a steady calendar that keeps the brand present through every season.",
-        "future": "Social builds the first impression. It layers into SEO, website, and AI cinematic video so awareness moves into a measurable pipeline.",
-        "hooks": [
-            ("Consistency signals reliability", "Six videos and twelve posts a month show an operation that runs on schedule, the same trait buyers want in a supplier."),
-            ("Proof travels further than claims", "Field walkthroughs and process clips let the work speak, which converts better than product descriptions alone."),
-            ("Owned attention compounds", "Managed community response keeps every comment and message warm, so interest does not cool before a conversation starts."),
-        ],
-        "closing": "Tell us your season and we will return a content calendar built for it.",
-    },
-    {
-        "key": "agribusiness-website",
-        "industry": "Agribusiness",
-        "label": "WEBSITE DESIGN - AGRIBUSINESS",
-        "headline": "A Website That Turns Agricultural Buyers Into Enquiries",
-        "sub": "Most agribusiness sites describe the operation. Few are built to capture the buyer. Hudace delivers a fast, mobile-first site engineered to convert distributors, wholesalers, and procurement teams.",
-        "bg_query": "modern greenhouse technology agriculture dark",
-        "body_query": "laptop website design office",
-        "card_head": "Website Design for Agribusiness",
-        "card_bullets": ["Custom multi-page website", "Mobile-first responsive build", "Lead and contact forms", "Analytics and WhatsApp"],
-        "deliverables": [
-            "Custom multi-page website",
-            "Mobile-first responsive build",
-            "Booking, lead, and contact forms",
-            "CMS to edit content yourself",
-            "SEO-ready structure and speed",
-            "Analytics and WhatsApp integration",
-            "Hosting and domain setup",
-            "Launch and handover",
-        ],
-        "scope": "Agribusiness purchases are researched on a phone in the field and approved at a desk. A mobile-first site with clear product, capacity, and certification pages and a WhatsApp path removes friction at both moments, so a serious buyer reaches you on the same visit.",
-        "proof": "We have built and launched sites for operations across production and distribution, pairing clean structure with fast load times so search and buyers both reward the page.",
-        "future": "The site becomes the hub. SEO drives qualified traffic to it and social keeps it warm between purchase cycles.",
-        "hooks": [
-            ("Speed protects the visit", "A fast, mobile-first build keeps a buyer on the page where a slow one loses them before the enquiry."),
-            ("Structure earns the ranking", "An SEO-ready architecture lets search engines place you for the terms procurement teams actually use."),
-            ("Forms turn traffic into pipeline", "Lead, contact, and WhatsApp paths capture intent at the moment it peaks, not days later."),
-        ],
-        "closing": "Send us your current site and we will return a build plan and a launch timeline.",
-    },
-    {
-        "key": "agribusiness-aistudio",
-        "industry": "Agribusiness",
-        "label": "AI WORK STUDIO - AGRIBUSINESS",
-        "headline": "A Cinematic Film of Your Operation, Without a Film Crew",
-        "sub": "Agribusiness sells on scale and standards that a single photo cannot convey. Hudace AI Work Studio produces a cinematic film of your operation in seven working days, with no crew on site.",
-        "bg_query": "cinematic agriculture drone aerial dark moody",
-        "body_query": "film camera production cinematic dark",
-        "card_head": "AI Work Studio for Agribusiness",
-        "card_bullets": ["60-second cinematic film", "Three 15-second social cuts", "Ten AI-generated stills", "Delivered in 7 working days"],
-        "deliverables": [
-            "60-second cinematic film",
-            "Three 15-second social cuts",
-            "Ten AI-generated stills",
-            "Script and concept included",
-            "Delivered in seven working days, no film crew",
-        ],
-        "scope": "A buyer deciding between agricultural suppliers responds to scale, process, and care they can see. A cinematic film communicates capacity and standards in sixty seconds, in a format that travels across sales decks, social, and trade conversations.",
-        "proof": "We have produced cinematic films for operations across production and consumer goods, delivering finished work in days rather than the weeks a traditional shoot requires.",
-        "future": "One film fuels months of content. The social cuts and stills feed the calendar long after delivery.",
-        "hooks": [
-            ("Scale is best shown, not described", "A cinematic sweep conveys capacity in seconds that a specification sheet cannot."),
-            ("Seven days keeps pace with the market", "AI production removes the crew, the location days, and the wait, so the film ships while the opportunity is live."),
-            ("One shoot, many assets", "A film, three cuts, and ten stills give every channel something to run from a single brief."),
-        ],
-        "closing": "Describe your operation and we will return a concept and a delivery date.",
-    },
-    {
-        "key": "consumer-seo",
-        "industry": "Consumer Products",
-        "label": "SEO / AEO / GEO / SRX - CONSUMER PRODUCTS",
-        "headline": "Get Found by Consumer Buyers, in Search and in AI Answers",
-        "sub": "Consumer product demand begins with a query, and increasingly with an AI answer. Hudace optimizes for both, so your brand appears at the moment buyers decide.",
-        "bg_query": "retail shopping consumer products dark moody",
+        "key": "financial-seo",
+        "industry": "Financial Services",
+        "label": "SEO / AEO / GEO / SRX - FINANCIAL SERVICES",
+        "headline": "Be the Answer When People Search for Financial Decisions",
+        "sub": "Financial choices begin with a search, and now with an AI answer. Hudace optimizes for classic search and answer engines so your institution appears at the moment trust is formed.",
+        "bg_query": "finance city skyline night dark",
         "body_query": "analytics dashboard data screen dark",
         "card_head": "SEO, AEO, GEO and SRX",
         "card_bullets": ["Technical SEO audit and fixes", "On-page and schema", "Authority and local SEO", "Visibility in AI answers"],
@@ -407,26 +321,26 @@ EMAILS = [
             "SRX: search experience and Core Web Vitals",
             "Monthly ranking and traffic report",
         ],
-        "scope": "Consumer buyers compare options before they ever reach a brand site. Optimizing the product and category pages for both classic search and AI answer engines means your range is the one quoted when a shopper asks, not a competitor's.",
-        "proof": "We have delivered search programs for consumer brands, improving both ranking positions and the share of AI-generated answers that cite the brand.",
-        "future": "Search creates durable demand. It compounds with a fast website and a steady social presence into a pipeline that does not depend on paid spend alone.",
+        "scope": "Financial products are researched long before they are chosen, and the comparison now happens across search results and AI answers at once. Optimizing service and product pages for both means your institution is the one cited when a prospect asks which provider to trust, rather than a competitor whose pages were built to be found.",
+        "proof": "We have run search programs that lifted both ranking positions and the share of AI-generated answers that cite the brand, turning organic discovery into a dependable source of qualified enquiries.",
+        "future": "Search creates demand that does not reset each month. It compounds with a fast website and a steady content presence into a pipeline that no longer depends on paid spend alone.",
         "hooks": [
-            ("Intent is the cheapest demand", "Ranking for what buyers already search means meeting them at the moment of decision, not interrupting them."),
-            ("AI answers are the new front page", "Structured answers and GEO place your brand inside the response, where more buying journeys now begin."),
-            ("Experience is a ranking factor", "Core Web Vitals and SRX work means the pages that rank also convert, so traffic turns into orders."),
+            ("Intent is the cheapest demand", "Ranking for what prospects already search means meeting them at the moment of a financial decision, not interrupting them later."),
+            ("AI answers are the new front page", "Structured answers and GEO place your institution inside the response, where a growing share of financial research now begins."),
+            ("Experience is a ranking factor", "Core Web Vitals and SRX work means the pages that rank also reassure, so traffic turns into applications and enquiries."),
         ],
         "closing": "Share your domain and we will return an audit summary and the first priorities.",
     },
     {
-        "key": "consumer-erp",
-        "industry": "Consumer Products",
-        "label": "ERP BUILDING - CONSUMER PRODUCTS",
-        "headline": "Custom Software That Runs Your Consumer Operation as One System",
-        "sub": "When inventory, orders, and billing live in separate tools, margin leaks between them. Hudace builds custom business software on the Xenon AI platform so your operation runs as one system.",
-        "bg_query": "warehouse logistics inventory dark industrial",
+        "key": "financial-erp",
+        "industry": "Financial Services",
+        "label": "ERP BUILDING - FINANCIAL SERVICES",
+        "headline": "Custom Software That Runs Your Financial Operation as One System",
+        "sub": "When onboarding, records, and reporting live in separate tools, risk and rework grow between them. Hudace builds custom business software on the Xenon AI platform so your operation runs as one auditable system.",
+        "bg_query": "financial technology server data dark blue",
         "body_query": "software dashboard screen business dark",
         "card_head": "Custom ERP and SaaS",
-        "card_bullets": ["Discovery and module blueprint", "CRM, inventory, billing modules", "Role-based dashboards", "Web and mobile access"],
+        "card_bullets": ["Discovery and module blueprint", "CRM, billing, records modules", "Role-based access and dashboards", "Web and mobile access"],
         "deliverables": [
             "Discovery and module blueprint",
             "Custom modules (CRM, inventory, billing, HR, and more)",
@@ -437,18 +351,105 @@ EMAILS = [
             "Training and documentation",
             "Ongoing support and iterations",
         ],
-        "scope": "Consumer product operations move fast across procurement, stock, fulfilment, and returns. Custom software built to your workflow, with automation across the steps staff repeat daily, removes the manual handoffs where time and accuracy are lost.",
-        "proof": "We have built operational software for distribution and consumer businesses, with reported reductions in administrative overhead once manual steps moved into automated workflows.",
-        "future": "The platform grows with the business. New modules and integrations add without replacing what already works.",
+        "scope": "Financial operations carry strict requirements for access control, traceability, and accuracy across client onboarding, servicing, and reporting. Custom software built to your workflow, with role-based access and automation across the steps staff repeat daily, removes the manual handoffs where errors and audit gaps appear.",
+        "proof": "We have built operational software for services businesses, with reported reductions in administrative overhead and cleaner records once manual steps moved into controlled, automated workflows.",
+        "future": "The platform grows with the business. New modules and integrations add without replacing the systems that already work.",
         "hooks": [
-            ("One system removes the seams", "When CRM, inventory, and billing share data, the gaps where errors and delays hide simply close."),
-            ("Automation returns hours", "Workflows handle the repeated steps, so staff spend time on judgement, not data entry."),
-            ("Built to your process, not a template", "A blueprint drawn from how you actually operate means adoption is fast and the software fits on day one."),
+            ("One system removes the seams", "When records, billing, and servicing share controlled data, the gaps where errors and audit issues hide simply close."),
+            ("Automation returns hours, and accuracy", "Workflows handle the repeated steps with a consistent trail, so staff spend time on judgement, not reconciliation."),
+            ("Built to your process, not a template", "A blueprint drawn from how you actually operate means adoption is fast and the controls fit on day one."),
         ],
         "closing": "Tell us the workflow that costs you the most time and we will scope a module for it.",
     },
     {
+        "key": "financial-aistudio",
+        "industry": "Financial Services",
+        "label": "AI WORK STUDIO - FINANCIAL SERVICES",
+        "headline": "A Cinematic Film That Earns Financial Trust, Without a Film Crew",
+        "sub": "Financial brands are chosen on confidence, and confidence is communicated best on screen. Hudace AI Work Studio produces a cinematic film of your institution in seven working days, with no crew on site.",
+        "bg_query": "cinematic business finance dark moody professional",
+        "body_query": "film camera production cinematic dark",
+        "card_head": "AI Work Studio for Finance",
+        "card_bullets": ["60-second cinematic film", "Three 15-second social cuts", "Ten AI-generated stills", "Delivered in 7 working days"],
+        "deliverables": [
+            "60-second cinematic film",
+            "Three 15-second social cuts",
+            "Ten AI-generated stills",
+            "Script and concept included",
+            "Delivered in seven working days, no film crew",
+        ],
+        "scope": "A prospect choosing a financial partner responds to assurance, stability, and care that they can see. A cinematic film communicates the institution's standing and approach in sixty seconds, in a format that travels across pitch decks, social, and client conversations.",
+        "proof": "We have produced cinematic films for professional and services businesses, delivering finished work in days rather than the weeks a traditional shoot requires.",
+        "future": "One film fuels months of presence. The social cuts and stills feed the content calendar long after delivery.",
+        "hooks": [
+            ("Trust is best shown, not described", "A cinematic treatment conveys stability and standing in seconds that a brochure cannot."),
+            ("Seven days keeps pace with the market", "AI production removes the crew, the location days, and the wait, so the film ships while the opportunity is live."),
+            ("One shoot, many assets", "A film, three cuts, and ten stills give every channel something to run from a single brief."),
+        ],
+        "closing": "Describe your institution and we will return a concept and a delivery date.",
+    },
+    {
+        "key": "telecom-social",
+        "industry": "Telecommunications",
+        "label": "SOCIAL MEDIA - TELECOMMUNICATIONS",
+        "headline": "Social Media That Keeps Subscribers Engaged and Switching In",
+        "sub": "Telecom is decided on coverage, value, and the feeling that a provider is present and responsive. Hudace runs a fully managed social function so your network stays visible to the customers who choose and renew.",
+        "bg_query": "telecommunications network city night lights dark",
+        "body_query": "smartphone social media content dark",
+        "card_head": "Social Media for Telecom",
+        "card_bullets": ["6 short-form videos monthly", "12 feed posts, 8 stories", "Community management", "Monthly performance report"],
+        "deliverables": [
+            "6 short-form videos per month",
+            "12 feed posts per month",
+            "8 stories per month",
+            "Captions and hashtag sets",
+            "Content calendar and scheduling",
+            "Community management (comments and DMs)",
+            "Monthly performance report",
+        ],
+        "scope": "Telecom buyers compare plans constantly and judge a provider by how present and responsive it feels online. A structured calendar built around offers, coverage updates, and quick support responses turns routine activity into the visible reliability that wins switchers and reduces churn.",
+        "proof": "We have run managed social programs that replaced irregular posting with a steady calendar, keeping the brand present and responsive through every campaign cycle.",
+        "future": "Social builds the first impression and the daily relationship. It layers into SEO, website, and AI cinematic video so attention moves into a measurable pipeline.",
+        "hooks": [
+            ("Presence signals reliability", "Six videos and twelve posts a month show a provider that is active and dependable, the same trait customers want in a network."),
+            ("Response keeps customers warm", "Managed community handling answers comments and messages quickly, so interest and support both stay close to the brand."),
+            ("Owned attention reduces churn", "A steady, useful feed keeps subscribers engaged between renewals, where silence invites a competitor's offer."),
+        ],
+        "closing": "Tell us your next campaign and we will return a content calendar built for it.",
+    },
+    {
+        "key": "telecom-website",
+        "industry": "Telecommunications",
+        "label": "WEBSITE DESIGN - TELECOMMUNICATIONS",
+        "headline": "A Website That Turns Telecom Visitors Into Subscribers",
+        "sub": "Most telecom sites list plans. Few are built to convert the visitor on a phone. Hudace delivers a fast, mobile-first site engineered to turn comparison traffic into sign-ups and enquiries.",
+        "bg_query": "5g network technology connection dark blue",
+        "body_query": "laptop website design office",
+        "card_head": "Website Design for Telecom",
+        "card_bullets": ["Custom multi-page website", "Mobile-first responsive build", "Lead and contact forms", "Analytics and WhatsApp"],
+        "deliverables": [
+            "Custom multi-page website",
+            "Mobile-first responsive build",
+            "Booking, lead, and contact forms",
+            "CMS to edit content yourself",
+            "SEO-ready structure and speed",
+            "Analytics and WhatsApp integration",
+            "Hosting and domain setup",
+            "Launch and handover",
+        ],
+        "scope": "Telecom purchases are researched and completed on a phone, often in minutes. A mobile-first site with clear plan comparisons, fast load times, and a WhatsApp path removes friction at the decision, so a ready buyer signs up on the same visit rather than leaving to compare elsewhere.",
+        "proof": "We have built and launched sites that paired clean structure with fast load times, so both search engines and visitors rewarded the page with rankings and conversions.",
+        "future": "The site becomes the hub. SEO drives qualified traffic to it and social keeps it warm between campaigns.",
+        "hooks": [
+            ("Speed protects the visit", "A fast, mobile-first build keeps a buyer on the page where a slow one loses them before the sign-up."),
+            ("Structure earns the ranking", "An SEO-ready architecture lets search engines place you for the plan and coverage terms buyers actually use."),
+            ("Forms turn traffic into pipeline", "Lead, contact, and WhatsApp paths capture intent at the moment it peaks, not days later."),
+        ],
+        "closing": "Send us your current site and we will return a build plan and a launch timeline.",
+    },
+    {
         "key": "schoolos",
+        "imgbase": "schoolos-jun28",
         "industry": None,
         "label": "SCHOOLOS - SCHOOL ERP",
         "headline": "Run the Whole School on One Connected Platform",
@@ -483,11 +484,11 @@ EMAILS = [
 ]
 
 SERVICE_NAME = {
-    "agribusiness-social": "Social Media",
-    "agribusiness-website": "Website Design",
-    "agribusiness-aistudio": "AI Work Studio",
-    "consumer-seo": "SEO / AEO / GEO / SRX",
-    "consumer-erp": "ERP Building",
+    "financial-seo": "SEO / AEO / GEO / SRX",
+    "financial-erp": "ERP Building",
+    "financial-aistudio": "AI Work Studio",
+    "telecom-social": "Social Media",
+    "telecom-website": "Website Design",
     "schoolos": "SchoolOS School ERP",
 }
 
@@ -518,10 +519,11 @@ def main():
         svc = SERVICE_NAME[e["key"]]
         prefix = f"[{DATE}] {e['industry']} | {svc}" if e["industry"] else f"[{DATE}] {svc}"
         print(f"\n== {prefix} ==")
+        base = e.get("imgbase", e["key"])
         try:
-            bg = f"bg-{e['key']}.jpg"
-            body = f"body-{e['key']}.jpg"
-            card = f"promo-{e['key']}.jpg"
+            bg = f"bg-{base}.jpg"
+            body = f"body-{base}.jpg"
+            card = f"promo-{base}.jpg"
             fetch_photo(e["bg_query"], bg)
             body_url = fetch_photo(e["body_query"], body)
             card_url = make_card(bg, card, e["label"], e["card_head"], e["card_bullets"])
