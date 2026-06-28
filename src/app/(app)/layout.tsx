@@ -24,16 +24,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setNavOpen(false);
   }, [pathname]);
 
-  if (loading) {
-    return <div className="flex h-screen items-center justify-center text-slate-400 text-sm">Loading…</div>;
-  }
-  if (!user) return null;
+  // Render the shell (sidebar + topbar) immediately so the chrome is instant.
+  // The useEffect above redirects to /login when loading finishes and user is null.
+  // While auth is in-flight we show a small spinner inside the content area rather
+  // than a blank screen replacing the whole layout.
   return (
     <div className="app-canvas flex h-screen w-screen overflow-hidden">
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenu={() => setNavOpen(true)} />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <div
+                style={{
+                  width: 32, height: 32,
+                  borderRadius: "50%",
+                  border: "3px solid #e2e8f0",
+                  borderTopColor: "#0f766e",
+                  animation: "spin 0.7s linear infinite",
+                }}
+              />
+            </div>
+          ) : children}
+        </main>
       </div>
       <TaskAlerts />
       <NoticeBoard />

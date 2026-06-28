@@ -9,7 +9,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 },
+          queries: {
+            retry: 1,
+            refetchOnWindowFocus: false,
+            // 2-minute stale window: navigating between CRM pages won't
+            // re-fetch data that's still fresh. Mutations still call
+            // invalidateQueries() so writes are always reflected immediately.
+            staleTime: 120_000,
+            // Keep cache entries in memory for 15 minutes so a back-navigation
+            // shows the previous data instantly while a background refetch runs.
+            gcTime: 15 * 60 * 1000,
+          },
         },
       })
   );
