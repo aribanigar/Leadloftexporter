@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Everything local, zero fees. A free marketplace for all of India.">
+  <defs>
+    <style>
+      .head { font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif; font-weight: 900; }
+      .serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed orange manifesto canvas -->
+  <rect width="1080" height="1350" fill="#ef6723"/>
+
+  <!-- Reserved top-left logo square (~140px), left blank for manual logo placement -->
+  <rect x="64" y="64" width="140" height="140" fill="none"/>
+
+  <!-- Italic-serif kicker -->
+  <text x="540" y="300" text-anchor="middle" class="serif" font-size="40" fill="#1A1A1A" opacity="0.92">a quiet little manifesto</text>
+
+  <!-- Oversized centered caps headline -->
+  <text x="540" y="470" text-anchor="middle" class="head" font-size="118" letter-spacing="-3" fill="#FFFFFF">EVERYTHING</text>
+  <text x="540" y="588" text-anchor="middle" class="head" font-size="118" letter-spacing="-3" fill="#FFFFFF">LOCAL.</text>
+
+  <!-- The one memorable visual device: the giant zero-fees promise -->
+  <text x="540" y="800" text-anchor="middle" class="head" font-size="300" letter-spacing="-8" fill="#1A1A1A">&#8377;0</text>
+  <text x="540" y="868" text-anchor="middle" class="head" font-size="58" letter-spacing="2" fill="#FFFFFF">FEES. FOREVER.</text>
+
+  <!-- Hairline separator -->
+  <rect x="340" y="930" width="400" height="3" fill="#1A1A1A" opacity="0.55"/>
+
+  <!-- Proof line, plain and declarative -->
+  <text x="540" y="1012" text-anchor="middle" class="sans" font-size="38" font-weight="bold" fill="#1A1A1A">List it free. Sell it direct.</text>
+  <text x="540" y="1066" text-anchor="middle" class="sans" font-size="38" font-weight="bold" fill="#1A1A1A">No commission. No middlemen.</text>
+
+  <!-- One CTA, on a dark band -->
+  <rect x="300" y="1130" width="480" height="92" rx="14" fill="#1A1A1A"/>
+  <text x="540" y="1189" text-anchor="middle" class="sans" font-size="38" font-weight="bold" fill="#FFFFFF" letter-spacing="1">Post your first ad — free</text>
+
+  <!-- Wordmark, bottom-left -->
+  <text x="64" y="1300" class="head" font-size="40" letter-spacing="-1" fill="#1A1A1A">qckserve.in</text>
+  <text x="1016" y="1300" text-anchor="end" class="serif" font-size="30" fill="#1A1A1A" opacity="0.85">all of India</text>
+</svg>
