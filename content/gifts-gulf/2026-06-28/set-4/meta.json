@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-28",
+  "theme": "Summer hydration",
+  "season": "Mid-year reset, summer events and H2 kickoff",
+  "design": "A",
+  "campaign_code": "GG-20260628-4",
+  "campaign_name": "Summer Hydration - 28 Jun 2026",
+  "subject": "Refilled all summer",
+  "skus": [
+    "GG1539",
+    "GG1541",
+    "GG1621",
+    "GG1696",
+    "GG1706",
+    "GG1622"
+  ],
+  "products": [
+    {
+      "name": "Sea",
+      "sku": "GG1539",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6960-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1539"
+    },
+    {
+      "name": "Sound",
+      "sku": "GG1541",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6962-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1541"
+    },
+    {
+      "name": "Aspen",
+      "sku": "GG1621",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9225-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1621"
+    },
+    {
+      "name": "Helsinki Basic",
+      "sku": "GG1696",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9850-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1696"
+    },
+    {
+      "name": "Shiku",
+      "sku": "GG1706",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9909-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1706"
+    },
+    {
+      "name": "Sicilia",
+      "sku": "GG1622",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9227-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1622"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20summer%20hydration%20options%20for%20our%20team."
+}

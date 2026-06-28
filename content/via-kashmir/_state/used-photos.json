@@ -5,9 +5,10 @@
     "b2b-cabs-shikaras": "shikara"
   },
   "_last": {
-    "b2c": "valley",
+    "b2c": "hero_dal",
     "b2b-hotels": "houseboat",
-    "b2b-cabs-shikaras": "shikara"
+    "b2b-cabs-shikaras": "valley",
+    "b2b-houseboats": "boats"
   },
   "2026-06-16": {
     "b2c": "hero_dal",
@@ -48,5 +49,10 @@
     "b2c": "valley",
     "b2b-hotels": "houseboat",
     "b2b-cabs-shikaras": "shikara"
+  },
+  "2026-06-28": {
+    "b2c": "hero_dal",
+    "b2b-cabs-shikaras": "valley",
+    "b2b-houseboats": "boats"
   }
 }

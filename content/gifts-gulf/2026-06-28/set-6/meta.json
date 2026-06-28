@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-28",
+  "theme": "Paper and print",
+  "season": "Mid-year reset, summer events and H2 kickoff",
+  "design": "C",
+  "campaign_code": "GG-20260628-6",
+  "campaign_name": "Paper And Print - 28 Jun 2026",
+  "subject": "Notes they keep writing",
+  "skus": [
+    "GG1301",
+    "GG1310",
+    "GG1456",
+    "GG1474",
+    "GG1497",
+    "GG1557"
+  ],
+  "products": [
+    {
+      "name": "Journu",
+      "sku": "GG1301",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2718-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1301"
+    },
+    {
+      "name": "Routine",
+      "sku": "GG1310",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2747-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1310"
+    },
+    {
+      "name": "Anotate",
+      "sku": "GG1456",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6532-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1456"
+    },
+    {
+      "name": "Musa",
+      "sku": "GG1474",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6640-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1474"
+    },
+    {
+      "name": "Kisan",
+      "sku": "GG1497",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6769-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1497"
+    },
+    {
+      "name": "Evernote",
+      "sku": "GG1557",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7431-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1557"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20paper%20and%20print%20options%20for%20our%20team."
+}

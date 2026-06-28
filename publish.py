@@ -1,421 +1,287 @@
 #!/usr/bin/env python3
 """
-publish.py — Date Khaas content-hub publisher.
+publish.py — seed daily QckServe content into the Content Hub (Supabase).
 
-Pipeline:
-  1. Read a content bundle (content.json) produced by the daily routine.
-  2. Fetch Muslim-wedding images from the Pixabay API for items that ask for them.
-  3. Write each item to disk under content-hub/date-khaas/<date>/ (for git history).
-  4. Seed each item into the Neon content-hub table.
-  5. Optionally git add/commit/push.
+Two write paths, auto-selected:
 
-It does NOT hardcode your schema. On connect it:
-  - locates the enum type whose labels match {html_email, whatsapp, caption, sms, other},
-  - finds the table+column that uses that enum (your content table),
-  - reads that table's real columns,
-  - inserts only into columns that exist, casting enum/jsonb columns correctly.
+  * PostgREST over HTTPS  — used when SUPABASE_SERVICE_KEY is set. This is the
+    ROUTINE path: Anthropic's cloud sandbox blocks Postgres ports (5432/6543),
+    so the only write channel to Supabase is PostgREST, which authenticates with
+    the service_role key. Stdlib only — nothing to pip install.
 
-Run `python publish.py --probe` first to print the discovered mapping (no writes).
+  * Direct DB (psycopg2) — fallback for local runs where 5432 is open and no
+    service key is provided. Auto-installs psycopg2-binary if missing.
 
-Env (put in .env or export):
-  DATABASE_URL        Neon connection string (required for DB write)
-  HUB_WORKSPACE       workspace UUID (written to a workspace column if one exists)
-  PIXABAY_API_KEY     free key from https://pixabay.com/api/docs/ (required for images)
-  CONTENT_TABLE       (optional) override auto-discovery, e.g. "content_items"
-  CONTENT_TYPE_COLUMN (optional) override, e.g. "type"
-  CONTENT_SLUG        (optional) project/collection slug, default "date-khaas"
+The Supabase project URL and the `qckserve` business_id are derived/resolved at
+runtime (from DATABASE_URL / SUPABASE_URL and by slug), so nothing is hard-coded.
+
+ENV
+  DATABASE_URL          postgresql://postgres.<ref>:<pass>@...pooler.supabase.com:5432/postgres
+  SUPABASE_URL          https://<ref>.supabase.co   (optional; derived from DATABASE_URL)
+  SUPABASE_SERVICE_KEY  service_role / sb_secret_ key  -> selects the REST path
+  HUB_WORKSPACE         workspace uuid
+
+USAGE
+  python publish.py --inspect
+  python publish.py --manifest content/qckserve/qckserve-2026-06-28.json
+  python publish.py --manifest <file> --dry-run         # print, no network
+  python publish.py --manifest <file> --skip-existing    # skip dup titles
+
+MANIFEST (json)
+  { "date":"2026-06-28","business":"qckserve","topic":"...",
+    "items":[ {channel, subject?, platform?, content, amp_content?, image_url?,
+               tags[], notes?, title?}, ... ] }
+  channel == content_hub type in {html_email, whatsapp, caption, sms, other}
 """
 
-import argparse
-import datetime as dt
-import json
-import os
-import re
-import subprocess
-import sys
-from pathlib import Path
+import argparse, json, os, sys, uuid, datetime, subprocess, re
 
-try:
-    import psycopg
-    from psycopg.types.json import Jsonb
-except ImportError:
-    psycopg = None
+DEFAULT_HUB_WORKSPACE = "1a716353-9472-4c1d-ae89-f95052e8f015"
 
-try:
-    import requests
-except ImportError:
-    requests = None
-
-# ----------------------------------------------------------------------------- #
-# config
-# ----------------------------------------------------------------------------- #
-
-TARGET_ENUM_LABELS = {"html_email", "whatsapp", "caption", "sms", "other"}
-DEFAULT_SLUG = os.environ.get("CONTENT_SLUG", "date-khaas")
-# Current Date Khaas hub workspace. The DB password is NOT stored here — it lives in .env.
-DEFAULT_WORKSPACE = "1a716353-9472-4c1d-ae89-f95052e8f015"
-ROOT = Path(__file__).resolve().parent
-CONTENT_DIR = ROOT / "content-hub" / "date-khaas"
-
-# canonical field -> candidate column names (first that exists in the table wins)
-FIELD_ALIASES = {
-    "workspace":  ["workspace_id", "workspace", "workspaceid", "hub_workspace", "org_id"],
-    "slug":       ["slug", "project", "project_slug", "collection", "folder", "board", "category"],
-    "title":      ["title", "name", "headline", "label"],
-    "subject":    ["subject", "email_subject", "preview_subject"],
-    "body":       ["body", "content", "html", "body_html", "content_html", "markdown", "text", "copy", "message"],
-    "status":     ["status", "state", "stage"],
-    "channel":    ["channel", "platform", "medium"],
-    "image_url":  ["image_url", "image", "media_url", "cover_image", "hero_image", "thumbnail"],
-    "metadata":   ["metadata", "meta", "data", "attributes", "props", "extra"],
-    "created_at": ["created_at", "createdat", "inserted_at", "created"],
-    "updated_at": ["updated_at", "updatedat", "modified_at", "updated"],
-}
-
-# ----------------------------------------------------------------------------- #
-# .env loader (no dependency)
-# ----------------------------------------------------------------------------- #
-
-def load_dotenv(path=".env"):
-    p = ROOT / path
-    if not p.exists():
-        return
-    for line in p.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+ALLOWED_TYPES = {"html_email", "whatsapp", "caption", "sms", "other"}
+CHANNEL_LABEL = {"html_email": "Email", "whatsapp": "WhatsApp", "caption": "Caption",
+                 "sms": "SMS", "other": "Other"}
 
 
-# ----------------------------------------------------------------------------- #
-# pixabay
-# ----------------------------------------------------------------------------- #
-
-def fetch_pixabay(query, count, out_dir):
-    """Download up to `count` images for `query`. Returns list of dicts."""
-    key = os.environ.get("PIXABAY_API_KEY")
-    if not key:
-        print("  ! PIXABAY_API_KEY not set — skipping image fetch", file=sys.stderr)
-        return []
-    if requests is None:
-        print("  ! `requests` not installed — skipping image fetch", file=sys.stderr)
-        return []
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    params = {
-        "key": key,
-        "q": query,
-        "image_type": "photo",
-        "orientation": "horizontal",
-        "safesearch": "true",
-        "order": "popular",
-        "per_page": max(3, min(count * 3, 50)),  # over-fetch, then take the best `count`
-    }
-    r = requests.get("https://pixabay.com/api/", params=params, timeout=30)
-    r.raise_for_status()
-    hits = r.json().get("hits", [])[:count]
-
-    results = []
-    for i, h in enumerate(hits):
-        url = h.get("largeImageURL") or h.get("webformatURL")
-        if not url:
-            continue
-        ext = os.path.splitext(url.split("?")[0])[1] or ".jpg"
-        slug = re.sub(r"[^a-z0-9]+", "-", query.lower()).strip("-")
-        fname = f"{slug}-{h.get('id', i)}{ext}"
-        fpath = out_dir / fname
-        try:
-            img = requests.get(url, timeout=60)
-            img.raise_for_status()
-            fpath.write_bytes(img.content)
-        except Exception as e:  # noqa: BLE001
-            print(f"  ! failed to download {url}: {e}", file=sys.stderr)
-            continue
-        results.append({
-            "local_path": str(fpath.relative_to(ROOT)),
-            "remote_url": h.get("largeImageURL"),
-            "page_url": h.get("pageURL"),
-            "author": h.get("user"),
-            "pixabay_id": h.get("id"),
-            "tags": h.get("tags"),
-            "license": "Pixabay Content License (free commercial use, no attribution required)",
-        })
-    print(f"  ↳ pixabay '{query}': {len(results)} image(s)")
-    return results
-
-
-# ----------------------------------------------------------------------------- #
-# schema discovery
-# ----------------------------------------------------------------------------- #
-
-def discover_schema(cur):
-    """Return (table, type_col, columns) where columns maps name -> info dict."""
-    # 1. enum types and their labels
-    cur.execute("""
-        SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder)
-        FROM pg_type t
-        JOIN pg_enum e ON e.enumtypid = t.oid
-        GROUP BY t.typname;
-    """)
-    enum_types = {row[0]: set(row[1]) for row in cur.fetchall()}
-
-    type_enum = None
-    for name, labels in enum_types.items():
-        if TARGET_ENUM_LABELS & labels:           # overlap with our content types
-            if not type_enum or len(TARGET_ENUM_LABELS & labels) > \
-               len(TARGET_ENUM_LABELS & enum_types[type_enum]):
-                type_enum = name
-    if not type_enum:
-        raise SystemExit("Could not find a content-type enum (html_email/whatsapp/…). "
-                         "Set CONTENT_TABLE and CONTENT_TYPE_COLUMN to override.")
-
-    # 2. which table/column uses that enum
-    override_table = os.environ.get("CONTENT_TABLE")
-    override_col = os.environ.get("CONTENT_TYPE_COLUMN")
-    if override_table and override_col:
-        table, type_col = override_table, override_col
-    else:
-        cur.execute("""
-            SELECT table_name, column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND udt_name = %s
-            ORDER BY table_name;
-        """, (type_enum,))
-        rows = cur.fetchall()
-        if not rows:
-            raise SystemExit(f"No table uses enum '{type_enum}'.")
-        table, type_col = rows[0]
-
-    # 3. full column list for that table, with type info + enum-ness
-    cur.execute("""
-        SELECT c.column_name, c.data_type, c.udt_name, c.is_nullable, c.column_default,
-               COALESCE(t.typtype = 'e', false) AS is_enum
-        FROM information_schema.columns c
-        LEFT JOIN pg_type t ON t.typname = c.udt_name
-        WHERE c.table_schema = 'public' AND c.table_name = %s
-        ORDER BY c.ordinal_position;
-    """, (table,))
-    columns = {}
-    for name, dtype, udt, nullable, default, is_enum in cur.fetchall():
-        columns[name] = {
-            "data_type": dtype, "udt": udt, "nullable": nullable == "YES",
-            "default": default, "is_enum": bool(is_enum),
-            "is_json": udt in ("json", "jsonb"),
-        }
-    return table, type_col, columns, type_enum
-
-
-def pick(columns, aliases):
-    for a in aliases:
-        if a in columns:
-            return a
+# ----------------------------- url derivation -----------------------------
+def derive_supabase_url(database_url, explicit):
+    if explicit:
+        return explicit.rstrip("/")
+    # postgresql://postgres.<ref>:...@aws-...pooler.supabase.com:5432/postgres
+    m = re.search(r"postgres\.([a-z0-9]+)[:@]", database_url or "")
+    if m:
+        return f"https://{m.group(1)}.supabase.co"
     return None
 
 
-# ----------------------------------------------------------------------------- #
-# insert builder
-# ----------------------------------------------------------------------------- #
-
-def build_insert(table, type_col, columns, item, slug, workspace, status):
-    """Return (sql, params). Only touches columns that exist."""
-    canon_value = {
-        "workspace": workspace,
-        "slug": slug,
-        "title": item.get("title"),
-        "subject": item.get("subject"),
-        "body": item.get("body") or item.get("content") or "",
-        "status": item.get("status", status),
-        "channel": item.get("channel"),
-        "image_url": (item.get("images") or [{}])[0].get("remote_url") if item.get("images") else None,
-        "metadata": item.get("metadata") or {},
-        "created_at": dt.datetime.now(dt.timezone.utc),
-        "updated_at": dt.datetime.now(dt.timezone.utc),
-    }
-    # fold useful extras into metadata so nothing is lost on lean schemas
-    md = dict(canon_value["metadata"])
-    for k in ("subject", "preheader", "channel", "format", "images", "research_sources", "cta_url"):
-        if item.get(k) is not None:
-            md.setdefault(k, item.get(k))
-    md.setdefault("generated_by", "datekhaas-daily-routine")
-    canon_value["metadata"] = md
-
-    cols, placeholders, params = [], [], []
-
-    # the content-type column is mandatory and must be cast to the enum
-    type_value = item["type"]
-    type_info = columns.get(type_col, {})
-    cols.append(quote_ident(type_col))
-    placeholders.append(f'%s::"{type_info.get("udt", type_col)}"' if type_info.get("is_enum") else "%s")
-    params.append(type_value)
-
-    used = {type_col}
-    for canon, aliases in FIELD_ALIASES.items():
-        col = pick(columns, aliases)
-        if not col or col in used:
-            continue
-        val = canon_value.get(canon)
-        if val is None:
-            continue
-        info = columns[col]
-        if info["is_json"]:
-            placeholders.append("%s")
-            params.append(Jsonb(val))
-        elif info["is_enum"]:
-            placeholders.append(f'%s::"{info["udt"]}"')
-            params.append(val)
-        else:
-            placeholders.append("%s")
-            params.append(val)
-        cols.append(quote_ident(col))
-        used.add(col)
-
-    sql = (f'INSERT INTO {quote_ident(table)} ({", ".join(cols)}) '
-           f'VALUES ({", ".join(placeholders)}) '
-           f'RETURNING {quote_ident(pick(columns, ["id", "uuid", "pk"]) or cols[0].strip(chr(34)))}')
-    return sql, params
-
-
-def quote_ident(name):
-    return '"' + name.replace('"', '""') + '"'
-
-
-# ----------------------------------------------------------------------------- #
-# git
-# ----------------------------------------------------------------------------- #
-
-def git(*args, check=True):
-    return subprocess.run(["git", *args], cwd=ROOT, check=check,
-                          capture_output=True, text=True)
-
-
-def git_commit(message):
+# ----------------------------- REST path (routine) -----------------------------
+def _rest(url, key, method="GET", path="", params=None, body=None):
+    import urllib.request, urllib.parse, urllib.error
+    full = f"{url}/rest/v1/{path}"
+    if params:
+        full += "?" + urllib.parse.urlencode(params)
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(full, data=data, method=method)
+    req.add_header("apikey", key)
+    req.add_header("Authorization", f"Bearer {key}")
+    req.add_header("Content-Type", "application/json")
+    if method == "POST":
+        req.add_header("Prefer", "return=representation")
     try:
-        git("rev-parse", "--is-inside-work-tree")
-    except subprocess.CalledProcessError:
-        print("  ! not a git repo — skipping commit", file=sys.stderr)
-        return None
-    git("add", "content-hub/date-khaas")
-    status = git("status", "--porcelain", "content-hub/date-khaas").stdout.strip()
-    if not status:
-        print("  ↳ git: nothing to commit")
-        return None
-    git("commit", "-m", message)
-    sha = git("rev-parse", "--short", "HEAD").stdout.strip()
-    print(f"  ↳ git commit {sha}")
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read().decode("utf-8")
+            return json.loads(raw) if raw else []
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        sys.exit(f"ERROR: PostgREST {method} {path} -> HTTP {e.code}\n       {detail}")
+    except Exception as e:
+        sys.exit(f"ERROR: PostgREST request failed: {e!r}")
+
+
+class RestBackend:
+    mode = "rest"
+
+    def __init__(self, url, key, workspace):
+        self.url, self.key, self.workspace = url, key, workspace
+
+    def resolve_business(self, slug):
+        rows = _rest(self.url, self.key, path="content_businesses", params={
+            "workspace_id": f"eq.{self.workspace}", "slug": f"eq.{slug}",
+            "select": "id,name,slug,brand_color", "limit": "1"})
+        if not rows:
+            sys.exit(f"ERROR: no business slug '{slug}' in workspace {self.workspace}.")
+        r = rows[0]
+        return {"id": r["id"], "name": r["name"], "slug": r["slug"], "brand_color": r["brand_color"]}
+
+    def title_exists(self, business_id, title):
+        rows = _rest(self.url, self.key, path="content_assets", params={
+            "workspace_id": f"eq.{self.workspace}", "business_id": f"eq.{business_id}",
+            "title": f"eq.{title}", "select": "id", "limit": "1"})
+        return bool(rows)
+
+    def insert_asset(self, row):
+        out = _rest(self.url, self.key, method="POST", path="content_assets", body={
+            "id": row["id"], "workspace_id": row["workspace_id"], "business_id": row["business_id"],
+            "title": row["title"], "type": row["type"], "content": row["content"],
+            "amp_content": row.get("amp_content"), "subject": row.get("subject"),
+            "platform": row.get("platform"), "tags": row.get("tags") or [],
+            "notes": row.get("notes"), "image_url": row.get("image_url")})
+        return out[0]["id"] if out else row["id"]
+
+    def list_businesses(self):
+        rows = _rest(self.url, self.key, path="content_businesses", params={
+            "workspace_id": f"eq.{self.workspace}", "select": "name,slug,brand_color", "order": "name"})
+        return [(r["name"], r["slug"], r["brand_color"]) for r in rows]
+
+    def close(self):
+        pass
+
+
+# ----------------------------- direct DB path (local) -----------------------------
+def _psycopg2():
     try:
-        git("push", "-u", "origin", git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip())
-        print("  ↳ git push ok")
-    except subprocess.CalledProcessError as e:
-        print(f"  ! git push failed (commit is local): {e.stderr.strip()}", file=sys.stderr)
-    return sha
+        import psycopg2  # noqa: F401
+    except ImportError:
+        print("psycopg2 not found — installing psycopg2-binary…")
+        subprocess.run([sys.executable, "-m", "pip", "install", "--quiet",
+                        "--break-system-packages", "psycopg2-binary"], check=False)
+    import psycopg2
+    return psycopg2
 
 
-# ----------------------------------------------------------------------------- #
-# main
-# ----------------------------------------------------------------------------- #
+class PgBackend:
+    mode = "direct-db"
 
-def main():
-    ap = argparse.ArgumentParser(description="Date Khaas content-hub publisher")
-    ap.add_argument("--bundle", default="content.json", help="path to content bundle JSON")
-    ap.add_argument("--probe", action="store_true", help="print discovered schema and exit")
-    ap.add_argument("--dry-run", action="store_true", help="build + print SQL, do not write")
-    ap.add_argument("--no-images", action="store_true", help="skip Pixabay fetch")
-    ap.add_argument("--no-git", action="store_true", help="skip git commit")
-    ap.add_argument("--images-per-item", type=int, default=3)
-    ap.add_argument("--status", default="draft")
-    ap.add_argument("--commit-message", default=None)
-    args = ap.parse_args()
+    def __init__(self, database_url, workspace):
+        psycopg2 = _psycopg2()
+        try:
+            self.conn = psycopg2.connect(database_url, connect_timeout=15)
+        except Exception as e:
+            sys.exit("ERROR: could not connect to the database.\n"
+                     "       Run this where port 5432 is open, or set SUPABASE_SERVICE_KEY "
+                     "to use the PostgREST/HTTPS path (required in the cloud routine sandbox).\n"
+                     f"       detail: {e!r}")
+        self.workspace = workspace
 
-    load_dotenv()
-    dsn = os.environ.get("DATABASE_URL")
-    workspace = os.environ.get("HUB_WORKSPACE", DEFAULT_WORKSPACE)
+    def resolve_business(self, slug):
+        cur = self.conn.cursor()
+        cur.execute("select id,name,slug,brand_color from content_businesses "
+                    "where workspace_id=%s and slug=%s limit 1", (self.workspace, slug))
+        r = cur.fetchone(); cur.close()
+        if not r:
+            sys.exit(f"ERROR: no business slug '{slug}' in workspace {self.workspace}.")
+        return {"id": r[0], "name": r[1], "slug": r[2], "brand_color": r[3]}
 
-    if psycopg is None:
-        sys.exit("psycopg not installed. Run: pip install 'psycopg[binary]'")
+    def title_exists(self, business_id, title):
+        cur = self.conn.cursor()
+        cur.execute("select 1 from content_assets where workspace_id=%s and business_id=%s "
+                    "and title=%s limit 1", (self.workspace, business_id, title))
+        r = cur.fetchone(); cur.close(); return bool(r)
 
-    # ---- probe -------------------------------------------------------------- #
-    if args.probe:
-        if not dsn:
-            sys.exit("DATABASE_URL not set")
-        with psycopg.connect(dsn, connect_timeout=20, prepare_threshold=None) as conn, conn.cursor() as cur:
-            table, type_col, columns, enum = discover_schema(cur)
-        print(f"content table : {table}")
-        print(f"type column   : {type_col}  (enum: {enum})")
-        print("field mapping :")
-        for canon, aliases in FIELD_ALIASES.items():
-            print(f"  {canon:<11} -> {pick(columns, aliases)}")
-        print("all columns   :")
-        for name, info in columns.items():
-            flags = ",".join(f for f, v in
-                             [("enum", info["is_enum"]), ("json", info["is_json"])] if v)
-            print(f"  {name:<22} {info['data_type']:<26} {flags}")
+    def insert_asset(self, row):
+        cur = self.conn.cursor()
+        cur.execute(
+            "insert into content_assets "
+            "(id,workspace_id,business_id,title,type,content,amp_content,subject,platform,tags,notes,image_url) "
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s) returning id",
+            (row["id"], row["workspace_id"], row["business_id"], row["title"], row["type"],
+             row["content"], row.get("amp_content"), row.get("subject"), row.get("platform"),
+             json.dumps(row.get("tags") or []), row.get("notes"), row.get("image_url")))
+        new_id = cur.fetchone()[0]; self.conn.commit(); cur.close(); return new_id
+
+    def list_businesses(self):
+        cur = self.conn.cursor()
+        cur.execute("select name,slug,brand_color from content_businesses "
+                    "where workspace_id=%s order by name", (self.workspace,))
+        rows = cur.fetchall(); cur.close(); return rows
+
+    def close(self):
+        self.conn.close()
+
+
+def make_backend(database_url, supabase_url, service_key, workspace):
+    if service_key:
+        url = derive_supabase_url(database_url, supabase_url)
+        if not url:
+            sys.exit("ERROR: SUPABASE_SERVICE_KEY set but could not derive SUPABASE_URL "
+                     "(set SUPABASE_URL or a valid DATABASE_URL).")
+        return RestBackend(url, service_key, workspace)
+    return PgBackend(database_url, workspace)
+
+
+# ----------------------------- shared -----------------------------
+def make_title(item, topic, date_str):
+    if item.get("title"):
+        return item["title"]
+    label = CHANNEL_LABEL.get(item["channel"], "Other")
+    if item["channel"] == "caption" and item.get("platform"):
+        label = item["platform"].capitalize()
+    return f"[{date_str}] {topic} ({label})"
+
+
+def cmd_inspect(backend, workspace):
+    print(f"Connected ({backend.mode}). Workspace {workspace}\n\nBusinesses:")
+    for name, slug, color in backend.list_businesses():
+        print(f"  - {slug:<22} {name:<24} {color}")
+    print(f"\nAllowed types: {sorted(ALLOWED_TYPES)}")
+    backend.close()
+
+
+def cmd_publish(backend, workspace, args):
+    with open(args.manifest, encoding="utf-8") as f:
+        man = json.load(f)
+    date_str = man.get("date") or datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    slug = args.business or man.get("business") or "qckserve"
+    topic = man.get("topic") or "QckServe"
+    items = man.get("items") or []
+    if not items:
+        sys.exit("ERROR: manifest has no 'items'.")
+
+    for it in items:  # validate before touching the network
+        ch = (it.get("channel") or "").strip()
+        if ch not in ALLOWED_TYPES:
+            sys.exit(f"ERROR: channel '{ch}' not in {sorted(ALLOWED_TYPES)}.")
+        if not it.get("content"):
+            sys.exit(f"ERROR: item ({ch}) has empty 'content'.")
+
+    if args.dry_run:
+        print(f"[dry] business={slug}  date={date_str}  topic={topic}  items={len(items)}")
+        for it in items:
+            print(f"  [dry] {it['channel']:<10} {make_title(it, topic, date_str)}")
+        print(f"\n[dry] would create={len(items)} (no network touched)")
         return
 
-    # ---- load bundle -------------------------------------------------------- #
-    bundle_path = ROOT / args.bundle
-    if not bundle_path.exists():
-        sys.exit(f"bundle not found: {bundle_path}")
-    bundle = json.loads(bundle_path.read_text())
-    items = bundle["items"] if isinstance(bundle, dict) else bundle
-    today = dt.date.today().isoformat()
-    day_dir = CONTENT_DIR / today
-    day_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Mode: {backend.mode}")
+    biz = backend.resolve_business(slug)
+    print(f"Business: {biz['name']} ({biz['slug']})  id={biz['id']}")
+    print(f"Date: {date_str}   Topic: {topic}   Items: {len(items)}\n")
 
-    # ---- images ------------------------------------------------------------- #
-    if not args.no_images:
-        img_dir = day_dir / "images"
-        cache = {}
-        for it in items:
-            q = it.get("image_query")
-            if not q:
-                continue
-            if q not in cache:
-                cache[q] = fetch_pixabay(q, args.images_per_item, img_dir)
-            it["images"] = cache[q]
+    created = skipped = 0
+    for it in items:
+        title = make_title(it, topic, date_str)
+        if args.skip_existing and backend.title_exists(biz["id"], title):
+            print(f"  ~ skip (exists): {title}"); skipped += 1; continue
+        row = {
+            "id": str(uuid.uuid4()), "workspace_id": workspace, "business_id": biz["id"],
+            "title": title, "type": it["channel"], "content": it["content"],
+            "amp_content": it.get("amp_content"), "subject": it.get("subject"),
+            "platform": it.get("platform"), "tags": it.get("tags") or [],
+            "notes": it.get("notes"), "image_url": it.get("image_url"),
+        }
+        new_id = backend.insert_asset(row)
+        print(f"  + {it['channel']:<10} {title}  -> {new_id}")
+        created += 1
 
-    # ---- write files for git ------------------------------------------------ #
-    for i, it in enumerate(items, 1):
-        stem = f"{i:02d}-{it['type']}-{re.sub(r'[^a-z0-9]+','-', (it.get('title') or 'untitled').lower()).strip('-')}"
-        (day_dir / f"{stem}.json").write_text(json.dumps(it, indent=2, ensure_ascii=False))
-        if it.get("body"):
-            ext = "html" if "html" in it["type"] or it.get("format") == "amp" else "txt"
-            (day_dir / f"{stem}.{ext}").write_text(it["body"])
-    print(f"  ↳ wrote {len(items)} item file(s) to {day_dir.relative_to(ROOT)}")
+    backend.close()
+    print(f"\nDone. created={created} skipped={skipped}")
+    print(f"View: https://leadloftexporter.vercel.app/content-hub/{slug}")
 
-    # ---- DB ----------------------------------------------------------------- #
-    inserted = []
-    if not dsn:
-        print("  ! DATABASE_URL not set — skipping DB seed", file=sys.stderr)
-    else:
-        with psycopg.connect(dsn, connect_timeout=20, prepare_threshold=None) as conn:
-            with conn.cursor() as cur:
-                table, type_col, columns, enum = discover_schema(cur)
-                valid = {r for r in TARGET_ENUM_LABELS}  # informational
-                for it in items:
-                    if it["type"] not in TARGET_ENUM_LABELS:
-                        print(f"  ! '{it['type']}' not in enum {sorted(valid)} — "
-                              f"map it to one of those", file=sys.stderr)
-                    sql, params = build_insert(table, type_col, columns, it,
-                                               DEFAULT_SLUG, workspace, args.status)
-                    if args.dry_run:
-                        print("\nDRY RUN SQL:\n" + sql)
-                        print("PARAMS:", [str(p)[:60] for p in params])
-                        continue
-                    cur.execute(sql, params)
-                    rid = cur.fetchone()[0]
-                    inserted.append(rid)
-                    print(f"  ↳ inserted {it['type']:<11} id={rid}")
-            if not args.dry_run:
-                conn.commit()
 
-    # ---- git ---------------------------------------------------------------- #
-    if not args.no_git and not args.dry_run:
-        msg = args.commit_message or f"content(date-khaas): daily drop {today} ({len(items)} items)"
-        git_commit(msg)
+def main():
+    ap = argparse.ArgumentParser(description="Seed QckServe content into the Content Hub.")
+    ap.add_argument("--manifest", help="path to manifest .json")
+    ap.add_argument("--business", help="business slug (default from manifest or 'qckserve')")
+    ap.add_argument("--dry-run", action="store_true", help="print, no network")
+    ap.add_argument("--skip-existing", action="store_true", help="skip rows whose title already exists")
+    ap.add_argument("--inspect", action="store_true", help="list businesses, then exit")
+    args = ap.parse_args()
 
-    if inserted:
-        print(f"\nDone. Seeded {len(inserted)} rows into the content hub.")
+    database_url = os.environ.get("DATABASE_URL")
+    supabase_url = os.environ.get("SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    workspace = os.environ.get("HUB_WORKSPACE", DEFAULT_HUB_WORKSPACE)
+
+    if args.dry_run and not args.inspect:
+        # dry-run needs no backend / network
+        return cmd_publish(None, workspace, args)
+
+    backend = make_backend(database_url, supabase_url, service_key, workspace)
+
+    if args.inspect:
+        return cmd_inspect(backend, workspace)
+    if not args.manifest:
+        sys.exit("ERROR: --manifest is required (or use --inspect).")
+    return cmd_publish(backend, workspace, args)
 
 
 if __name__ == "__main__":

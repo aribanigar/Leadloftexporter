@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "himalaya",   "feat": "goa",        "place": "Himachal Pradesh", "region": "North India"},
+  "kashmir": {"photo": "kashmir",    "feat": "himalaya",   "place": "Kashmir",          "region": "North India"},
+  "saudi":   {"photo": "maldives",   "feat": "thailand",   "place": "Maldives",         "region": "Indian Ocean"},
+  "dubai":   {"photo": "cappadocia", "feat": "bali",       "place": "Cappadocia",       "region": "Turkey"}
+}
