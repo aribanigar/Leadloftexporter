@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-28",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "C",
+      "theme": "Srinagar and the Dal in summer - cool mornings, a dawn shikara, gardens in full colour",
+      "subject": "The Dal is mirror-still and the city is cool at dawn",
+      "campaign_code": "VK-INR-B2C-20260628"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Open passes and full-day valley drives - filling empty seats this week",
+      "subject": "A full-day valley drive just went to another car",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260628"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "theme": "Peak-season weekend demand on the Dal - boats booking up first",
+      "subject": "This weekend's lake guest booked another deck",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260628"
+    }
+  ]
+}
