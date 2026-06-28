@@ -1,0 +1,64 @@
+{
+  "date": "2026-06-28",
+  "business": "qckserve",
+  "topic": "Everything local, zero fees",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Everything local. Zero fees, forever.",
+      "platform": "email",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<meta name=\"color-scheme\" content=\"light only\">\n<meta name=\"supported-color-schemes\" content=\"light only\">\n<title>Everything local. Zero fees. — qckserve.in</title>\n</head>\n<body style=\"margin:0; padding:0; background:#FCF9F8; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;\">\n\n<!-- Preheader: lands the promise in the inbox preview, hidden in the body -->\n<div style=\"display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#FCF9F8; opacity:0;\">\n  Sell to your neighbours. List free, keep 100%. ₹0 fees, forever — qckserve.in\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#FCF9F8\" style=\"background:#FCF9F8;\">\n<tr>\n<td align=\"center\" style=\"padding:24px 12px;\">\n\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background:#FFFFFF; border-radius:16px; overflow:hidden;\">\n\n    <!-- Wordmark zone: text only, no boxes -->\n    <tr>\n      <td align=\"left\" bgcolor=\"#FFFFFF\" style=\"background:#FFFFFF; padding:28px 40px 18px 40px; font-family:Poppins, Arial, sans-serif; font-size:18px; font-weight:bold; letter-spacing:-0.3px; color:#1A1A1A;\">\n        qckserve.in\n      </td>\n    </tr>\n\n    <!-- ============ MANIFESTO HERO: full-bleed orange, centered type ============ -->\n    <tr>\n      <td bgcolor=\"#ef6723\" style=\"background:#ef6723; padding:56px 40px 48px 40px;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n          <tr>\n            <td align=\"center\" style=\"font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-size:18px; line-height:24px; color:#1A1A1A; padding-bottom:14px;\">\n              a quiet little manifesto\n            </td>\n          </tr>\n          <tr>\n            <td align=\"center\" style=\"font-family:Poppins, 'Arial Black', Arial, sans-serif; font-weight:800; font-size:52px; line-height:54px; letter-spacing:-1.5px; color:#FFFFFF; padding-bottom:6px;\">\n              Everything local.\n            </td>\n          </tr>\n          <tr>\n            <td align=\"center\" style=\"font-family:Poppins, 'Arial Black', Arial, sans-serif; font-weight:800; font-size:52px; line-height:54px; letter-spacing:-1.5px; color:#1A1A1A;\">\n              Zero fees.\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <!-- ============ THE ONE VISUAL DEVICE: giant ₹0 on dark ============ -->\n    <tr>\n      <td bgcolor=\"#1A1A1A\" style=\"background:#1A1A1A; padding:44px 40px 40px 40px;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n          <tr>\n            <td align=\"center\" style=\"font-family:Poppins, 'Arial Black', Arial, sans-serif; font-weight:800; font-size:128px; line-height:120px; letter-spacing:-4px; color:#ef6723;\">\n              &#8377;0\n            </td>\n          </tr>\n          <tr>\n            <td align=\"center\" style=\"font-family:Poppins, Arial, sans-serif; font-weight:bold; font-size:20px; line-height:28px; letter-spacing:2px; color:#FFFFFF; padding-top:8px;\">\n              FEES. FOREVER.\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <!-- ============ PROOF / HOW: one idea per line ============ -->\n    <tr>\n      <td bgcolor=\"#FFFFFF\" style=\"background:#FFFFFF; padding:44px 48px 8px 48px; font-family:Poppins, Arial, sans-serif;\">\n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n          <tr>\n            <td style=\"font-size:24px; line-height:32px; font-weight:bold; color:#1A1A1A; padding-bottom:18px;\">\n              Sell to your neighbours. Keep 100%.\n            </td>\n          </tr>\n          <tr>\n            <td style=\"font-size:17px; line-height:28px; color:#3A3A3A; padding-bottom:6px;\">\n              <strong style=\"color:#1A1A1A;\">List it free.</strong> Property, bike, job, shop — any listing, zero rupees.\n            </td>\n          </tr>\n          <tr>\n            <td style=\"font-size:17px; line-height:28px; color:#3A3A3A; padding-bottom:6px;\">\n              <strong style=\"color:#1A1A1A;\">Sell it direct.</strong> The buyer talks to you, not a middleman.\n            </td>\n          </tr>\n          <tr>\n            <td style=\"font-size:17px; line-height:28px; color:#3A3A3A;\">\n              <strong style=\"color:#1A1A1A;\">Keep it all.</strong> No commission, no cut, no catch.\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <!-- ============ CTA: bulletproof button on a bgcolor td ============ -->\n    <tr>\n      <td bgcolor=\"#FFFFFF\" style=\"background:#FFFFFF; padding:32px 48px 44px 48px;\" align=\"center\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n          <tr>\n            <td align=\"center\" bgcolor=\"#ef6723\" style=\"background:#ef6723; border-radius:14px;\">\n              <a href=\"https://qckserve.in\" target=\"_blank\"\n                 style=\"display:inline-block; padding:18px 40px; font-family:Poppins, Arial, sans-serif; font-size:18px; font-weight:bold; line-height:20px; color:#FFFFFF; text-decoration:none; letter-spacing:0.3px;\">\n                Post your first ad — free\n              </a>\n            </td>\n          </tr>\n        </table>\n        <div style=\"font-family:Poppins, Arial, sans-serif; font-size:13px; line-height:20px; color:#8A8A8A; padding-top:16px;\">\n          No sign-up fee. No listing fee. Ever.\n        </div>\n      </td>\n    </tr>\n\n    <!-- ============ HERO POSTER BAND: real image with descriptive alt ============ -->\n    <tr>\n      <td bgcolor=\"#1A1A1A\" style=\"background:#1A1A1A; padding:0; font-size:0; line-height:0;\">\n        <a href=\"https://qckserve.in\" target=\"_blank\" style=\"text-decoration:none;\">\n          <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-06-28.svg\"\n               width=\"600\" alt=\"qckserve.in — Everything local, zero fees. A free marketplace for all of India.\"\n               style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\">\n        </a>\n      </td>\n    </tr>\n\n    <!-- ============ FOOTER ============ -->\n    <tr>\n      <td bgcolor=\"#FCF9F8\" style=\"background:#FCF9F8; padding:28px 40px 32px 40px; font-family:Poppins, Arial, sans-serif; font-size:13px; line-height:20px; color:#8A8A8A;\" align=\"center\">\n        <strong style=\"color:#1A1A1A;\">qckserve.in</strong> — India's free local marketplace.<br>\n        Properties · Vehicles · Jobs · Classifieds · Services · Store.<br>\n        One marketplace. Your whole neighbourhood. Free.\n      </td>\n    </tr>\n\n  </table>\n\n</td>\n</tr>\n</table>\n\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-28.svg",
+      "tags": [
+        "general",
+        "manifesto",
+        "zero-fees",
+        "promo"
+      ],
+      "notes": "Sunday/General — Manifesto archetype: full-bleed orange, oversized centered type, giant ₹0 device, one CTA."
+    },
+    {
+      "channel": "whatsapp",
+      "platform": "whatsapp",
+      "content": "Apne shehar mein bechna ab bilkul free 🧡\nGhar, gaadi, naukri ya dukaan — koi bhi listing, ₹0 fees.\nNa commission, na beech mein koi middleman. Buyer seedha aapse baat karega.\nAaj apna pehla ad daalo — free. qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-28.svg",
+      "tags": [
+        "general",
+        "whatsapp",
+        "hinglish"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "₹0 fees. Forever. 🧡\n\nApna ghar, gaadi, naukri ya dukaan — sab kuch local, sab kuch free. Na commission, na middleman. Buyer seedha aapse baat karega, beech mein koi nahi.\n\nApne poore mohalle ko online lao — bilkul free.\n👉 qckserve.in\n\n#qckserve #FreeListing #LocalMarketplace #ZeroCommission #IndiaLocal",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-06-28.svg",
+      "tags": [
+        "general",
+        "instagram",
+        "hinglish",
+        "hashtags"
+      ]
+    },
+    {
+      "channel": "sms",
+      "platform": "sms",
+      "content": "Sell local for ₹0. List your home, bike, job or shop free — no commission, no middlemen. Post your first ad free: qckserve.in",
+      "tags": [
+        "general",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "platform": "image-prompt",
+      "title": "[2026-06-28] Everything local, zero fees (Image Prompt)",
+      "content": "[2026-06-28] Everything local, zero fees (Image Prompt)\n\nSCENE: An editorial vertical poster, full-bleed flat tangerine-orange canvas, studio-clean, bold and confident like a modern Indian D2C manifesto ad — no gradients, no texture, pure flat colour blocking.\nSUBJECT: A single oversized hand-held smartphone floating centre-frame, tilted 8 degrees, held by a warm brown-skinned hand of an everyday Indian shop-owner, sleeve rolled.\nPHONE-UI MOCKUP: On screen, the qckserve.in app showing a clean local-listings feed — cards for a scooter, a 2BHK flat, a tailoring shop, a job — each card stamped with a crisp '₹0 fee' tag; a bold black 'Post for free' button at the bottom. Rounded 14px cards, generous whitespace.\nCOLOUR SYSTEM: background tangerine #ef6723; deep ink panel #1A1A1A; pure white #FFFFFF type; one accent orange #FF6B00 used sparingly; soft off-white #FCF9F8 for the phone screen.\nLIGHTING: bright even softbox key from top-left, gentle contact shadow under the phone, no harsh speculars.\nTYPE HIERARCHY: one giant extra-bold condensed headline 'EVERYTHING LOCAL.' in white, a smaller italic-serif kicker 'a quiet little manifesto', and a colossal black '₹0' device as the hero number with 'FEES. FOREVER.' beneath it.\nEYE FLOW: kicker → headline → giant ₹0 → phone screen → black CTA button → 'qckserve.in' wordmark bottom-left.\nCAMERA: straight-on product shot, 50mm equivalent, f/8 deep focus, 4:5 portrait crop.\nPERFORMANCE LAYER: thumb-stopping high-contrast composition optimised for Instagram feed; legible at 320px wide.\nLOGO ZONE: reserve a clean ~140px blank square in the TOP-LEFT corner for the brand mark — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "general",
+        "image-prompt",
+        "midjourney"
+      ]
+    }
+  ]
+}
