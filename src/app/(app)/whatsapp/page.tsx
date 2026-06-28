@@ -188,27 +188,42 @@ export default function WhatsAppOutreachPage() {
     refetchInterval: 3000, // poll so the QR refreshes + status flips on pair
   });
 
-  // Any sidecar failure (not configured = 503, host down = 404/502, gateway
-  // errors, or a 401/403 when the two WA_SIDECAR_TOKEN secrets don't match)
-  // means QR pairing can't work — surface the diagnostic banner rather than
-  // the misleading "click Add number" empty state. 401/403 in particular is
-  // the common deploy mistake: the token on the API and on the sidecar differ.
-  const sidecarUnavailable =
-    accountsError instanceof ApiError &&
-    [401, 403, 404, 500, 502, 503].includes(accountsError.status);
-  const sidecarErrorDetail =
-    accountsError instanceof ApiError ? accountsError.message : "";
+  // Any sidecar failure means QR pairing can't work — surface the diagnostic
+  // banner rather than the misleading "click Add number" empty state.
+  // Catch every ApiError status (including Render's 503 "Service Suspended")
+  // plus non-ApiError network failures.
+  const sidecarUnavailable = !!accountsError;
+  // Show a clean human-readable detail — never raw HTML (Render free-tier
+  // returns <!DOCTYPE html> when the sidecar is sleeping; the backend now
+  // converts that to a "whatsapp_sidecar_suspended" sentinel, but guard here
+  // too in case an older backend version is still deployed).
+  const sidecarErrorDetail = (() => {
+    if (!accountsError) return "";
+    const msg = accountsError instanceof ApiError ? accountsError.message : String(accountsError);
+    if (msg.trimStart().startsWith("<")) return "WhatsApp sidecar is suspended — resume it in your Render dashboard.";
+    if (msg.includes("whatsapp_sidecar_suspended")) return "WhatsApp sidecar is suspended on Render — open your Render dashboard and resume the service.";
+    return msg;
+  })();
 
   const addAccount = useMutation({
     mutationFn: (label: string) =>
       api("/whatsapp-web/accounts", { method: "POST", body: { label } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["wa-accounts"] }),
-    onError: (e) =>
-      alert(
-        e instanceof ApiError
-          ? `Couldn't start pairing: ${e.message}\n\nThe WhatsApp sidecar service must be deployed and reachable.`
-          : "Couldn't start pairing — the WhatsApp service is unavailable."
-      ),
+    onError: (e) => {
+      let detail = e instanceof ApiError ? e.message : "";
+      // Guard against raw HTML responses (Render "Service Suspended" page)
+      if (!detail || detail.trimStart().startsWith("<")) {
+        detail = "";
+      }
+      if (detail.includes("whatsapp_sidecar_suspended") || !detail) {
+        alert(
+          "WhatsApp sidecar is suspended on Render.\n\n" +
+          "Open your Render dashboard and resume the 'leadcaptura-whatsapp' service, then try again."
+        );
+      } else {
+        alert(`Couldn't start pairing: ${detail}\n\nThe WhatsApp sidecar service must be deployed and reachable.`);
+      }
+    },
   });
 
   const reconnect = useMutation({

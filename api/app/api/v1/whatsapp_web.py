@@ -107,6 +107,11 @@ async def _proxy(
             detail = resp.json().get("error") or resp.text[:200]
         except Exception:
             detail = resp.text[:200]
+        # Render free-tier returns an HTML "Service Suspended" page when the
+        # sidecar is sleeping. Don't propagate the raw markup — replace it with
+        # a clean sentinel the frontend can detect.
+        if isinstance(detail, str) and detail.lstrip().startswith("<"):
+            detail = f"whatsapp_sidecar_suspended (HTTP {resp.status_code})"
         raise HTTPException(resp.status_code, detail)
     try:
         return resp.json()
