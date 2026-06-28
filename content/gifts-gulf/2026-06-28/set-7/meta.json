@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-28",
+  "theme": "Organic cotton",
+  "season": "Mid-year reset, summer events and H2 kickoff",
+  "design": "A",
+  "campaign_code": "GG-20260628-7",
+  "campaign_name": "Organic Cotton - 28 Jun 2026",
+  "subject": "Soft cotton, your mark",
+  "skus": [
+    "GG1756",
+    "GG1757",
+    "GG1759",
+    "GG1760",
+    "GG1766",
+    "GG1767"
+  ],
+  "products": [
+    {
+      "name": "Epic",
+      "sku": "GG1756",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03564-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1756"
+    },
+    {
+      "name": "Pioneer Men",
+      "sku": "GG1757",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03565-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1757"
+    },
+    {
+      "name": "Stellar",
+      "sku": "GG1759",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03568-bl.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1759"
+    },
+    {
+      "name": "Comet",
+      "sku": "GG1760",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03574-bo.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1760"
+    },
+    {
+      "name": "Crusader Women",
+      "sku": "GG1766",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03581-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1766"
+    },
+    {
+      "name": "Crusader Men",
+      "sku": "GG1767",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03582-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1767"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20organic%20cotton%20options%20for%20our%20team."
+}

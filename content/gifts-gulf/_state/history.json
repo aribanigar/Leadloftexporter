@@ -1492,5 +1492,158 @@
       "GG1624",
       "GG1788"
     ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260628-1",
+    "campaign_name": "Premium Drinkware - 28 Jun 2026",
+    "subject": "Steel they keep using",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1287",
+      "GG1346",
+      "GG1354",
+      "GG1370",
+      "GG1429",
+      "GG1522"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260628-2",
+    "campaign_name": "Branded Totes - 28 Jun 2026",
+    "subject": "Totes worth keeping",
+    "theme": "Branded totes",
+    "skus": [
+      "GG1646",
+      "GG1653",
+      "GG1667",
+      "GG1672",
+      "GG1683",
+      "GG1581"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260628-3",
+    "campaign_name": "Recycled Carry - 28 Jun 2026",
+    "subject": "Packed for the day",
+    "theme": "Recycled carry",
+    "skus": [
+      "GG1061",
+      "GG1093",
+      "GG1170",
+      "GG1284",
+      "GG1313",
+      "GG1374"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260628-4",
+    "campaign_name": "Summer Hydration - 28 Jun 2026",
+    "subject": "Refilled all summer",
+    "theme": "Summer hydration",
+    "skus": [
+      "GG1539",
+      "GG1541",
+      "GG1621",
+      "GG1696",
+      "GG1706",
+      "GG1622"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260628-5",
+    "campaign_name": "Power On The Go - 28 Jun 2026",
+    "subject": "Charged and clearly yours",
+    "theme": "Power on the go",
+    "skus": [
+      "GG1536",
+      "GG1538",
+      "GG1330",
+      "GG1565",
+      "GG1352",
+      "GG1574"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260628-6",
+    "campaign_name": "Paper And Print - 28 Jun 2026",
+    "subject": "Notes they keep writing",
+    "theme": "Paper and print",
+    "skus": [
+      "GG1301",
+      "GG1310",
+      "GG1456",
+      "GG1474",
+      "GG1497",
+      "GG1557"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260628-7",
+    "campaign_name": "Organic Cotton - 28 Jun 2026",
+    "subject": "Soft cotton, your mark",
+    "theme": "Organic cotton",
+    "skus": [
+      "GG1756",
+      "GG1757",
+      "GG1759",
+      "GG1760",
+      "GG1766",
+      "GG1767"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260628-8",
+    "campaign_name": "Cooler Carry - 28 Jun 2026",
+    "subject": "Keep it cool, branded",
+    "theme": "Cooler carry",
+    "skus": [
+      "GG1589",
+      "GG1585",
+      "GG1417",
+      "GG1420",
+      "GG1421",
+      "GG1485"
+    ]
+  },
+  {
+    "date": "2026-06-28",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260628-9",
+    "campaign_name": "Natural Desk - 28 Jun 2026",
+    "subject": "Natural desks, your logo",
+    "theme": "Natural desk",
+    "skus": [
+      "GG1097",
+      "GG1100",
+      "GG1277",
+      "GG1470",
+      "GG1526",
+      "GG1661"
+    ]
   }
 ]

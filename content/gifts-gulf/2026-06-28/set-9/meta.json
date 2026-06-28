@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-28",
+  "theme": "Natural desk",
+  "season": "Mid-year reset, summer events and H2 kickoff",
+  "design": "C",
+  "campaign_code": "GG-20260628-9",
+  "campaign_name": "Natural Desk - 28 Jun 2026",
+  "subject": "Natural desks, your logo",
+  "skus": [
+    "GG1097",
+    "GG1100",
+    "GG1277",
+    "GG1470",
+    "GG1526",
+    "GG1661"
+  ],
+  "products": [
+    {
+      "name": "Hubbam",
+      "sku": "GG1097",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2143-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1097"
+    },
+    {
+      "name": "Hubstand",
+      "sku": "GG1100",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2144-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1100"
+    },
+    {
+      "name": "Itea Colour",
+      "sku": "GG1277",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2635-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1277"
+    },
+    {
+      "name": "Bayin Set",
+      "sku": "GG1470",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6601-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1470"
+    },
+    {
+      "name": "Techmate Bamboo",
+      "sku": "GG1526",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6898-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1526"
+    },
+    {
+      "name": "Quercus",
+      "sku": "GG1661",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9678-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1661"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-28/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20natural%20desk%20options%20for%20our%20team."
+}

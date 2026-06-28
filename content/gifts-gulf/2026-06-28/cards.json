@@ -1,0 +1,245 @@
+{
+  "date": "2026-06-28",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Kept in daily rotation",
+      "out": "content/gifts-gulf/2026-06-28/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2662-03",
+          "sku": "GG1287",
+          "name": "Topaz Large",
+          "desc": "Kept in daily rotation",
+          "colours": 0
+        },
+        {
+          "code": "mo2900-03",
+          "sku": "GG1346",
+          "name": "Cocoa",
+          "desc": "Holds hot or cold for hours",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Carried every single day",
+      "out": "content/gifts-gulf/2026-06-28/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9517-13",
+          "sku": "GG1646",
+          "name": "Illa Tote",
+          "desc": "Carried every single day",
+          "colours": 0
+        },
+        {
+          "code": "mo9595-13",
+          "sku": "GG1653",
+          "name": "Portobello",
+          "desc": "Soft, sturdy natural cotton",
+          "colours": 0
+        },
+        {
+          "code": "mo9731-03",
+          "sku": "GG1667",
+          "name": "Taske Medium",
+          "desc": "Roomy, simple, branded",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Made from recycled bottles",
+      "out": "content/gifts-gulf/2026-06-28/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2050-03",
+          "sku": "GG1061",
+          "name": "Valley Backpack",
+          "desc": "Made from recycled bottles",
+          "colours": 0
+        },
+        {
+          "code": "mo2125-03",
+          "sku": "GG1093",
+          "name": "Coolpack",
+          "desc": "Packed for the whole day",
+          "colours": 0
+        },
+        {
+          "code": "mo2373-03",
+          "sku": "GG1170",
+          "name": "Onbag",
+          "desc": "Light, roomy, branded",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Refilled through the day",
+      "out": "content/gifts-gulf/2026-06-28/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6960-22",
+          "sku": "GG1539",
+          "name": "Sea",
+          "desc": "Refilled through the day",
+          "colours": 0
+        },
+        {
+          "code": "mo6962-22",
+          "sku": "GG1541",
+          "name": "Sound",
+          "desc": "Light and shatter resistant",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Keeps devices topped up",
+      "out": "content/gifts-gulf/2026-06-28/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6947-03",
+          "sku": "GG1536",
+          "name": "Charge Up",
+          "desc": "Keeps devices topped up",
+          "colours": 0
+        },
+        {
+          "code": "mo6949-03",
+          "sku": "GG1538",
+          "name": "Tricpower",
+          "desc": "Earns its desk space",
+          "colours": 0
+        },
+        {
+          "code": "mo2830-03",
+          "sku": "GG1330",
+          "name": "Ampla",
+          "desc": "Clean tech, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Notes they keep writing",
+      "out": "content/gifts-gulf/2026-06-28/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2718-03",
+          "sku": "GG1301",
+          "name": "Journu",
+          "desc": "Notes they keep writing",
+          "colours": 0
+        },
+        {
+          "code": "mo2747-03",
+          "sku": "GG1310",
+          "name": "Routine",
+          "desc": "Recycled paper, sharp print",
+          "colours": 0
+        },
+        {
+          "code": "mo6532-06",
+          "sku": "GG1456",
+          "name": "Anotate",
+          "desc": "For everyday note-takers",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Soft, breathable organic cotton",
+      "out": "content/gifts-gulf/2026-06-28/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s03564-db",
+          "sku": "GG1756",
+          "name": "Epic",
+          "desc": "Soft, breathable organic cotton",
+          "colours": 0
+        },
+        {
+          "code": "s03565-db",
+          "sku": "GG1757",
+          "name": "Pioneer Men",
+          "desc": "Worn well past day one",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Keeps it cool for hours",
+      "out": "content/gifts-gulf/2026-06-28/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8529-06",
+          "sku": "GG1589",
+          "name": "Big Cubacool",
+          "desc": "Keeps it cool for hours",
+          "colours": 0
+        },
+        {
+          "code": "mo8438-06",
+          "sku": "GG1585",
+          "name": "Cubacool",
+          "desc": "Packed for the day out",
+          "colours": 0
+        },
+        {
+          "code": "mo6325-03",
+          "sku": "GG1417",
+          "name": "Olympic",
+          "desc": "Roomy, insulated, branded",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Earns its desk space",
+      "out": "content/gifts-gulf/2026-06-28/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2143-40",
+          "sku": "GG1097",
+          "name": "Hubbam",
+          "desc": "Earns its desk space",
+          "colours": 0
+        },
+        {
+          "code": "mo2144-40",
+          "sku": "GG1100",
+          "name": "Hubstand",
+          "desc": "Warm bamboo, your logo",
+          "colours": 0
+        },
+        {
+          "code": "mo2635-03",
+          "sku": "GG1277",
+          "name": "Itea Colour",
+          "desc": "Natural material, clean mark",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}
