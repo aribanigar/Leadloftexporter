@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Ceramic mugs",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "A",
+  "campaign_code": "GG-20260629-1",
+  "campaign_name": "Ceramic Mugs - 29 Jun 2026",
+  "subject": "Mugs for slow mornings",
+  "skus": [
+    "GG1050",
+    "GG1245",
+    "GG1547",
+    "GG1599",
+    "GG1065",
+    "GG1678"
+  ],
+  "products": [
+    {
+      "name": "Trent",
+      "sku": "GG1050",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7063-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1050"
+    },
+    {
+      "name": "Peze",
+      "sku": "GG1245",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2564-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1245"
+    },
+    {
+      "name": "Veika",
+      "sku": "GG1547",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6986-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1547"
+    },
+    {
+      "name": "Taza",
+      "sku": "GG1599",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8831-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1599"
+    },
+    {
+      "name": "Menkaure",
+      "sku": "GG1065",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2061-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1065"
+    },
+    {
+      "name": "Aspen Glass",
+      "sku": "GG1678",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9800-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1678"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20ceramic%20mugs%20options%20for%20our%20team."
+}

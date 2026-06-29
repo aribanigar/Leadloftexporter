@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Recycled steel",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "C",
+  "campaign_code": "GG-20260629-9",
+  "campaign_name": "Recycled Steel - 29 Jun 2026",
+  "subject": "Reborn steel, refilled often",
+  "skus": [
+    "GG1530",
+    "GG1531",
+    "GG1495",
+    "GG1535",
+    "GG1369",
+    "GG1064"
+  ],
+  "products": [
+    {
+      "name": "Namib Bottle",
+      "sku": "GG1530",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6931-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1530"
+    },
+    {
+      "name": "Namib Mug",
+      "sku": "GG1531",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6933-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1531"
+    },
+    {
+      "name": "Athena",
+      "sku": "GG1495",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6750-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1495"
+    },
+    {
+      "name": "Boali",
+      "sku": "GG1535",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6944-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1535"
+    },
+    {
+      "name": "Toien One",
+      "sku": "GG1369",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2989-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1369"
+    },
+    {
+      "name": "Fjard",
+      "sku": "GG1064",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2063-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1064"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20steel%20options%20for%20our%20team."
+}

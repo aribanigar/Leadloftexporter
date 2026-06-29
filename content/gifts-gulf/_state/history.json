@@ -1645,5 +1645,158 @@
       "GG1526",
       "GG1661"
     ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260629-1",
+    "campaign_name": "Ceramic Mugs - 29 Jun 2026",
+    "subject": "Mugs for slow mornings",
+    "theme": "Ceramic mugs",
+    "skus": [
+      "GG1050",
+      "GG1245",
+      "GG1547",
+      "GG1599",
+      "GG1065",
+      "GG1678"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260629-2",
+    "campaign_name": "Branded Pens - 29 Jun 2026",
+    "subject": "Sign with your logo",
+    "theme": "Branded pens",
+    "skus": [
+      "GG1554",
+      "GG1052",
+      "GG1575",
+      "GG1598",
+      "GG1569",
+      "GG1130"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260629-3",
+    "campaign_name": "Travel Pouches - 29 Jun 2026",
+    "subject": "Pack light, brand loud",
+    "theme": "Travel pouches",
+    "skus": [
+      "GG1335",
+      "GG1684",
+      "GG1686",
+      "GG1312",
+      "GG1332",
+      "GG1166"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260629-4",
+    "campaign_name": "Steel Lunch Sets - 29 Jun 2026",
+    "subject": "Lunch they actually carry",
+    "theme": "Steel lunch sets",
+    "skus": [
+      "GG1475",
+      "GG1722",
+      "GG1665",
+      "GG1318",
+      "GG1325",
+      "GG1496"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260629-5",
+    "campaign_name": "Desk Gadgets - 29 Jun 2026",
+    "subject": "Power within arm's reach",
+    "theme": "Desk gadgets",
+    "skus": [
+      "GG1630",
+      "GG1304",
+      "GG1597",
+      "GG1650",
+      "GG1556",
+      "GG1360"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260629-6",
+    "campaign_name": "Natural Carry - 29 Jun 2026",
+    "subject": "Natural fibre, your mark",
+    "theme": "Natural carry",
+    "skus": [
+      "GG1445",
+      "GG1552",
+      "GG1714",
+      "GG1137",
+      "GG1178",
+      "GG1433"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260629-7",
+    "campaign_name": "Cotton Tees - 29 Jun 2026",
+    "subject": "Tees they actually wear",
+    "theme": "Cotton tees",
+    "skus": [
+      "GG1742",
+      "GG1773",
+      "GG1793",
+      "GG1783",
+      "GG1785",
+      "GG1786"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260629-8",
+    "campaign_name": "Active Wear - 29 Jun 2026",
+    "subject": "Built for the move",
+    "theme": "Active wear",
+    "skus": [
+      "GG1725",
+      "GG1726",
+      "GG1798",
+      "GG1796",
+      "GG1792",
+      "GG1730"
+    ]
+  },
+  {
+    "date": "2026-06-29",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260629-9",
+    "campaign_name": "Recycled Steel - 29 Jun 2026",
+    "subject": "Reborn steel, refilled often",
+    "theme": "Recycled steel",
+    "skus": [
+      "GG1530",
+      "GG1531",
+      "GG1495",
+      "GG1535",
+      "GG1369",
+      "GG1064"
+    ]
   }
 ]

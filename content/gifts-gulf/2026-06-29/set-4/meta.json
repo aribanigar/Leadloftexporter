@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Steel lunch sets",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "A",
+  "campaign_code": "GG-20260629-4",
+  "campaign_name": "Steel Lunch Sets - 29 Jun 2026",
+  "subject": "Lunch they actually carry",
+  "skus": [
+    "GG1475",
+    "GG1722",
+    "GG1665",
+    "GG1318",
+    "GG1325",
+    "GG1496"
+  ],
+  "products": [
+    {
+      "name": "Chan Lunchbox Colour",
+      "sku": "GG1475",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6638-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1475"
+    },
+    {
+      "name": "Chan Bamboo",
+      "sku": "GG1722",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9991-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1722"
+    },
+    {
+      "name": "Big Chan",
+      "sku": "GG1665",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9703-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1665"
+    },
+    {
+      "name": "Suma Grip",
+      "sku": "GG1318",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2775-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1318"
+    },
+    {
+      "name": "Dualuse",
+      "sku": "GG1325",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2789-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1325"
+    },
+    {
+      "name": "Onto",
+      "sku": "GG1496",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6760-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1496"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20steel%20lunch%20sets%20options%20for%20our%20team."
+}

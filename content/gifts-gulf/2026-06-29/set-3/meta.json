@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Travel pouches",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "C",
+  "campaign_code": "GG-20260629-3",
+  "campaign_name": "Travel Pouches - 29 Jun 2026",
+  "subject": "Pack light, brand loud",
+  "skus": [
+    "GG1335",
+    "GG1684",
+    "GG1686",
+    "GG1312",
+    "GG1332",
+    "GG1166"
+  ],
+  "products": [
+    {
+      "name": "Doppkit",
+      "sku": "GG1335",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2860-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1335"
+    },
+    {
+      "name": "Pouchlo",
+      "sku": "GG1684",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9818-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1684"
+    },
+    {
+      "name": "Penlo",
+      "sku": "GG1686",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9819-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1686"
+    },
+    {
+      "name": "Brenna Pouch",
+      "sku": "GG1312",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2754-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1312"
+    },
+    {
+      "name": "Flysafe",
+      "sku": "GG1332",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2840-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1332"
+    },
+    {
+      "name": "Capnit",
+      "sku": "GG1166",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2359-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1166"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20travel%20pouches%20options%20for%20our%20team."
+}

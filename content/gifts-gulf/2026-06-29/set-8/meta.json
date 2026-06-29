@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Active wear",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260629-8",
+  "campaign_name": "Active Wear - 29 Jun 2026",
+  "subject": "Built for the move",
+  "skus": [
+    "GG1725",
+    "GG1726",
+    "GG1798",
+    "GG1796",
+    "GG1792",
+    "GG1730"
+  ],
+  "products": [
+    {
+      "name": "Prime Men",
+      "sku": "GG1725",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s00571-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1725"
+    },
+    {
+      "name": "Prime Women",
+      "sku": "GG1726",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s00573-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1726"
+    },
+    {
+      "name": "North",
+      "sku": "GG1798",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s55000-aq.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1798"
+    },
+    {
+      "name": "North Women",
+      "sku": "GG1796",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s54500-aq.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1796"
+    },
+    {
+      "name": "Slam",
+      "sku": "GG1792",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s13251-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1792"
+    },
+    {
+      "name": "North Kids",
+      "sku": "GG1730",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s00589-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1730"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20active%20wear%20options%20for%20our%20team."
+}

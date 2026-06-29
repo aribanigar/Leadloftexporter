@@ -1,0 +1,245 @@
+{
+  "date": "2026-06-29",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Warm in the hand each morning",
+      "out": "content/gifts-gulf/2026-06-29/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7063-06",
+          "sku": "GG1050",
+          "name": "Trent",
+          "desc": "Warm in the hand each morning",
+          "colours": 0
+        },
+        {
+          "code": "mo2564-04",
+          "sku": "GG1245",
+          "name": "Peze",
+          "desc": "Holds a generous pour",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Writes smooth from the first line",
+      "out": "content/gifts-gulf/2026-06-29/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo7323-04",
+          "sku": "GG1554",
+          "name": "Alucolor",
+          "desc": "Writes smooth from the first line",
+          "colours": 0
+        },
+        {
+          "code": "kc7109-03",
+          "sku": "GG1052",
+          "name": "Eleganci",
+          "desc": "Sits ready on every desk",
+          "colours": 0
+        },
+        {
+          "code": "mo8209-03",
+          "sku": "GG1575",
+          "name": "Neilo Touch",
+          "desc": "Solid barrel, clean print",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Keeps the small stuff together",
+      "out": "content/gifts-gulf/2026-06-29/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2860-03",
+          "sku": "GG1335",
+          "name": "Doppkit",
+          "desc": "Keeps the small stuff together",
+          "colours": 0
+        },
+        {
+          "code": "mo9818-07",
+          "sku": "GG1684",
+          "name": "Pouchlo",
+          "desc": "Zips shut, nothing slips out",
+          "colours": 0
+        },
+        {
+          "code": "mo9819-07",
+          "sku": "GG1686",
+          "name": "Penlo",
+          "desc": "Light, roomy, easy to pack",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Packs lunch for the commute",
+      "out": "content/gifts-gulf/2026-06-29/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6638-03",
+          "sku": "GG1475",
+          "name": "Chan Lunchbox Colour",
+          "desc": "Packs lunch for the commute",
+          "colours": 0
+        },
+        {
+          "code": "mo9991-40",
+          "sku": "GG1722",
+          "name": "Chan Bamboo",
+          "desc": "Seals tight, travels clean",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Keeps devices topped up",
+      "out": "content/gifts-gulf/2026-06-29/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9322-06",
+          "sku": "GG1630",
+          "name": "Pro Light Usb",
+          "desc": "Keeps devices topped up",
+          "colours": 0
+        },
+        {
+          "code": "mo2727-03",
+          "sku": "GG1304",
+          "name": "Venta",
+          "desc": "Earns its place on the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo8783-06",
+          "sku": "GG1597",
+          "name": "Squarie",
+          "desc": "Clean tech, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Woven from natural fibre",
+      "out": "content/gifts-gulf/2026-06-29/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6443-04",
+          "sku": "GG1445",
+          "name": "Aura",
+          "desc": "Woven from natural fibre",
+          "colours": 0
+        },
+        {
+          "code": "mo7264-13",
+          "sku": "GG1552",
+          "name": "Juhu",
+          "desc": "Roomy enough for the daily haul",
+          "colours": 0
+        },
+        {
+          "code": "mo9928-13",
+          "sku": "GG1714",
+          "name": "Jute Small",
+          "desc": "Sturdy handles, soft feel",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Soft cotton worn past day one",
+      "out": "content/gifts-gulf/2026-06-29/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s01714-bk",
+          "sku": "GG1742",
+          "name": "Stone",
+          "desc": "Soft cotton worn past day one",
+          "colours": 0
+        },
+        {
+          "code": "s03815-bk",
+          "sku": "GG1773",
+          "name": "Condor",
+          "desc": "Holds shape wash after wash",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Light and breathable on the move",
+      "out": "content/gifts-gulf/2026-06-29/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s00571-bk",
+          "sku": "GG1725",
+          "name": "Prime Men",
+          "desc": "Light and breathable on the move",
+          "colours": 0
+        },
+        {
+          "code": "s00573-bk",
+          "sku": "GG1726",
+          "name": "Prime Women",
+          "desc": "Keeps up through training",
+          "colours": 0
+        },
+        {
+          "code": "s55000-aq",
+          "sku": "GG1798",
+          "name": "North",
+          "desc": "Quick drying, clean print",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Made from recycled steel",
+      "out": "content/gifts-gulf/2026-06-29/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6931-01",
+          "sku": "GG1530",
+          "name": "Namib Bottle",
+          "desc": "Made from recycled steel",
+          "colours": 0
+        },
+        {
+          "code": "mo6933-01",
+          "sku": "GG1531",
+          "name": "Namib Mug",
+          "desc": "Holds hot or cold for hours",
+          "colours": 0
+        },
+        {
+          "code": "mo6750-03",
+          "sku": "GG1495",
+          "name": "Athena",
+          "desc": "Refilled day after day",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

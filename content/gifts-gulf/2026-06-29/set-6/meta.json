@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Natural carry",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "C",
+  "campaign_code": "GG-20260629-6",
+  "campaign_name": "Natural Carry - 29 Jun 2026",
+  "subject": "Natural fibre, your mark",
+  "skus": [
+    "GG1445",
+    "GG1552",
+    "GG1714",
+    "GG1137",
+    "GG1178",
+    "GG1433"
+  ],
+  "products": [
+    {
+      "name": "Aura",
+      "sku": "GG1445",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6443-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1445"
+    },
+    {
+      "name": "Juhu",
+      "sku": "GG1552",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7264-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1552"
+    },
+    {
+      "name": "Jute Small",
+      "sku": "GG1714",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9928-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1714"
+    },
+    {
+      "name": "Viveka",
+      "sku": "GG1137",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2301-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1137"
+    },
+    {
+      "name": "Leirur",
+      "sku": "GG1178",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2391-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1178"
+    },
+    {
+      "name": "Respect Coloured",
+      "sku": "GG1433",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6380-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1433"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20natural%20carry%20options%20for%20our%20team."
+}

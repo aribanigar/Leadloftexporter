@@ -1,0 +1,58 @@
+{
+  "date": "2026-06-29",
+  "theme": "Desk gadgets",
+  "season": "Start of H2, summer recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260629-5",
+  "campaign_name": "Desk Gadgets - 29 Jun 2026",
+  "subject": "Power within arm's reach",
+  "skus": [
+    "GG1630",
+    "GG1304",
+    "GG1597",
+    "GG1650",
+    "GG1556",
+    "GG1360"
+  ],
+  "products": [
+    {
+      "name": "Pro Light Usb",
+      "sku": "GG1630",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9322-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1630"
+    },
+    {
+      "name": "Venta",
+      "sku": "GG1304",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2727-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1304"
+    },
+    {
+      "name": "Squarie",
+      "sku": "GG1597",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8783-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1597"
+    },
+    {
+      "name": "Blacklet",
+      "sku": "GG1650",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9537-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1650"
+    },
+    {
+      "name": "Rio Duo",
+      "sku": "GG1556",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7440-08.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1556"
+    },
+    {
+      "name": "Chaco",
+      "sku": "GG1360",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2963-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1360"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-06-29/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20desk%20gadgets%20options%20for%20our%20team."
+}
