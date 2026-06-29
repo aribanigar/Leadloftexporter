@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Rent owner-direct with zero brokerage. Keep the broker's one month. A free marketplace for all of India.">
+  <defs>
+    <style>
+      .head { font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif; font-weight: 900; }
+      .serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Dark editorial canvas -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- Reserved top-left logo square (~140px), left blank for manual logo placement -->
+  <rect x="64" y="64" width="140" height="140" fill="none"/>
+
+  <!-- Italic-serif kicker, top-right of logo zone -->
+  <text x="1016" y="150" text-anchor="end" class="serif" font-size="40" fill="#FF6B00">peak moving season</text>
+
+  <!-- The one memorable visual device: the giant zero-brokerage promise (left-weighted hero) -->
+  <text x="56" y="560" class="head" font-size="440" letter-spacing="-18" fill="#ef6723">&#8377;0</text>
+  <text x="72" y="650" class="head" font-size="62" letter-spacing="2" fill="#FFFFFF">BROKERAGE.</text>
+
+  <!-- Headline, right-weighted, oversized caps -->
+  <text x="72" y="800" class="head" font-size="96" letter-spacing="-3" fill="#FFFFFF">RENT IT</text>
+  <text x="72" y="900" class="head" font-size="96" letter-spacing="-3" fill="#FFFFFF">OWNER-DIRECT.</text>
+  <text x="72" y="966" class="serif" font-size="40" fill="#bdbdbd">Keep the broker&#8217;s one month.</text>
+
+  <!-- 4-step timeline device -->
+  <rect x="72" y="1030" width="936" height="3" fill="#ef6723" opacity="0.6"/>
+
+  <circle cx="135" cy="1031" r="13" fill="#FF6B00"/>
+  <circle cx="447" cy="1031" r="13" fill="#FF6B00"/>
+  <circle cx="759" cy="1031" r="13" fill="#FF6B00"/>
+  <circle cx="1008" cy="1031" r="13" fill="#FF6B00"/>
+
+  <text x="100" y="1092" class="head" font-size="34" fill="#FF6B00">1</text>
+  <text x="100" y="1132" class="sans" font-size="28" font-weight="bold" fill="#FFFFFF">List free</text>
+
+  <text x="412" y="1092" class="head" font-size="34" fill="#FF6B00">2</text>
+  <text x="412" y="1132" class="sans" font-size="28" font-weight="bold" fill="#FFFFFF">Renters call</text>
+
+  <text x="724" y="1092" class="head" font-size="34" fill="#FF6B00">3</text>
+  <text x="724" y="1132" class="sans" font-size="28" font-weight="bold" fill="#FFFFFF">Talk direct</text>
+
+  <text x="940" y="1092" text-anchor="end" class="head" font-size="34" fill="#FF6B00">4</text>
+  <text x="1008" y="1132" text-anchor="end" class="sans" font-size="28" font-weight="bold" fill="#FFFFFF">Hand over keys</text>
+
+  <!-- One CTA, on an orange band -->
+  <rect x="72" y="1180" width="620" height="92" rx="14" fill="#ef6723"/>
+  <text x="382" y="1239" text-anchor="middle" class="sans" font-size="36" font-weight="bold" fill="#FFFFFF" letter-spacing="1">List your property &#8212; free</text>
+
+  <!-- Wordmark, bottom-left -->
+  <text x="72" y="1320" class="head" font-size="40" letter-spacing="-1" fill="#FFFFFF">qckserve.in</text>
+  <text x="1008" y="1320" text-anchor="end" class="serif" font-size="30" fill="#bdbdbd" opacity="0.9">all of India</text>
+</svg>
