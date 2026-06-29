@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-29",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (India)",
+  "theme": "Peak-season room demand - the search is happening now, unlisted rooms miss it",
+  "season": "Peak summer (late June 2026) - travellers booking Kashmir stays for July ahead of the early-July Amarnath rush, every pass and the Z-Morh tunnel open, the valley green and the lake busy. Demand high, the calm window before the south fills.",
+  "design": "B",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260629",
+  "campaign_name": "Hotels Rooms filling next door [INR] - 29 Jun 2026",
+  "subject": "Rooms are filling next door while yours sit unlisted",
+  "items": [
+    "VK-HOTELS-LISTING",
+    "VK-HOTELS-DEMAND",
+    "VK-HOTELS-SEEN"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-29/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-29/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

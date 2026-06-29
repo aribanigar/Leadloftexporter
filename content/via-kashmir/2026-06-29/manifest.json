@@ -1,0 +1,30 @@
+{
+  "date": "2026-06-29",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Green high meadows and cool mornings - the open, easy summer window before the early-July rush",
+      "subject": "The meadows are out and the mornings are still cool",
+      "campaign_code": "VK-INR-B2C-20260629"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "B",
+      "theme": "Peak-season room demand - the search is happening now, unlisted rooms miss it",
+      "subject": "Rooms are filling next door while yours sit unlisted",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260629"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "theme": "Lakeside demand on the Dal - the next guest picks from the boats that are listed",
+      "subject": "The lake's next guest is choosing a boat right now",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260629"
+    }
+  ]
+}

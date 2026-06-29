@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-29",
+  "track": "b2b-houseboats",
+  "audience": "houseboat owners (India)",
+  "theme": "Lakeside demand on the Dal - the next guest picks from the boats that are listed",
+  "season": "Peak summer (late June 2026) - the Dal busy and the lake stays booking up, travellers planning July ahead of the early-July Amarnath rush, every pass and the Z-Morh tunnel open, the valley green and the mornings cool.",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260629",
+  "campaign_name": "Houseboats The lake's next guest [INR] - 29 Jun 2026",
+  "subject": "The lake's next guest is choosing a boat right now",
+  "items": [
+    "VK-HBOAT-LISTING",
+    "VK-HBOAT-DECK",
+    "VK-HBOAT-SUNRISE"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-29/b2b-houseboats/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-06-29/b2b-houseboats/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
