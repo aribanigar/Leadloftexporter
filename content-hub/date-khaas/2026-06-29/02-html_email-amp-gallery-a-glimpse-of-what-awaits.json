@@ -1,0 +1,73 @@
+{
+  "type": "html_email",
+  "format": "amp",
+  "channel": "email",
+  "title": "AMP Gallery — A Glimpse of What Awaits",
+  "subject": "A glimpse of what awaits — verified, beautiful, and written for you",
+  "preheader": "Swipe through moments of barakah. Your nikah is closer than you think.",
+  "cta_url": "https://datekhaas.com/register",
+  "image_query": "nikah ceremony",
+  "body": "<!doctype html>\n<html ⚡4email>\n<head>\n  <meta charset=\"utf-8\">\n  <script async src=\"https://cdn.ampproject.org/v0.js\"></script>\n  <script async custom-element=\"amp-carousel\" src=\"https://cdn.ampproject.org/v0/amp-carousel-0.1.js\"></script>\n  <style amp4email-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style>\n  <noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>\n  <style amp-custom>\n    body { margin: 0; padding: 0; background: #f5f1eb; font-family: Helvetica, Arial, sans-serif; }\n    .header { background: #003527; padding: 24px; text-align: center; }\n    .logo { color: #e9c176; font-family: Georgia, serif; font-size: 26px; letter-spacing: 2px; }\n    .sub { color: #8ab8a8; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; margin-top: 6px; }\n    .badge { display: inline-block; background: #003527; color: #e9c176; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; border: 1px solid #e9c176; margin-bottom: 10px; }\n    .body-wrap { background: #ffffff; max-width: 600px; margin: 0 auto; }\n    .body-pad { padding: 36px 40px; text-align: center; }\n    h2 { font-family: Georgia, serif; color: #003527; font-size: 28px; font-weight: 400; line-height: 1.3; margin: 0 0 16px; }\n    p { color: #444; font-size: 15px; line-height: 1.75; margin: 0 0 14px; }\n    .cta { display: inline-block; background: #003527; color: #e9c176 !important; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-decoration: none; padding: 16px 42px; border-radius: 3px; text-transform: uppercase; margin-top: 8px; }\n    .footer { background: #003527; padding: 20px 24px; text-align: center; }\n    .footer p { color: #8ab8a8; font-size: 11px; line-height: 1.6; margin: 0; }\n    .footer a { color: #e9c176; text-decoration: none; }\n    .gold-bar { background: #e9c176; height: 3px; font-size: 0; line-height: 0; }\n    .slide-caption { position: relative; }\n    .verified-pill { display: inline-block; background: rgba(0,53,39,0.85); color: #e9c176; font-size: 11px; letter-spacing: 1px; padding: 4px 12px; border-radius: 20px; margin-top: -28px; position: relative; z-index: 1; }\n  </style>\n</head>\n<body>\n  <div class=\"body-wrap\">\n    <div class=\"header\">\n      <div class=\"logo\">Date Khaas</div>\n      <div class=\"sub\">Muslim Matrimony</div>\n    </div>\n    <div class=\"gold-bar\">&nbsp;</div>\n\n    <div style=\"padding: 28px 40px 10px; text-align: center;\">\n      <span class=\"badge\">&#10003; Every profile verified</span>\n      <h2>A glimpse of what awaits&#8202;—<br>beautiful, verified, and written for you</h2>\n      <p>This wedding season, those who found their person on Date Khaas began with one simple act of trust: a photo revealed, a wali invited, and an introduction made with dignity.</p>\n    </div>\n\n    <!-- AMP Carousel -->\n    <amp-carousel width=\"560\" height=\"340\" layout=\"fixed\" type=\"slides\" autoplay delay=\"3500\" loop style=\"margin: 0 auto 0; display: block;\">\n      <amp-img src=\"{{IMAGE_URL_0}}\" width=\"560\" height=\"340\" layout=\"fixed\" alt=\"A joyful Muslim wedding celebration\"></amp-img>\n      <amp-img src=\"{{IMAGE_URL_1}}\" width=\"560\" height=\"340\" layout=\"fixed\" alt=\"Nikah ceremony — a moment of barakah\"></amp-img>\n      <amp-img src=\"{{IMAGE_URL_2}}\" width=\"560\" height=\"340\" layout=\"fixed\" alt=\"Muslim bride and groom — a forever beginning\"></amp-img>\n    </amp-carousel>\n    <!-- Note for editors: replace {{IMAGE_URL_0/1/2}} with URLs from metadata.images[0/1/2].remote_url before sending -->\n\n    <div style=\"text-align: center; padding: 4px 0 20px;\">\n      <span class=\"verified-pill\">&#10003; Verified profiles only</span>\n    </div>\n\n    <div class=\"body-pad\">\n      <p>Your photo stays private. Your wali is part of every step. And every person you meet here has been verified — because your heart deserves no less.</p>\n      <p style=\"font-family: Georgia, serif; color: #003527; font-style: italic; font-size: 17px;\">\"And He placed between you affection and mercy.\"<br><span style=\"font-size: 13px; font-style: normal; color: #888;\">&mdash; Quran 30:21</span></p>\n      <a href=\"https://datekhaas.com/register\" class=\"cta\">Create Your Profile</a>\n    </div>\n\n    <div class=\"footer\">\n      <p>Date Khaas &nbsp;|&nbsp; <a href=\"https://datekhaas.com/privacy\">Privacy</a> &nbsp;|&nbsp; <a href=\"https://datekhaas.com/unsubscribe\">Unsubscribe</a></p>\n    </div>\n  </div>\n</body>\n</html>",
+  "body_fallback": "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>Date Khaas — A Glimpse of What Awaits</title>\n</head>\n<body style=\"margin:0;padding:0;background:#f5f1eb;font-family:Helvetica,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#f5f1eb;padding:32px 16px;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:4px;overflow:hidden;\">\n        <tr><td style=\"background:#003527;padding:24px;text-align:center;\">\n          <div style=\"color:#e9c176;font-family:Georgia,serif;font-size:26px;letter-spacing:2px;\">Date Khaas</div>\n          <div style=\"color:#8ab8a8;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:6px;\">Muslim Matrimony</div>\n        </td></tr>\n        <tr><td style=\"background:#e9c176;height:3px;font-size:0;line-height:0;\">&nbsp;</td></tr>\n        <tr><td style=\"padding:36px 40px;text-align:center;\">\n          <p style=\"display:inline-block;background:#003527;color:#e9c176;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:2px;border:1px solid #e9c176;margin:0 0 16px;\">&#10003; Every profile verified</p>\n          <h2 style=\"font-family:Georgia,serif;color:#003527;font-size:28px;font-weight:400;line-height:1.3;margin:0 0 16px;\">A glimpse of what awaits&#8202;&mdash;<br>beautiful, verified, and written for you</h2>\n          <p style=\"color:#444;font-size:15px;line-height:1.75;margin:0 0 20px;\">This wedding season, those who found their person on Date Khaas began with one simple act of trust: a photo revealed, a wali invited, and an introduction made with dignity.</p>\n          <p style=\"font-family:Georgia,serif;color:#003527;font-style:italic;font-size:17px;margin:0 0 28px;\">\"And He placed between you affection and mercy.\"<br><span style=\"font-size:13px;font-style:normal;color:#888;\">&mdash; Quran 30:21</span></p>\n          <a href=\"https://datekhaas.com/register\" style=\"display:inline-block;background:#003527;color:#e9c176;font-size:12px;font-weight:700;letter-spacing:2px;text-decoration:none;padding:16px 42px;border-radius:3px;text-transform:uppercase;\">Create Your Profile</a>\n        </td></tr>\n        <tr><td style=\"background:#003527;padding:20px;text-align:center;\">\n          <p style=\"color:#8ab8a8;font-size:11px;line-height:1.6;margin:0;\">Date Khaas &nbsp;|&nbsp; <a href=\"https://datekhaas.com/privacy\" style=\"color:#e9c176;text-decoration:none;\">Privacy</a> &nbsp;|&nbsp; <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;text-decoration:none;\">Unsubscribe</a></p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim Marriage Events UK ran 8 in-person halal matchmaking events across 5 cities (Manchester, Slough, Birmingham, Leeds, London) in May–June 2026 — peak diaspora wedding season is active right now.",
+        "source": "https://markets.financialcontent.com/stocks/article/abnewswire-2026-5-1-muslim-marriage-events-uk-announces-its-may-and-june-2026-schedule-featuring-in-person-halal-matchmaking-gatherings-across-five-major-uk-cities"
+      },
+      {
+        "insight": "Photo privacy (blurred photos released only on mutual consent) is the #1 feature Muslim women cite as making them feel safe on a matrimony app — it's a direct conversion driver, especially for family-introduced profiles.",
+        "source": "https://purematrimony.zendesk.com/hc/en-gb/articles/360013005612-New-Photo-Blur-feature"
+      },
+      {
+        "insight": "Competitor NikahForever leads with '100% privacy guaranteed' and 'verified profiles' — but wali involvement as a first-class in-app feature is absent from their proposition, leaving a gap Date Khaas can own.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "ShadiAmour UK claims '500+ verified halal marriages in UK 2026' — trust-proof via outcomes is the current headline battle in UK Muslim matrimony.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Wali involvement is described as 'a safeguard that signals serious intent and protects both parties' — apps that build wali as a formal role (not just informal advice) score highest on family trust surveys.",
+        "source": "https://purematrimony.com/blog/dating-apps-vs-muslim-marriage-apps-why-intent-matters-for-single-muslims"
+      },
+      {
+        "insight": "Seven non-negotiable trust features for matrimony apps: government-ID verification, photo blur defaults, wali/guardian access, moderation, no contact sharing, voice/video verification, and encrypted messaging.",
+        "source": "https://www.designosoft.com/blog/trust-is-everything-7-security-and-profile-verification-features-every-matrimony-app-must-have/"
+      }
+    ],
+    "amp_note": "Replace {{IMAGE_URL_0/1/2}} in body with URLs from metadata.images[].remote_url before sending."
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-7807230.jpg",
+      "remote_url": "https://pixabay.com/get/g16df549a56f1e35b18dc5d268960db434c0bd404567b35a1a0a4ad09917b133e9f66b9c3692eabe8bd1c179406f1ee64ca2cd515c98e71722b57fb4458aa2dc3_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-ceremony-ceremony-teatime-japan-7807230/",
+      "author": "mirkostoedter",
+      "pixabay_id": 7807230,
+      "tags": "tea ceremony, ceremony, teatime, japan, china, asia, pottery, teapots, tea ceremony, tea ceremony, tea ceremony, tea ceremony, tea ceremony, teatime, china, china, asia",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-1869716.jpg",
+      "remote_url": "https://pixabay.com/get/gb13fedd864e6d2fcfba5b37350d5b8b0d448edc6378170333446fb34f411d6fcf9dd6530307526556964bcc7a457980f3a262b43a99d5c1eb138e0ab072ccf2c_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
+      "author": "Pexels",
+      "pixabay_id": 1869716,
+      "tags": "tea, cup, pot, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, tea cup, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-6123746.jpg",
+      "remote_url": "https://pixabay.com/get/g58178a0025257113fe89aa5837070ae6faad43478257425aed92220f3889f64e3d06bdfc32afb54d27003884015ad547aa0de776df91bb448f3668eaef612918_1280.jpg",
+      "page_url": "https://pixabay.com/photos/teapot-tea-traditional-ceremony-6123746/",
+      "author": "cromagnon130",
+      "pixabay_id": 6123746,
+      "tags": "teapot, tea, traditional, ceremony, tea cups, cups, steam, hot tea, drink, beverage, japanese, asian, tea, tea, tea, tea, tea",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

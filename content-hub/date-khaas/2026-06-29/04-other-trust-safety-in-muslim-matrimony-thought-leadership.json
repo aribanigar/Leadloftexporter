@@ -1,0 +1,68 @@
+{
+  "type": "other",
+  "format": "linkedin",
+  "channel": "linkedin",
+  "title": "Trust & Safety in Muslim Matrimony — Thought Leadership",
+  "image_query": "muslim wedding celebration",
+  "body": "The Muslim matrimony space has a trust problem that \"100% verified\" badges don't solve.\n\nPlatforms have raced to add ID verification. That's table stakes now. But the real anxiety for Muslim families isn't \"is this person real?\" — it's:\n\n• Will my daughter's photo be seen by every man who signs up?\n• Can I, as her wali, actually be part of this process?\n• Is this introduction happening the right way — with respect, values alignment, and seriousness?\n\nAt Date Khaas, we're building the trust infrastructure that answers those questions:\n\n🔐 *Photo privacy by default* — your image is revealed only when you choose, to one person at a time\n🤝 *Wali as a first-class feature* — family members can follow every introduction in real time\n✔ *Verification that goes deeper* — identity, intent, and values, not just OTP\n\nIt's wedding season in the UK and North America right now. Families are actively looking. The platform that wins their trust wins their community.\n\nThe next frontier in Muslim matrimony isn't a better algorithm. It's a safer, more dignified introduction.\n\n#MuslimMatrimony #Nikah #HalalTech #TrustAndSafety #IslamicMarriage",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim Marriage Events UK ran 8 in-person halal matchmaking events across 5 cities (Manchester, Slough, Birmingham, Leeds, London) in May–June 2026 — peak diaspora wedding season is active right now.",
+        "source": "https://markets.financialcontent.com/stocks/article/abnewswire-2026-5-1-muslim-marriage-events-uk-announces-its-may-and-june-2026-schedule-featuring-in-person-halal-matchmaking-gatherings-across-five-major-uk-cities"
+      },
+      {
+        "insight": "Photo privacy (blurred photos released only on mutual consent) is the #1 feature Muslim women cite as making them feel safe on a matrimony app — it's a direct conversion driver, especially for family-introduced profiles.",
+        "source": "https://purematrimony.zendesk.com/hc/en-gb/articles/360013005612-New-Photo-Blur-feature"
+      },
+      {
+        "insight": "Competitor NikahForever leads with '100% privacy guaranteed' and 'verified profiles' — but wali involvement as a first-class in-app feature is absent from their proposition, leaving a gap Date Khaas can own.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "ShadiAmour UK claims '500+ verified halal marriages in UK 2026' — trust-proof via outcomes is the current headline battle in UK Muslim matrimony.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Wali involvement is described as 'a safeguard that signals serious intent and protects both parties' — apps that build wali as a formal role (not just informal advice) score highest on family trust surveys.",
+        "source": "https://purematrimony.com/blog/dating-apps-vs-muslim-marriage-apps-why-intent-matters-for-single-muslims"
+      },
+      {
+        "insight": "Seven non-negotiable trust features for matrimony apps: government-ID verification, photo blur defaults, wali/guardian access, moderation, no contact sharing, voice/video verification, and encrypted messaging.",
+        "source": "https://www.designosoft.com/blog/trust-is-everything-7-security-and-profile-verification-features-every-matrimony-app-must-have/"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-celebration-3928295.jpg",
+      "remote_url": "https://pixabay.com/get/gdef59ffd0fad29c4092df25f775fd790e50b4ea8103072488c1d371ace4b24673f4c77c8b8ac5471abd4dc456190f7e284af973fe45165f0f5c87b55ca98d986_1280.jpg",
+      "page_url": "https://pixabay.com/photos/indian-wedding-indian-bride-3928295/",
+      "author": "globalqart",
+      "pixabay_id": 3928295,
+      "tags": "indian wedding, indian bride, bridal makeup, henna, bollywood, marriage, culture, jewellery, design, emotions, gold, woman, fashion, asian, celebration, female, traditional, india, bridal, muslim wedding, indian wedding, indian bride, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bridal makeup, bollywood, bollywood, bollywood",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-celebration-4615557.jpg",
+      "remote_url": "https://pixabay.com/get/g7cbe2408737ef4263fb10dfd013e08540835476a70044219560169149c33e205215cc7f7d16701c7560381fba6878f2eb57cf954c8ccae49349ec3506b856dbf_1280.jpg",
+      "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+      "author": "OlcayErtem",
+      "pixabay_id": 4615557,
+      "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, nature, male, big, girl, happiness, celebration, ceremony, wife, bouquet, grass",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-celebration-443600.jpg",
+      "remote_url": "https://pixabay.com/get/gba60660b5d2636732e74acf15eaa1b0c1a9d3a52a1d50470ae29abf3ce4d6d80160e00249e3392b3e2bbfb6b4fc1c681818864e0caed6bd56ad95dad649d81d6_1280.jpg",
+      "page_url": "https://pixabay.com/photos/couple-wedding-park-newlyweds-443600/",
+      "author": "toanmda",
+      "pixabay_id": 443600,
+      "tags": "couple, wedding, park, newlyweds, wedding day, husband, wife, man, woman, bride, groom, romantic, love, happy, relationship, outdoors, wedding photography, portrait, couple, wedding, wedding, wedding, wedding, wedding, love",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "type": "html_email",
+  "format": "standard",
+  "channel": "email",
+  "title": "Seen Only By the Right Eyes — Marketing Email",
+  "subject": "Your face reaches only the one meant for you",
+  "preheader": "Photo privacy, wali involvement, and verified introductions — only on Date Khaas.",
+  "cta_url": "https://datekhaas.com/register",
+  "image_query": "muslim wedding ceremony",
+  "body": "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>Date Khaas — Seen Only By the Right Eyes</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#f5f1eb;font-family:Helvetica,Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background-color:#f5f1eb;padding:32px 16px;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;\">\n\n        <!-- Header -->\n        <tr>\n          <td style=\"background-color:#003527;padding:28px 32px;text-align:center;\">\n            <div style=\"color:#e9c176;font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:400;letter-spacing:3px;margin:0 0 6px;\">Date Khaas</div>\n            <div style=\"color:#8ab8a8;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;\">Muslim Matrimony</div>\n          </td>\n        </tr>\n\n        <!-- Hero image -->\n        <tr>\n          <td style=\"padding:0;line-height:0;\">\n            <img src=\"https://datekhaas.com/assets/email/hero-wedding.jpg\" alt=\"A serene Muslim wedding celebration\" width=\"600\" style=\"display:block;width:100%;max-width:600px;height:auto;\" />\n          </td>\n        </tr>\n\n        <!-- Gold accent bar -->\n        <tr>\n          <td style=\"background-color:#e9c176;height:3px;line-height:3px;font-size:3px;\">&nbsp;</td>\n        </tr>\n\n        <!-- Hero copy -->\n        <tr>\n          <td style=\"padding:44px 48px 28px;text-align:center;\">\n            <h1 style=\"font-family:Georgia,'Times New Roman',serif;color:#003527;font-size:34px;font-weight:400;line-height:1.25;margin:0 0 20px;letter-spacing:0.5px;\">\n              Seen only by<br>the right eyes\n            </h1>\n            <p style=\"font-family:Helvetica,Arial,sans-serif;color:#444444;font-size:16px;line-height:1.75;margin:0 0 12px;\">\n              There is a quiet longing that lives in the heart of every person seeking a nikah — not just for a partner, but for the kind of marriage that begins with <em>dignity</em>. Where you are not a profile to be scrolled through by strangers, but someone to be introduced — carefully, intentionally, when you are ready.\n            </p>\n            <p style=\"font-family:Helvetica,Arial,sans-serif;color:#444444;font-size:16px;line-height:1.75;margin:0;\">\n              That is what Date Khaas is built for.\n            </p>\n          </td>\n        </tr>\n\n        <!-- Divider -->\n        <tr>\n          <td style=\"padding:0 48px;\">\n            <hr style=\"border:none;border-top:1px solid #e9c176;margin:0;\" />\n          </td>\n        </tr>\n\n        <!-- Feature: Photo Privacy -->\n        <tr>\n          <td style=\"padding:32px 48px 0;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\">\n              <tr>\n                <td width=\"52\" valign=\"top\" style=\"padding-right:16px;\">\n                  <div style=\"width:44px;height:44px;background-color:#003527;border-radius:50%;text-align:center;line-height:44px;\">\n                    <span style=\"color:#e9c176;font-size:20px;font-family:serif;\">&#128274;</span>\n                  </div>\n                </td>\n                <td valign=\"top\">\n                  <p style=\"font-family:Georgia,'Times New Roman',serif;color:#003527;font-size:18px;font-weight:400;margin:0 0 6px;\">Your photo, your choice</p>\n                  <p style=\"font-family:Helvetica,Arial,sans-serif;color:#666666;font-size:14px;line-height:1.65;margin:0;\">Your photo stays private until you reveal it — to one person, in your own time. No one scrolls your face without your permission. Your image is not content; it is a gift you give when you are ready.</p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Feature: Wali Involvement -->\n        <tr>\n          <td style=\"padding:24px 48px 0;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\">\n              <tr>\n                <td width=\"52\" valign=\"top\" style=\"padding-right:16px;\">\n                  <div style=\"width:44px;height:44px;background-color:#003527;border-radius:50%;text-align:center;line-height:44px;\">\n                    <span style=\"color:#e9c176;font-size:20px;font-family:serif;\">&#129309;</span>\n                  </div>\n                </td>\n                <td valign=\"top\">\n                  <p style=\"font-family:Georgia,'Times New Roman',serif;color:#003527;font-size:18px;font-weight:400;margin:0 0 6px;\">Your wali, part of every step</p>\n                  <p style=\"font-family:Helvetica,Arial,sans-serif;color:#666666;font-size:14px;line-height:1.65;margin:0;\">Invite your wali to follow every introduction — they see exactly what you see: verified profiles, shared values, serious intentions. This is how a nikah should begin, with family as a blessing, not an afterthought.</p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- Feature: Verified -->\n        <tr>\n          <td style=\"padding:24px 48px 0;\">\n            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\">\n              <tr>\n                <td width=\"52\" valign=\"top\" style=\"padding-right:16px;\">\n                  <div style=\"width:44px;height:44px;background-color:#003527;border-radius:50%;text-align:center;line-height:44px;\">\n                    <span style=\"color:#e9c176;font-size:22px;font-family:serif;\">&#10003;</span>\n                  </div>\n                </td>\n                <td valign=\"top\">\n                  <p style=\"font-family:Georgia,'Times New Roman',serif;color:#003527;font-size:18px;font-weight:400;margin:0 0 6px;\">Verified before you are ever introduced</p>\n                  <p style=\"font-family:Helvetica,Arial,sans-serif;color:#666666;font-size:14px;line-height:1.65;margin:0;\">Identity and sincerity confirmed before a single conversation begins. You deserve to meet people who are genuinely here for what you are here for.</p>\n                </td>\n              </tr>\n            </table>\n          </td>\n        </tr>\n\n        <!-- CTA -->\n        <tr>\n          <td style=\"padding:44px 48px;text-align:center;\">\n            <a href=\"https://datekhaas.com/register\" style=\"display:inline-block;background-color:#003527;color:#e9c176;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-decoration:none;padding:18px 48px;border-radius:3px;text-transform:uppercase;\">Begin Your Journey</a>\n            <p style=\"font-family:Helvetica,Arial,sans-serif;color:#aaaaaa;font-size:12px;line-height:1.6;margin:20px 0 0;\">\n              Free to create your profile. Your nikah is written — we are here to help you find it.\n            </p>\n          </td>\n        </tr>\n\n        <!-- Footer -->\n        <tr>\n          <td style=\"background-color:#003527;padding:24px 32px;text-align:center;\">\n            <p style=\"font-family:Helvetica,Arial,sans-serif;color:#8ab8a8;font-size:11px;line-height:1.7;margin:0;\">\n              Date Khaas &nbsp;|&nbsp; Muslim Matrimony &nbsp;|&nbsp; <a href=\"https://datekhaas.com/privacy\" style=\"color:#e9c176;text-decoration:none;\">Privacy</a> &nbsp;|&nbsp; <a href=\"https://datekhaas.com/unsubscribe\" style=\"color:#e9c176;text-decoration:none;\">Unsubscribe</a>\n            </p>\n          </td>\n        </tr>\n\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim Marriage Events UK ran 8 in-person halal matchmaking events across 5 cities (Manchester, Slough, Birmingham, Leeds, London) in May–June 2026 — peak diaspora wedding season is active right now.",
+        "source": "https://markets.financialcontent.com/stocks/article/abnewswire-2026-5-1-muslim-marriage-events-uk-announces-its-may-and-june-2026-schedule-featuring-in-person-halal-matchmaking-gatherings-across-five-major-uk-cities"
+      },
+      {
+        "insight": "Photo privacy (blurred photos released only on mutual consent) is the #1 feature Muslim women cite as making them feel safe on a matrimony app — it's a direct conversion driver, especially for family-introduced profiles.",
+        "source": "https://purematrimony.zendesk.com/hc/en-gb/articles/360013005612-New-Photo-Blur-feature"
+      },
+      {
+        "insight": "Competitor NikahForever leads with '100% privacy guaranteed' and 'verified profiles' — but wali involvement as a first-class in-app feature is absent from their proposition, leaving a gap Date Khaas can own.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "ShadiAmour UK claims '500+ verified halal marriages in UK 2026' — trust-proof via outcomes is the current headline battle in UK Muslim matrimony.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Wali involvement is described as 'a safeguard that signals serious intent and protects both parties' — apps that build wali as a formal role (not just informal advice) score highest on family trust surveys.",
+        "source": "https://purematrimony.com/blog/dating-apps-vs-muslim-marriage-apps-why-intent-matters-for-single-muslims"
+      },
+      {
+        "insight": "Seven non-negotiable trust features for matrimony apps: government-ID verification, photo blur defaults, wali/guardian access, moderation, no contact sharing, voice/video verification, and encrypted messaging.",
+        "source": "https://www.designosoft.com/blog/trust-is-everything-7-security-and-profile-verification-features-every-matrimony-app-must-have/"
+      }
+    ]
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-ceremony-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/g3f0d3dbd054c0bc53ae8cb94d226d7c63aa0ae76dd3f6de868855988c9285604806fe32896598f5205bf26841741d8096fbf23cde02f946ef410672fd621037d_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-ceremony-4615557.jpg",
+      "remote_url": "https://pixabay.com/get/ge6749ba3c4f4c8099495db6bb2eb499e579c6a9ca360413a4ccd140ea43861e60c6392cc4e939964421d01c55103846565a080570780247d259ed20c2db38e76_1280.jpg",
+      "page_url": "https://pixabay.com/photos/happy-valentines-day-couple-wedding-4615557/",
+      "author": "OlcayErtem",
+      "pixabay_id": 4615557,
+      "tags": "happy valentines day, couple, wedding, marriage, bridal, double, love, people, man, woman, romance, happy, romantic, dress, married, nature, male, big, girl, happiness, celebration, ceremony, wife, bouquet, grass",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-wedding-ceremony-1868868.jpg",
+      "remote_url": "https://pixabay.com/get/gf8a9385568c189e40951d89e92160fef860b3292db9fff871f91b0becaa39a107253fa5e6cd03280f5375a9e79adbea401df499b62483c0048e52c76ec771429_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-ceremony-champagne-glasses-1868868/",
+      "author": "Pexels",
+      "pixabay_id": 1868868,
+      "tags": "wedding, ceremony, champagne, glasses, newlyweds, marriage, bride and groom, champagne glasses, toast, cheers, celebrate, celebration, wedding ceremony, elegant, bride, formal, groom, love, man, people, woman, wedding, wedding, wedding, wedding, wedding, champagne, champagne, marriage, groom, groom",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}

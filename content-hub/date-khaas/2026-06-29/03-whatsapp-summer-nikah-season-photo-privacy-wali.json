@@ -1,0 +1,70 @@
+{
+  "type": "whatsapp",
+  "format": "text",
+  "channel": "whatsapp",
+  "title": "Summer Nikah Season — Photo Privacy & Wali",
+  "cta_url": "https://datekhaas.com/register",
+  "image_query": "muslim bride groom",
+  "body": "Assalamu alaikum ✨\n\nIt's wedding season, and somewhere out there, the person written for you is making du'a for the same thing you are — a marriage filled with sukoon, love, and barakah.\n\nOn *Date Khaas*, your photo is seen only by those you choose. Your wali is with you from the very first introduction. And every profile is verified before you are ever connected.\n\nThis is how a nikah should begin — with dignity, not a swipe.\n\n👉 Create your free profile:\nhttps://datekhaas.com/register\n\nMay Allah write ease into your search. 🤍",
+  "metadata": {
+    "research_sources": [
+      {
+        "insight": "Muslim Marriage Events UK ran 8 in-person halal matchmaking events across 5 cities (Manchester, Slough, Birmingham, Leeds, London) in May–June 2026 — peak diaspora wedding season is active right now.",
+        "source": "https://markets.financialcontent.com/stocks/article/abnewswire-2026-5-1-muslim-marriage-events-uk-announces-its-may-and-june-2026-schedule-featuring-in-person-halal-matchmaking-gatherings-across-five-major-uk-cities"
+      },
+      {
+        "insight": "Photo privacy (blurred photos released only on mutual consent) is the #1 feature Muslim women cite as making them feel safe on a matrimony app — it's a direct conversion driver, especially for family-introduced profiles.",
+        "source": "https://purematrimony.zendesk.com/hc/en-gb/articles/360013005612-New-Photo-Blur-feature"
+      },
+      {
+        "insight": "Competitor NikahForever leads with '100% privacy guaranteed' and 'verified profiles' — but wali involvement as a first-class in-app feature is absent from their proposition, leaving a gap Date Khaas can own.",
+        "source": "https://www.nikahforever.com/faq"
+      },
+      {
+        "insight": "ShadiAmour UK claims '500+ verified halal marriages in UK 2026' — trust-proof via outcomes is the current headline battle in UK Muslim matrimony.",
+        "source": "https://www.shadiamour.com/blog/500-verified-halal-muslim-marriages-uk-2026-trusted-platform-london-birmingham-manchester"
+      },
+      {
+        "insight": "Wali involvement is described as 'a safeguard that signals serious intent and protects both parties' — apps that build wali as a formal role (not just informal advice) score highest on family trust surveys.",
+        "source": "https://purematrimony.com/blog/dating-apps-vs-muslim-marriage-apps-why-intent-matters-for-single-muslims"
+      },
+      {
+        "insight": "Seven non-negotiable trust features for matrimony apps: government-ID verification, photo blur defaults, wali/guardian access, moderation, no contact sharing, voice/video verification, and encrypted messaging.",
+        "source": "https://www.designosoft.com/blog/trust-is-everything-7-security-and-profile-verification-features-every-matrimony-app-must-have/"
+      }
+    ],
+    "char_count": 531
+  },
+  "images": [
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-bride-groom-8028163.jpg",
+      "remote_url": "https://pixabay.com/get/gdff757e3e0bb0d9dcb2458564c01f15a83d6af7ac3e45c5dc174353082a29d0f266b41f7d46c7c19865d13065888b856636a8b991fc00a171c160bfb9dd99f11_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-marriage-love-8028163/",
+      "author": "OlcayErtem",
+      "pixabay_id": 8028163,
+      "tags": "wedding, newlyweds, marriage, love, romantic, couple, man and woman, portrait, muslim, wedding, wedding, wedding, wedding, wedding, marriage",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-bride-groom-7353628.jpg",
+      "remote_url": "https://pixabay.com/get/g9bb0e36ef88a6b8ba404e5bb43723290353d2f73b01baf18ab1efffa930380d16e0f5972b762f3a767b5574b1516dbc333de975598ea69a9607a33bd17539fb2_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353628/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353628,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/muslim-bride-groom-7353626.jpg",
+      "remote_url": "https://pixabay.com/get/g3578a5db00b6168b213998dfb2ca8aff991dde63eb4ad219563392ffa94e972831d0d96ef94b8e6c0013eb6c060bc887d24170d1238c39a1e41cc613c1a85d32_1280.jpg",
+      "page_url": "https://pixabay.com/photos/wedding-newlyweds-couple-7353626/",
+      "author": "OlcayErtem",
+      "pixabay_id": 7353626,
+      "tags": "wedding, newlyweds, couple, bride and groom, marriage, love, wedding photoshoot, muslim wedding, rustic aesthetic, muslim wedding, muslim wedding, muslim wedding, muslim wedding, muslim wedding",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    }
+  ]
+}
