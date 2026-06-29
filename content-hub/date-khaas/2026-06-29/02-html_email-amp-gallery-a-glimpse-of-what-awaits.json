@@ -41,7 +41,7 @@
   "images": [
     {
       "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-7807230.jpg",
-      "remote_url": "https://pixabay.com/get/g16df549a56f1e35b18dc5d268960db434c0bd404567b35a1a0a4ad09917b133e9f66b9c3692eabe8bd1c179406f1ee64ca2cd515c98e71722b57fb4458aa2dc3_1280.jpg",
+      "remote_url": "https://pixabay.com/get/gcdc032de11193d8021c60a3486f66afc864e0e98af825f1bdbe33772f0d1fbf1c9e17f83f1b4a419630b25a8fb40113b2498ab898f36fb4f416de2387848f6ae_1280.jpg",
       "page_url": "https://pixabay.com/photos/tea-ceremony-ceremony-teatime-japan-7807230/",
       "author": "mirkostoedter",
       "pixabay_id": 7807230,
@@ -50,22 +50,22 @@
       "license": "Pixabay Content License (free commercial use, no attribution required)"
     },
     {
-      "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-1869716.jpg",
-      "remote_url": "https://pixabay.com/get/gb13fedd864e6d2fcfba5b37350d5b8b0d448edc6378170333446fb34f411d6fcf9dd6530307526556964bcc7a457980f3a262b43a99d5c1eb138e0ab072ccf2c_1280.jpg",
-      "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
-      "author": "Pexels",
-      "pixabay_id": 1869716,
-      "tags": "tea, cup, pot, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, tea cup, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
-      "has_faces": true,
-      "license": "Pixabay Content License (free commercial use, no attribution required)"
-    },
-    {
       "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-6123746.jpg",
-      "remote_url": "https://pixabay.com/get/g58178a0025257113fe89aa5837070ae6faad43478257425aed92220f3889f64e3d06bdfc32afb54d27003884015ad547aa0de776df91bb448f3668eaef612918_1280.jpg",
+      "remote_url": "https://pixabay.com/get/g2c6b4aee3b246aa2fc2a571e64f30bc139f5415871f584d8933733b3f74ea867b8a51bfaf7a6988383128c725c524d61d900573c1f80a57f416815d2ea91a879_1280.jpg",
       "page_url": "https://pixabay.com/photos/teapot-tea-traditional-ceremony-6123746/",
       "author": "cromagnon130",
       "pixabay_id": 6123746,
       "tags": "teapot, tea, traditional, ceremony, tea cups, cups, steam, hot tea, drink, beverage, japanese, asian, tea, tea, tea, tea, tea",
+      "has_faces": true,
+      "license": "Pixabay Content License (free commercial use, no attribution required)"
+    },
+    {
+      "local_path": "content-hub/date-khaas/2026-06-29/images/nikah-ceremony-1869716.jpg",
+      "remote_url": "https://pixabay.com/get/g9c4b655069a285ed52935c817b5453e289c2a7fbc5188cee07a6694cc67623759e0d153ab9fe32cf057756ad4839e51d3e82fbb24f5f5b549fcf778a170823f0_1280.jpg",
+      "page_url": "https://pixabay.com/photos/tea-cup-pot-tea-leaves-pour-1869716/",
+      "author": "Pexels",
+      "pixabay_id": 1869716,
+      "tags": "tea, cup, pot, tea leaves, pour, pouring, pouring tea, tea time, tea ceremony, tea cup, beverage, hot tea, drink, kitchenware, teapot, traditional, black tea, green tea",
       "has_faces": true,
       "license": "Pixabay Content License (free commercial use, no attribution required)"
     }
