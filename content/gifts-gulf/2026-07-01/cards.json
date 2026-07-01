@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-01",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Recycled paper, clean to write on",
+      "out": "content/gifts-gulf/2026-07-01/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6225-13",
+          "sku": "GG1400",
+          "name": "Grownotebook\u2122",
+          "desc": "Recycled paper, clean to write on",
+          "colours": 0
+        },
+        {
+          "code": "mo6689-13",
+          "sku": "GG1482",
+          "name": "Grow",
+          "desc": "Lies flat for real notes",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Keeps drinks cold for hours",
+      "out": "content/gifts-gulf/2026-07-01/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2107-16",
+          "sku": "GG1085",
+          "name": "Florence",
+          "desc": "Keeps drinks cold for hours",
+          "colours": 0
+        },
+        {
+          "code": "mo2108-16",
+          "sku": "GG1086",
+          "name": "Manoa",
+          "desc": "Recycled steel, built to last",
+          "colours": 0
+        },
+        {
+          "code": "mo2109-16",
+          "sku": "GG1087",
+          "name": "Mahua",
+          "desc": "Refilled morning to night",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Roomy cotton for the daily haul",
+      "out": "content/gifts-gulf/2026-07-01/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9518-13",
+          "sku": "GG1647",
+          "name": "India Tote",
+          "desc": "Roomy cotton for the daily haul",
+          "colours": 0
+        },
+        {
+          "code": "mo9732-13",
+          "sku": "GG1673",
+          "name": "Taske Large",
+          "desc": "Strong handles, soft feel",
+          "colours": 0
+        },
+        {
+          "code": "mo9817-03",
+          "sku": "GG1685",
+          "name": "Porto Bag",
+          "desc": "Folds flat, opens wide",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Made from recycled material",
+      "out": "content/gifts-gulf/2026-07-01/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2600-03",
+          "sku": "GG1267",
+          "name": "Brenna",
+          "desc": "Made from recycled material",
+          "colours": 0
+        },
+        {
+          "code": "mo2639-03",
+          "sku": "GG1280",
+          "name": "Bangkok Bag",
+          "desc": "Light to fold, strong to carry",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Keeps devices charged and ready",
+      "out": "content/gifts-gulf/2026-07-01/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2646-03",
+          "sku": "GG1283",
+          "name": "Fauleti Charge",
+          "desc": "Keeps devices charged and ready",
+          "colours": 0
+        },
+        {
+          "code": "mo2521-03",
+          "sku": "GG1221",
+          "name": "Netica",
+          "desc": "Clears the cable clutter",
+          "colours": 0
+        },
+        {
+          "code": "mo2080-06",
+          "sku": "GG1068",
+          "name": "Techmate Rabs",
+          "desc": "Clean tech, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Woven from natural jute",
+      "out": "content/gifts-gulf/2026-07-01/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2190-03",
+          "sku": "GG1114",
+          "name": "Fukuro",
+          "desc": "Woven from natural jute",
+          "colours": 0
+        },
+        {
+          "code": "mo2209-13",
+          "sku": "GG1120",
+          "name": "Zolang",
+          "desc": "Sturdy enough for a full load",
+          "colours": 0
+        },
+        {
+          "code": "mo2503-13",
+          "sku": "GG1216",
+          "name": "Lona",
+          "desc": "Natural texture, clean print",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Soft organic cotton, worn often",
+      "out": "content/gifts-gulf/2026-07-01/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s03566-bk",
+          "sku": "GG1758",
+          "name": "Planet Men",
+          "desc": "Soft organic cotton, worn often",
+          "colours": 0
+        },
+        {
+          "code": "s03578-db",
+          "sku": "GG1763",
+          "name": "Pioneer Kids",
+          "desc": "Holds shape wash after wash",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Clear glass, clean logo print",
+      "out": "content/gifts-gulf/2026-07-01/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2089-03",
+          "sku": "GG1072",
+          "name": "Ebor",
+          "desc": "Clear glass, clean logo print",
+          "colours": 0
+        },
+        {
+          "code": "mo2091-22",
+          "sku": "GG1073",
+          "name": "Celestial",
+          "desc": "Steady in the hand",
+          "colours": 0
+        },
+        {
+          "code": "mo6800-15",
+          "sku": "GG1505",
+          "name": "Thai",
+          "desc": "A glass they reach for daily",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Warm natural bamboo grain",
+      "out": "content/gifts-gulf/2026-07-01/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6981-03",
+          "sku": "GG1544",
+          "name": "Galao",
+          "desc": "Warm natural bamboo grain",
+          "colours": 0
+        },
+        {
+          "code": "mo6331-40",
+          "sku": "GG1419",
+          "name": "Inkless Bamboo",
+          "desc": "Sits neat on any desk",
+          "colours": 0
+        },
+        {
+          "code": "mo6345-40",
+          "sku": "GG1422",
+          "name": "Groovy",
+          "desc": "Natural finish, clean logo",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

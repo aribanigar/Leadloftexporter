@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-01",
+  "theme": "Cotton totes",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260701-3",
+  "campaign_name": "Cotton Totes - 01 Jul 2026",
+  "subject": "The tote that goes everywhere",
+  "skus": [
+    "GG1647",
+    "GG1673",
+    "GG1685",
+    "GG1654",
+    "GG1682",
+    "GG1695"
+  ],
+  "products": [
+    {
+      "name": "India Tote",
+      "sku": "GG1647",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9518-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1647"
+    },
+    {
+      "name": "Taske Large",
+      "sku": "GG1673",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9732-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1673"
+    },
+    {
+      "name": "Porto Bag",
+      "sku": "GG1685",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9817-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1685"
+    },
+    {
+      "name": "Portobello",
+      "sku": "GG1654",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9596-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1654"
+    },
+    {
+      "name": "Kleuren",
+      "sku": "GG1682",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9815-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1682"
+    },
+    {
+      "name": "Marketa +",
+      "sku": "GG1695",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9847-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1695"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cotton%20totes%20options%20for%20our%20team."
+}

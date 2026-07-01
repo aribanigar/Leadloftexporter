@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-01",
+  "theme": "Desk tech",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260701-5",
+  "campaign_name": "Desk Tech - 01 Jul 2026",
+  "subject": "Tech that clears the desk",
+  "skus": [
+    "GG1283",
+    "GG1221",
+    "GG1068",
+    "GG1316",
+    "GG1365",
+    "GG1629"
+  ],
+  "products": [
+    {
+      "name": "Fauleti Charge",
+      "sku": "GG1283",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2646-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1283"
+    },
+    {
+      "name": "Netica",
+      "sku": "GG1221",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2521-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1221"
+    },
+    {
+      "name": "Techmate Rabs",
+      "sku": "GG1068",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2080-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1068"
+    },
+    {
+      "name": "Karta",
+      "sku": "GG1316",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2774-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1316"
+    },
+    {
+      "name": "Karta Stand",
+      "sku": "GG1365",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2983-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1365"
+    },
+    {
+      "name": "Pro World &Amp; Usb",
+      "sku": "GG1629",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9321-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1629"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20desk%20tech%20options%20for%20our%20team."
+}

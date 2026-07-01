@@ -1798,5 +1798,157 @@
       "GG1369",
       "GG1064"
     ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260701-1",
+    "campaign_name": "Recycled Notebooks - 01 Jul 2026",
+    "subject": "Notebooks that get filled",
+    "theme": "Recycled notebooks",
+    "skus": [
+      "GG1400",
+      "GG1482",
+      "GG1467",
+      "GG1550",
+      "GG1620",
+      "GG1701"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260701-2",
+    "campaign_name": "Steel Bottles - 01 Jul 2026",
+    "subject": "One bottle, every refill",
+    "theme": "Steel bottles",
+    "skus": [
+      "GG1085",
+      "GG1086",
+      "GG1087",
+      "GG1122",
+      "GG1123",
+      "GG1071"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260701-3",
+    "campaign_name": "Cotton Totes - 01 Jul 2026",
+    "subject": "The tote that goes everywhere",
+    "theme": "Cotton totes",
+    "skus": [
+      "GG1647",
+      "GG1673",
+      "GG1685",
+      "GG1654",
+      "GG1682",
+      "GG1695"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260701-4",
+    "campaign_name": "Recycled Bags - 01 Jul 2026",
+    "subject": "Recycled bags they reuse",
+    "theme": "Recycled bags",
+    "skus": [
+      "GG1267",
+      "GG1280",
+      "GG1298",
+      "GG1306",
+      "GG1476",
+      "GG1490"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260701-5",
+    "campaign_name": "Desk Tech - 01 Jul 2026",
+    "subject": "Tech that clears the desk",
+    "theme": "Desk tech",
+    "skus": [
+      "GG1283",
+      "GG1221",
+      "GG1068",
+      "GG1316",
+      "GG1365",
+      "GG1629"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260701-6",
+    "campaign_name": "Jute Bags - 01 Jul 2026",
+    "subject": "Jute they carry proudly",
+    "theme": "Jute bags",
+    "skus": [
+      "GG1114",
+      "GG1120",
+      "GG1216",
+      "GG1381",
+      "GG1406",
+      "GG1567"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260701-7",
+    "campaign_name": "Organic Tees - 01 Jul 2026",
+    "subject": "Organic tees they live in",
+    "theme": "Organic tees",
+    "skus": [
+      "GG1758",
+      "GG1763",
+      "GG1764",
+      "GG1765",
+      "GG1610",
+      "GG1611"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260701-8",
+    "campaign_name": "Glassware - 01 Jul 2026",
+    "subject": "Glass they pour into daily",
+    "theme": "Glassware",
+    "skus": [
+      "GG1072",
+      "GG1073",
+      "GG1505",
+      "GG1529",
+      "GG1636"
+    ]
+  },
+  {
+    "date": "2026-07-01",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260701-9",
+    "campaign_name": "Bamboo Desk - 01 Jul 2026",
+    "subject": "Bamboo on every desk",
+    "theme": "Bamboo desk",
+    "skus": [
+      "GG1544",
+      "GG1419",
+      "GG1422",
+      "GG1451",
+      "GG1463",
+      "GG1500"
+    ]
   }
 ]

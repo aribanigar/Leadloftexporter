@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-01",
+  "theme": "Bamboo desk",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260701-9",
+  "campaign_name": "Bamboo Desk - 01 Jul 2026",
+  "subject": "Bamboo on every desk",
+  "skus": [
+    "GG1544",
+    "GG1419",
+    "GG1422",
+    "GG1451",
+    "GG1463",
+    "GG1500"
+  ],
+  "products": [
+    {
+      "name": "Galao",
+      "sku": "GG1544",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6981-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1544"
+    },
+    {
+      "name": "Inkless Bamboo",
+      "sku": "GG1419",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6331-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1419"
+    },
+    {
+      "name": "Groovy",
+      "sku": "GG1422",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6345-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1422"
+    },
+    {
+      "name": "Inkless Plus",
+      "sku": "GG1451",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6493-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1451"
+    },
+    {
+      "name": "Toolbam",
+      "sku": "GG1463",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6559-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1463"
+    },
+    {
+      "name": "Bram",
+      "sku": "GG1500",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6790-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1500"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20bamboo%20desk%20options%20for%20our%20team."
+}

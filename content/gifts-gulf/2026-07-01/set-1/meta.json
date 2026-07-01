@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-01",
+  "theme": "Recycled notebooks",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260701-1",
+  "campaign_name": "Recycled Notebooks - 01 Jul 2026",
+  "subject": "Notebooks that get filled",
+  "skus": [
+    "GG1400",
+    "GG1482",
+    "GG1467",
+    "GG1550",
+    "GG1620",
+    "GG1701"
+  ],
+  "products": [
+    {
+      "name": "Grownotebook\u2122",
+      "sku": "GG1400",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6225-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1400"
+    },
+    {
+      "name": "Grow",
+      "sku": "GG1482",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6689-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1482"
+    },
+    {
+      "name": "Ours",
+      "sku": "GG1467",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6580-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1467"
+    },
+    {
+      "name": "Recyclo",
+      "sku": "GG1550",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7173-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1550"
+    },
+    {
+      "name": "Reconote",
+      "sku": "GG1620",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9213-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1620"
+    },
+    {
+      "name": "Notecork",
+      "sku": "GG1701",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9860-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1701"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20notebooks%20options%20for%20our%20team."
+}

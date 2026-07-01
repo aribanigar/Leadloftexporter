@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-01",
+  "theme": "Recycled bags",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260701-4",
+  "campaign_name": "Recycled Bags - 01 Jul 2026",
+  "subject": "Recycled bags they reuse",
+  "skus": [
+    "GG1267",
+    "GG1280",
+    "GG1298",
+    "GG1306",
+    "GG1476",
+    "GG1490"
+  ],
+  "products": [
+    {
+      "name": "Brenna",
+      "sku": "GG1267",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2600-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1267"
+    },
+    {
+      "name": "Bangkok Bag",
+      "sku": "GG1280",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2639-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1280"
+    },
+    {
+      "name": "Practic",
+      "sku": "GG1298",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2696-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1298"
+    },
+    {
+      "name": "Arlon",
+      "sku": "GG1306",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2739-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1306"
+    },
+    {
+      "name": "Nata",
+      "sku": "GG1476",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6660-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1476"
+    },
+    {
+      "name": "Tapla",
+      "sku": "GG1490",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6718-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1490"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20bags%20options%20for%20our%20team."
+}

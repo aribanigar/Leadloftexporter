@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-01",
+  "theme": "Glassware",
+  "season": "Start of H2, summer recognition and everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260701-8",
+  "campaign_name": "Glassware - 01 Jul 2026",
+  "subject": "Glass they pour into daily",
+  "skus": [
+    "GG1072",
+    "GG1073",
+    "GG1505",
+    "GG1529",
+    "GG1636"
+  ],
+  "products": [
+    {
+      "name": "Ebor",
+      "sku": "GG1072",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2089-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1072"
+    },
+    {
+      "name": "Celestial",
+      "sku": "GG1073",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2091-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1073"
+    },
+    {
+      "name": "Thai",
+      "sku": "GG1505",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6800-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1505"
+    },
+    {
+      "name": "Olma",
+      "sku": "GG1529",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6922-26.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1529"
+    },
+    {
+      "name": "Mirror",
+      "sku": "GG1636",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9335-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1636"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-01/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20glassware%20options%20for%20our%20team."
+}

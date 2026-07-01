@@ -77,21 +77,21 @@ def verify_image(code):
 
 
 # ===========================================================================
-# DAILY RESEARCH BRIEF (2026-06-29)
-# H2 has just opened and summer recognition is the live moment. The fastest
-# growing order this year is not the big annual run, it is the small repeated
-# MICRO MOMENT: onboarding kits, project wins, quarterly recognition. Live 2026
-# signals (CorporateGift, Achievers, Merchery, Clove & Twine) name six pulls:
-# micro moments, accessible premium, everyday comfort, personal expression,
-# smart functionality, and quiet wellness, with satisfaction in generic branded
-# swag down sharply. So today curates by the SMALL EVERYDAY CARRY a person keeps
-# on hand: a desk mug, a pen they sign with, a travel pouch, a lunch set, a desk
-# gadget, a natural fibre bag, a soft tee, active wear, a recycled-steel refill.
-# Each set is a tight, photo-led edit around one coherent material so the grid
-# reads like a catalogue page. All 54 SKUs and all 9 subjects are fresh against
-# the last 14 days.
+# DAILY RESEARCH BRIEF (2026-07-01)
+# Start of H2, summer recognition. Live 2026 signals (CorporateGift, Achievers,
+# Merchery, Hyve) point the same way: buyers are trading the one big annual run
+# for MICRO MOMENTS across the year, and they want QUALITY OVER QUANTITY, fewer
+# items chosen with intent. Drinkware still earns the highest daily-use rate, so
+# a branded bottle or glass becomes a moving brand touchpoint. Comfort-forward
+# apparel is the other pull: soft tees people wear for years. Sustainability is
+# now table stakes, and subtle branding beats a shouted logo. So today curates by
+# the EVERYDAY-CARRY object a person actually keeps: a recycled notebook, a steel
+# bottle, a cotton tote, a recycled bag, a desk charger, a jute bag, an organic
+# tee, a glass, a bamboo desk piece. Each set is a tight, photo-led edit around
+# one coherent material so the grid reads like a catalogue page. All 53 SKUs and
+# all 9 subjects are fresh against the last 14 days.
 # ===========================================================================
-SEASON = "Start of H2, summer recognition and micro-moment gifting"
+SEASON = "Start of H2, summer recognition and everyday-carry gifting"
 
 # Each set leads with a corporate-gifting OCCASION and is backed by a coherent
 # mix of REAL fresh catalogue SKUs (not used in the last 14 days), chosen so
@@ -103,87 +103,87 @@ SEASON = "Start of H2, summer recognition and micro-moment gifting"
 # benefit, never a specific form (no "bottle", "notebook", "bag"), so every
 # line stays true whatever the exact piece is.
 SETS = [
-    dict(design='A', theme='Ceramic mugs',
-         name='Ceramic Mugs', angle='Desk mugs',
-         subject='Mugs for slow mornings',
-         headline='Ceramic mugs they keep using.',
-         subline='Ceramic mugs and glassware for the desk, branded with your logo.',
-         items=['GG1050', 'GG1245', 'GG1547', 'GG1599', 'GG1065', 'GG1678'],
-         descs=['Warm in the hand each morning', 'Holds a generous pour',
-                'Smooth glaze, clean print', 'A mug they keep choosing',
-                'Made to sit on the desk', 'Easy to grip and refill']),
-    dict(design='B', theme='Branded pens',
-         name='Branded Pens', angle='Branded pens',
-         subject='Sign with your logo',
-         headline='Pens worth signing with.',
-         subline='Smooth-writing pens for every desk, branded with your logo.',
-         items=['GG1554', 'GG1052', 'GG1575', 'GG1598', 'GG1569', 'GG1130'],
-         descs=['Writes smooth from the first line', 'Sits ready on every desk',
-                'Solid barrel, clean print', 'A pen they keep clicking',
-                'Comfortable through long notes', 'Your logo, signed all day']),
-    dict(design='C', theme='Travel pouches',
-         name='Travel Pouches', angle='Travel pouches',
-         subject='Pack light, brand loud',
-         headline='Everything zipped, nothing left behind.',
-         subline='Zip pouches and travel kits for packing, branded with your logo.',
-         items=['GG1335', 'GG1684', 'GG1686', 'GG1312', 'GG1332', 'GG1166'],
-         descs=['Keeps the small stuff together', 'Zips shut, nothing slips out',
-                'Light, roomy, easy to pack', 'A pouch they keep reusing',
-                'Slots into any bag', 'Made from recycled material']),
-    dict(design='A', theme='Steel lunch sets',
-         name='Steel Lunch Sets', angle='Lunch sets',
-         subject='Lunch they actually carry',
-         headline='Lunch sets they carry daily.',
-         subline='Steel lunch sets for the daily commute, branded with your logo.',
-         items=['GG1475', 'GG1722', 'GG1665', 'GG1318', 'GG1325', 'GG1496'],
-         descs=['Packs lunch for the commute', 'Seals tight, travels clean',
-                'Steel built to last', 'A set they reach for daily',
-                'Easy to carry and clean', 'Your logo on every lid']),
-    dict(design='B', theme='Desk gadgets',
-         name='Desk Gadgets', angle='Desk power',
-         subject="Power within arm's reach",
-         headline='Desk power kept close.',
-         subline='Chargers and desk gadgets for work, branded with your logo.',
-         items=['GG1630', 'GG1304', 'GG1597', 'GG1650', 'GG1556', 'GG1360'],
-         descs=['Keeps devices topped up', 'Earns its place on the desk',
+    dict(design='A', theme='Recycled notebooks',
+         name='Recycled Notebooks', angle='Recycled notebooks',
+         subject='Notebooks that get filled',
+         headline='Notebooks worth filling.',
+         subline='Recycled paper notebooks for every desk and meeting, branded with your logo.',
+         items=['GG1400', 'GG1482', 'GG1467', 'GG1550', 'GG1620', 'GG1701'],
+         descs=['Recycled paper, clean to write on', 'Lies flat for real notes',
+                'Sturdy cover, your logo', 'A notebook they keep using',
+                'Made from recycled paper', 'Ready for the next big idea']),
+    dict(design='B', theme='Steel bottles',
+         name='Steel Bottles', angle='Steel bottles',
+         subject='One bottle, every refill',
+         headline='One bottle, refilled all day.',
+         subline='Recycled steel bottles for daily hydration, branded with your logo.',
+         items=['GG1085', 'GG1086', 'GG1087', 'GG1122', 'GG1123', 'GG1071'],
+         descs=['Keeps drinks cold for hours', 'Recycled steel, built to last',
+                'Refilled morning to night', 'A bottle they carry everywhere',
+                'Better material, your logo', 'Sealed tight, no spills']),
+    dict(design='C', theme='Cotton totes',
+         name='Cotton Totes', angle='Cotton totes',
+         subject='The tote that goes everywhere',
+         headline='Cotton totes for the daily haul.',
+         subline='Natural cotton totes for shopping, events and commutes, branded with your logo.',
+         items=['GG1647', 'GG1673', 'GG1685', 'GG1654', 'GG1682', 'GG1695'],
+         descs=['Roomy cotton for the daily haul', 'Strong handles, soft feel',
+                'Folds flat, opens wide', 'A tote they actually reuse',
+                'Natural cotton, your mark', 'Built for shopping and events']),
+    dict(design='A', theme='Recycled bags',
+         name='Recycled Bags', angle='Recycled bags',
+         subject='Recycled bags they reuse',
+         headline='Recycled bags they keep reusing.',
+         subline='Recycled fabric bags for everyday carry, branded with your logo.',
+         items=['GG1267', 'GG1280', 'GG1298', 'GG1306', 'GG1476', 'GG1490'],
+         descs=['Made from recycled material', 'Light to fold, strong to carry',
+                'Roomy for the daily load', 'A bag they keep reaching for',
+                'Better material, your mark', 'Ready for the next trip out']),
+    dict(design='B', theme='Desk tech',
+         name='Desk Tech', angle='Desk tech',
+         subject='Tech that clears the desk',
+         headline='Desk tech that earns its place.',
+         subline='Chargers and desk tech for daily work, branded with your logo.',
+         items=['GG1283', 'GG1221', 'GG1068', 'GG1316', 'GG1365', 'GG1629'],
+         descs=['Keeps devices charged and ready', 'Clears the cable clutter',
                 'Clean tech, your logo', 'Built for everyday work',
-                'A gadget they actually use', 'Ready whenever they need it']),
-    dict(design='C', theme='Natural carry',
-         name='Natural Carry', angle='Natural carry',
-         subject='Natural fibre, your mark',
-         headline='Jute and cotton, naturally branded.',
-         subline='Natural fibre bags for everyday carry, branded with your logo.',
-         items=['GG1445', 'GG1552', 'GG1714', 'GG1137', 'GG1178', 'GG1433'],
-         descs=['Woven from natural fibre', 'Roomy enough for the daily haul',
-                'Sturdy handles, soft feel', 'A bag they keep reaching for',
-                'Better material, your mark', 'Made to be reused']),
-    dict(design='A', theme='Cotton tees',
-         name='Cotton Tees', angle='Team tees',
-         subject='Tees they actually wear',
-         headline='Soft tees they pull on first.',
-         subline='Soft cotton tees for the whole team, branded with your logo.',
-         items=['GG1742', 'GG1773', 'GG1793', 'GG1783', 'GG1785', 'GG1786'],
-         descs=['Soft cotton worn past day one', 'Holds shape wash after wash',
-                'Clean print, your logo', 'Made to be worn often',
+                'A gadget they actually use', 'Ready the moment they need it']),
+    dict(design='C', theme='Jute bags',
+         name='Jute Bags', angle='Jute bags',
+         subject='Jute they carry proudly',
+         headline='Jute bags, naturally branded.',
+         subline='Woven jute bags for markets and gifting, branded with your logo.',
+         items=['GG1114', 'GG1120', 'GG1216', 'GG1381', 'GG1406', 'GG1567'],
+         descs=['Woven from natural jute', 'Sturdy enough for a full load',
+                'Natural texture, clean print', 'A bag they keep reusing',
+                'Better material, your mark', 'Made to be carried again']),
+    dict(design='A', theme='Organic tees',
+         name='Organic Tees', angle='Organic tees',
+         subject='Organic tees they live in',
+         headline='Organic tees they wear for years.',
+         subline='Soft organic cotton tees for teams and events, branded with your logo.',
+         items=['GG1758', 'GG1763', 'GG1764', 'GG1765', 'GG1610', 'GG1611'],
+         descs=['Soft organic cotton, worn often', 'Holds shape wash after wash',
+                'Clean print, your logo', 'Made to be worn for years',
                 'A tee they actually keep', 'Comfortable from the first wear']),
-    dict(design='B', theme='Active wear',
-         name='Active Wear', angle='Active wear',
-         subject='Built for the move',
-         headline='Active wear for working teams.',
-         subline='Light active wear for training and events, branded with your logo.',
-         items=['GG1725', 'GG1726', 'GG1798', 'GG1796', 'GG1792', 'GG1730'],
-         descs=['Light and breathable on the move', 'Keeps up through training',
-                'Quick drying, clean print', 'Built for events and teams',
-                'A piece they keep wearing', 'Your logo, worn in motion']),
-    dict(design='C', theme='Recycled steel',
-         name='Recycled Steel', angle='Recycled steel',
-         subject='Reborn steel, refilled often',
-         headline='Recycled steel, refilled for years.',
-         subline='Recycled steel bottles and mugs for daily refills, branded with your logo.',
-         items=['GG1530', 'GG1531', 'GG1495', 'GG1535', 'GG1369', 'GG1064'],
-         descs=['Made from recycled steel', 'Holds hot or cold for hours',
-                'Refilled day after day', 'A bottle they keep close',
-                'Better material, your logo', 'Built to last, not bin']),
+    dict(design='B', theme='Glassware',
+         name='Glassware', angle='Glassware',
+         subject='Glass they pour into daily',
+         headline='Glassware that earns its shelf.',
+         subline='Glasses and tumblers for the desk and kitchen, branded with your logo.',
+         items=['GG1072', 'GG1073', 'GG1505', 'GG1529', 'GG1636'],
+         descs=['Clear glass, clean logo print', 'Steady in the hand',
+                'A glass they reach for daily', 'Made to sit out on show',
+                'Simple, premium, yours', 'Poured into morning and night']),
+    dict(design='C', theme='Bamboo desk',
+         name='Bamboo Desk', angle='Bamboo desk',
+         subject='Bamboo on every desk',
+         headline='Bamboo pieces for the desk.',
+         subline='Natural bamboo desk pieces for daily work, branded with your logo.',
+         items=['GG1544', 'GG1419', 'GG1422', 'GG1451', 'GG1463', 'GG1500'],
+         descs=['Warm natural bamboo grain', 'Sits neat on any desk',
+                'Natural finish, clean logo', 'A piece they keep on show',
+                'Better material, your mark', 'Made to last on the desk']),
 ]
 
 
