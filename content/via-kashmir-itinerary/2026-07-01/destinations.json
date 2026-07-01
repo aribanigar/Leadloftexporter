@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "coorg",    "feat": "kerala",   "place": "Coorg, Karnataka", "region": "South India"},
+  "kashmir": {"photo": "kashmir",  "feat": "himalaya", "place": "Kashmir",          "region": "North India"},
+  "saudi":   {"photo": "istanbul", "feat": "maldives", "place": "Istanbul, Turkiye","region": "Europe"},
+  "dubai":   {"photo": "santorini","feat": "georgia",  "place": "Santorini, Greece","region": "Europe"}
+}

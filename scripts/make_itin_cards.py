@@ -29,11 +29,12 @@ CARD_W, CARD_H = 1080, 1350
 MARKETS = ["india", "kashmir", "saudi", "dubai"]
 
 MARKET_COPY = {
-    "india":   {"headline": "Kerala quote\nin 2 minutes", "sub": "Build any Indian itinerary — fast, professional, branded."},
+    "india":   {"template": "{name} quote\nin 2 minutes", "sub": "Build any Indian itinerary — fast, professional, branded."},
     "kashmir": {"headline": "Kashmir circuit\nin 2 minutes", "sub": "Dal Lake · Gulmarg · Pahalgam — client-ready instantly."},
-    "saudi":   {"headline": "Cappadocia quote\nin 2 minutes", "sub": "Any global itinerary — fast, professional, branded."},
-    "dubai":   {"headline": "Bali itinerary\nin 2 minutes", "sub": "Any destination worldwide — quoted in minutes, not hours."},
+    "saudi":   {"template": "{name} quote\nin 2 minutes", "sub": "Any global itinerary — fast, professional, branded."},
+    "dubai":   {"template": "{name} itinerary\nin 2 minutes", "sub": "Any destination worldwide — quoted in minutes, not hours."},
 }
+DEFAULT_PLACE = {"india": "Kerala", "kashmir": "Kashmir", "saudi": "Cappadocia", "dubai": "Bali"}
 
 
 def gradient_image(w: int, h: int, top: tuple, bottom: tuple) -> Image.Image:
@@ -82,8 +83,9 @@ def try_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def draw_card(market: str, photo_name: str) -> Image.Image:
+def draw_card(market: str, photo_name: str, place_name: str = None) -> Image.Image:
     copy = MARKET_COPY.get(market, MARKET_COPY["india"])
+    place_name = place_name or DEFAULT_PLACE.get(market, "")
 
     # Base gradient
     card = gradient_image(CARD_W, CARD_H, GREEN, GREEN2)
@@ -114,8 +116,7 @@ def draw_card(market: str, photo_name: str) -> Image.Image:
 
     # Destination badge (top right)
     badge_font = try_font(22)
-    place = {"india": "Kerala", "kashmir": "Kashmir", "saudi": "Cappadocia", "dubai": "Bali"}.get(market, "")
-    badge_text = f"✦ {place}"
+    badge_text = f"✦ {place_name}"
     badge_bbox = draw.textbbox((0, 0), badge_text, font=badge_font)
     bw = badge_bbox[2] - badge_bbox[0] + 28
     bx = CARD_W - bw - 40
@@ -125,7 +126,8 @@ def draw_card(market: str, photo_name: str) -> Image.Image:
     # Main headline (lower part of photo zone)
     headline_font = try_font(80, bold=True)
     hy = photo_h - 240
-    lines = copy["headline"].split("\n")
+    headline = copy["template"].format(name=place_name) if "template" in copy else copy["headline"]
+    lines = headline.split("\n")
     for i, line in enumerate(lines):
         draw.text((60, hy + i * 94), line, font=headline_font, fill=WHITE)
 
@@ -190,10 +192,11 @@ def main():
     for m in markets:
         dest = dest_data.get(m, {})
         photo_name = dest.get("photo", m)
+        place_name = dest.get("place", "").split(",")[0].strip() or photo_name.replace("_", " ").title()
         out_dir = CONTENT / args.date / m / "img"
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "whatsapp.jpg"
-        card = draw_card(m, photo_name)
+        card = draw_card(m, photo_name, place_name)
         card.save(str(out_path), "JPEG", quality=88, optimize=True)
         print(f"  [{m}] {out_path} ({out_path.stat().st_size // 1024} KB)")
     print("Done.")
