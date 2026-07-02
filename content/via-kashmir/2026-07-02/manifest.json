@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-02",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "B/C/A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "Green high meadows and cool mornings - peak-summer Kashmir wide open as the July season begins",
+      "subject": "The valley is green and wide open this July",
+      "campaign_code": "VK-INR-B2C-20260702"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "C",
+      "theme": "Peak-season room demand as the yatra begins - the search is happening now, unlisted rooms miss it",
+      "subject": "A July guest just booked the room next door",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260702"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "A",
+      "theme": "Lakeside demand on the Dal at peak season - the next guest picks from the boats that are listed",
+      "subject": "The Dal is filling and your deck stays unlisted",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260702"
+    }
+  ]
+}
