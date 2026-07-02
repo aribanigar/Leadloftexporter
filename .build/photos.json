@@ -1,0 +1,46 @@
+{
+  "social-media": {
+    "slug": "social-media",
+    "query": "video production dark neon",
+    "pixabay_id": 10216710,
+    "page": "https://pixabay.com/photos/silhouette-stage-lighting-10216710/"
+  },
+  "seo": {
+    "slug": "seo",
+    "query": "dark data analytics dashboard",
+    "pixabay_id": 4941341,
+    "src_size": [
+      1280,
+      854
+    ],
+    "page": "https://pixabay.com/photos/engineer-engineering-4941341/"
+  },
+  "website-design": {
+    "slug": "website-design",
+    "query": "dark computer monitor code",
+    "pixabay_id": 6521720,
+    "page": "https://pixabay.com/photos/software-developer-web-developer-6521720/"
+  },
+  "erp-building": {
+    "slug": "erp-building",
+    "query": "database technology dark blue",
+    "pixabay_id": 3527268,
+    "page": "https://pixabay.com/photos/integration-face-binary-code-3527268/"
+  },
+  "ai-work-studio": {
+    "slug": "ai-work-studio",
+    "query": "cinema studio dark dramatic",
+    "pixabay_id": 7336161,
+    "page": "https://pixabay.com/photos/fashion-fashion-photography-7336161/"
+  },
+  "schoolos": {
+    "slug": "schoolos",
+    "query": "dark modern library books",
+    "pixabay_id": 5641389,
+    "src_size": [
+      1280,
+      854
+    ],
+    "page": "https://pixabay.com/photos/library-architecture-books-interior-5641389/"
+  }
+}

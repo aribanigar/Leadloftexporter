@@ -1,0 +1,15 @@
+{
+  "last_run": "2026-07-02",
+  "industries_used_history": [
+    { "date": "2026-07-02", "industries": ["Retail", "Education and Research"] }
+  ],
+  "industries_remaining": [
+    "Agribusiness", "Consumer Products", "Life Sciences and Healthcare", "Wholesale Distribution",
+    "Aerospace and Defense", "Automotive", "High Tech", "Industrial Manufacturing", "Mill Products",
+    "Chemicals", "Mining", "Oil Gas and Energy", "Utilities",
+    "Construction and Real Estate", "Media Sports and Entertainment", "Professional Services", "Telecommunications", "Travel and Transportation",
+    "Defense and Security", "Government",
+    "Financial Services"
+  ],
+  "notes": "First run. Supabase project returned HTTP 402 (egress quota exceeded) at run time; seeding may be blocked until the project plan is restored. Content and images still built and pushed."
+}

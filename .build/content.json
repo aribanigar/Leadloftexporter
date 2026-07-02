@@ -1,0 +1,186 @@
+{
+  "contact": { "phone": "+918218929990", "phone_display": "+91 82189 29990", "wa": "https://wa.me/918218929990", "email": "contact@hudace.com", "site": "hudace.com", "site_url": "https://hudace.com" },
+  "services": [
+    {
+      "slug": "social-media",
+      "name": "Social Media",
+      "industry": "Retail",
+      "subject": "A social presence that compounds for retail brands",
+      "headline": "MOMENTUM",
+      "hero_sub": "A social presence that compounds, built and run for you every month.",
+      "deliverables": [
+        "6 short-form videos / month",
+        "12 feed posts / month",
+        "8 stories / month",
+        "Captions and hashtag sets",
+        "Content calendar and scheduling",
+        "Community management (comments and DMs)",
+        "Monthly performance report"
+      ],
+      "scope_line": "For retail brands, this turns scattered posting into a monthly system that keeps products in front of buyers across the feed, stories, and short video.",
+      "proof_line": "In retail programs we have run, moving from occasional posts to a fixed monthly cadence gave brands a steady rise in saves, shares, and profile visits that convert.",
+      "future_line": "As the account matures the same engine extends into paid amplification and shoppable formats without changing the workflow.",
+      "hooks": [
+        "Consistency beats intensity. A fixed monthly output keeps your brand in the feed while competitors post in bursts and go quiet.",
+        "Short video earns the reach. Six shorts a month feed the formats platforms push hardest, so distribution works in your favour.",
+        "Every asset has a job. Captions, hashtag sets, and a planned calendar turn posts into a funnel rather than a scrapbook."
+      ],
+      "closing_line": "Tell us the brand and the goal. We return a calendar and the first batch within the week.",
+      "whatsapp": "Hudace runs your social media end to end. 6 short videos, 12 feed posts, and 8 stories a month, plus captions, scheduling, community management, and a monthly report. A predictable content engine rather than one-off posts. Speak with us: wa.me/918218929990",
+      "linkedin": "Most retail brands do not have a content problem. They have a consistency problem.\n\nHudace runs social media as a monthly system, not a scramble:\n- 6 short-form videos, 12 feed posts, and 8 stories every month\n- Captions, hashtag sets, and a planned calendar\n- Community management across comments and DMs\n- A monthly performance report tied to what matters\n\nConsistent output is what compounds reach. If you want a presence that builds month over month, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: Your social channels, run as a system\n\nHello,\n\nI looked at how your brand shows up on social and saw the common pattern for retail: strong products, uneven posting. That gap is where reach and revenue leak.\n\nHudace would run it as a monthly engine: 6 short videos, 12 feed posts, 8 stories, captions and hashtags, scheduling, community management, and a monthly report. Predictable output is what compounds.\n\nWould you be open to a short call to see the calendar we would run for you?\n\ncontact@hudace.com | +91 82189 29990"
+    },
+    {
+      "slug": "seo",
+      "name": "SEO / AEO / GEO / SRX",
+      "industry": "Education and Research",
+      "subject": "Be the answer when families and researchers search",
+      "headline": "VISIBILITY",
+      "hero_sub": "Rank in search, and show up inside AI-generated answers.",
+      "deliverables": [
+        "Technical SEO audit and fixes",
+        "Keyword and intent research",
+        "On-page optimization (titles, meta, headings, schema)",
+        "Content briefs and optimization",
+        "Authority and backlink building",
+        "Local SEO (profile, citations, maps)",
+        "AEO: answer-engine optimization (FAQ, structured answers)",
+        "GEO: visibility inside AI-generated answers",
+        "SRX: search experience and Core Web Vitals",
+        "Monthly ranking and traffic report"
+      ],
+      "scope_line": "For education and research institutions, this puts your programs in front of families and prospective researchers at the moment they search, and inside the AI answers they now read first.",
+      "proof_line": "In education programs we have run, fixing technical foundations and structuring answers moved institutions from invisible to consistently found for the terms that drive enquiries.",
+      "future_line": "As authority builds, the same structured content becomes the source AI assistants cite, extending reach beyond the traditional results page.",
+      "hooks": [
+        "Search moved. People read AI answers before they click, so AEO and GEO decide whether you are quoted or skipped.",
+        "Foundations first. A technical audit and Core Web Vitals work remove the reasons pages never rank in the first place.",
+        "Intent over volume. We target the terms that signal a real enquiry, so traffic turns into applications, not bounce."
+      ],
+      "closing_line": "Send us your site. We return an audit and the terms worth owning this quarter.",
+      "whatsapp": "Hudace makes your institution the answer when people search, and inside AI-generated answers too. Technical audit, on-page and schema, content, backlinks, local SEO, AEO, GEO, and Core Web Vitals, with a monthly report. Speak with us: wa.me/918218929990",
+      "linkedin": "Search changed. Families and researchers read an AI-generated answer before they ever click a link.\n\nHudace covers the full picture, not just rankings:\n- Technical audit, on-page, and schema done right\n- AEO and GEO so you appear inside AI answers\n- Authority building and local visibility\n- Core Web Vitals and search experience\n- A monthly ranking and traffic report\n\nIf you want to be found where decisions now start, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: Being the answer, not just a result\n\nHello,\n\nWhen someone researches programs like yours, the first thing they read is often an AI-generated answer. If your institution is not structured for that, you are absent from the moment that matters.\n\nHudace handles technical SEO, on-page and schema, content, authority, local visibility, and answer-engine optimization, with a monthly report on rankings and traffic.\n\nCould I send over a short audit of where you stand today?\n\ncontact@hudace.com | +91 82189 29990"
+    },
+    {
+      "slug": "website-design",
+      "name": "Website Design",
+      "industry": "Education and Research",
+      "subject": "A website that turns visitors into enquiries",
+      "headline": "PRESENCE",
+      "hero_sub": "A fast, mobile-first site you can edit yourself.",
+      "deliverables": [
+        "Custom multi-page website",
+        "Mobile-first responsive build",
+        "Booking, lead, and contact forms",
+        "CMS to edit content yourself",
+        "SEO-ready structure and speed",
+        "Analytics and WhatsApp integration",
+        "Hosting and domain setup",
+        "Launch and handover"
+      ],
+      "scope_line": "For education and research institutions, this gives you a site that presents programs clearly, captures enquiries, and updates itself without a developer on call.",
+      "proof_line": "In education programs we have run, a mobile-first rebuild with clear enquiry paths turned passive visits into a steady stream of qualified admissions questions.",
+      "future_line": "The same foundation scales into portals, event pages, and multi-campus structures as the institution grows.",
+      "hooks": [
+        "Mobile decides. Most visitors arrive on a phone, so a mobile-first build is where enquiries are won or lost.",
+        "Speed is trust. SEO-ready structure and fast load times keep people on the page long enough to act.",
+        "You stay in control. A CMS means you update programs and dates yourself, without waiting on anyone."
+      ],
+      "closing_line": "Share your current site. We return a structure and a launch timeline.",
+      "whatsapp": "Hudace builds a fast, mobile-first website you can edit yourself. Custom pages, lead and booking forms, CMS, SEO-ready structure, analytics and WhatsApp integration, hosting, and full handover at launch. Speak with us: wa.me/918218929990",
+      "linkedin": "A website is the first campus visit most people ever make.\n\nHudace builds sites that carry their weight:\n- Custom, mobile-first, and fast\n- Booking, lead, and contact forms that capture enquiries\n- A CMS so you edit content yourself\n- SEO-ready structure with analytics and WhatsApp built in\n- Hosting, domain, and a clean handover\n\nIf your current site looks the part but does not convert, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: A site that converts the first visit\n\nHello,\n\nFor most institutions the website is the first impression and the main enquiry channel, yet it is often slow on mobile and hard to update.\n\nHudace builds a custom, mobile-first site with lead and booking forms, a CMS you control, SEO-ready structure, analytics, and WhatsApp integration, then hands it over cleanly at launch.\n\nWould you like to see a proposed structure for your site?\n\ncontact@hudace.com | +91 82189 29990"
+    },
+    {
+      "slug": "erp-building",
+      "name": "ERP Building",
+      "industry": "Retail",
+      "subject": "Custom software that runs your retail operation",
+      "headline": "CONTROL",
+      "hero_sub": "One system for the workflows spreadsheets cannot hold.",
+      "deliverables": [
+        "Discovery and module blueprint",
+        "Custom modules (CRM, inventory, billing, HR, and more)",
+        "Role-based access and dashboards",
+        "Workflow automations",
+        "Integrations (payments, messaging, APIs)",
+        "Web and mobile access",
+        "Training and documentation",
+        "Ongoing support and iterations"
+      ],
+      "scope_line": "For retail operations, this replaces scattered spreadsheets and tools with one system for inventory, billing, customers, and staff, visible from web and mobile.",
+      "proof_line": "In retail operations we have built for, moving to a single system removed duplicate data entry and gave managers a live view of stock and sales in one place.",
+      "future_line": "Because it is modular, new needs such as loyalty, procurement, or multi-outlet reporting are added as blueprints rather than rebuilds.",
+      "hooks": [
+        "Built for how you work. Custom modules fit your process instead of forcing your process into generic software.",
+        "One source of truth. Role-based dashboards end the reconciliation between disconnected tools and files.",
+        "Automation compounds. Every workflow you remove by hand is time returned to the floor, every day."
+      ],
+      "closing_line": "Tell us the workflows that hurt most. We return a module blueprint.",
+      "whatsapp": "Hudace builds custom business software for retail: CRM, inventory, billing, HR, and more in one system, with role-based dashboards, automations, integrations, web and mobile access, training, and ongoing support. Speak with us: wa.me/918218929990",
+      "linkedin": "Growing retail operations rarely fail for lack of effort. They fail for lack of one system.\n\nHudace builds ERP around how you actually work:\n- Discovery and a clear module blueprint\n- Custom modules for CRM, inventory, billing, HR, and more\n- Role-based access, dashboards, and automations\n- Payment, messaging, and API integrations\n- Web and mobile access, training, and ongoing support\n\nIf your team lives in spreadsheets that no longer agree with each other, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: One system instead of ten spreadsheets\n\nHello,\n\nAs retail operations grow, inventory, billing, and customer data tend to scatter across tools that no longer agree. The cost is duplicate work and decisions made on stale numbers.\n\nHudace builds custom software that brings it into one system: CRM, inventory, billing, HR, dashboards, automations, and integrations, with training and ongoing support.\n\nCould we map your core workflows into a short module blueprint?\n\ncontact@hudace.com | +91 82189 29990"
+    },
+    {
+      "slug": "ai-work-studio",
+      "name": "AI Work Studio",
+      "industry": "Retail",
+      "subject": "A cinematic film for your brand in seven days, no crew",
+      "headline": "CINEMATIC",
+      "hero_sub": "A finished brand film and social cuts, produced with AI.",
+      "deliverables": [
+        "60-second cinematic film",
+        "Three 15-second social cuts",
+        "Ten AI-generated stills",
+        "Script and concept included",
+        "Delivered in seven working days, no film crew"
+      ],
+      "scope_line": "For retail brands, this delivers a launch-ready film and a full set of social cuts and stills, without the cost and calendar of a traditional shoot.",
+      "proof_line": "In retail campaigns we have produced, an AI-made film and cuts gave brands premium creative in days, at a fraction of the time a location shoot would have taken.",
+      "future_line": "Once the concept exists, seasonal refreshes and new product cuts are produced from the same world, so every campaign stays on brand.",
+      "hooks": [
+        "Speed is the advantage. Seven working days means you launch while the moment is still live.",
+        "One concept, many cuts. A film plus three social edits and ten stills covers a full campaign from one production.",
+        "Premium without the crew. Cinematic quality, no location, no calendar, no crew day rates."
+      ],
+      "closing_line": "Send us the product and the feeling. We return a script and a delivery date.",
+      "whatsapp": "Hudace AI Work Studio delivers a 60-second cinematic film, three 15-second social cuts, and ten AI-generated stills, with script and concept, in seven working days and no film crew. Speak with us: wa.me/918218929990",
+      "linkedin": "A brand film used to mean a crew, a location, and a month.\n\nHudace AI Work Studio delivers it in seven working days:\n- A 60-second cinematic film\n- Three 15-second social cuts\n- Ten AI-generated stills\n- Script and concept included\n- No film crew, no location day rates\n\nPremium creative, produced at the speed campaigns actually move. If you have a launch coming, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: A cinematic brand film in seven days\n\nHello,\n\nMost brand films stall on cost and scheduling. By the time the crew is booked, the moment has passed.\n\nHudace AI Work Studio produces a 60-second cinematic film, three 15-second social cuts, and ten stills, with script and concept, in seven working days and no crew.\n\nIf you have a product or launch in mind, may I send a sample concept?\n\ncontact@hudace.com | +91 82189 29990"
+    },
+    {
+      "slug": "schoolos",
+      "name": "SchoolOS (School ERP)",
+      "industry": "Education and Research",
+      "subject": "One real-time view of the whole institution",
+      "headline": "SCHOOLOS",
+      "hero_sub": "The school ERP that runs admissions to accounts in one place.",
+      "deliverables": [
+        "Admissions: online enquiry to enrollment",
+        "Student records: profiles, documents, history",
+        "Attendance: daily and period, parent alerts",
+        "Fees: invoices, online payments, reminders, receipts",
+        "Examinations: marks, grading, report cards",
+        "Timetable: classes, teachers, substitutions",
+        "Communication: announcements and parent app",
+        "Transport: routes, vehicles, live tracking",
+        "Library: catalog, issue and return",
+        "HR and payroll: staff and salaries",
+        "Reports: management dashboards"
+      ],
+      "scope_line": "For education institutions, SchoolOS connects admissions, attendance, fees, examinations, and communication so the whole school runs from one real-time view.",
+      "proof_line": "In institutions we have worked with, moving records, fees, and communication into one system cut the hours lost to routine administration and reconciliation across offices.",
+      "future_line": "Modules such as transport tracking, library, and HR and payroll switch on as the institution needs them, with no separate systems to stitch together.",
+      "hooks": [
+        "One view, every office. Admissions, attendance, fees, and exams share one record, so nothing is re-entered.",
+        "Parents stay informed. Attendance alerts, fee reminders, and announcements reach a parent app automatically.",
+        "Administration shrinks. Automating fees, receipts, and report cards returns time to teaching and leadership."
+      ],
+      "closing_line": "Tell us your current setup. We return a rollout plan module by module.",
+      "whatsapp": "Hudace SchoolOS runs your institution in one system: admissions, student records, attendance, fees, examinations, timetable, parent communication, transport, library, and HR and payroll, with management dashboards. Speak with us: wa.me/918218929990",
+      "linkedin": "Running a school across disconnected systems costs hours no one sees, every single day.\n\nHudace SchoolOS brings it into one real-time view:\n- Admissions, student records, and attendance\n- Fees with online payments, reminders, and receipts\n- Examinations, timetable, and report cards\n- A parent app for alerts and announcements\n- Transport, library, and HR and payroll\n- Management dashboards across the institution\n\nIf your offices still reconcile spreadsheets by hand, we should talk.\n\ncontact@hudace.com | +91 82189 29990 | hudace.com",
+      "outreach": "Subject: Admissions to accounts, in one system\n\nHello,\n\nMost institutions run admissions, attendance, fees, and examinations in separate tools that never quite agree. The hidden cost is administrative time and delayed information for parents.\n\nHudace SchoolOS unifies all of it: records, attendance with alerts, online fees, exams and report cards, a parent app, transport, library, and HR and payroll, with dashboards for leadership.\n\nCould I share a rollout plan tailored to your institution?\n\ncontact@hudace.com | +91 82189 29990"
+    }
+  ]
+}

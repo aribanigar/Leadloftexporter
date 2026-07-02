@@ -1,3 +1,7 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+
+# routine build artifacts (fonts are re-downloadable, emails duplicated in batch.json)
+.build/fonts/
+.build/emails/
