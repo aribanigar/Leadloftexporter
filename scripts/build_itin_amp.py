@@ -131,8 +131,8 @@ def build_amp(market: str, date_str: str):
   <!-- CTA card -->
   <div class="cta-card">
     <h2>Start building today</h2>
-    <p>Free to start. No setup. No learning curve.</p>
-    <a href="{CTA_URL}" class="cta-btn">Get started — it's free →</a>
+    <p>No setup. No learning curve.</p>
+    <a href="{CTA_URL}" class="cta-btn">Get started →</a>
   </div>
 
   <!-- Urgency -->
