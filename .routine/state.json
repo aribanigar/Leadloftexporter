@@ -1,0 +1,10 @@
+{
+  "last_run": "2026-07-02",
+  "folder": "hudace",
+  "industries_used_log": [
+    { "date": "2026-07-02", "industries": ["Retail", "Construction and Real Estate"] }
+  ],
+  "industries_used_recent": ["Retail", "Construction and Real Estate"],
+  "emails_per_run": ["social", "seo", "website", "erp", "aistudio", "schoolos"],
+  "notes": "Rotate 2 new industries each run; SchoolOS email is framed for Education. Never name a region or country in output."
+}

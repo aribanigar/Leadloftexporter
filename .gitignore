@@ -1,3 +1,9 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+
+# Routine build artifacts (regenerable; keep scripts + generated content only)
+build/assets/
+build/preview-*.png
+build/shot.mjs
+build/pixabay_pick.json

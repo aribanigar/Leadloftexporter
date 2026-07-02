@@ -1,0 +1,189 @@
+{
+  "social": {
+    "headline": "SOCIAL MEDIA",
+    "sub": "A consistent, on-brand presence, managed monthly.",
+    "subject": "A social presence that shows up every day",
+    "industry": "Retail",
+    "deliverables": [
+      "6 short-form videos / month",
+      "12 feed posts / month",
+      "8 stories / month",
+      "Captions and hashtag sets",
+      "Content calendar and scheduling",
+      "Community management (comments and DMs)",
+      "Monthly performance report"
+    ],
+    "card_deliverables": [
+      "6 short-form videos / month",
+      "12 feed posts / month",
+      "8 stories / month",
+      "Community management",
+      "Monthly performance report"
+    ],
+    "scope": "For retail brands, we turn your storefront and catalog into a steady feed of short video, posts, and stories that keep the brand present between purchases.",
+    "proof": "We have run social for consumer and retail brands and moved them from irregular posting to a consistent, on-brand presence that compounds over time.",
+    "future": "As the channel matures we layer in paid amplification and shoppable formats without adding to your team's workload.",
+    "hooks": [
+      ["Consistency beats bursts", "A fixed monthly output keeps your audience warm, so you are the brand they remember at the moment of purchase."],
+      ["Short video earns the reach", "Six cuts a month give the platforms fresh signals while your feed and stories hold the brand together."],
+      ["We manage the conversation", "Community management on comments and DMs turns passive followers into orders, not just likes."]
+    ]
+  },
+  "seo": {
+    "headline": "SEO AEO GEO SRX",
+    "sub": "Be the result buyers and AI answers find first.",
+    "subject": "Be the result buyers and AI find first",
+    "industry": "Construction and Real Estate",
+    "deliverables": [
+      "Technical SEO audit and fixes",
+      "Keyword and intent research",
+      "On-page optimization (titles, meta, headings, schema)",
+      "Content briefs and optimization",
+      "Authority and backlink building",
+      "Local SEO (profile, citations, maps)",
+      "AEO: answer-engine optimization (FAQ, structured answers)",
+      "GEO: visibility inside AI-generated answers",
+      "SRX: search experience and Core Web Vitals",
+      "Monthly ranking and traffic report"
+    ],
+    "card_deliverables": [
+      "Technical SEO audit and fixes",
+      "On-page optimization and schema",
+      "AEO answer-engine optimization",
+      "GEO visibility in AI answers",
+      "Monthly ranking and traffic report"
+    ],
+    "scope": "For construction and real estate firms, we make you the result buyers and partners find first, across classic search and AI-generated answers.",
+    "proof": "We have optimized sites in competitive service sectors and moved them from invisible to ranking for the terms that bring qualified enquiries.",
+    "future": "As rankings hold we expand into new service and location pages, so each win opens the next.",
+    "hooks": [
+      ["Search is the shortlist", "Technical fixes and on-page work put you on the first page where high-intent buyers actually look."],
+      ["AI answers are the new front page", "AEO and GEO get you cited inside AI-generated answers instead of left out of them."],
+      ["Speed and experience convert", "SRX and Core Web Vitals work turns visits into enquiries instead of bounces."]
+    ]
+  },
+  "website": {
+    "headline": "WEBSITE DESIGN",
+    "sub": "A fast, mobile-first site that turns visits into orders.",
+    "subject": "A website that turns visits into orders",
+    "industry": "Retail",
+    "deliverables": [
+      "Custom multi-page website",
+      "Mobile-first responsive build",
+      "Booking, lead, and contact forms",
+      "CMS to edit content yourself",
+      "SEO-ready structure and speed",
+      "Analytics and WhatsApp integration",
+      "Hosting and domain setup",
+      "Launch and handover"
+    ],
+    "card_deliverables": [
+      "Custom multi-page website",
+      "Mobile-first responsive build",
+      "Booking and lead forms",
+      "CMS you control",
+      "Analytics and WhatsApp integration"
+    ],
+    "scope": "For retail brands, a fast, mobile-first site turns browsing into booked and paid orders without adding staff.",
+    "proof": "We have built and shipped sites for consumer businesses that replaced slow, hard-to-edit pages with a fast site the team can update themselves.",
+    "future": "The CMS and structure are built to grow, so new lines and campaigns go live in hours, not weeks.",
+    "hooks": [
+      ["Mobile-first or nothing", "A responsive build meets buyers where they already are and keeps them from leaving."],
+      ["Forms are the revenue", "Booking, lead, and contact forms with WhatsApp integration route every enquiry straight to your team."],
+      ["You stay in control", "A CMS means you edit content yourself, so the site keeps up with the business."]
+    ]
+  },
+  "erp": {
+    "headline": "CUSTOM ERP",
+    "sub": "Business software built around how you work.",
+    "subject": "Software built around how you work",
+    "industry": "Construction and Real Estate",
+    "deliverables": [
+      "Discovery and module blueprint",
+      "Custom modules (CRM, inventory, billing, HR, and more)",
+      "Role-based access and dashboards",
+      "Workflow automations",
+      "Integrations (payments, messaging, APIs)",
+      "Web and mobile access",
+      "Training and documentation",
+      "Ongoing support and iterations"
+    ],
+    "card_deliverables": [
+      "Discovery and module blueprint",
+      "Custom modules built to fit",
+      "Role-based dashboards",
+      "Workflow automations",
+      "Web and mobile access"
+    ],
+    "scope": "For construction and real estate operators, custom software replaces spreadsheets and disconnected tools with one system your teams actually use.",
+    "proof": "We have built custom operational software for service businesses that unified scattered workflows into a single, role-based platform.",
+    "future": "Modules are added as you grow, so the system matches the business instead of forcing the business to match the software.",
+    "hooks": [
+      ["Built for your workflow", "Custom modules fit how your teams already work, so adoption is fast and clean."],
+      ["One source of truth", "Role-based dashboards give every team the view they need without the version-chaos of spreadsheets."],
+      ["Automation removes the busywork", "Workflow automations and integrations cut the manual steps that slow projects down."]
+    ]
+  },
+  "aistudio": {
+    "headline": "AI WORK STUDIO",
+    "sub": "Cinematic film and stills in seven working days.",
+    "subject": "Cinematic film in seven working days, no crew",
+    "industry": "Retail",
+    "deliverables": [
+      "60-second cinematic film",
+      "Three 15-second social cuts",
+      "Ten AI-generated stills",
+      "Script and concept included",
+      "Delivered in seven working days, no film crew"
+    ],
+    "card_deliverables": [
+      "60-second cinematic film",
+      "Three 15-second social cuts",
+      "Ten AI-generated stills",
+      "Script and concept included",
+      "Seven working days, no film crew"
+    ],
+    "scope": "For retail brands, cinematic film and stills give your launches the production value of a studio shoot without the crew or the wait.",
+    "proof": "We have produced AI cinematic work for consumer brands that delivered a campaign-ready film and social cuts in days.",
+    "future": "Once the look is set we re-cut and refresh for each drop, keeping every campaign on-brand.",
+    "hooks": [
+      ["Production value, no production", "A 60-second cinematic film and three social cuts land in seven working days, no film crew."],
+      ["One concept, every channel", "Ten AI stills and short cuts give you a full set of assets from a single idea."],
+      ["Concept included", "Script and concept are handled, so you approve a direction and receive finished work."]
+    ]
+  },
+  "schoolos": {
+    "headline": "SCHOOLOS",
+    "sub": "Run the whole school on one connected platform.",
+    "subject": "Run the whole school on one platform",
+    "industry": "Education and Research",
+    "deliverables": [
+      "Admissions: online enquiry to enrollment",
+      "Student records: profiles, documents, history",
+      "Attendance: daily and period, parent alerts",
+      "Fees: invoices, online payments, reminders, receipts",
+      "Examinations: marks, grading, report cards",
+      "Timetable: classes, teachers, substitutions",
+      "Communication: announcements and parent app",
+      "Transport: routes, vehicles, live tracking",
+      "Library: catalog, issue and return",
+      "HR and payroll: staff and salaries",
+      "Reports: management dashboards"
+    ],
+    "card_deliverables": [
+      "Admissions to enrollment",
+      "Attendance and parent alerts",
+      "Fees and online payments",
+      "Examinations and report cards",
+      "Transport, library, HR, reports"
+    ],
+    "scope": "For schools, SchoolOS runs admissions to reporting on one connected platform, so staff spend less time on admin and more on students.",
+    "proof": "We have built school operations software that replaced separate registers and tools with a single system parents and staff share.",
+    "future": "The Nectar assistant automates routine admin across admissions, attendance, and fees, and the platform grows with each new intake.",
+    "hooks": [
+      ["One platform, every department", "Admissions, attendance, fees, and exams share the same records, so nothing is entered twice."],
+      ["Parents stay informed", "The parent app and communication module send attendance and fee alerts automatically."],
+      ["Reports write themselves", "Management dashboards turn daily activity into decisions without manual collation."]
+    ]
+  }
+}
