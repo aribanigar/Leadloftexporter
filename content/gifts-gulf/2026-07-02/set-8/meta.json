@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-02",
+  "theme": "Desk tumblers",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260702-8",
+  "campaign_name": "Desk Tumblers - 02 Jul 2026",
+  "subject": "Cups for every desk",
+  "skus": [
+    "GG1291",
+    "GG1315",
+    "GG1317",
+    "GG1403",
+    "GG1407",
+    "GG1519"
+  ],
+  "products": [
+    {
+      "name": "Isforden Tumbler",
+      "sku": "GG1291",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2670-02.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1291"
+    },
+    {
+      "name": "Beaker",
+      "sku": "GG1315",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2772-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1315"
+    },
+    {
+      "name": "Goblet",
+      "sku": "GG1317",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2773-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1317"
+    },
+    {
+      "name": "Tuesday",
+      "sku": "GG1403",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6244-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1403"
+    },
+    {
+      "name": "Monday",
+      "sku": "GG1407",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6256-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1407"
+    },
+    {
+      "name": "Tridus",
+      "sku": "GG1519",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6866-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1519"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20desk%20tumblers%20options%20for%20our%20team."
+}

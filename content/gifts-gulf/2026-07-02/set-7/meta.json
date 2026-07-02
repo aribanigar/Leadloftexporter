@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-02",
+  "theme": "Recycled journals",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "A",
+  "campaign_code": "GG-20260702-7",
+  "campaign_name": "Recycled Journals - 02 Jul 2026",
+  "subject": "Journals made from less",
+  "skus": [
+    "GG1022",
+    "GG1025",
+    "GG1136",
+    "GG1197",
+    "GG1305",
+    "GG1703"
+  ],
+  "products": [
+    {
+      "name": "Sonora Plus",
+      "sku": "GG1022",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3775-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1022"
+    },
+    {
+      "name": "Sonora",
+      "sku": "GG1025",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3789-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1025"
+    },
+    {
+      "name": "Cinco",
+      "sku": "GG1136",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2285-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1136"
+    },
+    {
+      "name": "Peat",
+      "sku": "GG1197",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2448-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1197"
+    },
+    {
+      "name": "Cortona",
+      "sku": "GG1305",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2734-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1305"
+    },
+    {
+      "name": "Mid Paper Book",
+      "sku": "GG1703",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9867-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1703"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20journals%20options%20for%20our%20team."
+}

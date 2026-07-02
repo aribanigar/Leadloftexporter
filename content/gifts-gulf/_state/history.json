@@ -1950,5 +1950,158 @@
       "GG1463",
       "GG1500"
     ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260702-1",
+    "campaign_name": "Everyday Stationery - 02 Jul 2026",
+    "subject": "Notes worth keeping",
+    "theme": "Everyday stationery",
+    "skus": [
+      "GG1000",
+      "GG1056",
+      "GG1057",
+      "GG1116",
+      "GG1177",
+      "GG1465"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260702-2",
+    "campaign_name": "All-Day Hydration - 02 Jul 2026",
+    "subject": "Refill it all day",
+    "theme": "All-day hydration",
+    "skus": [
+      "GG1680",
+      "GG1430",
+      "GG1431",
+      "GG1499",
+      "GG1525",
+      "GG1405"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260702-3",
+    "campaign_name": "Fold-Away Shoppers - 02 Jul 2026",
+    "subject": "Bags that fold flat",
+    "theme": "Fold-away shoppers",
+    "skus": [
+      "GG1185",
+      "GG1227",
+      "GG1379",
+      "GG1390",
+      "GG1391",
+      "GG1509"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260702-4",
+    "campaign_name": "Stoneware Mugs - 02 Jul 2026",
+    "subject": "Mugs worth the shelf",
+    "theme": "Stoneware mugs",
+    "skus": [
+      "GG1049",
+      "GG1082",
+      "GG1083",
+      "GG1212",
+      "GG1225",
+      "GG1397"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260702-5",
+    "campaign_name": "Insulated Carry - 02 Jul 2026",
+    "subject": "Cold packed and ready",
+    "theme": "Insulated carry",
+    "skus": [
+      "GG1322",
+      "GG1307",
+      "GG1326",
+      "GG1331",
+      "GG1401",
+      "GG1707"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260702-6",
+    "campaign_name": "Signature Pens - 02 Jul 2026",
+    "subject": "Pens they never lose",
+    "theme": "Signature pens",
+    "skus": [
+      "GG1203",
+      "GG1345",
+      "GG1372",
+      "GG1533",
+      "GG1592",
+      "GG1720"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260702-7",
+    "campaign_name": "Recycled Journals - 02 Jul 2026",
+    "subject": "Journals made from less",
+    "theme": "Recycled journals",
+    "skus": [
+      "GG1022",
+      "GG1025",
+      "GG1136",
+      "GG1197",
+      "GG1305",
+      "GG1703"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260702-8",
+    "campaign_name": "Desk Tumblers - 02 Jul 2026",
+    "subject": "Cups for every desk",
+    "theme": "Desk tumblers",
+    "skus": [
+      "GG1291",
+      "GG1315",
+      "GG1317",
+      "GG1403",
+      "GG1407",
+      "GG1519"
+    ]
+  },
+  {
+    "date": "2026-07-02",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260702-9",
+    "campaign_name": "Canvas Carry - 02 Jul 2026",
+    "subject": "Cotton for the carry",
+    "theme": "Canvas carry",
+    "skus": [
+      "GG1055",
+      "GG1058",
+      "GG1523",
+      "GG1600",
+      "GG1660",
+      "GG1690"
+    ]
   }
 ]

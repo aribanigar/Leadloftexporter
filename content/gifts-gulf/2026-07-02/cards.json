@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-02",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Your logo on every page.",
+      "out": "content/gifts-gulf/2026-07-02/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "ar1804-03",
+          "sku": "GG1000",
+          "name": "Arconot Plain",
+          "desc": "Smooth paper, easy to write on",
+          "colours": 0
+        },
+        {
+          "code": "mo1800-03",
+          "sku": "GG1056",
+          "name": "Notelux",
+          "desc": "Lies flat for real notes",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "One bottle. Every refill.",
+      "out": "content/gifts-gulf/2026-07-02/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9812-16",
+          "sku": "GG1680",
+          "name": "Belo Bottle",
+          "desc": "Keeps drinks cold for hours",
+          "colours": 0
+        },
+        {
+          "code": "mo6372-16",
+          "sku": "GG1430",
+          "name": "Helsinki Med",
+          "desc": "Sealed tight, no spills",
+          "colours": 0
+        },
+        {
+          "code": "mo6376-03",
+          "sku": "GG1431",
+          "name": "Ursus",
+          "desc": "Built from steel to last",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Folds flat. Carries it all.",
+      "out": "content/gifts-gulf/2026-07-02/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2408-03",
+          "sku": "GG1185",
+          "name": "Feltote",
+          "desc": "Folds small, opens wide",
+          "colours": 0
+        },
+        {
+          "code": "mo2527-03",
+          "sku": "GG1227",
+          "name": "Libag",
+          "desc": "Made from recycled material",
+          "colours": 0
+        },
+        {
+          "code": "mo6150-03",
+          "sku": "GG1379",
+          "name": "Cuba",
+          "desc": "Strong handles, roomy fit",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Their morning mug, your brand.",
+      "out": "content/gifts-gulf/2026-07-02/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7062-06",
+          "sku": "GG1049",
+          "name": "Dublin",
+          "desc": "Solid stoneware, clean print",
+          "colours": 0
+        },
+        {
+          "code": "mo2101-06",
+          "sku": "GG1082",
+          "name": "Karoo",
+          "desc": "Sits well in the hand",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Lunch stays cool, brand travels.",
+      "out": "content/gifts-gulf/2026-07-02/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2782-03",
+          "sku": "GG1322",
+          "name": "Drift",
+          "desc": "Keeps lunch cool for hours",
+          "colours": 0
+        },
+        {
+          "code": "mo2738-03",
+          "sku": "GG1307",
+          "name": "Namur",
+          "desc": "Made from recycled fabric",
+          "colours": 0
+        },
+        {
+          "code": "mo2788-03",
+          "sku": "GG1326",
+          "name": "Gelid",
+          "desc": "Roomy, wipes clean inside",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "The pen they keep reaching for.",
+      "out": "content/gifts-gulf/2026-07-02/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2476-03",
+          "sku": "GG1203",
+          "name": "Seattle",
+          "desc": "Smooth write, every time",
+          "colours": 0
+        },
+        {
+          "code": "mo2891-06",
+          "sku": "GG1345",
+          "name": "Rois",
+          "desc": "Solid in the hand",
+          "colours": 0
+        },
+        {
+          "code": "mo3314-03",
+          "sku": "GG1372",
+          "name": "Riocolour",
+          "desc": "Clean barrel, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Branded, and better for it.",
+      "out": "content/gifts-gulf/2026-07-02/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3775-03",
+          "sku": "GG1022",
+          "name": "Sonora Plus",
+          "desc": "Recycled paper, clean to write on",
+          "colours": 0
+        },
+        {
+          "code": "it3789-03",
+          "sku": "GG1025",
+          "name": "Sonora",
+          "desc": "Lies flat for long notes",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "A cup for every desk.",
+      "out": "content/gifts-gulf/2026-07-02/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2670-02",
+          "sku": "GG1291",
+          "name": "Isforden Tumbler",
+          "desc": "Reusable, easy to rinse",
+          "colours": 0
+        },
+        {
+          "code": "mo2772-03",
+          "sku": "GG1315",
+          "name": "Beaker",
+          "desc": "Fits the hand and the bag",
+          "colours": 0
+        },
+        {
+          "code": "mo2773-03",
+          "sku": "GG1317",
+          "name": "Goblet",
+          "desc": "Clean body, your logo",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Cotton they carry every day.",
+      "out": "content/gifts-gulf/2026-07-02/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo1447-03",
+          "sku": "GG1055",
+          "name": "Buzz",
+          "desc": "Natural cotton, soft feel",
+          "colours": 0
+        },
+        {
+          "code": "mo1464-03",
+          "sku": "GG1058",
+          "name": "Buffalo",
+          "desc": "Roomy for the daily load",
+          "colours": 0
+        },
+        {
+          "code": "mo6875-03",
+          "sku": "GG1523",
+          "name": "Long Beach Singa",
+          "desc": "Strong stitch, clean print",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

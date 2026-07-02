@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-02",
+  "theme": "Signature pens",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "C",
+  "campaign_code": "GG-20260702-6",
+  "campaign_name": "Signature Pens - 02 Jul 2026",
+  "subject": "Pens they never lose",
+  "skus": [
+    "GG1203",
+    "GG1345",
+    "GG1372",
+    "GG1533",
+    "GG1592",
+    "GG1720"
+  ],
+  "products": [
+    {
+      "name": "Seattle",
+      "sku": "GG1203",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2476-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1203"
+    },
+    {
+      "name": "Rois",
+      "sku": "GG1345",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2891-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1345"
+    },
+    {
+      "name": "Riocolour",
+      "sku": "GG1372",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo3314-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1372"
+    },
+    {
+      "name": "Cleanpen",
+      "sku": "GG1533",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6936-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1533"
+    },
+    {
+      "name": "Toolpen",
+      "sku": "GG1592",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8679-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1592"
+    },
+    {
+      "name": "Rio Clean",
+      "sku": "GG1720",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9951-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1720"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20signature%20pens%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-02",
+  "theme": "Insulated carry",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260702-5",
+  "campaign_name": "Insulated Carry - 02 Jul 2026",
+  "subject": "Cold packed and ready",
+  "skus": [
+    "GG1322",
+    "GG1307",
+    "GG1326",
+    "GG1331",
+    "GG1401",
+    "GG1707"
+  ],
+  "products": [
+    {
+      "name": "Drift",
+      "sku": "GG1322",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2782-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1322"
+    },
+    {
+      "name": "Namur",
+      "sku": "GG1307",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2738-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1307"
+    },
+    {
+      "name": "Gelid",
+      "sku": "GG1326",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2788-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1326"
+    },
+    {
+      "name": "Coldi",
+      "sku": "GG1331",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2832-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1331"
+    },
+    {
+      "name": "Glacier Rpet",
+      "sku": "GG1401",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6237-25.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1401"
+    },
+    {
+      "name": "Icecube",
+      "sku": "GG1707",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9915-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1707"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20insulated%20carry%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-02",
+  "theme": "All-day hydration",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260702-2",
+  "campaign_name": "All-Day Hydration - 02 Jul 2026",
+  "subject": "Refill it all day",
+  "skus": [
+    "GG1680",
+    "GG1430",
+    "GG1431",
+    "GG1499",
+    "GG1525",
+    "GG1405"
+  ],
+  "products": [
+    {
+      "name": "Belo Bottle",
+      "sku": "GG1680",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9812-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1680"
+    },
+    {
+      "name": "Helsinki Med",
+      "sku": "GG1430",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6372-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1430"
+    },
+    {
+      "name": "Ursus",
+      "sku": "GG1431",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6376-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1431"
+    },
+    {
+      "name": "Mili",
+      "sku": "GG1499",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6774-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1499"
+    },
+    {
+      "name": "Arctic",
+      "sku": "GG1525",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6896-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1525"
+    },
+    {
+      "name": "Irmug",
+      "sku": "GG1405",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6257-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1405"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-02/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20all-day%20hydration%20options%20for%20our%20team."
+}
