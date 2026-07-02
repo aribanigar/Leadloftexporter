@@ -1,0 +1,62 @@
+{
+  "date": "2026-07-02",
+  "business": "qckserve",
+  "topic": "Sell what you don't use — free classifieds, buyer pays you direct",
+  "design_archetype": "coupon/ticket — a dashed-cut card with a perforation feel. Flat colour blocking (no gradients): QckServe orange #ef6723 + dark #1A1A1A + warm off-white #FCF9F8. Oversized Poppins caps headline + Georgia italic kicker. One memorable device: a ₹0 ticket with a perforated tear-off stub.",
+  "brand": {
+    "name": "QckServe",
+    "wordmark": "qckserve.in",
+    "tagline": "India's Free Local Marketplace",
+    "verticals": ["Properties", "Vehicles", "Jobs", "Classifieds", "Services", "Store", "General"],
+    "colors": {
+      "primary": "#ef6723",
+      "primary_dark": "#FF6B00",
+      "ink": "#1A1A1A",
+      "paper": "#FCF9F8",
+      "highlight": "#FFE7D8"
+    },
+    "fonts": {
+      "head": "Poppins",
+      "kicker": "Georgia italic"
+    }
+  },
+  "items": [
+    {
+      "channel": "html_email",
+      "vertical": "classifieds",
+      "subject": "Sell it free — that box you keep meaning to clear out",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"x-apple-disable-message-reformatting\">\n<title>Sell it free — that box you keep meaning to clear out</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">The monsoon clear-out. List what you don't use — ₹0 to list, ₹0 commission, buyer pays you direct. Nationwide.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n\n  <tr><td style=\"padding:24px 40px 8px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n\n  <tr><td style=\"background-color:#ef6723;padding:40px 40px 44px 40px;\">\n    <div style=\"font-family:Georgia,serif;font-style:italic;font-size:18px;color:#FFE7D8;padding-bottom:14px;\">The monsoon clear-out.</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:58px;line-height:0.98;font-weight:800;color:#FFFFFF;letter-spacing:-2px;\">Sell it.<br>Free.</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#FFF3EC;padding-top:16px;\">That box you keep meaning to clear out? Someone nearby wants it.</div>\n  </td></tr>\n\n  <tr><td style=\"font-size:0;line-height:0;\"><img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-02.svg\" width=\"600\" alt=\"QckServe — a &#8377;0 coupon: free to list, zero commission, buyer pays you direct. A free classifieds marketplace for all of India.\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\"></td></tr>\n\n  <tr><td style=\"background-color:#FFFFFF;padding:36px 40px 8px 40px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A;border-radius:16px;\">\n      <tr>\n        <td width=\"56%\" valign=\"middle\" style=\"padding:32px 8px 32px 32px;border-right:2px dashed #4a4a4a;\">\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:76px;line-height:1;font-weight:800;color:#ef6723;letter-spacing:-3px;\">&#8377;0</div>\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:3px;color:#FFFFFF;padding-top:8px;\">TO LIST</div>\n          <div style=\"font-family:Georgia,serif;font-style:italic;font-size:15px;color:#FF8A4C;padding-top:6px;\">zero commission, ever</div>\n        </td>\n        <td width=\"44%\" valign=\"middle\" align=\"center\" style=\"padding:32px 24px;\">\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:4px;color:#9a9a9a;\">ADMIT ONE</div>\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:26px;font-weight:800;color:#FFFFFF;padding-top:4px;\">SELLER</div>\n          <div style=\"font-family:Georgia,serif;font-style:italic;font-size:14px;color:#bdbdbd;padding-top:6px;line-height:1.4;\">every corner of India</div>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n\n  <tr><td style=\"background-color:#FFFFFF;padding:28px 40px 4px 40px;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.55;font-weight:600;color:#1A1A1A;\">List it today.<br>A buyer nearby messages you.<br><span style=\"color:#ef6723;\">You keep every rupee.</span></div>\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"padding:24px 40px 8px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List an item &#8212; free</a></td></tr></table></td></tr>\n\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 40px;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#FF8A4C;text-transform:uppercase;padding-bottom:18px;\">What free means here</div>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#FFFFFF;padding-bottom:14px;\">No listing fee. Post as many items as you like.</td></tr>\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#FFFFFF;padding-bottom:14px;\">No commission. The full price is yours.</td></tr>\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#FFFFFF;padding-bottom:0;\">No middleman. Buyers reach you direct.</td></tr>\n    </table>\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"background-color:#1A1A1A;padding:8px 40px 36px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#FFFFFF\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:16px 36px;font-family:'Poppins',Arial,sans-serif;font-size:17px;font-weight:700;color:#1A1A1A;text-decoration:none;border-radius:14px;\">Start selling &#8212; free</a></td></tr></table></td></tr>\n\n  <tr><td style=\"background-color:#FCF9F8;padding:24px 40px;border-top:1px solid #EEE6E1;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India's free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-02.svg",
+      "tags": ["classifieds", "promo", "email"],
+      "notes": "Coupon/ticket archetype — a ₹0 ticket with a dashed perforation and tear-off 'ADMIT ONE SELLER' stub. Anchored to the monsoon declutter/recommerce season; kept national."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "classifieds",
+      "content": "Ghar mein aisi cheezein padi hain jo use nahi hoti? 📦 Baarish ka time hai — thoda declutter karo aur wahi saaman bech ke paise banao. QckServe pe listing bilkul FREE, ₹0 commission, buyer seedha aapse baat karega. Poora paisa aapka. Abhi list karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-02.svg",
+      "tags": ["classifieds", "promo", "whatsapp"]
+    },
+    {
+      "channel": "caption",
+      "vertical": "classifieds",
+      "platform": "instagram",
+      "content": "Woh cheez jo mahino se dabbe mein padi hai? Kisi ko uski zaroorat hai. 📦\n\nMonsoon clear-out mode on. Apna unused saaman list karo — ₹0 listing, ₹0 commission, buyer seedha aapse. Poora paisa aapki jeb mein. Seedhi baat, seedha deal.\n\n👉 qckserve.in\n\n#QckServe #ZeroCommission #SellFree #DeclutterIndia #SecondHandIndia",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-02.svg",
+      "tags": ["classifieds", "promo", "caption", "instagram"]
+    },
+    {
+      "channel": "sms",
+      "vertical": "classifieds",
+      "content": "Sell what you don't use — free on QckServe. ₹0 to list, ₹0 commission, buyer pays you direct. List now: qckserve.in",
+      "tags": ["classifieds", "promo", "sms"]
+    },
+    {
+      "channel": "other",
+      "vertical": "classifieds",
+      "title": "[2026-07-02] Sell what you don't use — free classifieds (Image Prompt)",
+      "content": "Editorial classifieds hero poster for QckServe, coupon/ticket theme.\n\nSCENE: A warm, softly-lit Indian home interior on a rainy monsoon afternoon — a tidy corner where someone is clearing out: a neatly stacked box of gently-used goods (a table lamp, books, a small speaker, folded clothes), rain visible on a window behind, calm and value-conscious mood.\nSUBJECT: A friendly hand placing one item into the box, mid-gesture, natural and unposed — the everyday act of decluttering to sell.\nPHONE-UI MOCKUP: A smartphone in the lower-right showing the QckServe classifieds listing screen — a single item card with a photo, a title field, an empty price field, and a bright button reading 'List free'; a small badge '₹0 commission'. Clean, modern, uncluttered app UI.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — QckServe orange #ef6723 as the hero accent, deep charcoal #1A1A1A for contrast blocks, warm off-white paper #FCF9F8 as base, soft highlight #FFE7D8. One accent used sparingly.\nLIGHTING: soft, diffused monsoon daylight from the window, gentle shadows, cosy and clean.\nTYPE HIERARCHY: oversized extra-bold condensed caps headline 'SELL IT. FREE.' with a smaller Georgia-italic kicker 'the monsoon clear-out'; a coupon/ticket device showing a giant '₹0 TO LIST' with a dashed perforation and a tear-off 'ADMIT ONE SELLER' stub.\nEYE FLOW: top-left logo zone → oversized headline → ₹0 coupon ticket → phone UI → wordmark 'qckserve.in' bottom.\nCAMERA: 35mm editorial, shallow depth of field, eye-level, product-catalogue crispness.\nPERFORMANCE LAYER: high thumb-stopping contrast, legible at small sizes, message reads even with the image compressed.\nReserve the TOP-LEFT logo zone (~140px square) empty — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": ["classifieds", "image-prompt", "other"]
+    }
+  ]
+}

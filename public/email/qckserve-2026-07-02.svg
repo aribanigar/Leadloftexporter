@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Sell what you don't use. Free to list, zero commission, buyer pays you direct. A free classifieds marketplace for all of India.">
+  <defs>
+    <style>
+      .head { font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif; font-weight: 900; }
+      .serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Warm paper canvas -->
+  <rect width="1080" height="1350" fill="#FCF9F8"/>
+
+  <!-- Reserved top-left logo square (~140px), left blank for manual logo placement -->
+  <rect x="64" y="64" width="140" height="140" fill="none"/>
+
+  <!-- Italic-serif kicker, top-right of logo zone -->
+  <text x="1016" y="150" text-anchor="end" class="serif" font-size="40" fill="#ef6723">the monsoon clear-out</text>
+
+  <!-- Oversized caps headline -->
+  <text x="72" y="360" class="head" font-size="150" letter-spacing="-6" fill="#1A1A1A">SELL IT.</text>
+  <text x="72" y="500" class="head" font-size="150" letter-spacing="-6" fill="#ef6723">FREE.</text>
+  <text x="72" y="566" class="serif" font-size="42" fill="#6b6b6b">That box you keep meaning to clear out.</text>
+
+  <!-- The memorable visual device: a coupon / ticket with a perforated cut -->
+  <g>
+    <!-- ticket body -->
+    <rect x="72" y="640" width="936" height="330" rx="26" fill="#1A1A1A"/>
+    <!-- perforation notches (paper punched out on both edges of the cut) -->
+    <circle cx="700" cy="640" r="26" fill="#FCF9F8"/>
+    <circle cx="700" cy="970" r="26" fill="#FCF9F8"/>
+    <!-- dashed perforation line -->
+    <line x1="700" y1="678" x2="700" y2="932" stroke="#FCF9F8" stroke-width="4" stroke-dasharray="10 14" opacity="0.7"/>
+
+    <!-- main stub: the promise -->
+    <text x="120" y="770" class="head" font-size="230" letter-spacing="-10" fill="#ef6723">&#8377;0</text>
+    <text x="128" y="850" class="sans" font-size="40" font-weight="bold" letter-spacing="3" fill="#FFFFFF">TO LIST</text>
+    <text x="128" y="905" class="serif" font-size="34" fill="#FF8A4C">zero commission, ever</text>
+
+    <!-- tear-off stub: admit line -->
+    <text x="854" y="742" text-anchor="middle" class="sans" font-size="24" font-weight="bold" letter-spacing="4" fill="#bdbdbd">ADMIT ONE</text>
+    <text x="854" y="800" text-anchor="middle" class="head" font-size="46" fill="#FFFFFF">SELLER</text>
+    <text x="854" y="858" text-anchor="middle" class="serif" font-size="30" fill="#bdbdbd">every corner</text>
+    <text x="854" y="898" text-anchor="middle" class="serif" font-size="30" fill="#bdbdbd">of India</text>
+  </g>
+
+  <!-- Plain-speech proof, one idea per line -->
+  <text x="72" y="1075" class="sans" font-size="40" font-weight="bold" fill="#1A1A1A">List it today.</text>
+  <text x="72" y="1130" class="sans" font-size="40" font-weight="bold" fill="#1A1A1A">A buyer nearby messages you.</text>
+  <text x="72" y="1185" class="sans" font-size="40" font-weight="bold" fill="#ef6723">You keep every rupee.</text>
+
+  <!-- One CTA, on an orange band -->
+  <rect x="72" y="1235" width="560" height="92" rx="14" fill="#ef6723"/>
+  <text x="352" y="1294" text-anchor="middle" class="sans" font-size="36" font-weight="bold" fill="#FFFFFF" letter-spacing="1">List an item &#8212; free</text>
+
+  <!-- Wordmark, bottom-left -->
+  <text x="680" y="1300" class="head" font-size="40" letter-spacing="-1" fill="#1A1A1A">qckserve.in</text>
+</svg>
