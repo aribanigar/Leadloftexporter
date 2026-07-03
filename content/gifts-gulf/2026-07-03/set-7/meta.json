@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-03",
+  "theme": "Organic cotton bags",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "A",
+  "campaign_code": "GG-20260703-7",
+  "campaign_name": "Organic Cotton Bags - 03 Jul 2026",
+  "subject": "Cotton that carries more",
+  "skus": [
+    "GG1117",
+    "GG1234",
+    "GG1392",
+    "GG1442",
+    "GG1460",
+    "GG1472"
+  ],
+  "products": [
+    {
+      "name": "Bente",
+      "sku": "GG1117",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2196-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1117"
+    },
+    {
+      "name": "Recoba Colour",
+      "sku": "GG1234",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2551-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1234"
+    },
+    {
+      "name": "Zimde Colour",
+      "sku": "GG1392",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6189-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1392"
+    },
+    {
+      "name": "Style Pouch",
+      "sku": "GG1442",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6421-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1442"
+    },
+    {
+      "name": "Panda Bag",
+      "sku": "GG1460",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6550-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1460"
+    },
+    {
+      "name": "Amber Small",
+      "sku": "GG1472",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6634-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1472"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20organic%20cotton%20bags%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-03",
+  "theme": "Everyday notebooks",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "A",
+  "campaign_code": "GG-20260703-1",
+  "campaign_name": "Everyday Notebooks - 03 Jul 2026",
+  "subject": "Notes that pull their weight",
+  "skus": [
+    "GG1047",
+    "GG1048",
+    "GG1223",
+    "GG1239",
+    "GG1493",
+    "GG1652"
+  ],
+  "products": [
+    {
+      "name": "Bloquero",
+      "sku": "GG1047",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7012-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1047"
+    },
+    {
+      "name": "Bloquero Plus",
+      "sku": "GG1048",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7013-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1048"
+    },
+    {
+      "name": "Recarnote",
+      "sku": "GG1223",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2523-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1223"
+    },
+    {
+      "name": "Sticknote",
+      "sku": "GG1239",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2554-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1239"
+    },
+    {
+      "name": "Mito Note",
+      "sku": "GG1493",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6743-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1493"
+    },
+    {
+      "name": "Notes Folder",
+      "sku": "GG1652",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9549-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1652"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20everyday%20notebooks%20options%20for%20our%20team."
+}

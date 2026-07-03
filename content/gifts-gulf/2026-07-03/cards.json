@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-03",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Recycled paper, smooth to write on",
+      "out": "content/gifts-gulf/2026-07-03/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7012-03",
+          "sku": "GG1047",
+          "name": "Bloquero",
+          "desc": "Recycled paper, smooth to write on",
+          "colours": 0
+        },
+        {
+          "code": "kc7013-03",
+          "sku": "GG1048",
+          "name": "Bloquero Plus",
+          "desc": "A larger pad for long meetings",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Light bottle made for movement",
+      "out": "content/gifts-gulf/2026-07-03/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2470-03",
+          "sku": "GG1202",
+          "name": "Sporttle",
+          "desc": "Light bottle made for movement",
+          "colours": 0
+        },
+        {
+          "code": "mo2489-03",
+          "sku": "GG1208",
+          "name": "Activate",
+          "desc": "Grippy body, easy daily refill",
+          "colours": 0
+        },
+        {
+          "code": "mo2500-03",
+          "sku": "GG1215",
+          "name": "Spot",
+          "desc": "Recycled steel, built to last",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Roomy tote in bright recycled fabric",
+      "out": "content/gifts-gulf/2026-07-03/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3787-03",
+          "sku": "GG1024",
+          "name": "Totecolor",
+          "desc": "Roomy tote in bright recycled fabric",
+          "colours": 0
+        },
+        {
+          "code": "mo2372-03",
+          "sku": "GG1169",
+          "name": "Bagga",
+          "desc": "Folds small, opens wide",
+          "colours": 0
+        },
+        {
+          "code": "mo2858-13",
+          "sku": "GG1333",
+          "name": "Baga",
+          "desc": "Everyday shopper with a soft feel",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Slim recycled power bank for the bag",
+      "out": "content/gifts-gulf/2026-07-03/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2340-03",
+          "sku": "GG1159",
+          "name": "Powerflat8C",
+          "desc": "Slim recycled power bank for the bag",
+          "colours": 0
+        },
+        {
+          "code": "mo9231-03",
+          "sku": "GG1626",
+          "name": "Powernoty",
+          "desc": "Power bank and notebook in one",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Soft brushed hoodie for the whole team",
+      "out": "content/gifts-gulf/2026-07-03/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it0971-04",
+          "sku": "GG1003",
+          "name": "Classic Pullover Hoodie",
+          "desc": "Soft brushed hoodie for the whole team",
+          "colours": 0
+        },
+        {
+          "code": "ar1470-01",
+          "sku": "GG1002",
+          "name": "Classic Polo Shirt",
+          "desc": "Classic cotton polo, clean and smart",
+          "colours": 0
+        },
+        {
+          "code": "ar1589-01",
+          "sku": "GG1001",
+          "name": "Premium Cotton T-Shirt",
+          "desc": "Organic cotton tee that wears in fast",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Notebook with a warm cork cover",
+      "out": "content/gifts-gulf/2026-07-03/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2553-07",
+          "sku": "GG1236",
+          "name": "Corkbook",
+          "desc": "Notebook with a warm cork cover",
+          "colours": 0
+        },
+        {
+          "code": "mo9855-13",
+          "sku": "GG1699",
+          "name": "Visioncork",
+          "desc": "Cork bound notes for the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo9858-13",
+          "sku": "GG1698",
+          "name": "Foldcork",
+          "desc": "Slim cork folder for papers",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Organic cotton shopper, sturdy and reusable",
+      "out": "content/gifts-gulf/2026-07-03/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2196-13",
+          "sku": "GG1117",
+          "name": "Bente",
+          "desc": "Organic cotton shopper, sturdy and reusable",
+          "colours": 0
+        },
+        {
+          "code": "mo2551-03",
+          "sku": "GG1234",
+          "name": "Recoba Colour",
+          "desc": "Coloured recycled cotton tote",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled steel drink set, ready to gift",
+      "out": "content/gifts-gulf/2026-07-03/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2314-03",
+          "sku": "GG1145",
+          "name": "Emerald Set",
+          "desc": "Recycled steel drink set, ready to gift",
+          "colours": 0
+        },
+        {
+          "code": "mo6795-16",
+          "sku": "GG1502",
+          "name": "Graz Set",
+          "desc": "Writing set boxed and tidy",
+          "colours": 0
+        },
+        {
+          "code": "mo9836-40",
+          "sku": "GG1693",
+          "name": "Todo Set",
+          "desc": "Wood desk set for the planner",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Structured backpack with a city look",
+      "out": "content/gifts-gulf/2026-07-03/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2231-03",
+          "sku": "GG1124",
+          "name": "Bai Backpack",
+          "desc": "Structured backpack with a city look",
+          "colours": 0
+        },
+        {
+          "code": "mo2047-03",
+          "sku": "GG1059",
+          "name": "Hana",
+          "desc": "Recycled backpack for daily commutes",
+          "colours": 0
+        },
+        {
+          "code": "mo2048-03",
+          "sku": "GG1060",
+          "name": "Rocky",
+          "desc": "Roomy recycled pack for longer days",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

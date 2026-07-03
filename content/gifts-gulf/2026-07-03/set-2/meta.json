@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-03",
+  "theme": "Recycled hydration",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "B",
+  "campaign_code": "GG-20260703-2",
+  "campaign_name": "Recycled Hydration - 03 Jul 2026",
+  "subject": "Refilled, never thrown away",
+  "skus": [
+    "GG1202",
+    "GG1208",
+    "GG1215",
+    "GG1243",
+    "GG1327",
+    "GG1710"
+  ],
+  "products": [
+    {
+      "name": "Sporttle",
+      "sku": "GG1202",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2470-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1202"
+    },
+    {
+      "name": "Activate",
+      "sku": "GG1208",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2489-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1208"
+    },
+    {
+      "name": "Spot",
+      "sku": "GG1215",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2500-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1215"
+    },
+    {
+      "name": "Florence Sing",
+      "sku": "GG1243",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2562-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1243"
+    },
+    {
+      "name": "Activate Max",
+      "sku": "GG1327",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2791-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1327"
+    },
+    {
+      "name": "Bielo Tumbler",
+      "sku": "GG1710",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9927-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1710"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20hydration%20options%20for%20our%20team."
+}

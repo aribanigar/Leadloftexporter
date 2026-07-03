@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-03",
+  "theme": "Cork and bamboo",
+  "season": "Mid H2, everyday-carry recognition and micro-moment gifting",
+  "design": "C",
+  "campaign_code": "GG-20260703-6",
+  "campaign_name": "Cork And Bamboo - 03 Jul 2026",
+  "subject": "Nature, right on the desk",
+  "skus": [
+    "GG1236",
+    "GG1699",
+    "GG1698",
+    "GG1492",
+    "GG1454",
+    "GG1276"
+  ],
+  "products": [
+    {
+      "name": "Corkbook",
+      "sku": "GG1236",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2553-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1236"
+    },
+    {
+      "name": "Visioncork",
+      "sku": "GG1699",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9855-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1699"
+    },
+    {
+      "name": "Foldcork",
+      "sku": "GG1698",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9858-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1698"
+    },
+    {
+      "name": "Sumless",
+      "sku": "GG1492",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6729-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1492"
+    },
+    {
+      "name": "Sonorabam",
+      "sku": "GG1454",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6528-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1454"
+    },
+    {
+      "name": "Chippewa Set",
+      "sku": "GG1276",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2633-09.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1276"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-03/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cork%20and%20bamboo%20options%20for%20our%20team."
+}

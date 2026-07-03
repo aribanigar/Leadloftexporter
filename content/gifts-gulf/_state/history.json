@@ -2103,5 +2103,158 @@
       "GG1660",
       "GG1690"
     ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260703-1",
+    "campaign_name": "Everyday Notebooks - 03 Jul 2026",
+    "subject": "Notes that pull their weight",
+    "theme": "Everyday notebooks",
+    "skus": [
+      "GG1047",
+      "GG1048",
+      "GG1223",
+      "GG1239",
+      "GG1493",
+      "GG1652"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260703-2",
+    "campaign_name": "Recycled Hydration - 03 Jul 2026",
+    "subject": "Refilled, never thrown away",
+    "theme": "Recycled hydration",
+    "skus": [
+      "GG1202",
+      "GG1208",
+      "GG1215",
+      "GG1243",
+      "GG1327",
+      "GG1710"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260703-3",
+    "campaign_name": "Totes And Shoppers - 03 Jul 2026",
+    "subject": "Totes for the daily haul",
+    "theme": "Totes and shoppers",
+    "skus": [
+      "GG1024",
+      "GG1169",
+      "GG1333",
+      "GG1415",
+      "GG1605",
+      "GG1606"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260703-4",
+    "campaign_name": "Desk Tech - 03 Jul 2026",
+    "subject": "The desk, powered up",
+    "theme": "Desk tech",
+    "skus": [
+      "GG1159",
+      "GG1626",
+      "GG1303",
+      "GG1362",
+      "GG1663",
+      "GG1593"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260703-5",
+    "campaign_name": "Branded Apparel - 03 Jul 2026",
+    "subject": "Wear the brand well",
+    "theme": "Branded apparel",
+    "skus": [
+      "GG1003",
+      "GG1002",
+      "GG1001",
+      "GG1027",
+      "GG1232",
+      "GG1004"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260703-6",
+    "campaign_name": "Cork And Bamboo - 03 Jul 2026",
+    "subject": "Nature, right on the desk",
+    "theme": "Cork and bamboo",
+    "skus": [
+      "GG1236",
+      "GG1699",
+      "GG1698",
+      "GG1492",
+      "GG1454",
+      "GG1276"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260703-7",
+    "campaign_name": "Organic Cotton Bags - 03 Jul 2026",
+    "subject": "Cotton that carries more",
+    "theme": "Organic cotton bags",
+    "skus": [
+      "GG1117",
+      "GG1234",
+      "GG1392",
+      "GG1442",
+      "GG1460",
+      "GG1472"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260703-8",
+    "campaign_name": "Gift Sets - 03 Jul 2026",
+    "subject": "Boxed and ready to give",
+    "theme": "Gift sets",
+    "skus": [
+      "GG1145",
+      "GG1502",
+      "GG1693",
+      "GG1395",
+      "GG1034",
+      "GG1511"
+    ]
+  },
+  {
+    "date": "2026-07-03",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260703-9",
+    "campaign_name": "Recycled Carry - 03 Jul 2026",
+    "subject": "Carry it, keep it, reuse it",
+    "theme": "Recycled carry",
+    "skus": [
+      "GG1124",
+      "GG1059",
+      "GG1060",
+      "GG1708",
+      "GG1688",
+      "GG1383"
+    ]
   }
 ]
