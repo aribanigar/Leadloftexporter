@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "varanasi",  "feat": "rajasthan", "place": "Varanasi, Uttar Pradesh", "region": "North India"},
+  "kashmir": {"photo": "kashmir",   "feat": "himalaya",  "place": "Kashmir",                 "region": "North India"},
+  "saudi":   {"photo": "georgia",   "feat": "santorini", "place": "Tbilisi, Georgia",         "region": "Eastern Europe"},
+  "dubai":   {"photo": "thailand",  "feat": "istanbul",  "place": "Phuket, Thailand",         "region": "Southeast Asia"}
+}
