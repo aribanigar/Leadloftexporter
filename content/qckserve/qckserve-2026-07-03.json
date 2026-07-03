@@ -1,0 +1,91 @@
+{
+  "date": "2026-07-03",
+  "business": "qckserve",
+  "topic": "List your service free — monsoon is your busy season, zero commission",
+  "design_archetype": "editorial magazine — oversized Poppins caps headline + Georgia-italic kicker with a hairline masthead rule, and one memorable device: a three-column proof strip (₹0 to list / 0% commission / 1:1 direct) on a dark band. Flat colour blocking (no gradients): QckServe orange #ef6723 + dark #1A1A1A + warm off-white #FCF9F8.",
+  "brand": {
+    "name": "QckServe",
+    "wordmark": "qckserve.in",
+    "tagline": "India's Free Local Marketplace",
+    "verticals": [
+      "Properties",
+      "Vehicles",
+      "Jobs",
+      "Classifieds",
+      "Services",
+      "Store",
+      "General"
+    ],
+    "colors": {
+      "primary": "#ef6723",
+      "primary_dark": "#FF6B00",
+      "ink": "#1A1A1A",
+      "paper": "#FCF9F8",
+      "highlight": "#FFE7D8"
+    },
+    "fonts": {
+      "head": "Poppins",
+      "kicker": "Georgia italic"
+    }
+  },
+  "items": [
+    {
+      "channel": "html_email",
+      "vertical": "services",
+      "subject": "List your service free — monsoon is your busy season",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"x-apple-disable-message-reformatting\">\n<title>List your service — free. Monsoon is your busy season.</title>\n</head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">Monsoon books out every good repair pro. List your trade free — ₹0 to list, 0% commission, customers call you direct. Nationwide.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n\n  <tr><td style=\"padding:24px 40px 4px 40px;font-family:'Poppins',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n\n  <!-- Editorial masthead: italic-serif kicker + hairline rule -->\n  <tr><td style=\"padding:8px 40px 0 40px;\">\n    <div style=\"font-family:Georgia,serif;font-style:italic;font-size:19px;color:#ef6723;\">The monsoon rush</div>\n    <div style=\"border-top:2px solid #1A1A1A;margin-top:12px;\"></div>\n  </td></tr>\n\n  <!-- Oversized caps headline -->\n  <tr><td style=\"padding:20px 40px 40px 40px;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:56px;line-height:0.98;font-weight:800;color:#1A1A1A;letter-spacing:-2px;\">YOUR BUSY<br>SEASON.</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:17px;line-height:1.5;color:#5a5a5a;padding-top:16px;\">Every good repair pro is booked out right now. List your trade free — the calls come straight to you.</div>\n  </td></tr>\n\n  <!-- Live poster hero band -->\n  <tr><td style=\"font-size:0;line-height:0;\"><img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-03.svg\" width=\"600\" alt=\"QckServe — list your service free: &#8377;0 to list, 0% commission, customers call you direct. A free local services marketplace for all of India.\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\"></td></tr>\n\n  <!-- The star device: three editorial proof columns -->\n  <tr><td style=\"background-color:#1A1A1A;padding:36px 24px 32px 24px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n      <tr>\n        <td width=\"33%\" valign=\"top\" align=\"center\" style=\"padding:0 8px;\">\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:44px;font-weight:800;color:#ef6723;letter-spacing:-1px;\">&#8377;0</div>\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#FFFFFF;padding-top:6px;\">TO LIST</div>\n          <div style=\"font-family:Georgia,serif;font-style:italic;font-size:13px;color:#9a9a9a;padding-top:4px;\">post it free</div>\n        </td>\n        <td width=\"34%\" valign=\"top\" align=\"center\" style=\"padding:0 8px;border-left:1px solid #3a3a3a;border-right:1px solid #3a3a3a;\">\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:44px;font-weight:800;color:#ef6723;letter-spacing:-1px;\">0%</div>\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#FFFFFF;padding-top:6px;\">COMMISSION</div>\n          <div style=\"font-family:Georgia,serif;font-style:italic;font-size:13px;color:#9a9a9a;padding-top:4px;\">keep every rupee</div>\n        </td>\n        <td width=\"33%\" valign=\"top\" align=\"center\" style=\"padding:0 8px;\">\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:44px;font-weight:800;color:#ef6723;letter-spacing:-1px;\">1:1</div>\n          <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#FFFFFF;padding-top:6px;\">DIRECT</div>\n          <div style=\"font-family:Georgia,serif;font-style:italic;font-size:13px;color:#9a9a9a;padding-top:4px;\">they call you</div>\n        </td>\n      </tr>\n    </table>\n  </td></tr>\n\n  <!-- Plain-speech proof, one idea per line -->\n  <tr><td style=\"background-color:#FFFFFF;padding:32px 40px 4px 40px;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:20px;line-height:1.55;font-weight:600;color:#1A1A1A;\">List your trade today.<br>A customer nearby calls you.<br><span style=\"color:#ef6723;\">You keep every rupee.</span></div>\n  </td></tr>\n\n  <!-- One CTA — verb + outcome -->\n  <tr><td align=\"center\" style=\"padding:24px 40px 12px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">List your service &#8212; free</a></td></tr></table></td></tr>\n\n  <!-- What free means -->\n  <tr><td style=\"background-color:#FCF9F8;padding:32px 40px 12px 40px;border-top:1px solid #EEE6E1;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;text-transform:uppercase;padding-bottom:18px;\">What free means here</div>\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">No listing fee. Plumber, electrician, painter, cleaner — post your service free.</td></tr>\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#1A1A1A;padding-bottom:14px;\">No commission. The job is yours; the full payment is yours.</td></tr>\n      <tr><td width=\"34\" valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:800;color:#ef6723;\">&#10003;</td><td valign=\"top\" style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.5;color:#1A1A1A;padding-bottom:0;\">No middleman. Customers see your number and call you direct.</td></tr>\n    </table>\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"background-color:#FCF9F8;padding:20px 40px 32px 40px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:14px;\"><a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:16px 36px;font-family:'Poppins',Arial,sans-serif;font-size:17px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px;\">Get found this monsoon &#8212; free</a></td></tr></table></td></tr>\n\n  <tr><td style=\"background-color:#1A1A1A;padding:24px 40px;\"><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:14px;font-weight:700;color:#FFFFFF;\">qckserve.in</div><div style=\"font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a9a9a;padding-top:4px;\">India's free local marketplace. Owner-direct, no middlemen, no commission.</div></td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-03.svg",
+      "tags": [
+        "services",
+        "promo",
+        "email"
+      ],
+      "notes": "Editorial-magazine archetype — italic-serif masthead kicker, oversized caps headline, and a three-column proof strip as the star device. Anchored to the monsoon surge in home-repair demand (plumbing, waterproofing, seepage) that books out good local pros June-Aug; kept national, spoken to the service provider."
+    },
+    {
+      "channel": "whatsapp",
+      "vertical": "services",
+      "content": "Barish ka season = repair ka season. 🔧 Plumber, electrician, painter, cleaner — sabki demand full hai. QckServe pe apni service list karo bilkul FREE. ₹0 commission, customer seedha aapko call karega, poora paisa aapka. Abhi list karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-03.svg",
+      "tags": [
+        "services",
+        "promo",
+        "whatsapp"
+      ]
+    },
+    {
+      "channel": "caption",
+      "vertical": "services",
+      "platform": "instagram",
+      "content": "Barish shuru, aur phone bajna shuru. 🔧\n\nMonsoon mein har achhe repair-wale ki booking full hai. Toh customer aap tak kaise pahunche? QckServe pe apni service list karo — ₹0 listing, 0% commission, customer seedha aapko call. Kaam bhi aapka, poora paisa bhi aapka.\n\n👉 qckserve.in\n\n#QckServe #ZeroCommission #LocalServices #HomeServicesIndia #MonsoonReady",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-03.svg",
+      "tags": [
+        "services",
+        "promo",
+        "caption",
+        "instagram"
+      ]
+    },
+    {
+      "channel": "sms",
+      "vertical": "services",
+      "content": "List your service free on QckServe. Monsoon = peak demand. ₹0 to list, 0% commission, customers call you direct. Start: qckserve.in",
+      "tags": [
+        "services",
+        "promo",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "vertical": "services",
+      "title": "[2026-07-03] List your service free — monsoon is your busy season (Image Prompt)",
+      "content": "Editorial magazine hero poster for QckServe, local-services theme.\n\nSCENE: A warm, real Indian setting during monsoon — a confident local tradesperson (an electrician or plumber) in a clean work shirt standing in a doorway with a modest tool bag, light rain on the street behind, an unhurried in-demand mood; a homeowner just out of frame welcoming them in.\nSUBJECT: The tradesperson mid-stride answering a call on their phone — the everyday moment of a job coming in direct.\nPHONE-UI MOCKUP: A smartphone in the lower-right showing the QckServe services listing screen — a provider card with a photo, a trade label ('Electrician'), a visible 'Call' button and a small badge '0% commission'. Clean, modern app UI.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — QckServe orange #ef6723 as the hero accent, deep charcoal #1A1A1A for contrast blocks, warm off-white paper #FCF9F8 as base, soft highlight #FFE7D8. One accent used sparingly.\nLIGHTING: soft, diffused monsoon daylight, gentle shadows, cosy and trustworthy.\nTYPE HIERARCHY: oversized extra-bold condensed caps headline 'YOUR BUSY SEASON.' with a smaller Georgia-italic kicker 'the monsoon rush'; a three-column editorial proof strip reading '₹0 TO LIST | 0% COMMISSION | 1:1 DIRECT'.\nEYE FLOW: top-left logo zone → oversized headline → three-column proof strip → phone UI → wordmark 'qckserve.in' bottom.\nCAMERA: 35mm editorial, shallow depth of field, eye-level, magazine-cover crispness.\nPERFORMANCE LAYER: high thumb-stopping contrast, legible at small sizes, message reads even when compressed.\nReserve the TOP-LEFT logo zone (~140px square) empty — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "services",
+        "image-prompt",
+        "other"
+      ]
+    }
+  ]
+}

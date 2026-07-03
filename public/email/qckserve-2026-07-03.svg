@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — List your service free. Zero commission, customers call you direct. A free local services marketplace for all of India.">
+  <defs>
+    <style>
+      .head { font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif; font-weight: 900; }
+      .serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Warm paper canvas -->
+  <rect width="1080" height="1350" fill="#FCF9F8"/>
+
+  <!-- Reserved top-left logo square (~140px), left blank for manual logo placement -->
+  <rect x="64" y="64" width="140" height="140" fill="none"/>
+
+  <!-- Italic-serif kicker, top-right, editorial masthead feel -->
+  <text x="1016" y="150" text-anchor="end" class="serif" font-size="40" fill="#ef6723">the monsoon rush</text>
+  <line x1="72" y1="196" x2="1008" y2="196" stroke="#1A1A1A" stroke-width="3"/>
+
+  <!-- Oversized caps headline -->
+  <text x="72" y="392" class="head" font-size="150" letter-spacing="-6" fill="#1A1A1A">YOUR</text>
+  <text x="72" y="536" class="head" font-size="150" letter-spacing="-6" fill="#1A1A1A">BUSY</text>
+  <text x="72" y="680" class="head" font-size="150" letter-spacing="-6" fill="#ef6723">SEASON.</text>
+  <text x="76" y="752" class="serif" font-size="44" fill="#6b6b6b">Repairs are booked out. Get the calls.</text>
+
+  <!-- Memorable device: three editorial proof columns on a dark band -->
+  <g>
+    <rect x="72" y="820" width="936" height="250" rx="26" fill="#1A1A1A"/>
+
+    <!-- column 1 -->
+    <text x="228" y="940" text-anchor="middle" class="head" font-size="96" letter-spacing="-4" fill="#ef6723">&#8377;0</text>
+    <text x="228" y="1000" text-anchor="middle" class="sans" font-size="30" font-weight="bold" letter-spacing="2" fill="#FFFFFF">TO LIST</text>
+    <text x="228" y="1042" text-anchor="middle" class="serif" font-size="26" fill="#bdbdbd">post it free</text>
+
+    <!-- divider -->
+    <line x1="384" y1="864" x2="384" y2="1026" stroke="#4a4a4a" stroke-width="2"/>
+
+    <!-- column 2 -->
+    <text x="540" y="940" text-anchor="middle" class="head" font-size="96" letter-spacing="-4" fill="#ef6723">0%</text>
+    <text x="540" y="1000" text-anchor="middle" class="sans" font-size="30" font-weight="bold" letter-spacing="2" fill="#FFFFFF">COMMISSION</text>
+    <text x="540" y="1042" text-anchor="middle" class="serif" font-size="26" fill="#bdbdbd">keep every rupee</text>
+
+    <!-- divider -->
+    <line x1="696" y1="864" x2="696" y2="1026" stroke="#4a4a4a" stroke-width="2"/>
+
+    <!-- column 3 -->
+    <text x="852" y="940" text-anchor="middle" class="head" font-size="96" letter-spacing="-4" fill="#ef6723">1:1</text>
+    <text x="852" y="1000" text-anchor="middle" class="sans" font-size="30" font-weight="bold" letter-spacing="2" fill="#FFFFFF">DIRECT</text>
+    <text x="852" y="1042" text-anchor="middle" class="serif" font-size="26" fill="#bdbdbd">they call you</text>
+  </g>
+
+  <!-- Plain-speech proof, one idea per line -->
+  <text x="72" y="1150" class="sans" font-size="38" font-weight="bold" fill="#1A1A1A">List your trade today.</text>
+  <text x="72" y="1200" class="sans" font-size="38" font-weight="bold" fill="#ef6723">A customer nearby calls you direct.</text>
+
+  <!-- One CTA, on an orange band -->
+  <rect x="72" y="1240" width="600" height="88" rx="14" fill="#ef6723"/>
+  <text x="372" y="1297" text-anchor="middle" class="sans" font-size="34" font-weight="bold" fill="#FFFFFF" letter-spacing="1">List your service &#8212; free</text>
+
+  <!-- Wordmark, bottom-right -->
+  <text x="1008" y="1300" text-anchor="end" class="head" font-size="40" letter-spacing="-1" fill="#1A1A1A">qckserve.in</text>
+</svg>
