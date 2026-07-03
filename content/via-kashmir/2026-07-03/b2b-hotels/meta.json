@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-03",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (India)",
+  "theme": "Peak-season room demand as the yatra begins - travellers booking now, unlisted rooms miss the guest",
+  "season": "Peak summer (early July 2026) - the Amarnath Yatra begins 3 July and runs 57 days, the longest in recent years, so the valley is busy and fully open. Flights landing in Srinagar, every pass and the Z-Morh tunnel clear, the high meadows at Sonamarg and Pahalgam lush and green, and the Dal glass-still and cool at dawn.",
+  "design": "A",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260703",
+  "campaign_name": "Hotels The season opened, rooms unlisted [INR] - 03 Jul 2026",
+  "subject": "The season just opened and your rooms are still unlisted",
+  "items": [
+    "VK-HOTELS-LISTING",
+    "VK-HOTELS-DEMAND",
+    "VK-HOTELS-SEEN"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-03/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-03/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

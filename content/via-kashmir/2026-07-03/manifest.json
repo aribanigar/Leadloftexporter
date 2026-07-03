@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-03",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "C/A/B",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "C",
+      "theme": "Peak-summer Kashmir - high meadows lush, passes open, the season at its height as July begins",
+      "subject": "Kashmir's greenest weeks have just begun",
+      "campaign_code": "VK-INR-B2C-20260703"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "theme": "Peak-season room demand as the yatra begins - travellers booking now, unlisted rooms miss the guest",
+      "subject": "The season just opened and your rooms are still unlisted",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260703"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "B",
+      "theme": "Season just opened - airport runs, valley drives and shikara demand moving now; idle seats do not come back",
+      "subject": "The season's first airport runs are being booked now",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260703"
+    }
+  ]
+}
