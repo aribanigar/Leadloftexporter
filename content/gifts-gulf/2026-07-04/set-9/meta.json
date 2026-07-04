@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-04",
+  "theme": "Coffee & Tea",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "C",
+  "campaign_code": "GG-20260704-9",
+  "campaign_name": "Coffee & Tea - 04 Jul 2026",
+  "subject": "Mornings, in your colours",
+  "skus": [
+    "GG1147",
+    "GG1510",
+    "GG1512",
+    "GG1658",
+    "GG1344"
+  ],
+  "products": [
+    {
+      "name": "Topaz",
+      "sku": "GG1147",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2317-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1147"
+    },
+    {
+      "name": "Matt",
+      "sku": "GG1510",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6839-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1510"
+    },
+    {
+      "name": "Lim",
+      "sku": "GG1512",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6840-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1512"
+    },
+    {
+      "name": "Rodeo",
+      "sku": "GG1658",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9618-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1658"
+    },
+    {
+      "name": "Mugiva",
+      "sku": "GG1344",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2890-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1344"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20coffee%20and%20tea%20options%20for%20our%20team."
+}

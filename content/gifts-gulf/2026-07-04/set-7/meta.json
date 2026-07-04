@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-04",
+  "theme": "Event Giveaways",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "A",
+  "campaign_code": "GG-20260704-7",
+  "campaign_name": "Event Giveaways - 04 Jul 2026",
+  "subject": "Handouts they actually keep",
+  "skus": [
+    "GG1612",
+    "GG1023",
+    "GG1551",
+    "GG1193",
+    "GG1196",
+    "GG1131"
+  ],
+  "products": [
+    {
+      "name": "Moira",
+      "sku": "GG1612",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9040-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1612"
+    },
+    {
+      "name": "Cartoon",
+      "sku": "GG1023",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3780-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1023"
+    },
+    {
+      "name": "Shoop",
+      "sku": "GG1551",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7208-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1551"
+    },
+    {
+      "name": "Go",
+      "sku": "GG1193",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2444-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1193"
+    },
+    {
+      "name": "Maipen",
+      "sku": "GG1196",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2449-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1196"
+    },
+    {
+      "name": "Bubble",
+      "sku": "GG1131",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2269-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1131"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}

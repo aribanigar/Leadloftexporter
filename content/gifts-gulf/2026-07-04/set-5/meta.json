@@ -1,0 +1,44 @@
+{
+  "date": "2026-07-04",
+  "theme": "Tech & Desk",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "B",
+  "campaign_code": "GG-20260704-5",
+  "campaign_name": "Tech & Desk - 04 Jul 2026",
+  "subject": "Gear that stays on the desk",
+  "skus": [
+    "GG1218",
+    "GG1439",
+    "GG1199",
+    "GG1134"
+  ],
+  "products": [
+    {
+      "name": "Wusic",
+      "sku": "GG1218",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2513-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1218"
+    },
+    {
+      "name": "Superpad",
+      "sku": "GG1439",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6416-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1439"
+    },
+    {
+      "name": "Boogar",
+      "sku": "GG1199",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2458-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1199"
+    },
+    {
+      "name": "Pandu",
+      "sku": "GG1134",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2281-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1134"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20tech%20and%20desk%20options%20for%20our%20team."
+}

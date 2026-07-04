@@ -1,0 +1,151 @@
+{
+  "date": "2026-07-04",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "generated_utc": "2026-07-04T01:05:35.218745Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium Drinkware",
+      "angle": "Premium Drinkware",
+      "campaign_code": "GG-20260704-1",
+      "campaign_name": "Premium Drinkware - 04 Jul 2026",
+      "subject": "Steel that holds the cold",
+      "skus": [
+        "GG1146",
+        "GG1412",
+        "GG1676",
+        "GG1466",
+        "GG1368",
+        "GG1135"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Bags & Travel",
+      "angle": "Bags & Travel",
+      "campaign_code": "GG-20260704-2",
+      "campaign_name": "Bags & Travel - 04 Jul 2026",
+      "subject": "Packed for the day ahead",
+      "skus": [
+        "GG1031",
+        "GG1037",
+        "GG1179",
+        "GG1256"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Eco & Sustainable",
+      "angle": "Eco & Sustainable",
+      "campaign_code": "GG-20260704-3",
+      "campaign_name": "Eco & Sustainable - 04 Jul 2026",
+      "subject": "Made from what came before",
+      "skus": [
+        "GG1078",
+        "GG1077",
+        "GG1104",
+        "GG1140",
+        "GG1204"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Notebooks & Writing",
+      "angle": "Notebooks & Writing",
+      "campaign_code": "GG-20260704-4",
+      "campaign_name": "Notebooks & Writing - 04 Jul 2026",
+      "subject": "Ideas need somewhere to go",
+      "skus": [
+        "GG1180",
+        "GG1222",
+        "GG1334",
+        "GG1054",
+        "GG1507",
+        "GG1640"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Tech & Desk",
+      "angle": "Tech & Desk",
+      "campaign_code": "GG-20260704-5",
+      "campaign_name": "Tech & Desk - 04 Jul 2026",
+      "subject": "Gear that stays on the desk",
+      "skus": [
+        "GG1218",
+        "GG1439",
+        "GG1199",
+        "GG1134"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Executive Onboarding",
+      "angle": "Executive Onboarding",
+      "campaign_code": "GG-20260704-6",
+      "campaign_name": "Executive Onboarding - 04 Jul 2026",
+      "subject": "The first-day welcome kit",
+      "skus": [
+        "GG1275",
+        "GG1045",
+        "GG1583",
+        "GG1046",
+        "GG1017"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event Giveaways",
+      "angle": "Event Giveaways",
+      "campaign_code": "GG-20260704-7",
+      "campaign_name": "Event Giveaways - 04 Jul 2026",
+      "subject": "Handouts they actually keep",
+      "skus": [
+        "GG1612",
+        "GG1023",
+        "GG1551",
+        "GG1193",
+        "GG1196",
+        "GG1131"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Summer Occasions",
+      "angle": "Summer Occasions",
+      "campaign_code": "GG-20260704-8",
+      "campaign_name": "Summer Occasions - 04 Jul 2026",
+      "subject": "Built for days outside",
+      "skus": [
+        "GG1211",
+        "GG1198",
+        "GG1340",
+        "GG1237"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Coffee & Tea",
+      "angle": "Coffee & Tea",
+      "campaign_code": "GG-20260704-9",
+      "campaign_name": "Coffee & Tea - 04 Jul 2026",
+      "subject": "Mornings, in your colours",
+      "skus": [
+        "GG1147",
+        "GG1510",
+        "GG1512",
+        "GG1658",
+        "GG1344"
+      ]
+    }
+  ]
+}

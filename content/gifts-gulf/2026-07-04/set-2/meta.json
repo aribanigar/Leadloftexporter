@@ -1,0 +1,44 @@
+{
+  "date": "2026-07-04",
+  "theme": "Bags & Travel",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "B",
+  "campaign_code": "GG-20260704-2",
+  "campaign_name": "Bags & Travel - 04 Jul 2026",
+  "subject": "Packed for the day ahead",
+  "skus": [
+    "GG1031",
+    "GG1037",
+    "GG1179",
+    "GG1256"
+  ],
+  "products": [
+    {
+      "name": "Bapal",
+      "sku": "GG1031",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2364-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1031"
+    },
+    {
+      "name": "Terra",
+      "sku": "GG1037",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc5078-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1037"
+    },
+    {
+      "name": "Nyko",
+      "sku": "GG1179",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2392-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1179"
+    },
+    {
+      "name": "Mountain",
+      "sku": "GG1256",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2579-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1256"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20bags%20and%20travel%20options%20for%20our%20team."
+}

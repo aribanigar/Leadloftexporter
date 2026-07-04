@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-04",
+  "theme": "Executive Onboarding",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "C",
+  "campaign_code": "GG-20260704-6",
+  "campaign_name": "Executive Onboarding - 04 Jul 2026",
+  "subject": "The first-day welcome kit",
+  "skus": [
+    "GG1275",
+    "GG1045",
+    "GG1583",
+    "GG1046",
+    "GG1017"
+  ],
+  "products": [
+    {
+      "name": "Cadeau",
+      "sku": "GG1275",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2634-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1275"
+    },
+    {
+      "name": "Nova",
+      "sku": "GG1045",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6856-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1045"
+    },
+    {
+      "name": "Kadeau",
+      "sku": "GG1583",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8406-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1583"
+    },
+    {
+      "name": "Talor",
+      "sku": "GG1046",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6998-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1046"
+    },
+    {
+      "name": "Premier",
+      "sku": "GG1017",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3350-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1017"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20executive%20onboarding%20options%20for%20our%20team."
+}

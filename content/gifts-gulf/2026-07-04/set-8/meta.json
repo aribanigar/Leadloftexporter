@@ -1,0 +1,44 @@
+{
+  "date": "2026-07-04",
+  "theme": "Summer Occasions",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "B",
+  "campaign_code": "GG-20260704-8",
+  "campaign_name": "Summer Occasions - 04 Jul 2026",
+  "subject": "Built for days outside",
+  "skus": [
+    "GG1211",
+    "GG1198",
+    "GG1340",
+    "GG1237"
+  ],
+  "products": [
+    {
+      "name": "Wooler",
+      "sku": "GG1211",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2492-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1211"
+    },
+    {
+      "name": "Lekker",
+      "sku": "GG1198",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2459-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1198"
+    },
+    {
+      "name": "Wale",
+      "sku": "GG1340",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2879-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1340"
+    },
+    {
+      "name": "Kolapsi",
+      "sku": "GG1237",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2548-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1237"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20summer%20occasions%20options%20for%20our%20team."
+}

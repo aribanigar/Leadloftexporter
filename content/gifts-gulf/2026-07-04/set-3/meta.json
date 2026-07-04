@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-04",
+  "theme": "Eco & Sustainable",
+  "season": "Mid H2, summer hydration and event-season gifting",
+  "design": "C",
+  "campaign_code": "GG-20260704-3",
+  "campaign_name": "Eco & Sustainable - 04 Jul 2026",
+  "subject": "Made from what came before",
+  "skus": [
+    "GG1078",
+    "GG1077",
+    "GG1104",
+    "GG1140",
+    "GG1204"
+  ],
+  "products": [
+    {
+      "name": "Osole",
+      "sku": "GG1078",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2098-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1078"
+    },
+    {
+      "name": "Origin",
+      "sku": "GG1077",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2097-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1077"
+    },
+    {
+      "name": "Sparta",
+      "sku": "GG1104",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2159-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1104"
+    },
+    {
+      "name": "Phottle",
+      "sku": "GG1140",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2308-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1140"
+    },
+    {
+      "name": "Notie",
+      "sku": "GG1204",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2481-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1204"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-04/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20eco%20and%20sustainable%20options%20for%20our%20team."
+}
