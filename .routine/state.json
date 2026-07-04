@@ -1,0 +1,21 @@
+{
+  "industry_order": [
+    "Agribusiness", "Consumer Products", "Life Sciences and Healthcare", "Retail", "Wholesale Distribution",
+    "Aerospace and Defense", "Automotive", "High Tech", "Industrial Manufacturing", "Mill Products",
+    "Chemicals", "Mining", "Oil Gas and Energy", "Utilities",
+    "Construction and Real Estate", "Media Sports and Entertainment", "Professional Services", "Telecommunications", "Travel and Transportation",
+    "Defense and Security", "Education and Research", "Government",
+    "Financial Services"
+  ],
+  "next_index": 2,
+  "runs": [
+    {
+      "date": "2026-07-04",
+      "industries": ["Agribusiness", "Consumer Products"],
+      "services": ["Social Media", "SEO / AEO / GEO / SRX", "Website Design", "AI Work Studio", "ERP Building", "Performance Marketing", "SchoolOS (School ERP)"],
+      "items": 28,
+      "seeded": false,
+      "seed_note": "Supabase project restricted (exceed_egress_quota) - REST API returned 402; images and content committed to repo, DB seeding must be re-run once the Supabase plan/spend cap is restored"
+    }
+  ]
+}
