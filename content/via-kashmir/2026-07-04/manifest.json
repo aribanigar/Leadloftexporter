@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-04",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/C/B",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Peak-summer Kashmir - meadows lush, passes clear, the valley at its greenest as July settles in",
+      "subject": "Summer in the valley is green, cool and wide open",
+      "campaign_code": "VK-INR-B2C-20260704"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "C",
+      "theme": "Peak-season runs booking now - airport pickups, valley drives, golden-hour shikaras; idle seats and boats do not come back",
+      "subject": "The rides are booking today and your seats sit idle",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260704"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "theme": "Peak-summer Dal demand - travellers want the real houseboat stay; unlisted decks miss this week's guests",
+      "subject": "Your houseboat is missing this week's Dal guests",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260704"
+    }
+  ]
+}
