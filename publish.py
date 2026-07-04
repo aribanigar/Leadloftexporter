@@ -2,47 +2,41 @@
 """
 publish.py — seed daily QckServe content into the Content Hub (Supabase).
 
-Two transports, picked automatically:
+Two write paths, auto-selected:
 
   * PostgREST over HTTPS  — used when SUPABASE_SERVICE_KEY is set. This is the
     ROUTINE path: Anthropic's cloud sandbox blocks Postgres ports (5432/6543),
-    so the only write path is Supabase's REST API authenticated with the
-    service_role key. Stdlib only — nothing to pip install.
+    so the only write channel to Supabase is PostgREST, which authenticates with
+    the service_role key. Stdlib only — nothing to pip install.
 
-  * Direct psycopg2       — used when no service key is present (local runs on a
-    laptop / VM / server where port 5432 is open). Auto-installs psycopg2-binary.
+  * Direct DB (psycopg2) — fallback for local runs where 5432 is open and no
+    service key is provided. Auto-installs psycopg2-binary if missing.
 
-The Supabase project URL is derived from DATABASE_URL (or SUPABASE_URL if set),
-and the business is resolved by slug — nothing else is hard-coded.
+The Supabase project URL and the `qckserve` business_id are derived/resolved at
+runtime (from DATABASE_URL / SUPABASE_URL and by slug), so nothing is hard-coded.
 
 ENV
   DATABASE_URL          postgresql://postgres.<ref>:<pass>@...pooler.supabase.com:5432/postgres
+  SUPABASE_URL          https://<ref>.supabase.co   (optional; derived from DATABASE_URL)
+  SUPABASE_SERVICE_KEY  service_role / sb_secret_ key  -> selects the REST path
   HUB_WORKSPACE         workspace uuid
-  SUPABASE_URL          (optional) https://<ref>.supabase.co  — else derived from DATABASE_URL
-  SUPABASE_SERVICE_KEY  service_role key — presence selects the HTTPS/PostgREST path
 
 USAGE
   python publish.py --inspect
-  python publish.py --manifest content/qckserve/qckserve-2026-07-04.json
-  python publish.py --manifest <file> --dry-run          # print, no network, no key needed
-  python publish.py --manifest <file> --skip-existing     # skip dup titles
+  python publish.py --manifest content/qckserve/qckserve-2026-06-28.json
+  python publish.py --manifest <file> --dry-run         # print, no network
+  python publish.py --manifest <file> --skip-existing    # skip dup titles
 
 MANIFEST (json)
-  { "date":"2026-07-04","business":"qckserve","topic":"...",
+  { "date":"2026-06-28","business":"qckserve","topic":"...",
     "items":[ {channel, subject?, platform?, content, amp_content?, image_url?,
                tags[], notes?, title?}, ... ] }
   channel == content_hub type in {html_email, whatsapp, caption, sms, other}
 """
 
 import argparse, json, os, sys, uuid, datetime, subprocess, re
-import urllib.request, urllib.parse, urllib.error
 
-# --- baked-in defaults so it runs with minimal env setup (override via env / secrets) ---
-DEFAULT_DATABASE_URL = ("postgresql://postgres.cmdnezltteldysoxyjzh:vTqdrCo4vaa4MJzz"
-                        "@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres")
 DEFAULT_HUB_WORKSPACE = "1a716353-9472-4c1d-ae89-f95052e8f015"
-# SECURITY: the DB password / service key are live write creds. Prefer setting them as
-# routine secrets and rotating in Supabase; defaults here are only for convenience.
 
 ALLOWED_TYPES = {"html_email", "whatsapp", "caption", "sms", "other"}
 CHANNEL_LABEL = {"html_email": "Email", "whatsapp": "WhatsApp", "caption": "Caption",
@@ -50,88 +44,80 @@ CHANNEL_LABEL = {"html_email": "Email", "whatsapp": "WhatsApp", "caption": "Capt
 
 
 # ----------------------------- url derivation -----------------------------
-def project_ref_from_db_url(database_url):
-    # postgresql://postgres.<ref>:<pass>@...  -> <ref>
-    m = re.search(r"postgres\.([a-z0-9]+):", database_url or "")
-    return m.group(1) if m else None
+def derive_supabase_url(database_url, explicit):
+    if explicit:
+        return explicit.rstrip("/")
+    # postgresql://postgres.<ref>:...@aws-...pooler.supabase.com:5432/postgres
+    m = re.search(r"postgres\.([a-z0-9]+)[:@]", database_url or "")
+    if m:
+        return f"https://{m.group(1)}.supabase.co"
+    return None
 
 
-def supabase_base_url(database_url):
-    env = os.environ.get("SUPABASE_URL")
-    if env:
-        return env.rstrip("/")
-    ref = project_ref_from_db_url(database_url)
-    if not ref:
-        sys.exit("ERROR: could not derive Supabase URL — set SUPABASE_URL.")
-    return f"https://{ref}.supabase.co"
+# ----------------------------- REST path (routine) -----------------------------
+def _rest(url, key, method="GET", path="", params=None, body=None):
+    import urllib.request, urllib.parse, urllib.error
+    full = f"{url}/rest/v1/{path}"
+    if params:
+        full += "?" + urllib.parse.urlencode(params)
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(full, data=data, method=method)
+    req.add_header("apikey", key)
+    req.add_header("Authorization", f"Bearer {key}")
+    req.add_header("Content-Type", "application/json")
+    if method == "POST":
+        req.add_header("Prefer", "return=representation")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read().decode("utf-8")
+            return json.loads(raw) if raw else []
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        sys.exit(f"ERROR: PostgREST {method} {path} -> HTTP {e.code}\n       {detail}")
+    except Exception as e:
+        sys.exit(f"ERROR: PostgREST request failed: {e!r}")
 
 
-# =========================================================================
-#  PostgREST (HTTPS) transport — the routine/cloud path
-# =========================================================================
-class RestClient:
-    def __init__(self, base_url, service_key):
-        self.base = base_url.rstrip("/") + "/rest/v1"
-        self.key = service_key
+class RestBackend:
+    mode = "rest"
 
-    def _headers(self, extra=None):
-        h = {"apikey": self.key, "Authorization": f"Bearer {self.key}",
-             "Content-Type": "application/json"}
-        if extra:
-            h.update(extra)
-        return h
+    def __init__(self, url, key, workspace):
+        self.url, self.key, self.workspace = url, key, workspace
 
-    def _request(self, method, path, params=None, body=None, headers=None):
-        url = self.base + path
-        if params:
-            url += "?" + urllib.parse.urlencode(params, safe="*.,()")
-        data = json.dumps(body).encode("utf-8") if body is not None else None
-        req = urllib.request.Request(url, data=data, method=method,
-                                     headers=self._headers(headers))
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                raw = resp.read().decode("utf-8")
-                return json.loads(raw) if raw.strip() else None
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", "replace")
-            sys.exit(f"ERROR: Supabase REST {method} {path} -> HTTP {e.code}\n"
-                     f"       {detail}\n"
-                     "       (402/egress-quota means the Supabase project is restricted — "
-                     "upgrade the plan or remove spend caps in the dashboard.)")
-        except urllib.error.URLError as e:
-            sys.exit(f"ERROR: could not reach Supabase REST at {self.base}: {e.reason!r}")
-
-    def resolve_business(self, workspace, slug):
-        rows = self._request("GET", "/content_businesses", params={
-            "workspace_id": f"eq.{workspace}", "slug": f"eq.{slug}",
+    def resolve_business(self, slug):
+        rows = _rest(self.url, self.key, path="content_businesses", params={
+            "workspace_id": f"eq.{self.workspace}", "slug": f"eq.{slug}",
             "select": "id,name,slug,brand_color", "limit": "1"})
         if not rows:
-            sys.exit(f"ERROR: no business slug '{slug}' in workspace {workspace}.")
+            sys.exit(f"ERROR: no business slug '{slug}' in workspace {self.workspace}.")
         r = rows[0]
-        return {"id": r["id"], "name": r["name"], "slug": r["slug"],
-                "brand_color": r.get("brand_color")}
+        return {"id": r["id"], "name": r["name"], "slug": r["slug"], "brand_color": r["brand_color"]}
 
-    def title_exists(self, workspace, business_id, title):
-        rows = self._request("GET", "/content_assets", params={
-            "workspace_id": f"eq.{workspace}", "business_id": f"eq.{business_id}",
+    def title_exists(self, business_id, title):
+        rows = _rest(self.url, self.key, path="content_assets", params={
+            "workspace_id": f"eq.{self.workspace}", "business_id": f"eq.{business_id}",
             "title": f"eq.{title}", "select": "id", "limit": "1"})
         return bool(rows)
 
     def insert_asset(self, row):
-        rows = self._request("POST", "/content_assets", body=row,
-                             headers={"Prefer": "return=representation"})
-        return rows[0]["id"] if rows else None
+        out = _rest(self.url, self.key, method="POST", path="content_assets", body={
+            "id": row["id"], "workspace_id": row["workspace_id"], "business_id": row["business_id"],
+            "title": row["title"], "type": row["type"], "content": row["content"],
+            "amp_content": row.get("amp_content"), "subject": row.get("subject"),
+            "platform": row.get("platform"), "tags": row.get("tags") or [],
+            "notes": row.get("notes"), "image_url": row.get("image_url")})
+        return out[0]["id"] if out else row["id"]
 
-    def list_businesses(self, workspace):
-        rows = self._request("GET", "/content_businesses", params={
-            "workspace_id": f"eq.{workspace}",
-            "select": "name,slug,brand_color", "order": "name"}) or []
-        return [(r["name"], r["slug"], r.get("brand_color")) for r in rows]
+    def list_businesses(self):
+        rows = _rest(self.url, self.key, path="content_businesses", params={
+            "workspace_id": f"eq.{self.workspace}", "select": "name,slug,brand_color", "order": "name"})
+        return [(r["name"], r["slug"], r["brand_color"]) for r in rows]
+
+    def close(self):
+        pass
 
 
-# =========================================================================
-#  psycopg2 (direct DB) transport — local / open-port path
-# =========================================================================
+# ----------------------------- direct DB path (local) -----------------------------
 def _psycopg2():
     try:
         import psycopg2  # noqa: F401
@@ -143,30 +129,33 @@ def _psycopg2():
     return psycopg2
 
 
-class DirectClient:
-    def __init__(self, database_url):
+class PgBackend:
+    mode = "direct-db"
+
+    def __init__(self, database_url, workspace):
         psycopg2 = _psycopg2()
         try:
             self.conn = psycopg2.connect(database_url, connect_timeout=15)
         except Exception as e:
             sys.exit("ERROR: could not connect to the database.\n"
-                     "       Run where port 5432 is open (laptop / VM / server), or set "
-                     "SUPABASE_SERVICE_KEY to use the HTTPS path.\n"
+                     "       Run this where port 5432 is open, or set SUPABASE_SERVICE_KEY "
+                     "to use the PostgREST/HTTPS path (required in the cloud routine sandbox).\n"
                      f"       detail: {e!r}")
+        self.workspace = workspace
 
-    def resolve_business(self, workspace, slug):
+    def resolve_business(self, slug):
         cur = self.conn.cursor()
         cur.execute("select id,name,slug,brand_color from content_businesses "
-                    "where workspace_id=%s and slug=%s limit 1", (workspace, slug))
+                    "where workspace_id=%s and slug=%s limit 1", (self.workspace, slug))
         r = cur.fetchone(); cur.close()
         if not r:
-            sys.exit(f"ERROR: no business slug '{slug}' in workspace {workspace}.")
+            sys.exit(f"ERROR: no business slug '{slug}' in workspace {self.workspace}.")
         return {"id": r[0], "name": r[1], "slug": r[2], "brand_color": r[3]}
 
-    def title_exists(self, workspace, business_id, title):
+    def title_exists(self, business_id, title):
         cur = self.conn.cursor()
         cur.execute("select 1 from content_assets where workspace_id=%s and business_id=%s "
-                    "and title=%s limit 1", (workspace, business_id, title))
+                    "and title=%s limit 1", (self.workspace, business_id, title))
         r = cur.fetchone(); cur.close(); return bool(r)
 
     def insert_asset(self, row):
@@ -180,21 +169,24 @@ class DirectClient:
              json.dumps(row.get("tags") or []), row.get("notes"), row.get("image_url")))
         new_id = cur.fetchone()[0]; self.conn.commit(); cur.close(); return new_id
 
-    def list_businesses(self, workspace):
+    def list_businesses(self):
         cur = self.conn.cursor()
         cur.execute("select name,slug,brand_color from content_businesses "
-                    "where workspace_id=%s order by name", (workspace,))
+                    "where workspace_id=%s order by name", (self.workspace,))
         rows = cur.fetchall(); cur.close(); return rows
 
+    def close(self):
+        self.conn.close()
 
-def make_client(database_url):
-    key = os.environ.get("SUPABASE_SERVICE_KEY")
-    if key:
-        base = supabase_base_url(database_url)
-        print(f"mode=rest  ({base})")
-        return RestClient(base, key)
-    print("mode=direct (psycopg2)")
-    return DirectClient(database_url)
+
+def make_backend(database_url, supabase_url, service_key, workspace):
+    if service_key:
+        url = derive_supabase_url(database_url, supabase_url)
+        if not url:
+            sys.exit("ERROR: SUPABASE_SERVICE_KEY set but could not derive SUPABASE_URL "
+                     "(set SUPABASE_URL or a valid DATABASE_URL).")
+        return RestBackend(url, service_key, workspace)
+    return PgBackend(database_url, workspace)
 
 
 # ----------------------------- shared -----------------------------
@@ -207,15 +199,15 @@ def make_title(item, topic, date_str):
     return f"[{date_str}] {topic} ({label})"
 
 
-def cmd_inspect(database_url, workspace):
-    client = make_client(database_url)
-    print(f"Workspace {workspace}\n\nBusinesses:")
-    for name, slug, color in client.list_businesses(workspace):
+def cmd_inspect(backend, workspace):
+    print(f"Connected ({backend.mode}). Workspace {workspace}\n\nBusinesses:")
+    for name, slug, color in backend.list_businesses():
         print(f"  - {slug:<22} {name:<24} {color}")
     print(f"\nAllowed types: {sorted(ALLOWED_TYPES)}")
+    backend.close()
 
 
-def cmd_publish(database_url, workspace, args):
+def cmd_publish(backend, workspace, args):
     with open(args.manifest, encoding="utf-8") as f:
         man = json.load(f)
     date_str = man.get("date") or datetime.datetime.utcnow().strftime("%Y-%m-%d")
@@ -239,15 +231,15 @@ def cmd_publish(database_url, workspace, args):
         print(f"\n[dry] would create={len(items)} (no network touched)")
         return
 
-    client = make_client(database_url)
-    biz = client.resolve_business(workspace, slug)
+    print(f"Mode: {backend.mode}")
+    biz = backend.resolve_business(slug)
     print(f"Business: {biz['name']} ({biz['slug']})  id={biz['id']}")
     print(f"Date: {date_str}   Topic: {topic}   Items: {len(items)}\n")
 
     created = skipped = 0
     for it in items:
         title = make_title(it, topic, date_str)
-        if args.skip_existing and client.title_exists(workspace, biz["id"], title):
+        if args.skip_existing and backend.title_exists(biz["id"], title):
             print(f"  ~ skip (exists): {title}"); skipped += 1; continue
         row = {
             "id": str(uuid.uuid4()), "workspace_id": workspace, "business_id": biz["id"],
@@ -256,10 +248,11 @@ def cmd_publish(database_url, workspace, args):
             "platform": it.get("platform"), "tags": it.get("tags") or [],
             "notes": it.get("notes"), "image_url": it.get("image_url"),
         }
-        new_id = client.insert_asset(row)
+        new_id = backend.insert_asset(row)
         print(f"  + {it['channel']:<10} {title}  -> {new_id}")
         created += 1
 
+    backend.close()
     print(f"\nDone. created={created} skipped={skipped}")
     print(f"View: https://leadloftexporter.vercel.app/content-hub/{slug}")
 
@@ -273,14 +266,22 @@ def main():
     ap.add_argument("--inspect", action="store_true", help="list businesses, then exit")
     args = ap.parse_args()
 
-    database_url = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+    database_url = os.environ.get("DATABASE_URL")
+    supabase_url = os.environ.get("SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY")
     workspace = os.environ.get("HUB_WORKSPACE", DEFAULT_HUB_WORKSPACE)
 
+    if args.dry_run and not args.inspect:
+        # dry-run needs no backend / network
+        return cmd_publish(None, workspace, args)
+
+    backend = make_backend(database_url, supabase_url, service_key, workspace)
+
     if args.inspect:
-        return cmd_inspect(database_url, workspace)
+        return cmd_inspect(backend, workspace)
     if not args.manifest:
         sys.exit("ERROR: --manifest is required (or use --inspect).")
-    return cmd_publish(database_url, workspace, args)
+    return cmd_publish(backend, workspace, args)
 
 
 if __name__ == "__main__":
