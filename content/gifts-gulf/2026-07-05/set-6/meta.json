@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Jute market bags",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260705-6",
+  "campaign_name": "Jute Market Bags - 05 Jul 2026",
+  "subject": "Jute that earns its carry",
+  "skus": [
+    "GG1607",
+    "GG1609",
+    "GG1712",
+    "GG1713",
+    "GG1668",
+    "GG1518"
+  ],
+  "products": [
+    {
+      "name": "Brick Lane",
+      "sku": "GG1607",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8965-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1607"
+    },
+    {
+      "name": "Campo De Fiori",
+      "sku": "GG1609",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8967-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1609"
+    },
+    {
+      "name": "Jute Large",
+      "sku": "GG1712",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9930-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1712"
+    },
+    {
+      "name": "Jute Medium",
+      "sku": "GG1713",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9929-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1713"
+    },
+    {
+      "name": "Taske Medium",
+      "sku": "GG1668",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9730-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1668"
+    },
+    {
+      "name": "Kecil Top",
+      "sku": "GG1518",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6868-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1518"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20jute%20market%20bags%20options%20for%20our%20team."
+}

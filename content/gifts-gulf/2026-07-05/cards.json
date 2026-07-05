@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-05",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Simple glass bottle for the desk",
+      "out": "content/gifts-gulf/2026-07-05/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2105-23",
+          "sku": "GG1084",
+          "name": "Abe",
+          "desc": "Simple glass bottle for the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo6413-22",
+          "sku": "GG1437",
+          "name": "Ameland",
+          "desc": "Clear glass, easy to refill",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Steel flask that keeps drinks cold",
+      "out": "content/gifts-gulf/2026-07-05/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6676-16",
+          "sku": "GG1479",
+          "name": "Helsinki Extra",
+          "desc": "Steel flask that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo9539-03",
+          "sku": "GG1648",
+          "name": "Iceland",
+          "desc": "Slim steel bottle for the bag",
+          "colours": 0
+        },
+        {
+          "code": "mo9689-40",
+          "sku": "GG1662",
+          "name": "Mokka",
+          "desc": "Insulated steel, warm or cold",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Stoneware mug with a matte finish",
+      "out": "content/gifts-gulf/2026-07-05/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8658-06",
+          "sku": "GG1591",
+          "name": "Chalcky",
+          "desc": "Stoneware mug with a matte finish",
+          "colours": 0
+        },
+        {
+          "code": "mo6849-03",
+          "sku": "GG1513",
+          "name": "Dublin Colour",
+          "desc": "Coloured stoneware for the morning brew",
+          "colours": 0
+        },
+        {
+          "code": "mo2598-04",
+          "sku": "GG1264",
+          "name": "Orot",
+          "desc": "Rounded mug that feels good to hold",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Bamboo piece with a warm grain",
+      "out": "content/gifts-gulf/2026-07-05/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9914-40",
+          "sku": "GG1709",
+          "name": "Baicoi",
+          "desc": "Bamboo piece with a warm grain",
+          "colours": 0
+        },
+        {
+          "code": "mo9945-40",
+          "sku": "GG1719",
+          "name": "Bayba",
+          "desc": "Natural bamboo, smooth to the touch",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Seed paper notes you can plant after",
+      "out": "content/gifts-gulf/2026-07-05/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6511-06",
+          "sku": "GG1452",
+          "name": "Memo Seed",
+          "desc": "Seed paper notes you can plant after",
+          "colours": 0
+        },
+        {
+          "code": "mo6510-06",
+          "sku": "GG1453",
+          "name": "Vison Seed",
+          "desc": "Plantable pad that grows into herbs",
+          "colours": 0
+        },
+        {
+          "code": "mo6541-13",
+          "sku": "GG1457",
+          "name": "Grass Book",
+          "desc": "Grass paper book with a natural feel",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Jute bag with a rugged weave",
+      "out": "content/gifts-gulf/2026-07-05/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8965-13",
+          "sku": "GG1607",
+          "name": "Brick Lane",
+          "desc": "Jute bag with a rugged weave",
+          "colours": 0
+        },
+        {
+          "code": "mo8967-13",
+          "sku": "GG1609",
+          "name": "Campo De Fiori",
+          "desc": "Roomy jute tote for the market",
+          "colours": 0
+        },
+        {
+          "code": "mo9930-13",
+          "sku": "GG1712",
+          "name": "Jute Large",
+          "desc": "Large jute carry for the weekly haul",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Sticky notes that stay within reach",
+      "out": "content/gifts-gulf/2026-07-05/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9036-06",
+          "sku": "GG1614",
+          "name": "Memosticky",
+          "desc": "Sticky notes that stay within reach",
+          "colours": 0
+        },
+        {
+          "code": "mo2823-13",
+          "sku": "GG1328",
+          "name": "Memoring",
+          "desc": "Ring bound memo pad for the desk",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled aluminium bottle, light to carry",
+      "out": "content/gifts-gulf/2026-07-05/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2309-03",
+          "sku": "GG1142",
+          "name": "Bergamo",
+          "desc": "Recycled aluminium bottle, light to carry",
+          "colours": 0
+        },
+        {
+          "code": "mo6561-03",
+          "sku": "GG1464",
+          "name": "Bern Ra",
+          "desc": "Slim aluminium bottle for the day",
+          "colours": 0
+        },
+        {
+          "code": "mo2157-03",
+          "sku": "GG1102",
+          "name": "Florina",
+          "desc": "Recycled metal bottle built to reuse",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled cotton tote, soft and strong",
+      "out": "content/gifts-gulf/2026-07-05/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6673-13",
+          "sku": "GG1477",
+          "name": "Zoco",
+          "desc": "Recycled cotton tote, soft and strong",
+          "colours": 0
+        },
+        {
+          "code": "mo6850-13",
+          "sku": "GG1514",
+          "name": "Tura",
+          "desc": "Organic cotton bag for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo6190-13",
+          "sku": "GG1393",
+          "name": "Zimde",
+          "desc": "Organic cotton tote in calm tones",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Glass drinkware",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260705-1",
+  "campaign_name": "Glass Drinkware - 05 Jul 2026",
+  "subject": "Clear glass, clean pour",
+  "skus": [
+    "GG1084",
+    "GG1437",
+    "GG1382",
+    "GG1671",
+    "GG1396",
+    "GG1468"
+  ],
+  "products": [
+    {
+      "name": "Abe",
+      "sku": "GG1084",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2105-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1084"
+    },
+    {
+      "name": "Ameland",
+      "sku": "GG1437",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6413-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1437"
+    },
+    {
+      "name": "Bless",
+      "sku": "GG1382",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6158-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1382"
+    },
+    {
+      "name": "Praga",
+      "sku": "GG1671",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9746-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1671"
+    },
+    {
+      "name": "Venice",
+      "sku": "GG1396",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6210-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1396"
+    },
+    {
+      "name": "Zeal",
+      "sku": "GG1468",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6585-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1468"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20glass%20drinkware%20options%20for%20our%20team."
+}

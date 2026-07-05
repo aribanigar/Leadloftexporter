@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Stoneware mugs",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260705-3",
+  "campaign_name": "Stoneware Mugs - 05 Jul 2026",
+  "subject": "The desk mug, upgraded",
+  "skus": [
+    "GG1591",
+    "GG1513",
+    "GG1264",
+    "GG1578",
+    "GG1584",
+    "GG1625"
+  ],
+  "products": [
+    {
+      "name": "Chalcky",
+      "sku": "GG1591",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8658-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1591"
+    },
+    {
+      "name": "Dublin Colour",
+      "sku": "GG1513",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6849-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1513"
+    },
+    {
+      "name": "Orot",
+      "sku": "GG1264",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2598-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1264"
+    },
+    {
+      "name": "Sensa",
+      "sku": "GG1578",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8316-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1578"
+    },
+    {
+      "name": "Sublimkonik",
+      "sku": "GG1584",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8442-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1584"
+    },
+    {
+      "name": "Colour Trent",
+      "sku": "GG1625",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9242-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1625"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20stoneware%20mugs%20options%20for%20our%20team."
+}

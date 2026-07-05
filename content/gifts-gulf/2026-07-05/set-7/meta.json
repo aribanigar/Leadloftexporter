@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Sticky notes",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260705-7",
+  "campaign_name": "Sticky Notes - 05 Jul 2026",
+  "subject": "Reminders in your colour",
+  "skus": [
+    "GG1614",
+    "GG1328",
+    "GG1564",
+    "GG1051",
+    "GG1289",
+    "GG1288"
+  ],
+  "products": [
+    {
+      "name": "Memosticky",
+      "sku": "GG1614",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9036-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1614"
+    },
+    {
+      "name": "Memoring",
+      "sku": "GG1328",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2823-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1328"
+    },
+    {
+      "name": "Memokit",
+      "sku": "GG1564",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7627-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1564"
+    },
+    {
+      "name": "Memoff",
+      "sku": "GG1051",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7083-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1051"
+    },
+    {
+      "name": "Tint",
+      "sku": "GG1289",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2664-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1289"
+    },
+    {
+      "name": "Tintray",
+      "sku": "GG1288",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2663-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1288"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20sticky%20notes%20options%20for%20our%20team."
+}

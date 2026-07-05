@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Recycled aluminium",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260705-8",
+  "campaign_name": "Recycled Aluminium - 05 Jul 2026",
+  "subject": "Light metal, long refills",
+  "skus": [
+    "GG1142",
+    "GG1464",
+    "GG1102",
+    "GG1248",
+    "GG1119",
+    "GG1066"
+  ],
+  "products": [
+    {
+      "name": "Bergamo",
+      "sku": "GG1142",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2309-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1142"
+    },
+    {
+      "name": "Bern Ra",
+      "sku": "GG1464",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6561-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1464"
+    },
+    {
+      "name": "Florina",
+      "sku": "GG1102",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2157-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1102"
+    },
+    {
+      "name": "Orwell",
+      "sku": "GG1248",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2567-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1248"
+    },
+    {
+      "name": "Rumba",
+      "sku": "GG1119",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2205-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1119"
+    },
+    {
+      "name": "Retool",
+      "sku": "GG1066",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2072-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1066"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20aluminium%20options%20for%20our%20team."
+}

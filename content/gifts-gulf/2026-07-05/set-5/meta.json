@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-05",
+  "theme": "Seed paper notes",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260705-5",
+  "campaign_name": "Seed Paper Notes - 05 Jul 2026",
+  "subject": "Notes that grow after",
+  "skus": [
+    "GG1452",
+    "GG1453",
+    "GG1457",
+    "GG1458",
+    "GG1228",
+    "GG1282"
+  ],
+  "products": [
+    {
+      "name": "Memo Seed",
+      "sku": "GG1452",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6511-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1452"
+    },
+    {
+      "name": "Vison Seed",
+      "sku": "GG1453",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6510-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1453"
+    },
+    {
+      "name": "Grass Book",
+      "sku": "GG1457",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6541-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1457"
+    },
+    {
+      "name": "Grass Notes",
+      "sku": "GG1458",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6542-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1458"
+    },
+    {
+      "name": "Cenote",
+      "sku": "GG1228",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2526-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1228"
+    },
+    {
+      "name": "Treze",
+      "sku": "GG1282",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2645-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1282"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-05/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20seed%20paper%20notes%20options%20for%20our%20team."
+}
