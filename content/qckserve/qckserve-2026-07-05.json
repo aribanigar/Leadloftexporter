@@ -1,0 +1,63 @@
+{
+  "date": "2026-07-05",
+  "business": "qckserve",
+  "topic": "Your marketplace shouldn't charge you",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Your marketplace shouldn't charge you",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\"/>\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"/>\n<title>Your marketplace shouldn't charge you</title>\n<!--[if mso]><style type=\"text/css\">body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:#FCF9F8;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#FCF9F8;\">List free. Sell direct. Pay ₹0 — forever. That's the whole promise.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;\">\n\n  <!-- Logo zone -->\n  <tr><td style=\"padding:28px 40px 20px 40px;font-family:'Poppins',Arial,sans-serif;font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#1A1A1A;\">qckserve.in</td></tr>\n\n  <!-- HERO: full-bleed orange manifesto -->\n  <tr><td bgcolor=\"#ef6723\" style=\"background-color:#ef6723;padding:56px 40px 60px 40px;text-align:center;\">\n    <div style=\"font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:20px;color:#FCF9F8;margin:0 0 18px 0;\">a promise, not a plan</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-weight:800;font-size:52px;line-height:1.03;letter-spacing:-1.5px;color:#1A1A1A;margin:0;\">Your marketplace</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-weight:800;font-size:52px;line-height:1.03;letter-spacing:-1.5px;color:#1A1A1A;margin:0;\">shouldn't</div>\n    <div style=\"font-family:Georgia,'Times New Roman',serif;font-style:italic;font-weight:700;font-size:52px;line-height:1.05;color:#FCF9F8;margin:0;\">charge you.</div>\n  </td></tr>\n\n  <!-- THE DEVICE: giant zero on dark band -->\n  <tr><td bgcolor=\"#1A1A1A\" style=\"background-color:#1A1A1A;padding:44px 40px 40px 40px;text-align:center;\">\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-weight:800;font-size:132px;line-height:1;letter-spacing:-4px;color:#FF6B00;margin:0;\">&#8377;0</div>\n    <div style=\"font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:15px;letter-spacing:4px;color:#FFFFFF;margin:14px 0 0 0;\">TO LIST&nbsp;&middot;&nbsp;TO SELL&nbsp;&middot;&nbsp;FOREVER</div>\n  </td></tr>\n\n  <!-- Poster hero image band -->\n  <tr><td style=\"font-size:0;line-height:0;\">\n    <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-05.svg\" width=\"600\" alt=\"QckServe manifesto poster: Your marketplace shouldn't charge you. List for zero rupees, forever.\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\"/>\n  </td></tr>\n\n  <!-- PROOF / body: one idea per line, benefit first -->\n  <tr><td style=\"padding:44px 40px 8px 40px;\">\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:18px;line-height:1.55;color:#1A1A1A;margin:0 0 18px 0;font-weight:600;\">Selling near you should be simple.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3a3a3a;margin:0 0 10px 0;\">List your shop, home, vehicle or gig — free.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3a3a3a;margin:0 0 10px 0;\">Talk to the buyer directly. No agent. No cut.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3a3a3a;margin:0 0 10px 0;\">Keep every rupee you earn.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3a3a3a;margin:0;\">One free marketplace. All of India.</p>\n  </td></tr>\n\n  <!-- Hairline -->\n  <tr><td style=\"padding:24px 40px;\"><div style=\"height:1px;background-color:#ece5e2;line-height:1px;font-size:0;\">&nbsp;</div></td></tr>\n\n  <!-- HOW: what free means -->\n  <tr><td style=\"padding:0 40px 8px 40px;\">\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#ef6723;margin:0 0 16px 0;\">WHAT FREE MEANS</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#1A1A1A;margin:0 0 8px 0;\"><span style=\"color:#ef6723;font-weight:800;\">&check;</span>&nbsp;&nbsp;Zero commission on any sale.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#1A1A1A;margin:0 0 8px 0;\"><span style=\"color:#ef6723;font-weight:800;\">&check;</span>&nbsp;&nbsp;Zero fee to post a listing.</p>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:16px;line-height:1.6;color:#1A1A1A;margin:0;\"><span style=\"color:#ef6723;font-weight:800;\">&check;</span>&nbsp;&nbsp;Zero middlemen between you and the buyer.</p>\n  </td></tr>\n\n  <!-- CTA: bulletproof button -->\n  <tr><td style=\"padding:36px 40px 48px 40px;\" align=\"center\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n      <tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"background-color:#ef6723;border-radius:12px;\">\n        <a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block;padding:18px 40px;font-family:'Poppins',Arial,sans-serif;font-size:18px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:12px;\">List free on QckServe &rarr;</a>\n      </td></tr>\n    </table>\n    <p style=\"font-family:'Poppins',Arial,sans-serif;font-size:13px;color:#8a8a8a;margin:16px 0 0 0;\">qckserve.in &middot; India's free local marketplace</p>\n  </td></tr>\n\n</table>\n\n<!-- footer -->\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;\">\n  <tr><td style=\"padding:20px 40px;text-align:center;font-family:'Poppins',Arial,sans-serif;font-size:12px;line-height:1.5;color:#a5a5a5;\">\n    You're receiving this because you care about selling direct.<br/>QckServe &middot; qckserve.in\n  </td></tr>\n</table>\n\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-05.svg",
+      "tags": [
+        "general",
+        "manifesto",
+        "zero-fees",
+        "promo"
+      ],
+      "notes": "Sunday General / Manifesto archetype: full-bleed orange hero, giant ₹0 device, single CTA. Table-based, inline styles, ~6KB."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "Bechna free. Sell direct. ₹0 commission — hamesha. 🧡\n\nGhar, dukaan, gaadi ya kaam — sab kuch list karo bina kisi fee ke. Beech mein koi middleman nahi, seedha buyer se baat.\n\nPoore India ke liye ek free marketplace.\nqckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-05.svg",
+      "tags": [
+        "general",
+        "whatsapp",
+        "zero-fees"
+      ],
+      "notes": "Hinglish, 1 emoji, ends qckserve.in"
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Aapka marketplace aapse paisa kyun le? 🤔\n\nQckServe pe list karna free, bechna free, commission ₹0 — hamesha. Na agent, na middleman — seedha buyer se baat, poore India mein.\n\nList karo free → qckserve.in\n\n#QckServe #FreeMarketplace #ZeroCommission #SellDirect #IndiaBusiness",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-05.svg",
+      "tags": [
+        "general",
+        "instagram",
+        "zero-fees"
+      ],
+      "notes": "Instagram Hinglish caption, hook + 5 hashtags"
+    },
+    {
+      "channel": "sms",
+      "content": "List free. Sell direct. Pay ₹0 commission — forever. One free marketplace for all of India: qckserve.in",
+      "tags": [
+        "general",
+        "sms",
+        "zero-fees"
+      ],
+      "notes": "One line, <160 chars, English, qckserve.in"
+    },
+    {
+      "channel": "other",
+      "title": "[2026-07-05] Your marketplace shouldn't charge you (Image Prompt)",
+      "content": "SCENE: A clean, editorial poster-style hero for a nationwide Indian marketplace brand, flat design, no gradients.\nSUBJECT: A single oversized rupee-zero symbol (₹0) as the hero motif, paired with a confident manifesto headline “Your marketplace shouldn't charge you.” Convey trust, warmth and value-consciousness — an owner-direct, zero-fee promise for all of India.\nPHONE-UI MOCKUP: A minimal smartphone floating lower-right showing the QckServe app — a simple listing card with a bold ‘₹0 to list’ badge, a ‘Chat with owner’ button, and category chips (Properties, Vehicles, Jobs, Services, Store). Clean sans UI, generous whitespace.\nCOLOUR SYSTEM: flat colour blocking only — QckServe orange #ef6723 and #FF6B00 accent, near-black #1A1A1A, warm off-white #FCF9F8, pure #FFFFFF. One accent used sparingly. No gradients, no glow.\nLIGHTING: soft even studio light, gentle contact shadow under the phone, matte surfaces, no harsh speculars.\nTYPE HIERARCHY: one extra-bold condensed all-caps headline (Poppins) with tight letter-spacing, a small italic-serif kicker for contrast, and a tiny label row ‘Zero commission · Owner-direct · No middlemen’.\nEYE FLOW: kicker → giant ₹0 → headline → phone mockup → CTA at the bottom.\nCAMERA: straight-on flat-lay / poster composition, 50mm equivalent, no perspective distortion, centered balance.\nPERFORMANCE LAYER: thumb-stopping single focal device (the giant ₹0), high figure-ground contrast, reads at a glance in a feed.\nReserve a ~140px TOP-LEFT square as empty negative space for the logo — logo placed manually. Real text baked minimally; keep composition breathable.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "general",
+        "image-prompt"
+      ],
+      "notes": "QckServe production image prompt, 4:5"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — India's free marketplace. Zero commission. Owner-direct. List for zero rupees.">
+  <defs>
+    <style>
+      .head { font-family: 'Poppins','Arial Narrow',Arial,sans-serif; font-weight:800; fill:#1A1A1A; letter-spacing:-2px; }
+      .serif { font-family: Georgia,'Times New Roman',serif; font-style:italic; fill:#1A1A1A; }
+      .body { font-family: 'Poppins',Arial,sans-serif; fill:#1A1A1A; }
+      .light { font-family: 'Poppins',Arial,sans-serif; fill:#FCF9F8; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed orange manifesto field -->
+  <rect width="1080" height="1350" fill="#ef6723"/>
+
+  <!-- Reserved top-left logo square (~140px) left blank for manual logo placement -->
+  <rect x="72" y="72" width="140" height="140" fill="none"/>
+
+  <!-- Kicker (italic serif for contrast) -->
+  <text x="540" y="330" text-anchor="middle" class="serif" font-size="46">a promise, not a plan</text>
+
+  <!-- Oversized manifesto headline, centered -->
+  <text x="540" y="470" text-anchor="middle" class="head" font-size="118">YOUR</text>
+  <text x="540" y="588" text-anchor="middle" class="head" font-size="118">MARKETPLACE</text>
+  <text x="540" y="706" text-anchor="middle" class="head" font-size="118">SHOULDN'T</text>
+  <text x="540" y="824" text-anchor="middle" class="serif" font-weight="700" font-size="118">charge you.</text>
+
+  <!-- The one memorable device: giant zero -->
+  <text x="540" y="1112" text-anchor="middle" class="light" font-family="'Poppins',Arial,sans-serif" font-weight="800" font-size="360" letter-spacing="-8">&#8377;0</text>
+  <text x="540" y="1176" text-anchor="middle" class="light" font-size="34" font-weight="700" letter-spacing="6">TO LIST. TO SELL. FOREVER.</text>
+
+  <!-- Sub-line: value prop, national -->
+  <text x="540" y="1240" text-anchor="middle" class="body" font-size="30" font-weight="600">Zero commission &#183; Owner-direct &#183; No middlemen &#183; All of India</text>
+
+  <!-- Wordmark bottom-left -->
+  <text x="72" y="1300" class="light" font-size="40" font-weight="800" letter-spacing="-1">qckserve.in</text>
+</svg>
