@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-05",
+  "track": "b2c",
+  "audience": "travellers (India)",
+  "theme": "Peak-summer Kashmir - Srinagar's gardens in full bloom, Gulmarg's hills green under a running gondola, the Dal calm and cool at dawn",
+  "season": "Peak summer (early July 2026). The Amarnath Yatra runs 2 July to 17 August, so the valley is busy and fully open. Flights landing in Srinagar, every pass and the Z-Morh tunnel clear, Mughal gardens at full bloom, Chinars in full leaf, Gulmarg green with both gondola phases running, and the Dal glass-still and cool at dawn (Srinagar ~15-30C).",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2C-20260705",
+  "campaign_name": "Kashmir Gardens in bloom, Gulmarg green [INR] - 05 Jul 2026",
+  "subject": "Gardens in bloom and Gulmarg gone green",
+  "items": [
+    "VK-B2C-GARDENS",
+    "VK-B2C-GULMARG",
+    "VK-B2C-DATES"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-05/b2c/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-05/b2c/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

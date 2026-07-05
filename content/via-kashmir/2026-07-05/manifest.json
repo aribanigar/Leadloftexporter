@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-05",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "C/A/B",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "C",
+      "theme": "Peak-summer Kashmir - Srinagar's gardens in full bloom, Gulmarg's hills green under a running gondola, the Dal calm and cool at dawn",
+      "subject": "Gardens in bloom and Gulmarg gone green",
+      "campaign_code": "VK-INR-B2C-20260705"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "theme": "Peak-season hotel demand - summer and the Amarnath Yatra fill rooms fast; unlisted stays miss the guests booking today",
+      "subject": "A Kashmir traveller is booking a room right now",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260705"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "theme": "Peak-summer Dal demand - travellers want the real houseboat stay; unlisted decks miss tonight's lake guests",
+      "subject": "Tonight's Dal guest is choosing a houseboat now",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260705"
+    }
+  ]
+}
