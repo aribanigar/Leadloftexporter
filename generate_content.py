@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Hudace content batch - 2026-07-03 - Industries: Industrial Manufacturing, Mill Products.
+"""Generate Hudace content batch - 2026-07-05 - Industries: Chemicals, Mining.
 Six emails (one per marketing service plus a dedicated SchoolOS School ERP email), each with
 a WhatsApp message, a LinkedIn caption, and an outreach message sharing one baked 4:5 card.
 
@@ -13,7 +13,7 @@ from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from PIL import Image, ImageDraw, ImageFont
 
-DATE = "2026-07-03"
+DATE = "2026-07-05"
 BASE_URL = "https://leadloftexporter.vercel.app/email"
 EMAIL_DIR = "public/email"
 PIXABAY_KEY = os.environ.get("PIXABAY_API", "56316516-fbb10ad7475940758256bc517")
@@ -300,15 +300,15 @@ def email_html(label, headline, sub, card_url, body_url, deliverables, scope, pr
 # -- batch content (region-agnostic, SAP-calm) ---------------------------------
 EMAILS = [
     {
-        "key": "industrial-erp",
-        "industry": "Industrial Manufacturing",
-        "label": "ERP BUILDING - INDUSTRIAL MANUFACTURING",
-        "headline": "Custom Software That Runs Production, Inventory, and Maintenance as One System",
-        "sub": "When production schedules, stock levels, and maintenance logs live in separate tools, downtime and rework grow in the gaps between them. Hudace builds custom business software on the Xenon AI platform so the plant runs as one connected system.",
-        "bg_query": "factory industrial machinery dark cinematic",
+        "key": "chemicals-erp",
+        "industry": "Chemicals",
+        "label": "ERP BUILDING - CHEMICALS",
+        "headline": "Custom Software That Runs Batches, Inventory, and Compliance as One Record",
+        "sub": "When batch records, raw material stock, quality results, and safety documentation live in separate tools, every audit and every recall becomes a search. Hudace builds custom business software on the Xenon AI platform so the operation runs as one connected system.",
+        "bg_query": "chemical plant industrial pipes dark cinematic",
         "body_query": "software dashboard data screen dark",
         "card_head": "Custom ERP and SaaS",
-        "card_bullets": ["Discovery and module blueprint", "Production, inventory, maintenance", "Role-based access and dashboards", "Web and mobile access"],
+        "card_bullets": ["Discovery and module blueprint", "Batch, inventory, quality, safety", "Role-based access and dashboards", "Web and mobile access"],
         "deliverables": [
             "Discovery and module blueprint",
             "Custom modules (CRM, inventory, billing, HR, and more)",
@@ -319,23 +319,23 @@ EMAILS = [
             "Training and documentation",
             "Ongoing support and iterations",
         ],
-        "scope": "Industrial manufacturing runs on parallel cycles of production, procurement, inventory, and maintenance, and the cost sits in the handoffs between them. Custom software built to your workflow, with role-based access and automation across the steps teams repeat every shift, removes the manual reconciliation where delays and stock errors appear and keeps every order, part, and work order tied to the same record.",
-        "proof": "We have built operational software for manufacturing and technical businesses, with reported reductions in administrative overhead and cleaner records once manual steps moved into controlled, automated workflows.",
-        "future": "The platform grows with the plant. New modules and integrations add without replacing the systems that already work.",
+        "scope": "Chemical operations run on parallel cycles of formulation, procurement, quality control, and regulatory reporting, and the risk sits in the handoffs where a batch record, a certificate of analysis, and a stock movement fail to reference each other. Custom software built to your process, with role-based access and automation across the steps teams repeat every shift, keeps raw material, batch, and quality result tied to one traceable record, so an audit or a recall is a query rather than a search through files.",
+        "proof": "We have built operational software for manufacturing and process businesses, with reported reductions in administrative overhead and cleaner traceability once manual reconciliation moved into controlled, automated workflows.",
+        "future": "The platform grows with the operation. New modules for compliance, maintenance, and distribution add without replacing the systems that already work.",
         "hooks": [
-            ("One system removes the seams", "When production, inventory, and maintenance data share controlled records, the gaps where delays and stock errors hide simply close."),
-            ("Automation returns hours, and accuracy", "Workflows handle the repeated steps with a consistent trail, so supervisors spend time on exceptions, not reconciliation."),
-            ("Built to your process, not a template", "A blueprint drawn from how the plant actually runs means adoption is fast and the controls fit on day one."),
+            ("Traceability becomes a query", "When batch, material, and quality records share one controlled system, a recall or an audit is answered in minutes rather than reconstructed from files."),
+            ("Automation returns hours, and accuracy", "Workflows handle the repeated documentation with a consistent trail, so teams spend time on exceptions, not on cross-checking spreadsheets."),
+            ("Built to your process, not a template", "A blueprint drawn from how the operation actually runs means the controls fit your specifications and safety steps on day one."),
         ],
         "closing": "Tell us the workflow that costs you the most time and we will scope a module for it.",
     },
     {
-        "key": "industrial-seo",
-        "industry": "Industrial Manufacturing",
-        "label": "SEO / AEO / GEO / SRX - INDUSTRIAL MANUFACTURING",
-        "headline": "Be the Supplier Found First When a Specification Is Searched",
-        "sub": "Industrial buyers research suppliers long before an enquiry is sent, now across search results and AI answers at once. Hudace optimizes for both so your capability is visible at the moment a requirement is being defined.",
-        "bg_query": "industrial factory interior dark cinematic",
+        "key": "chemicals-seo",
+        "industry": "Chemicals",
+        "label": "SEO / AEO / GEO / SRX - CHEMICALS",
+        "headline": "Be the Supplier Found First When a Grade or Specification Is Searched",
+        "sub": "Technical buyers research chemical suppliers long before an enquiry is sent, now across search results and AI answers at once. Hudace optimizes for both so your grades, purities, and capabilities are visible at the moment a requirement is being defined.",
+        "bg_query": "chemical laboratory research industrial dark cinematic",
         "body_query": "engineering data analytics screen dark",
         "card_head": "SEO, AEO, GEO and SRX",
         "card_bullets": ["Technical SEO audit and fixes", "On-page and schema", "Authority and local SEO", "Visibility in AI answers"],
@@ -351,26 +351,26 @@ EMAILS = [
             "SRX: search experience and Core Web Vitals",
             "Monthly ranking and traffic report",
         ],
-        "scope": "Industrial procurement is technical and quietly research-led. Buyers scope requirements through specification searches and capability comparisons that now play out across search engines and AI answers together. Optimizing capability, material, and tolerance pages for both means your operation is the one cited when an engineer or purchaser investigates who can meet a requirement, rather than a competitor whose pages were structured to be found.",
+        "scope": "Chemical procurement is technical and quietly research-led. Buyers scope requirements through grade searches, specification comparisons, and safety documentation that now play out across search engines and AI answers together. Optimizing product, grade, and application pages for both, with structured data and clear technical detail, means your operation is the one cited when a formulator or purchaser investigates who can supply a specification, rather than a competitor whose pages were structured to be found.",
         "proof": "We have run search programs that lifted both ranking positions and the share of AI-generated answers that cite the brand, turning technical discovery into a dependable source of qualified enquiries.",
-        "future": "Search creates demand that does not reset each month. It compounds with a fast website and a steady content presence into a pipeline that no longer depends on trade events and referrals alone.",
+        "future": "Search creates demand that does not reset each month. It compounds with a fast website and a steady content presence into a pipeline that no longer depends on trade shows and referrals alone.",
         "hooks": [
-            ("Intent is the cheapest demand", "Ranking for the specifications and capabilities buyers already search means meeting them as a requirement forms, not interrupting them later."),
-            ("AI answers are the new shortlist", "Structured answers and GEO place your capability inside the response, where a growing share of technical supplier research now begins."),
+            ("Intent is the cheapest demand", "Ranking for the grades and applications buyers already search means meeting them as a requirement forms, not interrupting them later."),
+            ("AI answers are the new shortlist", "Structured answers and GEO place your grades and capabilities inside the response, where a growing share of technical supplier research now begins."),
             ("Experience is a ranking factor", "Core Web Vitals and SRX work means the pages that rank also read as credible, so technical traffic turns into qualified enquiries."),
         ],
         "closing": "Share your domain and we will return an audit summary and the first priorities.",
     },
     {
-        "key": "industrial-website",
-        "industry": "Industrial Manufacturing",
-        "label": "WEBSITE DESIGN - INDUSTRIAL MANUFACTURING",
+        "key": "chemicals-website",
+        "industry": "Chemicals",
+        "label": "WEBSITE DESIGN - CHEMICALS",
         "headline": "A Website That Turns Technical Visitors Into Qualified Enquiries",
-        "sub": "Most manufacturing sites list machines and certifications. Few are built to turn a researching engineer into an enquiry on a phone. Hudace delivers a fast, mobile-first site engineered to convert technical traffic into contact.",
-        "bg_query": "manufacturing plant machinery dark blue",
+        "sub": "Most chemical sites list products and certifications. Few are built to turn a researching formulator into an enquiry with a specification attached. Hudace delivers a fast, mobile-first site engineered to convert technical traffic into contact.",
+        "bg_query": "chemical plant refinery night industrial dark blue",
         "body_query": "laptop website design office dark",
-        "card_head": "Website Design for Industry",
-        "card_bullets": ["Custom multi-page website", "Mobile-first responsive build", "Booking and lead forms", "Analytics and WhatsApp"],
+        "card_head": "Website Design for Chemicals",
+        "card_bullets": ["Custom multi-page website", "Mobile-first responsive build", "Grade pages and lead forms", "Analytics and WhatsApp"],
         "deliverables": [
             "Custom multi-page website",
             "Mobile-first responsive build",
@@ -381,25 +381,25 @@ EMAILS = [
             "Hosting and domain setup",
             "Launch and handover",
         ],
-        "scope": "Industrial research happens on a phone, on the floor, and between other tasks, and the enquiry is won or lost on speed and clarity. A mobile-first site with clear capability pages, downloadable specifications, fast load times, and lead and WhatsApp paths removes friction at the decision, so a qualified buyer sends the enquiry on the same visit rather than leaving to compare elsewhere.",
+        "scope": "Technical research happens on a phone, at a bench, and between other tasks, and the enquiry is won or lost on speed and clarity. A mobile-first site with clear grade and application pages, downloadable specifications and safety documentation, fast load times, and lead and WhatsApp paths removes friction at the decision, so a qualified buyer sends the enquiry on the same visit rather than leaving to compare elsewhere.",
         "proof": "We have built and launched sites that paired clean structure with fast load times, so both search engines and visitors rewarded the page with rankings and conversions.",
         "future": "The site becomes the hub. SEO drives qualified traffic to it and a steady content presence keeps it warm between enquiries.",
         "hooks": [
             ("Speed protects the visit", "A fast, mobile-first build keeps a buyer on the page where a slow one loses them before the enquiry."),
-            ("Structure earns the ranking", "An SEO-ready architecture lets search engines place you for the capabilities and materials buyers actually search."),
+            ("Structure earns the ranking", "An SEO-ready architecture lets search engines place you for the grades and applications buyers actually search."),
             ("Forms turn traffic into pipeline", "Lead, contact, and WhatsApp paths capture intent at the moment it peaks, not days later."),
         ],
         "closing": "Send us your current site and we will return a build plan and a launch timeline.",
     },
     {
-        "key": "mill-social",
-        "industry": "Mill Products",
-        "label": "SOCIAL MEDIA - MILL PRODUCTS",
-        "headline": "Social Media That Builds Standing in a Commodity Category",
-        "sub": "When the product is measured in grades and tonnage, buyers choose the supplier they trust and keep seeing. Hudace runs a fully managed social function so your mill stays visible and credible across a long, relationship-led purchase.",
-        "bg_query": "steel mill sparks molten dark cinematic",
+        "key": "mining-social",
+        "industry": "Mining",
+        "label": "SOCIAL MEDIA - MINING",
+        "headline": "Social Media That Builds Standing in a Long, Trust-Led Supply Chain",
+        "sub": "When contracts run on reliability, safety record, and consistent grade, buyers choose the operation they trust and keep seeing. Hudace runs a fully managed social function so your operation stays visible and credible across a long, relationship-led purchase.",
+        "bg_query": "mining excavator quarry heavy machinery dark cinematic",
         "body_query": "smartphone social media content dark",
-        "card_head": "Social Media for Mill Products",
+        "card_head": "Social Media for Mining",
         "card_bullets": ["6 short-form videos monthly", "12 feed posts, 8 stories", "Community management", "Monthly performance report"],
         "deliverables": [
             "6 short-form videos per month",
@@ -410,25 +410,25 @@ EMAILS = [
             "Community management (comments and DMs)",
             "Monthly performance report",
         ],
-        "scope": "Mill products are bought on trust, grade consistency, and supply reliability, and the supplier a buyer keeps seeing is the one that feels dependable. A structured calendar built around capability, quality processes, and delivery turns routine activity into steady visibility with distributors and specifiers, while managed comments and messages handle the questions that shape a supply decision.",
+        "scope": "Mining and resource supply are bought on trust, grade consistency, safety standing, and delivery reliability, and the operation a buyer keeps seeing is the one that feels dependable. A structured calendar built around capability, safety practice, and logistics turns routine activity into steady visibility with offtakers and partners, while managed comments and messages handle the questions that shape a long supply decision.",
         "proof": "We have run managed social programs that replaced irregular posting with a steady calendar, keeping the brand present and responsive through every production and demand cycle.",
         "future": "Social builds the first impression and the daily relationship. It layers into SEO, website, and AI cinematic video so attention moves into a measurable pipeline of enquiries.",
         "hooks": [
-            ("Presence signals reliability", "Six videos and twelve posts a month keep a commodity supplier visible and credible through a long buying relationship."),
+            ("Presence signals reliability", "Six videos and twelve posts a month keep a resource supplier visible and credible through a long buying relationship."),
             ("Response turns interest into supply talks", "Managed community handling answers comments and messages quickly, so a question becomes an enquiry instead of a missed lead."),
             ("Owned attention reduces ad dependence", "A steady, useful feed builds an audience the brand reaches without paying for every impression."),
         ],
-        "closing": "Tell us your product range and we will return a content calendar built for it.",
+        "closing": "Tell us your operation and output and we will return a content calendar built for it.",
     },
     {
-        "key": "mill-aistudio",
-        "industry": "Mill Products",
-        "label": "AI WORK STUDIO - MILL PRODUCTS",
-        "headline": "A Cinematic Film of the Mill, Without a Film Crew on Site",
-        "sub": "Scale, precision, and process are what set one mill apart from another, and they are communicated best on screen. Hudace AI Work Studio produces a cinematic film of your operation in seven working days, with no crew on the floor.",
-        "bg_query": "factory production line molten metal cinematic dark",
+        "key": "mining-aistudio",
+        "industry": "Mining",
+        "label": "AI WORK STUDIO - MINING",
+        "headline": "A Cinematic Film of the Operation, Without a Crew on a Hazardous Site",
+        "sub": "Scale, safety, and command of a demanding process are what set one operation apart, and they are communicated best on screen. Hudace AI Work Studio produces a cinematic film of your operation in seven working days, with no crew on site.",
+        "bg_query": "mining haul truck open pit machinery cinematic dark",
         "body_query": "film camera production cinematic dark",
-        "card_head": "AI Work Studio for Mills",
+        "card_head": "AI Work Studio for Mining",
         "card_bullets": ["60-second cinematic film", "Three 15-second social cuts", "Ten AI-generated stills", "Delivered in 7 working days"],
         "deliverables": [
             "60-second cinematic film",
@@ -437,11 +437,11 @@ EMAILS = [
             "Script and concept included",
             "Delivered in seven working days, no film crew",
         ],
-        "scope": "A buyer evaluating a mill responds to scale, consistency, and command of a demanding process that they can see. A cinematic film communicates the operation's standing and quality approach in sixty seconds, in a format that travels across capability decks, trade channels, and distributor conversations.",
-        "proof": "We have produced cinematic films for industrial and manufacturing businesses, delivering finished work in days rather than the weeks a traditional shoot requires.",
-        "future": "One film fuels months of presence. The social cuts and stills feed the content calendar and sales decks long after delivery.",
+        "scope": "A buyer or partner evaluating a resource operation responds to scale, safety, and command of a demanding process that they can see. A cinematic film communicates the operation's standing and safety approach in sixty seconds, in a format that travels across capability decks, investor conversations, and offtaker discussions, without the access, insurance, and delay of putting a crew on a live site.",
+        "proof": "We have produced cinematic films for industrial and heavy operations, delivering finished work in days rather than the weeks a traditional shoot requires.",
+        "future": "One film fuels months of presence. The social cuts and stills feed the content calendar and investor decks long after delivery.",
         "hooks": [
-            ("Scale is best shown, not described", "A cinematic treatment conveys capacity and process rigor in seconds that a specification sheet cannot."),
+            ("Scale is best shown, not described", "A cinematic treatment conveys capacity and process command in seconds that a capability sheet cannot."),
             ("Seven days keeps pace with demand", "AI production removes the crew, the site access, and the wait, so the film ships while the opportunity is live."),
             ("One shoot, many assets", "A film, three cuts, and ten stills give every channel something to run from a single brief."),
         ],
@@ -449,7 +449,7 @@ EMAILS = [
     },
     {
         "key": "schoolos",
-        "imgbase": "schoolos-jul03",
+        "imgbase": "schoolos-jul05",
         "industry": None,
         "label": "SCHOOLOS - SCHOOL ERP",
         "headline": "Run the Whole School on One Connected Platform",
@@ -484,11 +484,11 @@ EMAILS = [
 ]
 
 SERVICE_NAME = {
-    "industrial-erp": "ERP Building",
-    "industrial-seo": "SEO / AEO / GEO / SRX",
-    "industrial-website": "Website Design",
-    "mill-social": "Social Media",
-    "mill-aistudio": "AI Work Studio",
+    "chemicals-erp": "ERP Building",
+    "chemicals-seo": "SEO / AEO / GEO / SRX",
+    "chemicals-website": "Website Design",
+    "mining-social": "Social Media",
+    "mining-aistudio": "AI Work Studio",
     "schoolos": "SchoolOS School ERP",
 }
 
