@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "kerala",     "feat": "tajmahal",  "place": "Alleppey, Kerala",     "region": "South India"},
+  "kashmir": {"photo": "kashmir",    "feat": "himalaya",  "place": "Kashmir",              "region": "North India"},
+  "saudi":   {"photo": "maldives",   "feat": "santorini", "place": "Maldives",             "region": "Indian Ocean"},
+  "dubai":   {"photo": "cappadocia", "feat": "bali",      "place": "Cappadocia, Turkiye",  "region": "Europe"}
+}
