@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-07-05",
+  "last_run": "2026-07-06",
   "folder": "hudace",
   "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c",
   "industries_used": [
@@ -44,11 +44,13 @@
     "Industrial Manufacturing",
     "Mill Products",
     "Chemicals",
-    "Mining"
-  ],
-  "next_candidates": [
+    "Mining",
     "Oil Gas and Energy",
     "Utilities"
+  ],
+  "next_candidates": [
+    "Media Sports and Entertainment",
+    "Travel and Transportation"
   ],
   "run_history": [
     {
@@ -144,11 +146,23 @@
       "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c",
       "seeded": false,
       "seed_status": "BLOCKED: Supabase REST returned HTTP 402 exceed_egress_quota (project restricted; owner must upgrade plan or remove spend caps to restore service). Same block as 2026-07-03. Content, 18 images (6 bg + 6 body + 6 promo cards), and batch are committed. Re-seed once service is restored (idempotent): python3 publish_rest.py --folder hudace .routine/batches/2026-07-05.json"
+    },
+    {
+      "date": "2026-07-06",
+      "industries": [
+        "Oil Gas and Energy",
+        "Utilities"
+      ],
+      "items_created": 24,
+      "folder": "hudace",
+      "business_id": "7ab57d94-9f43-40e4-b6a0-1ca6575ce24c",
+      "seeded": false,
+      "seed_status": "BLOCKED: Supabase REST returned HTTP 402 exceed_egress_quota (project restricted; owner must upgrade plan or remove spend caps to restore service). Same block as 2026-07-03 and 2026-07-05. Content, 18 images (6 bg + 6 body + 6 promo cards), and batch are committed. Re-seed once service is restored (idempotent): python3 publish_rest.py --folder hudace .routine/batches/2026-07-06.json"
     }
   ],
   "seed_pending": {
-    "date": "2026-07-05",
-    "batch": ".routine/batches/2026-07-05.json",
+    "date": "2026-07-06",
+    "batch": ".routine/batches/2026-07-06.json",
     "reason": "Supabase HTTP 402 exceed_egress_quota"
   },
   "seed_pending_all": [
@@ -160,6 +174,11 @@
     {
       "date": "2026-07-05",
       "batch": ".routine/batches/2026-07-05.json",
+      "reason": "Supabase HTTP 402 exceed_egress_quota"
+    },
+    {
+      "date": "2026-07-06",
+      "batch": ".routine/batches/2026-07-06.json",
       "reason": "Supabase HTTP 402 exceed_egress_quota"
     }
   ]
