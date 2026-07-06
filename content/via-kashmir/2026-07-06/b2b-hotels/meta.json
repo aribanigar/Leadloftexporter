@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-06",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (Kashmir operators)",
+  "theme": "Peak-week hotel demand - summer and the Amarnath Yatra fill rooms fast; the room next door books while an unlisted stay sits empty",
+  "season": "Peak summer (early July 2026), Amarnath Yatra underway. Summer tourism plus the Yatra have Kashmir stays filling fast, with Srinagar, Pahalgam and Sonamarg routes busy and accommodation in heavy demand.",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260706",
+  "campaign_name": "Hotels Peak-week rooms filling next door [INR] - 06 Jul 2026",
+  "subject": "Peak-week guests are booking the room next to yours",
+  "items": [
+    "VK-HOTELS-DEMAND",
+    "VK-HOTELS-PEAKWEEK",
+    "VK-HOTELS-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-06/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-06/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

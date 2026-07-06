@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-06",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "B/C/A",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "Cool green escape - while the plains swelter, Kashmir stays green and cool: green valley, Sonamarg's meadows and glaciers, the Dal calm at dawn",
+      "subject": "Cool mornings, green meadows, and Kashmir wide open",
+      "campaign_code": "VK-INR-B2C-20260706"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "C",
+      "theme": "Peak-week hotel demand - the room next door books while an unlisted stay sits empty",
+      "subject": "Peak-week guests are booking the room next to yours",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260706"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Peak-week runs booking all day - airport pickups, valley drives, golden-hour shikaras; idle seats and boats do not come back",
+      "subject": "The season's busiest rides are booking without your cab",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260706"
+    }
+  ]
+}
