@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — List your property free this monsoon, zero brokerage. qckserve.in">
+  <defs>
+    <style>
+      .cap  { font-family: 'Arial Narrow','Poppins',Arial,sans-serif; font-weight:800; letter-spacing:-1px; }
+      .serif{ font-family: Georgia,'Times New Roman',serif; font-style:italic; }
+      .body { font-family: 'Poppins',Arial,sans-serif; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left blank square reserved for logo (~140px) -->
+  <rect x="72" y="72" width="140" height="140" fill="none"/>
+
+  <!-- kicker -->
+  <text x="240" y="150" class="serif" font-size="34" fill="#FF6B00">the monsoon moving season</text>
+  <text x="240" y="188" class="body" font-size="22" fill="#8C8C8C" letter-spacing="3">PROPERTIES · INDIA · OWNER-DIRECT</text>
+
+  <!-- giant number hero -->
+  <text x="60" y="620" class="cap" font-size="440" fill="#FF6B00">&#8377;0</text>
+  <text x="80" y="700" class="body" font-size="30" fill="#FCF9F8" letter-spacing="4">TO LIST · TO REACH · TO CLOSE</text>
+
+  <!-- orange band with headline -->
+  <rect x="0" y="770" width="1080" height="330" fill="#ef6723"/>
+  <text x="72" y="890" class="cap" font-size="96" fill="#1A1A1A">LIST YOUR</text>
+  <text x="72" y="985" class="cap" font-size="96" fill="#FFFFFF">PROPERTY FREE.</text>
+  <text x="72" y="1058" class="serif" font-size="44" fill="#1A1A1A">no broker. no cut. no wait.</text>
+
+  <!-- 4-step timeline -->
+  <g class="body" fill="#FCF9F8" font-size="26">
+    <circle cx="90"  cy="1170" r="9" fill="#FF6B00"/>
+    <text x="118" y="1178">Post your listing</text>
+    <circle cx="90"  cy="1225" r="9" fill="#FF6B00"/>
+    <text x="118" y="1233">Tenants reach you direct</text>
+    <circle cx="640" cy="1170" r="9" fill="#FF6B00"/>
+    <text x="668" y="1178">Skip the brokerage</text>
+    <circle cx="640" cy="1225" r="9" fill="#FF6B00"/>
+    <text x="668" y="1233">Close on your terms</text>
+  </g>
+
+  <!-- footer wordmark -->
+  <text x="72" y="1310" class="cap" font-size="40" fill="#FFFFFF">qckserve.in</text>
+  <text x="1008" y="1310" text-anchor="end" class="body" font-size="22" fill="#8C8C8C">India’s free local marketplace</text>
+</svg>

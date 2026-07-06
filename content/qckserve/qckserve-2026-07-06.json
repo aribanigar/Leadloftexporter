@@ -1,0 +1,64 @@
+{
+  "date": "2026-07-06",
+  "business": "qckserve",
+  "topic": "Monsoon rental season — list free, skip the brokerage",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "List your property free this monsoon — keep the brokerage",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<title>List your property free this monsoon — qckserve.in</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#1A1A1A; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;\">\n<!-- preheader (hidden) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#1A1A1A; opacity:0;\">\n  Free to list. Owner-direct. No brokerage. This monsoon, rent it out on your terms.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n  <!-- 600px frame -->\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#1A1A1A; border-radius:16px; overflow:hidden;\">\n\n    <!-- logo zone -->\n    <tr><td style=\"padding:28px 40px 8px 40px; font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">\n      qckserve.in\n    </td></tr>\n    <tr><td style=\"padding:0 40px; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#FF6B00;\">\n      the monsoon moving season\n    </td></tr>\n\n    <!-- HERO: giant ₹0 left, headline right -->\n    <tr><td style=\"padding:24px 40px 8px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr>\n          <td width=\"46%\" valign=\"middle\" style=\"font-family:'Arial Narrow',Arial,sans-serif; font-size:120px; line-height:100px; font-weight:800; letter-spacing:-3px; color:#FF6B00;\">\n            &#8377;0\n          </td>\n          <td width=\"54%\" valign=\"middle\" style=\"font-family:'Poppins',Arial,sans-serif; font-size:30px; line-height:34px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">\n            List your property.<br />Keep the brokerage.\n          </td>\n        </tr>\n      </table>\n    </td></tr>\n\n    <!-- one clear body block, under 90 words before CTA -->\n    <tr><td style=\"padding:12px 40px 4px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      It’s peak renting season. More homes are up for rent than there are tenants — so this is your month to find one fast.\n    </td></tr>\n    <tr><td style=\"padding:6px 40px 20px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      On QckServe, owners list for <strong style=\"color:#FFFFFF;\">free</strong> and tenants reach you <strong style=\"color:#FFFFFF;\">directly</strong>. No broker. No commission. No middleman taking a cut of your rent.\n    </td></tr>\n\n    <!-- primary CTA (bulletproof button) -->\n    <tr><td style=\"padding:0 40px 32px 40px;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr><td align=\"center\" bgcolor=\"#FF6B00\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:16px 34px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A; text-decoration:none; border-radius:12px;\">\n            List your property — free &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- hero poster band -->\n    <tr><td style=\"font-size:0; line-height:0;\">\n      <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-06.svg\"\n           width=\"600\" alt=\"QckServe — List your property free this monsoon. Zero brokerage, owner-direct. qckserve.in\"\n           style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\" />\n    </td></tr>\n\n    <!-- ORANGE proof band -->\n    <tr><td bgcolor=\"#ef6723\" style=\"padding:34px 40px;\">\n      <div style=\"font-family:Georgia,serif; font-style:italic; font-size:16px; color:#1A1A1A;\">what “free” actually means</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:34px; line-height:38px; font-weight:800; letter-spacing:-1px; color:#FFFFFF; padding-top:6px;\">\n        Zero to list.<br />Zero commission.\n      </div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; line-height:24px; color:#1A1A1A; padding-top:10px;\">\n        Your rent stays yours. Every enquiry comes straight to you — not to an agent’s phone.\n      </div>\n    </td></tr>\n\n    <!-- DARK 4-step timeline -->\n    <tr><td style=\"padding:34px 40px 10px 40px; font-family:'Poppins',Arial,sans-serif; font-size:13px; font-weight:700; letter-spacing:3px; color:#8C8C8C;\">\n      HOW IT WORKS\n    </td></tr>\n    <tr><td style=\"padding:0 40px 28px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family:'Poppins',Arial,sans-serif;\">\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">1</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Post your listing — photos, rent, location.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">2</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Tenants message you directly.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">3</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Show the home. Skip the brokerage.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">4</td>\n          <td valign=\"top\" style=\"font-size:16px; line-height:22px; color:#FFFFFF;\">Close the deal on your terms.</td>\n        </tr>\n      </table>\n    </td></tr>\n\n    <!-- LIGHT closing CTA band -->\n    <tr><td bgcolor=\"#FCF9F8\" style=\"padding:36px 40px; text-align:center;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; line-height:30px; font-weight:800; letter-spacing:-0.5px; color:#1A1A1A;\">\n        Your home. Your rent. Your rules.\n      </div>\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" style=\"margin:20px auto 0 auto;\">\n        <tr><td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:15px 32px; font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">\n            Post your property now &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- footer -->\n    <tr><td style=\"padding:26px 40px 34px 40px; font-family:'Poppins',Arial,sans-serif; font-size:12px; line-height:18px; color:#8C8C8C;\">\n      QckServe · India’s free local marketplace · qckserve.in<br />\n      Zero commission. Free listings. Owner-direct, always.\n    </td></tr>\n\n  </table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-06.svg",
+      "tags": [
+        "properties",
+        "promo",
+        "email"
+      ],
+      "notes": "Monday Properties email — Big-number hero archetype (giant ₹0 + 4-step timeline). Anchor: 2026 rental supply up ~9% QoQ vs demand +0.6%, peak monsoon moving season."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "🏠 Ghar kiraye pe dena hai?\nIs monsoon season mein tenant zyada, wait kam.\n\nQckServe pe listing bilkul FREE. Na broker, na commission — tenant seedha aapse baat karega. Rent poora aapka. ₹0 cut.\n\nAbhi list karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-06.svg",
+      "tags": [
+        "properties",
+        "promo",
+        "whatsapp"
+      ],
+      "notes": "Hinglish B2C, owner-direct rent angle."
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Ghar kiraye pe dena hai? Is monsoon, tenant milna sabse aasaan. 🌧️🏠\n\nQckServe pe listing FREE hai. Na broker, na commission, na beech ka aadmi. Tenant seedha aapse baat karega aur rent poora aapki jeb mein.\n\n₹0 to list. ₹0 commission. Sirf aapki shart pe deal.\nList your property free → qckserve.in\n\n#QckServe #RentFree #NoBrokerage #PropertyIndia #GharKiraye",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-06.svg",
+      "tags": [
+        "properties",
+        "promo",
+        "caption",
+        "instagram"
+      ],
+      "notes": "Instagram Hinglish caption with hashtags."
+    },
+    {
+      "channel": "sms",
+      "content": "QckServe: List your property FREE this rental season. No broker, no commission — tenants reach you direct. qckserve.in",
+      "tags": [
+        "properties",
+        "promo",
+        "sms"
+      ],
+      "notes": "One-line English SMS, <160 chars."
+    },
+    {
+      "channel": "other",
+      "title": "[2026-07-06] Monsoon rental season — list free, skip the brokerage (Image Prompt)",
+      "content": "Editorial real-estate promo poster, vertical 4:5, QckServe brand.\n\nSCENE: a bright modern Indian apartment doorway just after monsoon rain, warm daylight spilling in, a young owner handing keys directly to a smiling tenant — no broker in frame.\nSUBJECT: the owner-to-tenant handshake as the emotional focus; confident, friendly, real.\nPHONE-UI MOCKUP: a floating smartphone shows the QckServe app listing screen — a rental card with photo, monthly rent, 'Contact owner directly' button, and a bold '₹0 to list' badge.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — deep charcoal #1A1A1A base, primary orange #ef6723, accent #FF6B00, off-white #FCF9F8 for cards; one accent used sparingly.\nLIGHTING: soft post-rain diffused daylight, gentle reflections on wet floor, clean shadows.\nTYPE HIERARCHY: one oversized condensed headline 'LIST FREE', an italic-serif kicker 'the monsoon moving season', small 'qckserve.in' wordmark bottom-left.\nEYE FLOW: giant ₹0 → handshake → phone UI → wordmark.\nCAMERA: 35mm, eye-level, shallow depth of field, editorial magazine framing.\nPERFORMANCE LAYER: high thumb-stopping contrast, mobile-first legibility, one memorable device (the giant ₹0).\nReserve the TOP-LEFT logo zone empty (~140px square) — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "properties",
+        "image-prompt",
+        "other"
+      ],
+      "notes": "AI image prompt, QckServe production format, --ar 4:5."
+    }
+  ]
+}
