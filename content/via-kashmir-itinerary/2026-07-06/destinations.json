@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "meghalaya",  "feat": "goa",       "place": "Meghalaya (Cherrapunji / Shillong)", "region": "Northeast India"},
+  "kashmir": {"photo": "kashmir",    "feat": "himalaya",  "place": "Kashmir",                            "region": "North India"},
+  "saudi":   {"photo": "santorini",  "feat": "alps",      "place": "Santorini, Greece",                  "region": "Europe"},
+  "dubai":   {"photo": "georgia",    "feat": "maldives",  "place": "Tbilisi, Georgia",                    "region": "Caucasus"}
+}
