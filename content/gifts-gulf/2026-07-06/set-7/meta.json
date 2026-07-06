@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Event giveaways",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "A",
+  "campaign_code": "GG-20260706-7",
+  "campaign_name": "Event Giveaways - 06 Jul 2026",
+  "subject": "Totes by the hundred",
+  "skus": [
+    "GG1366",
+    "GG1623",
+    "GG1545",
+    "GG1669",
+    "GG1098"
+  ],
+  "products": [
+    {
+      "name": "Aurora",
+      "sku": "GG1366",
+      "desc": "Cotton tote with bright rainbow handles",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2984-99.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1366"
+    },
+    {
+      "name": "Cottonel Plus",
+      "sku": "GG1623",
+      "desc": "Classic cotton tote, ready to brand",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9267-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1623"
+    },
+    {
+      "name": "Fundraw",
+      "sku": "GG1545",
+      "desc": "Cotton drawstring bag for quick handouts",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6980-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1545"
+    },
+    {
+      "name": "Taske Small",
+      "sku": "GG1669",
+      "desc": "Cotton pouch for small giveaways",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9729-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1669"
+    },
+    {
+      "name": "Chisai",
+      "sku": "GG1098",
+      "desc": "Compact cotton tote for light loads",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2147-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1098"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20event%20giveaways."
+}

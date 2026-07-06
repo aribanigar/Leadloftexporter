@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Bags and travel",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "B",
+  "campaign_code": "GG-20260706-2",
+  "campaign_name": "Bags And Travel - 06 Jul 2026",
+  "subject": "Pack it, brand it",
+  "skus": [
+    "GG1041",
+    "GG1608",
+    "GG1241",
+    "GG1299",
+    "GG1164"
+  ],
+  "products": [
+    {
+      "name": "Boccaria",
+      "sku": "GG1041",
+      "desc": "Roomy weekender with leather-look trims",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6351-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1041"
+    },
+    {
+      "name": "Stockholm",
+      "sku": "GG1608",
+      "desc": "Padded laptop bag with a shoulder strap",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8957-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1608"
+    },
+    {
+      "name": "Coolin",
+      "sku": "GG1241",
+      "desc": "Insulated cool bag for lunches and trips",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2560-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1241"
+    },
+    {
+      "name": "Litas",
+      "sku": "GG1299",
+      "desc": "Everyday shopper that folds down small",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2698-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1299"
+    },
+    {
+      "name": "Feux",
+      "sku": "GG1164",
+      "desc": "Slim folder that holds a tablet and notes",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2360-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1164"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20bags%20for%20my%20team."
+}

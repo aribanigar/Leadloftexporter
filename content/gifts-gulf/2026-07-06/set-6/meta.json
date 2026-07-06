@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Executive onboarding",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "C",
+  "campaign_code": "GG-20260706-6",
+  "campaign_name": "Executive Onboarding - 06 Jul 2026",
+  "subject": "First day, fully equipped",
+  "skus": [
+    "GG1293",
+    "GG1262",
+    "GG1033",
+    "GG1015",
+    "GG1247"
+  ],
+  "products": [
+    {
+      "name": "Servir",
+      "sku": "GG1293",
+      "desc": "Vacuum carafe with a wooden handle",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2674-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1293"
+    },
+    {
+      "name": "Topiz",
+      "sku": "GG1262",
+      "desc": "Travel tumbler with a handy carry strap",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2596-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1262"
+    },
+    {
+      "name": "Epsom",
+      "sku": "GG1033",
+      "desc": "Metal case that keeps cards crisp",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2225-17.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1033"
+    },
+    {
+      "name": "Oregon",
+      "sku": "GG1015",
+      "desc": "Two-pen set in a slim gift box",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3177-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1015"
+    },
+    {
+      "name": "Cozy",
+      "sku": "GG1247",
+      "desc": "Padded sleeve that guards a laptop",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2568-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1247"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20onboarding%20kits."
+}

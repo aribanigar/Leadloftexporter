@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Summer refreshment",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "B",
+  "campaign_code": "GG-20260706-8",
+  "campaign_name": "Summer Refreshment - 06 Jul 2026",
+  "subject": "Glass, chilled and branded",
+  "skus": [
+    "GG1394",
+    "GG1723",
+    "GG1715",
+    "GG1311",
+    "GG1459"
+  ],
+  "products": [
+    {
+      "name": "Utah Denim",
+      "sku": "GG1394",
+      "desc": "Glass bottle in a soft denim sleeve",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6192-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1394"
+    },
+    {
+      "name": "Astoglass",
+      "sku": "GG1723",
+      "desc": "Glass cup with a grip band and lid",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9992-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1723"
+    },
+    {
+      "name": "Iceland Rpet",
+      "sku": "GG1715",
+      "desc": "Clear bottle with an easy-loop lid",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9940-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1715"
+    },
+    {
+      "name": "Isjforden",
+      "sku": "GG1311",
+      "desc": "Sport bottle with a textured grip",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2755-02.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1311"
+    },
+    {
+      "name": "Utah Large",
+      "sku": "GG1459",
+      "desc": "Big glass bottle in a protective sleeve",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6545-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1459"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20summer%20bottles."
+}

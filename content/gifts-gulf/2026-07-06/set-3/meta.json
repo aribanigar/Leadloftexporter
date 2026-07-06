@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Tech and desk",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "C",
+  "campaign_code": "GG-20260706-3",
+  "campaign_name": "Tech And Desk - 06 Jul 2026",
+  "subject": "Gadgets they actually use",
+  "skus": [
+    "GG1110",
+    "GG1195",
+    "GG1590",
+    "GG1436",
+    "GG1411"
+  ],
+  "products": [
+    {
+      "name": "Sonora",
+      "sku": "GG1110",
+      "desc": "Wireless earbuds in a compact charging case",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2176-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1110"
+    },
+    {
+      "name": "Flip",
+      "sku": "GG1195",
+      "desc": "Foldable pad that charges three things at once",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2445-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1195"
+    },
+    {
+      "name": "Finder",
+      "sku": "GG1590",
+      "desc": "Item tracker so keys never go missing",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8648-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1590"
+    },
+    {
+      "name": "Ergopad",
+      "sku": "GG1436",
+      "desc": "Mouse pad with a cushioned wrist rest",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6411-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1436"
+    },
+    {
+      "name": "Whippy Plus",
+      "sku": "GG1411",
+      "desc": "Bamboo stand that holds a phone at eye level",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6277-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1411"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20desk%20tech%20for%20my%20team."
+}

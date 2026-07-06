@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Eco and sustainable",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "A",
+  "campaign_code": "GG-20260706-4",
+  "campaign_name": "Eco And Sustainable - 06 Jul 2026",
+  "subject": "Recycled, and still premium",
+  "skus": [
+    "GG1174",
+    "GG1153",
+    "GG1150",
+    "GG1158",
+    "GG1036"
+  ],
+  "products": [
+    {
+      "name": "Nunavut",
+      "sku": "GG1174",
+      "desc": "Recycled steel flask, hot or cold for hours",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2383-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1174"
+    },
+    {
+      "name": "Calefrio",
+      "sku": "GG1153",
+      "desc": "Recycled steel bottle for daily refills",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2331-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1153"
+    },
+    {
+      "name": "Acero",
+      "sku": "GG1150",
+      "desc": "Recycled steel mug with a bamboo handle",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2325-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1150"
+    },
+    {
+      "name": "Carabi",
+      "sku": "GG1158",
+      "desc": "Recycled steel bottle with a clip-on cap",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2336-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1158"
+    },
+    {
+      "name": "Trikes",
+      "sku": "GG1036",
+      "desc": "Wooden travel games set for downtime",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2941-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1036"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20eco-friendly%20branded%20gifts."
+}

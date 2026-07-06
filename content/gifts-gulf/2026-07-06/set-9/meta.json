@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Ceramic mugs",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "C",
+  "campaign_code": "GG-20260706-9",
+  "campaign_name": "Ceramic Mugs - 06 Jul 2026",
+  "subject": "Mornings on their desk",
+  "skus": [
+    "GG1416",
+    "GG1555",
+    "GG1615",
+    "GG1101",
+    "GG1194"
+  ],
+  "products": [
+    {
+      "name": "Subcork",
+      "sku": "GG1416",
+      "desc": "Ceramic mug on a warm cork base",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6323-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1416"
+    },
+    {
+      "name": "Dual",
+      "sku": "GG1555",
+      "desc": "Two-tone mug with a matching spoon",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7344-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1555"
+    },
+    {
+      "name": "Rome",
+      "sku": "GG1615",
+      "desc": "Clean porcelain mug for the desk",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9078-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1615"
+    },
+    {
+      "name": "Alas",
+      "sku": "GG1101",
+      "desc": "Enamel mug with a classic camp look",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2148-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1101"
+    },
+    {
+      "name": "Co",
+      "sku": "GG1194",
+      "desc": "Coffee cup with a soft cork grip",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2446-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1194"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20ceramic%20mugs."
+}

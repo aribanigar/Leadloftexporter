@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-06",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Steel they carry every day.",
+      "out": "content/gifts-gulf/2026-07-06/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6313-03",
+          "sku": "GG1414",
+          "name": "Aspen Cork",
+          "desc": "Steel bottle set on a warm cork base",
+          "colours": 0
+        },
+        {
+          "code": "mo6533-03",
+          "sku": "GG1455",
+          "name": "Ruby",
+          "desc": "Steel mug with a cork base and handle",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Branded bags for every trip.",
+      "out": "content/gifts-gulf/2026-07-06/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc6351-03",
+          "sku": "GG1041",
+          "name": "Boccaria",
+          "desc": "Roomy weekender with leather-look trims",
+          "colours": 0
+        },
+        {
+          "code": "mo8957-07",
+          "sku": "GG1608",
+          "name": "Stockholm",
+          "desc": "Padded laptop bag with a shoulder strap",
+          "colours": 0
+        },
+        {
+          "code": "mo2560-15",
+          "sku": "GG1241",
+          "name": "Coolin",
+          "desc": "Insulated cool bag for lunches and trips",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Your brand, on their desk.",
+      "out": "content/gifts-gulf/2026-07-06/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2176-06",
+          "sku": "GG1110",
+          "name": "Sonora",
+          "desc": "Wireless earbuds in a compact charging case",
+          "colours": 0
+        },
+        {
+          "code": "mo2445-06",
+          "sku": "GG1195",
+          "name": "Flip",
+          "desc": "Foldable pad that charges three things at once",
+          "colours": 0
+        },
+        {
+          "code": "mo6277-40",
+          "sku": "GG1411",
+          "name": "Whippy Plus",
+          "desc": "Bamboo stand that holds a phone at eye level",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Recycled steel, kept for years.",
+      "out": "content/gifts-gulf/2026-07-06/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2325-03",
+          "sku": "GG1150",
+          "name": "Acero",
+          "desc": "Recycled steel mug with a bamboo handle",
+          "colours": 0
+        },
+        {
+          "code": "mo2383-03",
+          "sku": "GG1174",
+          "name": "Nunavut",
+          "desc": "Recycled steel flask, hot or cold for hours",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Your name on every page.",
+      "out": "content/gifts-gulf/2026-07-06/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9108-03",
+          "sku": "GG1617",
+          "name": "Softnote",
+          "desc": "Hardcover notebook with an elastic close",
+          "colours": 0
+        },
+        {
+          "code": "mo6794-16",
+          "sku": "GG1501",
+          "name": "Graz",
+          "desc": "Metal pen boxed in a cork gift case",
+          "colours": 0
+        },
+        {
+          "code": "mo7756-13",
+          "sku": "GG1568",
+          "name": "Stibox",
+          "desc": "Desk set with sticky notes, ruler and pen",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Welcome them the right way.",
+      "out": "content/gifts-gulf/2026-07-06/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2674-03",
+          "sku": "GG1293",
+          "name": "Servir",
+          "desc": "Vacuum carafe with a wooden handle",
+          "colours": 0
+        },
+        {
+          "code": "mo2596-03",
+          "sku": "GG1262",
+          "name": "Topiz",
+          "desc": "Travel tumbler with a handy carry strap",
+          "colours": 0
+        },
+        {
+          "code": "kc2225-17",
+          "sku": "GG1033",
+          "name": "Epsom",
+          "desc": "Metal case that keeps cards crisp",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Your brand in every hand.",
+      "out": "content/gifts-gulf/2026-07-06/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2984-99",
+          "sku": "GG1366",
+          "name": "Aurora",
+          "desc": "Cotton tote with bright rainbow handles",
+          "colours": 0
+        },
+        {
+          "code": "mo9267-13",
+          "sku": "GG1623",
+          "name": "Cottonel Plus",
+          "desc": "Classic cotton tote, ready to brand",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Keep them cool and branded.",
+      "out": "content/gifts-gulf/2026-07-06/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6192-04",
+          "sku": "GG1394",
+          "name": "Utah Denim",
+          "desc": "Glass bottle in a soft denim sleeve",
+          "colours": 0
+        },
+        {
+          "code": "mo6545-03",
+          "sku": "GG1459",
+          "name": "Utah Large",
+          "desc": "Big glass bottle in a protective sleeve",
+          "colours": 0
+        },
+        {
+          "code": "mo9992-03",
+          "sku": "GG1723",
+          "name": "Astoglass",
+          "desc": "Glass cup with a grip band and lid",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Their morning starts with you.",
+      "out": "content/gifts-gulf/2026-07-06/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6323-06",
+          "sku": "GG1416",
+          "name": "Subcork",
+          "desc": "Ceramic mug on a warm cork base",
+          "colours": 0
+        },
+        {
+          "code": "mo7344-04",
+          "sku": "GG1555",
+          "name": "Dual",
+          "desc": "Two-tone mug with a matching spoon",
+          "colours": 0
+        },
+        {
+          "code": "mo9078-06",
+          "sku": "GG1615",
+          "name": "Rome",
+          "desc": "Clean porcelain mug for the desk",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

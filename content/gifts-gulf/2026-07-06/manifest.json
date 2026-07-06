@@ -1,0 +1,151 @@
+{
+  "date": "2026-07-06",
+  "season": "Mid H2, product-led corporate gifting",
+  "generated_utc": "2026-07-06T01:06:51Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Insulated steel drinkware",
+      "campaign_code": "GG-20260706-1",
+      "campaign_name": "Premium Drinkware - 06 Jul 2026",
+      "subject": "Steel they will keep",
+      "skus": [
+        "GG1655",
+        "GG1183",
+        "GG1414",
+        "GG1455",
+        "GG1483"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Bags and travel",
+      "angle": "Travel and work bags",
+      "campaign_code": "GG-20260706-2",
+      "campaign_name": "Bags And Travel - 06 Jul 2026",
+      "subject": "Pack it, brand it",
+      "skus": [
+        "GG1041",
+        "GG1608",
+        "GG1241",
+        "GG1299",
+        "GG1164"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Tech and desk",
+      "angle": "Desk tech and gadgets",
+      "campaign_code": "GG-20260706-3",
+      "campaign_name": "Tech And Desk - 06 Jul 2026",
+      "subject": "Gadgets they actually use",
+      "skus": [
+        "GG1110",
+        "GG1195",
+        "GG1590",
+        "GG1436",
+        "GG1411"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Eco and sustainable",
+      "angle": "Recycled materials",
+      "campaign_code": "GG-20260706-4",
+      "campaign_name": "Eco And Sustainable - 06 Jul 2026",
+      "subject": "Recycled, and still premium",
+      "skus": [
+        "GG1174",
+        "GG1153",
+        "GG1150",
+        "GG1158",
+        "GG1036"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Notebooks and writing",
+      "angle": "Notebooks, pens and desk sets",
+      "campaign_code": "GG-20260706-5",
+      "campaign_name": "Notebooks And Writing - 06 Jul 2026",
+      "subject": "Ideas need good paper",
+      "skus": [
+        "GG1617",
+        "GG1501",
+        "GG1568",
+        "GG1074",
+        "GG1020"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Executive onboarding",
+      "angle": "Welcome and onboarding kits",
+      "campaign_code": "GG-20260706-6",
+      "campaign_name": "Executive Onboarding - 06 Jul 2026",
+      "subject": "First day, fully equipped",
+      "skus": [
+        "GG1293",
+        "GG1262",
+        "GG1033",
+        "GG1015",
+        "GG1247"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event giveaways",
+      "angle": "Cotton totes and giveaways",
+      "campaign_code": "GG-20260706-7",
+      "campaign_name": "Event Giveaways - 06 Jul 2026",
+      "subject": "Totes by the hundred",
+      "skus": [
+        "GG1366",
+        "GG1623",
+        "GG1545",
+        "GG1669",
+        "GG1098"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Summer refreshment",
+      "angle": "Glass and sport bottles",
+      "campaign_code": "GG-20260706-8",
+      "campaign_name": "Summer Refreshment - 06 Jul 2026",
+      "subject": "Glass, chilled and branded",
+      "skus": [
+        "GG1394",
+        "GG1723",
+        "GG1715",
+        "GG1311",
+        "GG1459"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Ceramic mugs",
+      "angle": "Desk mugs and cups",
+      "campaign_code": "GG-20260706-9",
+      "campaign_name": "Ceramic Mugs - 06 Jul 2026",
+      "subject": "Mornings on their desk",
+      "skus": [
+        "GG1416",
+        "GG1555",
+        "GG1615",
+        "GG1101",
+        "GG1194"
+      ]
+    }
+  ]
+}

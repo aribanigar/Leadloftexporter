@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Premium drinkware",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "A",
+  "campaign_code": "GG-20260706-1",
+  "campaign_name": "Premium Drinkware - 06 Jul 2026",
+  "subject": "Steel they will keep",
+  "skus": [
+    "GG1655",
+    "GG1183",
+    "GG1414",
+    "GG1455",
+    "GG1483"
+  ],
+  "products": [
+    {
+      "name": "Chin Chin",
+      "sku": "GG1655",
+      "desc": "Insulated cup with a clear press lid",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9597-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1655"
+    },
+    {
+      "name": "Remid Moss",
+      "sku": "GG1183",
+      "desc": "Aluminium bottle with a clip-on cap",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2403-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1183"
+    },
+    {
+      "name": "Aspen Cork",
+      "sku": "GG1414",
+      "desc": "Steel bottle set on a warm cork base",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6313-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1414"
+    },
+    {
+      "name": "Ruby",
+      "sku": "GG1455",
+      "desc": "Steel mug with a cork base and handle",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6533-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1455"
+    },
+    {
+      "name": "Chin Chan",
+      "sku": "GG1483",
+      "desc": "Insulated cup with a slide-close lid",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6700-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1483"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20steel%20drinkware%20for%20my%20team."
+}

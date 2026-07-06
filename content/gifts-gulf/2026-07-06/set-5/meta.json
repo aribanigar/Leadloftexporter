@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-06",
+  "theme": "Notebooks and writing",
+  "season": "Mid H2, product-led corporate gifting",
+  "design": "B",
+  "campaign_code": "GG-20260706-5",
+  "campaign_name": "Notebooks And Writing - 06 Jul 2026",
+  "subject": "Ideas need good paper",
+  "skus": [
+    "GG1617",
+    "GG1501",
+    "GG1568",
+    "GG1074",
+    "GG1020"
+  ],
+  "products": [
+    {
+      "name": "Softnote",
+      "sku": "GG1617",
+      "desc": "Hardcover notebook with an elastic close",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9108-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1617"
+    },
+    {
+      "name": "Graz",
+      "sku": "GG1501",
+      "desc": "Metal pen boxed in a cork gift case",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6794-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1501"
+    },
+    {
+      "name": "Stibox",
+      "sku": "GG1568",
+      "desc": "Desk set with sticky notes, ruler and pen",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7756-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1568"
+    },
+    {
+      "name": "Feltbook",
+      "sku": "GG1074",
+      "desc": "Felt-wrapped notebook for meetings",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2093-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1074"
+    },
+    {
+      "name": "Blocky",
+      "sku": "GG1020",
+      "desc": "Twelve colouring pencils in a neat tube",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3630-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1020"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-06/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20branded%20notebooks%20and%20pens."
+}
