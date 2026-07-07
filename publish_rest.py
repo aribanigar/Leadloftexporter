@@ -21,7 +21,11 @@ def _req(method, path, body=None, prefer=None):
         return r.status, (json.loads(raw) if raw.strip() else None)
     except urllib.error.HTTPError as e: return e.code, e.read().decode()
 def get(path):
-    _, j = _req("GET", path); return j
+    st, j = _req("GET", path)
+    if not isinstance(j, list):
+        # e.g. project restricted (402 egress quota) returns an error object/string
+        raise SystemExit(f"Supabase GET {path} returned {st}: {j}")
+    return j
 def folder_id(name):
     rows = get(f"content_businesses?workspace_id=eq.{WS}&slug=eq.{urllib.parse.quote(name)}&select=id")
     if rows: return rows[0]["id"]
