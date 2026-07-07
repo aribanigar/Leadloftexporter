@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-07",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Your logo. Cold that lasts.",
+      "out": "content/gifts-gulf/2026-07-07/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6366-03",
+          "sku": "GG1427",
+          "name": "Tiksi",
+          "desc": "Double wall steel that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2112-03",
+          "sku": "GG1088",
+          "name": "Redu",
+          "desc": "Slim steel bottle that fits any bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Recycled today. Carried tomorrow.",
+      "out": "content/gifts-gulf/2026-07-07/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2164-15",
+          "sku": "GG1106",
+          "name": "Llana",
+          "desc": "Made from recycled plastic bottles",
+          "colours": 0
+        },
+        {
+          "code": "mo2165-15",
+          "sku": "GG1107",
+          "name": "Plana",
+          "desc": "Recycled fabric with a clean finish",
+          "colours": 0
+        },
+        {
+          "code": "mo2274-03",
+          "sku": "GG1132",
+          "name": "Elnas",
+          "desc": "Recycled blend that feels sturdy",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Your logo. Their daily carry.",
+      "out": "content/gifts-gulf/2026-07-07/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it1639-04",
+          "sku": "GG1007",
+          "name": "Yatch",
+          "desc": "Natural cotton tote for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2094-13",
+          "sku": "GG1075",
+          "name": "Osole ++",
+          "desc": "Roomy cotton shopper that folds flat",
+          "colours": 0
+        },
+        {
+          "code": "mo2095-13",
+          "sku": "GG1076",
+          "name": "Osole Cos",
+          "desc": "Cotton bag with a clean, simple cut",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Branded pages they keep.",
+      "out": "content/gifts-gulf/2026-07-07/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2576-03",
+          "sku": "GG1253",
+          "name": "Camp",
+          "desc": "Soft cover notebook for daily notes",
+          "colours": 0
+        },
+        {
+          "code": "mo2684-03",
+          "sku": "GG1294",
+          "name": "Korovin",
+          "desc": "Bound journal that lies flat to write",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Warm wood, your mark.",
+      "out": "content/gifts-gulf/2026-07-07/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6398-13",
+          "sku": "GG1434",
+          "name": "Educount",
+          "desc": "Wood piece with a warm natural grain",
+          "colours": 0
+        },
+        {
+          "code": "mo6363-40",
+          "sku": "GG1428",
+          "name": "Travis",
+          "desc": "Smooth wood finish, quietly premium",
+          "colours": 0
+        },
+        {
+          "code": "it1047-01",
+          "sku": "GG1005",
+          "name": "Arcolor",
+          "desc": "Light wood accent for any desk",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Small tools, daily habit.",
+      "out": "content/gifts-gulf/2026-07-07/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2483-40",
+          "sku": "GG1205",
+          "name": "Keypop",
+          "desc": "Handy metal piece for the keys",
+          "colours": 0
+        },
+        {
+          "code": "mo9756-03",
+          "sku": "GG1674",
+          "name": "Plateado",
+          "desc": "Polished metal with a clean weight",
+          "colours": 0
+        },
+        {
+          "code": "it3020-03",
+          "sku": "GG1014",
+          "name": "Tech",
+          "desc": "Compact metal tool for daily carry",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Branded bottles they refill.",
+      "out": "content/gifts-gulf/2026-07-07/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc6540-04",
+          "sku": "GG1042",
+          "name": "Vivi",
+          "desc": "Clear bottle that is light to carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2941-03",
+          "sku": "GG1357",
+          "name": "Sarnie",
+          "desc": "Tough bottle for the gym bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Soft cotton. Real story.",
+      "out": "content/gifts-gulf/2026-07-07/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2188-03",
+          "sku": "GG1113",
+          "name": "Mare",
+          "desc": "Recycled cotton tote, soft and strong",
+          "colours": 0
+        },
+        {
+          "code": "mo2189-03",
+          "sku": "GG1115",
+          "name": "Mujika",
+          "desc": "Recycled cotton bag for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2302-03",
+          "sku": "GG1138",
+          "name": "Viveka Colour",
+          "desc": "Coloured recycled cotton shopper",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Refill it. Brand it.",
+      "out": "content/gifts-gulf/2026-07-07/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2158-03",
+          "sku": "GG1103",
+          "name": "Veria",
+          "desc": "Recycled aluminium bottle, light to carry",
+          "colours": 0
+        },
+        {
+          "code": "kc6589-16",
+          "sku": "GG1043",
+          "name": "Heim",
+          "desc": "Aluminium bottle built for daily refills",
+          "colours": 0
+        },
+        {
+          "code": "mo2380-03",
+          "sku": "GG1172",
+          "name": "Scribble",
+          "desc": "Slim aluminium bottle for the bag",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

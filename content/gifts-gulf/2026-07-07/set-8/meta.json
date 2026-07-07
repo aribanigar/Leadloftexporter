@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-07",
+  "theme": "Recycled cotton bags",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260707-8",
+  "campaign_name": "Recycled Cotton Bags - 07 Jul 2026",
+  "subject": "Soft cotton, real story",
+  "skus": [
+    "GG1113",
+    "GG1115",
+    "GG1138",
+    "GG1141",
+    "GG1181",
+    "GG1182"
+  ],
+  "products": [
+    {
+      "name": "Mare",
+      "sku": "GG1113",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2188-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1113"
+    },
+    {
+      "name": "Mujika",
+      "sku": "GG1115",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2189-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1115"
+    },
+    {
+      "name": "Viveka Colour",
+      "sku": "GG1138",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2302-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1138"
+    },
+    {
+      "name": "Koper Back",
+      "sku": "GG1141",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2307-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1141"
+    },
+    {
+      "name": "Cabetri",
+      "sku": "GG1181",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2401-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1181"
+    },
+    {
+      "name": "Cabetri Colour",
+      "sku": "GG1182",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2402-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1182"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20cotton%20bags%20options%20for%20our%20team."
+}

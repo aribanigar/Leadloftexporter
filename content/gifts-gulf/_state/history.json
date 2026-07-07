@@ -2553,5 +2553,157 @@
       "GG1101",
       "GG1194"
     ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260707-1",
+    "campaign_name": "Insulated Steel Bottles - 07 Jul 2026",
+    "subject": "Steel they carry daily",
+    "theme": "Insulated steel bottles",
+    "skus": [
+      "GG1427",
+      "GG1088",
+      "GG1089",
+      "GG1090",
+      "GG1112",
+      "GG1126"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260707-2",
+    "campaign_name": "Recycled RPET Carry - 07 Jul 2026",
+    "subject": "Recycled, and still sharp",
+    "theme": "Recycled RPET carry",
+    "skus": [
+      "GG1106",
+      "GG1107",
+      "GG1132",
+      "GG1133",
+      "GG1139",
+      "GG1189"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260707-3",
+    "campaign_name": "Cotton Totes - 07 Jul 2026",
+    "subject": "Totes for every hand",
+    "theme": "Cotton totes",
+    "skus": [
+      "GG1007",
+      "GG1075",
+      "GG1076",
+      "GG1079",
+      "GG1094",
+      "GG1095"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260707-4",
+    "campaign_name": "Bound Notebooks - 07 Jul 2026",
+    "subject": "Covers worth opening",
+    "theme": "Bound notebooks",
+    "skus": [
+      "GG1253",
+      "GG1294",
+      "GG1308",
+      "GG1309",
+      "GG1367",
+      "GG1561"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260707-5",
+    "campaign_name": "Wood And Bamboo Desk - 07 Jul 2026",
+    "subject": "Wood on every desk",
+    "theme": "Wood and bamboo desk",
+    "skus": [
+      "GG1434",
+      "GG1428",
+      "GG1005",
+      "GG1008",
+      "GG1013",
+      "GG1461"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260707-6",
+    "campaign_name": "Metal Desk And Carry - 07 Jul 2026",
+    "subject": "Small tech, big habit",
+    "theme": "Metal desk and carry",
+    "skus": [
+      "GG1205",
+      "GG1674",
+      "GG1014",
+      "GG1230",
+      "GG1631",
+      "GG1632"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260707-7",
+    "campaign_name": "Sport Bottles - 07 Jul 2026",
+    "subject": "Bottles built for sport",
+    "theme": "Sport bottles",
+    "skus": [
+      "GG1042",
+      "GG1357",
+      "GG1480",
+      "GG1540",
+      "GG1250",
+      "GG1481"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260707-8",
+    "campaign_name": "Recycled Cotton Bags - 07 Jul 2026",
+    "subject": "Soft cotton, real story",
+    "theme": "Recycled cotton bags",
+    "skus": [
+      "GG1113",
+      "GG1115",
+      "GG1138",
+      "GG1141",
+      "GG1181",
+      "GG1182"
+    ]
+  },
+  {
+    "date": "2026-07-07",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260707-9",
+    "campaign_name": "Aluminium Bottles - 07 Jul 2026",
+    "subject": "Light metal, endless refills",
+    "theme": "Aluminium bottles",
+    "skus": [
+      "GG1103",
+      "GG1043",
+      "GG1172",
+      "GG1375",
+      "GG1602"
+    ]
   }
 ]

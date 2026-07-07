@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-07",
+  "theme": "Metal desk and carry",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260707-6",
+  "campaign_name": "Metal Desk And Carry - 07 Jul 2026",
+  "subject": "Small tech, big habit",
+  "skus": [
+    "GG1205",
+    "GG1674",
+    "GG1014",
+    "GG1230",
+    "GG1631",
+    "GG1632"
+  ],
+  "products": [
+    {
+      "name": "Keypop",
+      "sku": "GG1205",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2483-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1205"
+    },
+    {
+      "name": "Plateado",
+      "sku": "GG1674",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9756-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1674"
+    },
+    {
+      "name": "Tech",
+      "sku": "GG1014",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3020-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1014"
+    },
+    {
+      "name": "Lircle",
+      "sku": "GG1230",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2537-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1230"
+    },
+    {
+      "name": "Pin Opener",
+      "sku": "GG1631",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9331-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1631"
+    },
+    {
+      "name": "Pin",
+      "sku": "GG1632",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9330-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1632"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20metal%20desk%20and%20carry%20options%20for%20our%20team."
+}

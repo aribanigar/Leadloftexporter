@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-07",
+  "theme": "Cotton totes",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260707-3",
+  "campaign_name": "Cotton Totes - 07 Jul 2026",
+  "subject": "Totes for every hand",
+  "skus": [
+    "GG1007",
+    "GG1075",
+    "GG1076",
+    "GG1079",
+    "GG1094",
+    "GG1095"
+  ],
+  "products": [
+    {
+      "name": "Yatch",
+      "sku": "GG1007",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it1639-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1007"
+    },
+    {
+      "name": "Osole ++",
+      "sku": "GG1075",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2094-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1075"
+    },
+    {
+      "name": "Osole Cos",
+      "sku": "GG1076",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2095-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1076"
+    },
+    {
+      "name": "Osole Draw",
+      "sku": "GG1079",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2096-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1079"
+    },
+    {
+      "name": "Heaven Stripe",
+      "sku": "GG1094",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2126-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1094"
+    },
+    {
+      "name": "Heaven",
+      "sku": "GG1095",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2127-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1095"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cotton%20totes%20options%20for%20our%20team."
+}

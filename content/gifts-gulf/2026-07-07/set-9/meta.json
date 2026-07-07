@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-07",
+  "theme": "Aluminium bottles",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260707-9",
+  "campaign_name": "Aluminium Bottles - 07 Jul 2026",
+  "subject": "Light metal, endless refills",
+  "skus": [
+    "GG1103",
+    "GG1043",
+    "GG1172",
+    "GG1375",
+    "GG1602"
+  ],
+  "products": [
+    {
+      "name": "Veria",
+      "sku": "GG1103",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2158-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1103"
+    },
+    {
+      "name": "Heim",
+      "sku": "GG1043",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6589-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1043"
+    },
+    {
+      "name": "Scribble",
+      "sku": "GG1172",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2380-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1172"
+    },
+    {
+      "name": "Neilo Clean",
+      "sku": "GG1375",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6138-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1375"
+    },
+    {
+      "name": "Bern",
+      "sku": "GG1602",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8893-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1602"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-07/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20aluminium%20bottles%20options%20for%20our%20team."
+}

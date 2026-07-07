@@ -1,0 +1,159 @@
+{
+  "date": "2026-07-07",
+  "season": "Mid H2, material-led everyday-carry gifting",
+  "generated_utc": "2026-07-07T00:41:07.382241Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Insulated steel bottles",
+      "angle": "Insulated steel",
+      "campaign_code": "GG-20260707-1",
+      "campaign_name": "Insulated Steel Bottles - 07 Jul 2026",
+      "subject": "Steel they carry daily",
+      "skus": [
+        "GG1427",
+        "GG1088",
+        "GG1089",
+        "GG1090",
+        "GG1112",
+        "GG1126"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Recycled RPET carry",
+      "angle": "Made from recycled plastic",
+      "campaign_code": "GG-20260707-2",
+      "campaign_name": "Recycled RPET Carry - 07 Jul 2026",
+      "subject": "Recycled, and still sharp",
+      "skus": [
+        "GG1106",
+        "GG1107",
+        "GG1132",
+        "GG1133",
+        "GG1139",
+        "GG1189"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Cotton totes",
+      "angle": "Natural cotton shoppers",
+      "campaign_code": "GG-20260707-3",
+      "campaign_name": "Cotton Totes - 07 Jul 2026",
+      "subject": "Totes for every hand",
+      "skus": [
+        "GG1007",
+        "GG1075",
+        "GG1076",
+        "GG1079",
+        "GG1094",
+        "GG1095"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Bound notebooks",
+      "angle": "Soft cover notebooks",
+      "campaign_code": "GG-20260707-4",
+      "campaign_name": "Bound Notebooks - 07 Jul 2026",
+      "subject": "Covers worth opening",
+      "skus": [
+        "GG1253",
+        "GG1294",
+        "GG1308",
+        "GG1309",
+        "GG1367",
+        "GG1561"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Wood and bamboo desk",
+      "angle": "Warm wood desk pieces",
+      "campaign_code": "GG-20260707-5",
+      "campaign_name": "Wood And Bamboo Desk - 07 Jul 2026",
+      "subject": "Wood on every desk",
+      "skus": [
+        "GG1434",
+        "GG1428",
+        "GG1005",
+        "GG1008",
+        "GG1013",
+        "GG1461"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Metal desk and carry",
+      "angle": "Small metal tools",
+      "campaign_code": "GG-20260707-6",
+      "campaign_name": "Metal Desk And Carry - 07 Jul 2026",
+      "subject": "Small tech, big habit",
+      "skus": [
+        "GG1205",
+        "GG1674",
+        "GG1014",
+        "GG1230",
+        "GG1631",
+        "GG1632"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Sport bottles",
+      "angle": "Clear sport bottles",
+      "campaign_code": "GG-20260707-7",
+      "campaign_name": "Sport Bottles - 07 Jul 2026",
+      "subject": "Bottles built for sport",
+      "skus": [
+        "GG1042",
+        "GG1357",
+        "GG1480",
+        "GG1540",
+        "GG1250",
+        "GG1481"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Recycled cotton bags",
+      "angle": "Recycled cotton carry",
+      "campaign_code": "GG-20260707-8",
+      "campaign_name": "Recycled Cotton Bags - 07 Jul 2026",
+      "subject": "Soft cotton, real story",
+      "skus": [
+        "GG1113",
+        "GG1115",
+        "GG1138",
+        "GG1141",
+        "GG1181",
+        "GG1182"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Aluminium bottles",
+      "angle": "Light aluminium refills",
+      "campaign_code": "GG-20260707-9",
+      "campaign_name": "Aluminium Bottles - 07 Jul 2026",
+      "subject": "Light metal, endless refills",
+      "skus": [
+        "GG1103",
+        "GG1043",
+        "GG1172",
+        "GG1375",
+        "GG1602"
+      ]
+    }
+  ]
+}
