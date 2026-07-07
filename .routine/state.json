@@ -1,0 +1,20 @@
+{
+  "last_run": "2026-07-07",
+  "runs": [
+    {
+      "date": "2026-07-07",
+      "industries": ["Retail", "Construction and Real Estate"],
+      "services": ["Social Media", "SEO / AEO / GEO / SRX", "Website Design", "ERP Building", "AI Work Studio", "SchoolOS"],
+      "items": 24,
+      "seed_status": "failed_supabase_egress_quota_402"
+    }
+  ],
+  "industries_used": ["Retail", "Construction and Real Estate"],
+  "industries_remaining": [
+    "Agribusiness", "Consumer Products", "Life Sciences and Healthcare", "Wholesale Distribution",
+    "Aerospace and Defense", "Automotive", "High Tech", "Industrial Manufacturing", "Mill Products",
+    "Chemicals", "Mining", "Oil Gas and Energy", "Utilities",
+    "Media Sports and Entertainment", "Professional Services", "Telecommunications", "Travel and Transportation",
+    "Defense and Security", "Education and Research", "Government", "Financial Services"
+  ]
+}
