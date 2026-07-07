@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "uttarakhand", "feat": "coorg",    "place": "Nainital, Uttarakhand", "region": "North India"},
+  "kashmir": {"photo": "kashmir",     "feat": "himalaya", "place": "Kashmir",               "region": "North India"},
+  "saudi":   {"photo": "zanzibar",    "feat": "georgia",  "place": "Zanzibar, Tanzania",    "region": "East Africa"},
+  "dubai":   {"photo": "seychelles",  "feat": "cappadocia","place": "Seychelles",           "region": "Indian Ocean"}
+}
