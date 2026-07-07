@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Sell your vehicle owner-direct. Zero commission, keep every rupee. qckserve.in">
+  <defs>
+    <style>
+      .cap  { font-family: 'Arial Narrow','Poppins',Arial,sans-serif; font-weight:800; letter-spacing:-1px; }
+      .serif{ font-family: Georgia,'Times New Roman',serif; font-style:italic; }
+      .body { font-family: 'Poppins',Arial,sans-serif; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left blank square reserved for logo (~140px) -->
+  <rect x="72" y="72" width="140" height="140" fill="none"/>
+
+  <!-- kicker -->
+  <text x="240" y="150" class="serif" font-size="34" fill="#FF6B00">owner to owner, no middleman</text>
+  <text x="240" y="188" class="body" font-size="22" fill="#8C8C8C" letter-spacing="3">VEHICLES · INDIA · ZERO COMMISSION</text>
+
+  <!-- SPLIT HERO: dark stat panel (left) + orange message (right) -->
+  <!-- left: the struck middleman's cut -->
+  <text x="72" y="330" class="body" font-size="24" fill="#8C8C8C" letter-spacing="3">A DEALER'S CUT</text>
+  <text x="60" y="470" class="cap" font-size="150" fill="#5A5A5A">₹18,000</text>
+  <line x1="72" y1="425" x2="640" y2="425" stroke="#FF6B00" stroke-width="10"/>
+
+  <!-- right: what you keep -->
+  <text x="72" y="600" class="body" font-size="24" fill="#8C8C8C" letter-spacing="3">YOUR COMMISSION ON QCKSERVE</text>
+  <text x="60" y="770" class="cap" font-size="300" fill="#FF6B00">₹0</text>
+
+  <!-- orange band with headline -->
+  <rect x="0" y="850" width="1080" height="300" fill="#ef6723"/>
+  <text x="72" y="965" class="cap" font-size="96" fill="#1A1A1A">SELL IT</text>
+  <text x="72" y="1060" class="cap" font-size="96" fill="#FFFFFF">YOURSELF.</text>
+  <text x="640" y="1010" class="serif" font-size="44" fill="#1A1A1A" text-anchor="end">keep every rupee.</text>
+
+  <!-- slim comparison strip -->
+  <g class="body" fill="#FCF9F8" font-size="26">
+    <circle cx="90"  cy="1215" r="9" fill="#FF6B00"/>
+    <text x="118" y="1223">Free to list</text>
+    <circle cx="430" cy="1215" r="9" fill="#FF6B00"/>
+    <text x="458" y="1223">Buyers call you direct</text>
+    <circle cx="860" cy="1215" r="9" fill="#FF6B00"/>
+    <text x="888" y="1223">No cut</text>
+  </g>
+
+  <!-- footer wordmark -->
+  <text x="72" y="1310" class="cap" font-size="40" fill="#FFFFFF">qckserve.in</text>
+  <text x="1008" y="1310" text-anchor="end" class="body" font-size="22" fill="#8C8C8C">India’s free local marketplace</text>
+</svg>

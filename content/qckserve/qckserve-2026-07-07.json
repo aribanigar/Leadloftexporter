@@ -1,0 +1,64 @@
+{
+  "date": "2026-07-07",
+  "business": "qckserve",
+  "topic": "Sell your vehicle owner-direct — keep every rupee",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Sell your bike or car free — keep every rupee",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<title>Sell your vehicle free — keep every rupee — qckserve.in</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#1A1A1A; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;\">\n<!-- preheader (hidden) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#1A1A1A; opacity:0;\">\n  Free to list. Owner-direct. Zero commission. Sell your bike or car and keep the full price.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n  <!-- 600px frame -->\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#1A1A1A; border-radius:16px; overflow:hidden;\">\n\n    <!-- logo zone -->\n    <tr><td style=\"padding:28px 40px 8px 40px; font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">\n      qckserve.in\n    </td></tr>\n    <tr><td style=\"padding:0 40px; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#FF6B00;\">\n      owner to owner, no middleman\n    </td></tr>\n\n    <!-- SPLIT HERO: dark stat panel (left) + orange message (right) -->\n    <tr><td style=\"padding:24px 40px 8px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr>\n          <!-- left: dark stat panel with the price-strike device -->\n          <td width=\"42%\" valign=\"middle\" bgcolor=\"#000000\" style=\"padding:22px 20px; border-radius:14px;\">\n            <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:2px; color:#8C8C8C;\">A DEALER'S CUT</div>\n            <div style=\"font-family:'Arial Narrow',Arial,sans-serif; font-size:40px; font-weight:800; color:#5A5A5A; text-decoration:line-through; padding:4px 0 14px 0;\">&#8377;18,000</div>\n            <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:2px; color:#8C8C8C;\">YOUR CUT HERE</div>\n            <div style=\"font-family:'Arial Narrow',Arial,sans-serif; font-size:64px; line-height:60px; font-weight:800; letter-spacing:-2px; color:#FF6B00; padding-top:2px;\">&#8377;0</div>\n          </td>\n          <!-- right: orange message -->\n          <td width=\"58%\" valign=\"middle\" style=\"padding-left:18px; font-family:'Poppins',Arial,sans-serif; font-size:30px; line-height:34px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">\n            Sell it yourself.<br />Keep every rupee.\n          </td>\n        </tr>\n      </table>\n    </td></tr>\n\n    <!-- one clear body block, under 90 words before CTA -->\n    <tr><td style=\"padding:16px 40px 4px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      Selling your bike or car this month? Every rupee counts.\n    </td></tr>\n    <tr><td style=\"padding:6px 40px 20px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      On QckServe you list for <strong style=\"color:#FFFFFF;\">free</strong> and buyers call you <strong style=\"color:#FFFFFF;\">directly</strong>. No dealer. No commission. The full sale price stays with you.\n    </td></tr>\n\n    <!-- primary CTA (bulletproof button) -->\n    <tr><td style=\"padding:0 40px 32px 40px;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr><td align=\"center\" bgcolor=\"#FF6B00\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:16px 34px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A; text-decoration:none; border-radius:12px;\">\n            List your vehicle — free &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- hero poster band -->\n    <tr><td style=\"font-size:0; line-height:0;\">\n      <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-07.svg\"\n           width=\"600\" alt=\"QckServe — Sell your vehicle owner-direct. Zero commission, keep every rupee. qckserve.in\"\n           style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\" />\n    </td></tr>\n\n    <!-- ORANGE proof band -->\n    <tr><td bgcolor=\"#ef6723\" style=\"padding:34px 40px;\">\n      <div style=\"font-family:Georgia,serif; font-style:italic; font-size:16px; color:#1A1A1A;\">what zero commission means</div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:34px; line-height:38px; font-weight:800; letter-spacing:-1px; color:#FFFFFF; padding-top:6px;\">\n        Sell for &#8377;X.<br />Keep &#8377;X.\n      </div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; line-height:24px; color:#1A1A1A; padding-top:10px;\">\n        No agent between you and the buyer. Every enquiry lands on your phone, not someone else's.\n      </div>\n    </td></tr>\n\n    <!-- DARK comparison strip -->\n    <tr><td style=\"padding:34px 40px 10px 40px; font-family:'Poppins',Arial,sans-serif; font-size:13px; font-weight:700; letter-spacing:3px; color:#8C8C8C;\">\n      WHY OWNER-DIRECT\n    </td></tr>\n    <tr><td style=\"padding:0 40px 28px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family:'Poppins',Arial,sans-serif;\">\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">&#8226;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Free to list &mdash; photos, price, location.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">&#8226;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Buyers message and call you directly.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">&#8226;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">No dealer markup. No commission cut.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:22px; font-weight:800; color:#FF6B00;\">&#8226;</td>\n          <td valign=\"top\" style=\"font-size:16px; line-height:22px; color:#FFFFFF;\">Close the deal on your terms.</td>\n        </tr>\n      </table>\n    </td></tr>\n\n    <!-- LIGHT closing CTA band -->\n    <tr><td bgcolor=\"#FCF9F8\" style=\"padding:36px 40px; text-align:center;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; line-height:30px; font-weight:800; letter-spacing:-0.5px; color:#1A1A1A;\">\n        Your vehicle. Your price. Your rules.\n      </div>\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" style=\"margin:20px auto 0 auto;\">\n        <tr><td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:15px 32px; font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">\n            Post your vehicle now &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- footer -->\n    <tr><td style=\"padding:26px 40px 34px 40px; font-family:'Poppins',Arial,sans-serif; font-size:12px; line-height:18px; color:#8C8C8C;\">\n      QckServe &middot; India&rsquo;s free local marketplace &middot; qckserve.in<br />\n      Zero commission. Free listings. Owner-direct, always.\n    </td></tr>\n\n  </table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-07.svg",
+      "tags": [
+        "vehicles",
+        "promo",
+        "email"
+      ],
+      "notes": "Tuesday Vehicles email — Split-hero archetype (dark stat panel + orange message, price-strike device: dealer cut struck vs ₹0). Anchor: monsoon is India's softest used-vehicle selling window, so keeping the full price matters more this month. National, not city-scoped."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "🛥️ Bike ya car bechni hai?\nQckServe pe listing bilkul FREE. Na dealer, na commission — buyer seedha aapko call karega.\n\nPoora sale price aapki jeb mein. ₹0 cut.\n\nAbhi list karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-07.svg",
+      "tags": [
+        "vehicles",
+        "promo",
+        "whatsapp"
+      ],
+      "notes": "Hinglish B2C, owner-direct vehicle resale angle, <=1 emoji, ends with qckserve.in."
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Purani bike ya car bechni hai? Dealer ko cut dene ki zaroorat nahi. 🛥️\n\nQckServe pe listing FREE hai. Na dealer, na commission, na beech ka aadmi. Buyer seedha aapse baat karega aur poora price aapki jeb mein.\n\n₹0 to list. ₹0 commission. Sirf aapki shart pe deal.\nList your vehicle free → qckserve.in\n\n#QckServe #SellFree #NoCommission #UsedCarIndia #BikeForSale",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-07.svg",
+      "tags": [
+        "vehicles",
+        "promo",
+        "caption",
+        "instagram"
+      ],
+      "notes": "Instagram Hinglish caption, strong hook + 5 hashtags."
+    },
+    {
+      "channel": "sms",
+      "content": "QckServe: Sell your bike or car FREE. No dealer, no commission — buyers reach you direct. Full price stays yours. qckserve.in",
+      "tags": [
+        "vehicles",
+        "promo",
+        "sms"
+      ],
+      "notes": "One-line English SMS, <160 chars."
+    },
+    {
+      "channel": "other",
+      "title": "[2026-07-07] Sell your vehicle owner-direct — keep every rupee (Image Prompt)",
+      "content": "Editorial automotive-marketplace promo poster, vertical 4:5, QckServe brand.\n\nSCENE: a clean urban Indian setting after monsoon rain — a used motorcycle and a hatchback parked side by side, warm evening light, a young owner handing keys directly to a buyer, no dealer in frame.\nSUBJECT: the owner-to-buyer handshake over the vehicle as the emotional focus; confident, friendly, real.\nPHONE-UI MOCKUP: a floating smartphone shows the QckServe app listing screen — a vehicle card with photo, price, 'Call owner directly' button, and a bold '₹0 to list' badge.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — deep charcoal #1A1A1A base, primary orange #ef6723, accent #FF6B00, off-white #FCF9F8 for cards; one accent used sparingly.\nLIGHTING: soft post-rain diffused daylight, gentle reflections on wet asphalt, clean shadows.\nTYPE HIERARCHY: one oversized condensed headline 'SELL IT YOURSELF', an italic-serif kicker 'owner to owner, no middleman', small 'qckserve.in' wordmark bottom-left.\nEYE FLOW: struck dealer's cut → giant ₹0 → handshake → phone UI → wordmark.\nCAMERA: 35mm, eye-level, shallow depth of field, editorial magazine framing.\nPERFORMANCE LAYER: high thumb-stopping contrast, mobile-first legibility, one memorable device (the price-strike: dealer's cut struck out beside a giant ₹0).\nReserve the TOP-LEFT logo zone empty (~140px square) — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "vehicles",
+        "image-prompt",
+        "other"
+      ],
+      "notes": "AI image prompt, QckServe production format, --ar 4:5."
+    }
+  ]
+}
