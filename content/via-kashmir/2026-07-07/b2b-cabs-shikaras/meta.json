@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-07",
+  "track": "b2b-cabs-shikaras",
+  "audience": "cab & shikara operators (India)",
+  "theme": "Peak-week rides booking all day at the busiest time of year - airport pickups, valley drives to Pahalgam and Sonamarg, golden-hour shikaras; idle cabs and boats do not come back",
+  "season": "Peak summer (early July 2026). The Amarnath Yatra is underway (3 Jul - 28 Aug), so the valley is busy and fully open and hotels, cabs and boats are filling fast. Flights landing in Srinagar, every pass and the Z-Morh tunnel clear, Gulmarg's meadow green with the gondola running, the high meadows at Sonamarg and Pahalgam lush and cool (5-15C), and Srinagar warm by day and cool at night (roughly 15-30C) while the plains bake. Brief afternoon showers possible.",
+  "design": "A",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260707",
+  "campaign_name": "Cabs & Shikaras Busiest-week runs going elsewhere [INR] - 07 Jul 2026",
+  "subject": "Peak-week airport runs are booking past your cab",
+  "items": [
+    "VK-CABS-LISTING",
+    "VK-CABS-DRIVE",
+    "VK-CABS-SHIKARA"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-07/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-07/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

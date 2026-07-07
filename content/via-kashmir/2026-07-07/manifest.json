@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-07",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "C/A/B",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "C",
+      "theme": "Cool green escape at the peak of summer - the high meadows at Sonamarg and Pahalgam green and cool, snow still on the peaks, the valley wide open while the plains bake",
+      "subject": "Snow on the peaks, green in the meadows",
+      "campaign_code": "VK-INR-B2C-20260707"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Peak-week rides booking all day at the busiest time of year - airport pickups, valley drives to Pahalgam and Sonamarg, golden-hour shikaras; idle cabs and boats do not come back",
+      "subject": "Peak-week airport runs are booking past your cab",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260707"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "theme": "Peak Dal Lake demand - travellers booking every houseboat they can find; an unlisted boat loses the guest to a listed one. Karew Sa Join Kashrew",
+      "subject": "The lake is full this week and your boat is unlisted",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260707"
+    }
+  ]
+}
