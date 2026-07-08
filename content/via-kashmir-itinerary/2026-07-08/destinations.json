@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "ladakh",     "feat": "kerala",   "place": "Pangong Lake, Ladakh", "region": "North India"},
+  "kashmir": {"photo": "kashmir",    "feat": "himalaya", "place": "Kashmir",              "region": "North India"},
+  "saudi":   {"photo": "baku",       "feat": "maldives", "place": "Baku, Azerbaijan",     "region": "Caucasus"},
+  "dubai":   {"photo": "samarkand",  "feat": "bali",     "place": "Samarkand, Uzbekistan","region": "Central Asia"}
+}
