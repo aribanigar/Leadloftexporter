@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-08",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Green valley at the peak of summer - meadows out, the last snow still on the high peaks, and the Dal like glass at dawn while the plains bake",
+      "subject": "The valley is green and the Dal is glass at dawn",
+      "campaign_code": "VK-INR-B2C-20260708"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "B",
+      "theme": "Peak-week demand and loss-aversion - summer plus the Yatra have Kashmir booking hard; an unlisted stay loses the guest to a listed one",
+      "subject": "This week's guest booked a room you never listed",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260708"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "theme": "Peak Dal Lake demand - travellers booking every houseboat they can find; an unlisted boat loses the guest to a listed one. Karew Sa Join Kashrew",
+      "subject": "The lake is booking tonight and your deck is unlisted",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260708"
+    }
+  ]
+}

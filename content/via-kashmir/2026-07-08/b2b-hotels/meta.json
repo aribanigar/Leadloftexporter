@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-08",
+  "track": "b2b-hotels",
+  "audience": "hotels and stays (operators, India)",
+  "theme": "Peak-week demand and loss-aversion - summer plus the Yatra have Kashmir booking hard; an unlisted stay loses the guest to a listed one",
+  "season": "Peak summer (early-mid July 2026). The Amarnath Yatra is underway (3 Jul - 28 Aug), so the valley is busy and fully open; flights landing in Srinagar, the passes and the Z-Morh tunnel clear, Gulmarg green with the gondola running, the high meadows at Sonamarg and Pahalgam lush and cool (5-15C), and Srinagar warm by day and cool at night (roughly 15-30C) while the plains bake. Brief afternoon showers possible.",
+  "design": "B",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260708",
+  "campaign_name": "Hotels Peak-week demand, list your stay [INR] - 08 Jul 2026",
+  "subject": "This week's guest booked a room you never listed",
+  "items": [
+    "VK-HOTELS-DEMAND",
+    "VK-HOTELS-SEARCH",
+    "VK-HOTELS-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-08/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-08/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
