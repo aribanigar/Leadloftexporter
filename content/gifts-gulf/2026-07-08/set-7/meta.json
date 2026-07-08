@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-08",
+  "theme": "Recycled steel tumblers",
+  "season": "Mid H2, sustainable-material everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260708-7",
+  "campaign_name": "Recycled Steel Tumblers - 08 Jul 2026",
+  "subject": "The tumbler they refill",
+  "skus": [
+    "GG1192",
+    "GG1214",
+    "GG1219",
+    "GG1220",
+    "GG1242",
+    "GG1249"
+  ],
+  "products": [
+    {
+      "name": "Mate",
+      "sku": "GG1192",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2423-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1192"
+    },
+    {
+      "name": "Tumboo",
+      "sku": "GG1214",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2499-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1214"
+    },
+    {
+      "name": "Athena Plus",
+      "sku": "GG1219",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2517-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1219"
+    },
+    {
+      "name": "Athena Mid",
+      "sku": "GG1220",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2516-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1220"
+    },
+    {
+      "name": "Suma Hand",
+      "sku": "GG1242",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2561-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1242"
+    },
+    {
+      "name": "Blerm",
+      "sku": "GG1249",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2572-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1249"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20steel%20tumblers%20options%20for%20our%20team."
+}

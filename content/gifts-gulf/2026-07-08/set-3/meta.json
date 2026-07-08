@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-08",
+  "theme": "Recycled cotton totes",
+  "season": "Mid H2, sustainable-material everyday-carry gifting",
+  "design": "C",
+  "campaign_code": "GG-20260708-3",
+  "campaign_name": "Recycled Cotton Totes - 08 Jul 2026",
+  "subject": "Cotton with a conscience",
+  "skus": [
+    "GG1127",
+    "GG1173",
+    "GG1206",
+    "GG1235",
+    "GG1238",
+    "GG1244"
+  ],
+  "products": [
+    {
+      "name": "Shoppi",
+      "sku": "GG1127",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2245-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1127"
+    },
+    {
+      "name": "Pesacara",
+      "sku": "GG1173",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2379-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1173"
+    },
+    {
+      "name": "Maldi Beach",
+      "sku": "GG1206",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2485-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1206"
+    },
+    {
+      "name": "Sinn",
+      "sku": "GG1235",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2550-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1235"
+    },
+    {
+      "name": "Laguna",
+      "sku": "GG1238",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2555-37.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1238"
+    },
+    {
+      "name": "Gave Colour",
+      "sku": "GG1244",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2565-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1244"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20cotton%20totes%20options%20for%20our%20team."
+}

@@ -2705,5 +2705,158 @@
       "GG1375",
       "GG1602"
     ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260708-1",
+    "campaign_name": "Recycled Steel Drinkware - 08 Jul 2026",
+    "subject": "Steel with a second life",
+    "theme": "Recycled steel drinkware",
+    "skus": [
+      "GG1148",
+      "GG1149",
+      "GG1151",
+      "GG1152",
+      "GG1184",
+      "GG1187"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260708-2",
+    "campaign_name": "Recycled Everyday Carry - 08 Jul 2026",
+    "subject": "Recycled, ready to carry",
+    "theme": "Recycled everyday carry",
+    "skus": [
+      "GG1011",
+      "GG1016",
+      "GG1062",
+      "GG1210",
+      "GG1217",
+      "GG1231"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260708-3",
+    "campaign_name": "Recycled Cotton Totes - 08 Jul 2026",
+    "subject": "Cotton with a conscience",
+    "theme": "Recycled cotton totes",
+    "skus": [
+      "GG1127",
+      "GG1173",
+      "GG1206",
+      "GG1235",
+      "GG1238",
+      "GG1244"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260708-4",
+    "campaign_name": "Recycled Paper Notebooks - 08 Jul 2026",
+    "subject": "Notes on recycled pages",
+    "theme": "Recycled paper notebooks",
+    "skus": [
+      "GG1386",
+      "GG1387",
+      "GG1388",
+      "GG1105",
+      "GG1018",
+      "GG1053"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260708-5",
+    "campaign_name": "Coloured Cotton Bags - 08 Jul 2026",
+    "subject": "Cotton in your colours",
+    "theme": "Coloured cotton bags",
+    "skus": [
+      "GG1257",
+      "GG1258",
+      "GG1259",
+      "GG1260",
+      "GG1336",
+      "GG1377"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260708-6",
+    "campaign_name": "Recycled Desk And Carry - 08 Jul 2026",
+    "subject": "Desks that give back",
+    "theme": "Recycled desk and carry",
+    "skus": [
+      "GG1373",
+      "GG1441",
+      "GG1446",
+      "GG1486",
+      "GG1579",
+      "GG1580"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260708-7",
+    "campaign_name": "Recycled Steel Tumblers - 08 Jul 2026",
+    "subject": "The tumbler they refill",
+    "theme": "Recycled steel tumblers",
+    "skus": [
+      "GG1192",
+      "GG1214",
+      "GG1219",
+      "GG1220",
+      "GG1242",
+      "GG1249"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260708-8",
+    "campaign_name": "Paper Notebooks And Pads - 08 Jul 2026",
+    "subject": "Where the day gets written",
+    "theme": "Paper notebooks and pads",
+    "skus": [
+      "GG1156",
+      "GG1399",
+      "GG1449",
+      "GG1484",
+      "GG1491",
+      "GG1503"
+    ]
+  },
+  {
+    "date": "2026-07-08",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260708-9",
+    "campaign_name": "Wood And Bamboo Gifts - 08 Jul 2026",
+    "subject": "Warm wood, quiet mark",
+    "theme": "Wood and bamboo gifts",
+    "skus": [
+      "GG1506",
+      "GG1571",
+      "GG1577",
+      "GG1603",
+      "GG1718",
+      "GG1380"
+    ]
   }
 ]

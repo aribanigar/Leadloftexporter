@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-08",
+  "theme": "Recycled everyday carry",
+  "season": "Mid H2, sustainable-material everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260708-2",
+  "campaign_name": "Recycled Everyday Carry - 08 Jul 2026",
+  "subject": "Recycled, ready to carry",
+  "skus": [
+    "GG1011",
+    "GG1016",
+    "GG1062",
+    "GG1210",
+    "GG1217",
+    "GG1231"
+  ],
+  "products": [
+    {
+      "name": "Expo",
+      "sku": "GG1011",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it2074-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1011"
+    },
+    {
+      "name": "Zipper",
+      "sku": "GG1016",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3101-37.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1016"
+    },
+    {
+      "name": "Bright Rollpack",
+      "sku": "GG1062",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2056-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1062"
+    },
+    {
+      "name": "Hige",
+      "sku": "GG1210",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2491-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1210"
+    },
+    {
+      "name": "Koeler",
+      "sku": "GG1217",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2504-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1217"
+    },
+    {
+      "name": "Heddow",
+      "sku": "GG1231",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2534-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1231"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20everyday%20carry%20options%20for%20our%20team."
+}

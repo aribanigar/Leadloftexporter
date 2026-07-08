@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-08",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Recycled steel that keeps drinks cold",
+      "out": "content/gifts-gulf/2026-07-08/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2322-03",
+          "sku": "GG1148",
+          "name": "Walnut",
+          "desc": "Recycled steel that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2323-03",
+          "sku": "GG1149",
+          "name": "Acerito",
+          "desc": "Slim recycled steel bottle for any bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Made from recycled plastic, clean finish",
+      "out": "content/gifts-gulf/2026-07-08/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it2074-04",
+          "sku": "GG1011",
+          "name": "Expo",
+          "desc": "Made from recycled plastic, clean finish",
+          "colours": 0
+        },
+        {
+          "code": "it3101-37",
+          "sku": "GG1016",
+          "name": "Zipper",
+          "desc": "Recycled carry that folds away small",
+          "colours": 0
+        },
+        {
+          "code": "mo2056-16",
+          "sku": "GG1062",
+          "name": "Bright Rollpack",
+          "desc": "Recycled blend that feels sturdy",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Recycled cotton tote for the daily carry",
+      "out": "content/gifts-gulf/2026-07-08/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2245-13",
+          "sku": "GG1127",
+          "name": "Shoppi",
+          "desc": "Recycled cotton tote for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2379-03",
+          "sku": "GG1173",
+          "name": "Pesacara",
+          "desc": "Organic cotton bag with a clean cut",
+          "colours": 0
+        },
+        {
+          "code": "mo2485-07",
+          "sku": "GG1206",
+          "name": "Maldi Beach",
+          "desc": "Recycled cotton shopper that folds flat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Recycled paper notebook for daily notes",
+      "out": "content/gifts-gulf/2026-07-08/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6172-03",
+          "sku": "GG1386",
+          "name": "Paper Tone S",
+          "desc": "Recycled paper notebook for daily notes",
+          "colours": 0
+        },
+        {
+          "code": "mo6173-03",
+          "sku": "GG1387",
+          "name": "Paper Tone M",
+          "desc": "Bound recycled pages that lie flat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Cotton tote in a bright, fresh tone",
+      "out": "content/gifts-gulf/2026-07-08/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2584-04",
+          "sku": "GG1257",
+          "name": "Hamma",
+          "desc": "Cotton tote in a bright, fresh tone",
+          "colours": 0
+        },
+        {
+          "code": "mo2589-03",
+          "sku": "GG1258",
+          "name": "Osole+ Colour",
+          "desc": "Coloured cotton bag for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2590-03",
+          "sku": "GG1259",
+          "name": "Osole++ Colour",
+          "desc": "Drawstring cotton bag for small trips",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Recycled desk piece for everyday work",
+      "out": "content/gifts-gulf/2026-07-08/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6131-16",
+          "sku": "GG1373",
+          "name": "Visiback",
+          "desc": "Recycled desk piece for everyday work",
+          "colours": 0
+        },
+        {
+          "code": "mo6419-07",
+          "sku": "GG1441",
+          "name": "Toplo",
+          "desc": "Recycled carry that keeps things tidy",
+          "colours": 0
+        },
+        {
+          "code": "mo6455-15",
+          "sku": "GG1446",
+          "name": "Duo Indico",
+          "desc": "Recycled blend with a clean finish",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Recycled steel tumbler that holds the cold",
+      "out": "content/gifts-gulf/2026-07-08/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2423-03",
+          "sku": "GG1192",
+          "name": "Mate",
+          "desc": "Recycled steel tumbler that holds the cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2499-03",
+          "sku": "GG1214",
+          "name": "Tumboo",
+          "desc": "Slim recycled steel tumbler for the gym",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Bound paper notebook for daily notes",
+      "out": "content/gifts-gulf/2026-07-08/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2335-03",
+          "sku": "GG1156",
+          "name": "Scribi 4",
+          "desc": "Bound paper notebook for daily notes",
+          "colours": 0
+        },
+        {
+          "code": "mo6220-01",
+          "sku": "GG1399",
+          "name": "Baobab",
+          "desc": "Paper pad for meetings and quick lists",
+          "colours": 0
+        },
+        {
+          "code": "mo6487-03",
+          "sku": "GG1449",
+          "name": "Casove",
+          "desc": "Neat notebook that lies flat to write",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Bamboo piece with a warm natural grain",
+      "out": "content/gifts-gulf/2026-07-08/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6821-40",
+          "sku": "GG1506",
+          "name": "Naira",
+          "desc": "Bamboo piece with a warm natural grain",
+          "colours": 0
+        },
+        {
+          "code": "mo8200-40",
+          "sku": "GG1571",
+          "name": "Woodave",
+          "desc": "Smooth wood finish, quietly premium",
+          "colours": 0
+        },
+        {
+          "code": "mo8249-40",
+          "sku": "GG1577",
+          "name": "Beau",
+          "desc": "Light wood accent for any desk",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-08",
+  "theme": "Recycled steel drinkware",
+  "season": "Mid H2, sustainable-material everyday-carry gifting",
+  "design": "A",
+  "campaign_code": "GG-20260708-1",
+  "campaign_name": "Recycled Steel Drinkware - 08 Jul 2026",
+  "subject": "Steel with a second life",
+  "skus": [
+    "GG1148",
+    "GG1149",
+    "GG1151",
+    "GG1152",
+    "GG1184",
+    "GG1187"
+  ],
+  "products": [
+    {
+      "name": "Walnut",
+      "sku": "GG1148",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2322-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1148"
+    },
+    {
+      "name": "Acerito",
+      "sku": "GG1149",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2323-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1149"
+    },
+    {
+      "name": "Oz",
+      "sku": "GG1151",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2326-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1151"
+    },
+    {
+      "name": "Suma",
+      "sku": "GG1152",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2327-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1152"
+    },
+    {
+      "name": "Rebig Moss",
+      "sku": "GG1184",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2404-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1184"
+    },
+    {
+      "name": "Cordle",
+      "sku": "GG1187",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2413-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1187"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20steel%20drinkware%20options%20for%20our%20team."
+}

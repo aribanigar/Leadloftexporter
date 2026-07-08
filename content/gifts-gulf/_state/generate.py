@@ -77,83 +77,85 @@ def verify_image(code):
 
 
 # ===========================================================================
-# DAILY RESEARCH BRIEF (2026-07-07)
-# Deep summer, mid H2, the steady stretch before the year-end gifting rush. The
-# live 2026 read (CorporateGift, Merchery, ASI, Swag) still points the same way:
-# buyers reward pieces a person keeps in daily rotation, and the material is the
-# story felt in the hand. Today stays material-led, but rotates to a fresh nine
-# so the catalogue reads new: insulated steel, recycled RPET carry, natural
-# cotton totes, bound notebooks, warm wood and bamboo desk pieces, small metal
-# tools, clear sport bottles, recycled cotton bags, and light aluminium refills.
-# Branding stays quiet on the piece. All SKUs and all 9 subjects are fresh
-# against the last 14 days and every image is HEAD-verified before it ships.
+# DAILY RESEARCH BRIEF (2026-07-08)
+# Deep summer, mid H2, the steady run before the year-end gifting rush. The live
+# 2026 read (Swag, CorporateGift, Award Maven, PPAI) is clear: sustainable
+# material is now the default, not the upgrade. Recipients expect reusable,
+# responsibly made pieces, and 72% feel warmer toward a brand that uses
+# sustainable materials. So today runs a fully material-forward nine, each set a
+# fresh material story: recycled stainless steel drinkware, recycled-blend
+# everyday carry, recycled and organic cotton totes, recycled paper notebooks,
+# coloured cotton bags, recycled desk and carry, recycled steel tumblers, paper
+# notebooks and pads, and warm wood and bamboo. Branding stays quiet on the
+# piece. All SKUs and all 9 subjects are fresh against the last 14 days and every
+# image is HEAD-verified before it ships.
 # ===========================================================================
-SEASON = "Mid H2, material-led everyday-carry gifting"
+SEASON = "Mid H2, sustainable-material everyday-carry gifting"
 
 SETS = [
-    dict(design='A', theme='Insulated steel bottles',
-         name='Insulated Steel Bottles', angle='Insulated steel',
-         subject='Steel they carry daily',
-         headline='Steel that holds all day.',
-         subline='Insulated steel bottles for the desk and the commute, branded with your logo.',
-         items=['GG1427', 'GG1088', 'GG1089', 'GG1090', 'GG1112', 'GG1126'],
-         descs=['Double wall steel that keeps drinks cold', 'Slim steel bottle that fits any bag', 'Insulated steel for warm or cold', 'Sturdy steel built for daily use', 'Compact steel flask for the commute', 'Wide mouth steel, easy to fill']),
-    dict(design='B', theme='Recycled RPET carry',
-         name='Recycled RPET Carry', angle='Made from recycled plastic',
-         subject='Recycled, and still sharp',
-         headline='Recycled plastic, made useful.',
+    dict(design='A', theme='Recycled steel drinkware',
+         name='Recycled Steel Drinkware', angle='Recycled stainless steel',
+         subject='Steel with a second life',
+         headline='Steel with a second life.',
+         subline='Recycled stainless steel drinkware for the desk and the commute, branded with your logo.',
+         items=['GG1148', 'GG1149', 'GG1151', 'GG1152', 'GG1184', 'GG1187'],
+         descs=['Recycled steel that keeps drinks cold', 'Slim recycled steel bottle for any bag', 'Recycled steel built for daily use', 'Insulated recycled steel, warm or cold', 'Sturdy recycled steel for the commute', 'Recycled steel ready for your logo']),
+    dict(design='B', theme='Recycled everyday carry',
+         name='Recycled Everyday Carry', angle='Made from recycled plastic',
+         subject='Recycled, ready to carry',
+         headline='Recycled plastic, ready to carry.',
          subline='Everyday carry made from recycled plastic, branded with your logo.',
-         items=['GG1106', 'GG1107', 'GG1132', 'GG1133', 'GG1139', 'GG1189'],
-         descs=['Made from recycled plastic bottles', 'Recycled fabric with a clean finish', 'Recycled blend that feels sturdy', 'Light recycled piece for daily use', 'Recycled material, quietly premium', 'Recycled carry that folds away small']),
-    dict(design='C', theme='Cotton totes',
-         name='Cotton Totes', angle='Natural cotton shoppers',
-         subject='Totes for every hand',
-         headline='Cotton totes for every hand.',
-         subline='Natural cotton totes and shoppers for the daily carry, branded with your logo.',
-         items=['GG1007', 'GG1075', 'GG1076', 'GG1079', 'GG1094', 'GG1095'],
-         descs=['Natural cotton tote for the daily carry', 'Roomy cotton shopper that folds flat', 'Cotton bag with a clean, simple cut', 'Drawstring cotton bag for small trips', 'Striped cotton tote with a fresh look', 'Soft cotton carry ready for your logo']),
-    dict(design='A', theme='Bound notebooks',
-         name='Bound Notebooks', angle='Soft cover notebooks',
-         subject='Covers worth opening',
-         headline='Covers worth opening.',
-         subline='Bound notebooks with a soft cover for daily notes, branded with your logo.',
-         items=['GG1253', 'GG1294', 'GG1308', 'GG1309', 'GG1367', 'GG1561'],
-         descs=['Soft cover notebook for daily notes', 'Bound journal that lies flat to write', 'Neat notebook for meetings and lists', 'Compact journal that fits the bag', 'Classic cover with a clean finish', 'Everyday notebook ready for your logo']),
-    dict(design='B', theme='Wood and bamboo desk',
-         name='Wood And Bamboo Desk', angle='Warm wood desk pieces',
-         subject='Wood on every desk',
-         headline='Wood on every desk.',
-         subline='Wood and bamboo desk pieces with a warm finish, branded with your logo.',
-         items=['GG1434', 'GG1428', 'GG1005', 'GG1008', 'GG1013', 'GG1461'],
-         descs=['Wood piece with a warm natural grain', 'Smooth wood finish, quietly premium', 'Light wood accent for any desk', 'Natural wood that calms the workspace', 'Clean wood lines ready for your logo', 'Bamboo detail with a soft touch']),
-    dict(design='C', theme='Metal desk and carry',
-         name='Metal Desk And Carry', angle='Small metal tools',
-         subject='Small tech, big habit',
-         headline='Small tools, big habit.',
-         subline='Small metal tools and carry pieces for every day, branded with your logo.',
-         items=['GG1205', 'GG1674', 'GG1014', 'GG1230', 'GG1631', 'GG1632'],
-         descs=['Handy metal piece for the keys', 'Polished metal with a clean weight', 'Compact metal tool for daily carry', 'Neat metal accent that lasts', 'Simple metal opener for the ring', 'Slim metal detail ready for your logo']),
-    dict(design='A', theme='Sport bottles',
-         name='Sport Bottles', angle='Clear sport bottles',
-         subject='Bottles built for sport',
-         headline='Bottles built for sport.',
-         subline='Clear sport bottles for the gym and the desk, branded with your logo.',
-         items=['GG1042', 'GG1357', 'GG1480', 'GG1540', 'GG1250', 'GG1481'],
-         descs=['Clear bottle that is light to carry', 'Tough bottle for the gym bag', 'Slim sport bottle for easy sips', 'Everyday bottle built to reuse', 'Sturdy bottle for water on the move', 'Simple sport bottle ready for your logo']),
-    dict(design='B', theme='Recycled cotton bags',
-         name='Recycled Cotton Bags', angle='Recycled cotton carry',
-         subject='Soft cotton, real story',
-         headline='Soft cotton, real story.',
-         subline='Recycled cotton bags for everyday carry, branded with your logo.',
-         items=['GG1113', 'GG1115', 'GG1138', 'GG1141', 'GG1181', 'GG1182'],
-         descs=['Recycled cotton tote, soft and strong', 'Recycled cotton bag for the daily carry', 'Coloured recycled cotton shopper', 'Recycled cotton carry for light loads', 'Recycled cotton bag in calm tones', 'Recycled cotton bag ready for your logo']),
-    dict(design='C', theme='Aluminium bottles',
-         name='Aluminium Bottles', angle='Light aluminium refills',
-         subject='Light metal, endless refills',
-         headline='Light metal, endless refills.',
-         subline='Aluminium bottles for easy refills, branded with your logo.',
-         items=['GG1103', 'GG1043', 'GG1172', 'GG1375', 'GG1602'],
-         descs=['Recycled aluminium bottle, light to carry', 'Aluminium bottle built for daily refills', 'Slim aluminium bottle for the bag', 'Clean aluminium finish, easy to reuse', 'Sturdy aluminium bottle for movement', 'Aluminium bottle ready for your logo']),
+         items=['GG1011', 'GG1016', 'GG1062', 'GG1210', 'GG1217', 'GG1231'],
+         descs=['Made from recycled plastic, clean finish', 'Recycled carry that folds away small', 'Recycled blend that feels sturdy', 'Light recycled piece for daily use', 'Recycled material, quietly premium', 'Recycled carry ready for your logo']),
+    dict(design='C', theme='Recycled cotton totes',
+         name='Recycled Cotton Totes', angle='Organic and recycled cotton',
+         subject='Cotton with a conscience',
+         headline='Cotton with a conscience.',
+         subline='Organic and recycled cotton totes for the daily carry, branded with your logo.',
+         items=['GG1127', 'GG1173', 'GG1206', 'GG1235', 'GG1238', 'GG1244'],
+         descs=['Recycled cotton tote for the daily carry', 'Organic cotton bag with a clean cut', 'Recycled cotton shopper that folds flat', 'Soft recycled cotton for small trips', 'Recycled cotton tote in calm tones', 'Recycled cotton carry ready for your logo']),
+    dict(design='A', theme='Recycled paper notebooks',
+         name='Recycled Paper Notebooks', angle='Recycled paper pages',
+         subject='Notes on recycled pages',
+         headline='Notes on recycled pages.',
+         subline='Recycled paper notebooks for daily notes, branded with your logo.',
+         items=['GG1386', 'GG1387', 'GG1388', 'GG1105', 'GG1018', 'GG1053'],
+         descs=['Recycled paper notebook for daily notes', 'Bound recycled pages that lie flat', 'Neat paper notebook for meetings and lists', 'Compact recycled journal for the bag', 'Clean recycled cover, quietly premium', 'Recycled paper notebook ready for your logo']),
+    dict(design='B', theme='Coloured cotton bags',
+         name='Coloured Cotton Bags', angle='Cotton in bright tones',
+         subject='Cotton in your colours',
+         headline='Cotton in your colours.',
+         subline='Cotton totes and drawstring bags in bright tones, branded with your logo.',
+         items=['GG1257', 'GG1258', 'GG1259', 'GG1260', 'GG1336', 'GG1377'],
+         descs=['Cotton tote in a bright, fresh tone', 'Coloured cotton bag for the daily carry', 'Drawstring cotton bag for small trips', 'Roomy cotton shopper that folds flat', 'Cotton bag with a clean, simple cut', 'Coloured cotton carry ready for your logo']),
+    dict(design='C', theme='Recycled desk and carry',
+         name='Recycled Desk And Carry', angle='Recycled desk pieces',
+         subject='Desks that give back',
+         headline='Desks that give back.',
+         subline='Recycled desk and carry pieces for every day, branded with your logo.',
+         items=['GG1373', 'GG1441', 'GG1446', 'GG1486', 'GG1579', 'GG1580'],
+         descs=['Recycled desk piece for everyday work', 'Recycled carry that keeps things tidy', 'Recycled blend with a clean finish', 'Light recycled piece for the desk', 'Recycled material, quietly premium', 'Recycled desk piece ready for your logo']),
+    dict(design='A', theme='Recycled steel tumblers',
+         name='Recycled Steel Tumblers', angle='Recycled steel, daily',
+         subject='The tumbler they refill',
+         headline='The tumbler they refill.',
+         subline='Recycled stainless steel tumblers for the gym and the desk, branded with your logo.',
+         items=['GG1192', 'GG1214', 'GG1219', 'GG1220', 'GG1242', 'GG1249'],
+         descs=['Recycled steel tumbler that holds the cold', 'Slim recycled steel tumbler for the gym', 'Recycled steel built to reuse daily', 'Sturdy recycled steel for water on the move', 'Compact recycled steel for the desk', 'Recycled steel tumbler ready for your logo']),
+    dict(design='B', theme='Paper notebooks and pads',
+         name='Paper Notebooks And Pads', angle='Bound paper for notes',
+         subject='Where the day gets written',
+         headline='Where the day gets written.',
+         subline='Bound paper notebooks and pads for meetings and lists, branded with your logo.',
+         items=['GG1156', 'GG1399', 'GG1449', 'GG1484', 'GG1491', 'GG1503'],
+         descs=['Bound paper notebook for daily notes', 'Paper pad for meetings and quick lists', 'Neat notebook that lies flat to write', 'Compact paper journal for the bag', 'Clean paper cover, quietly premium', 'Paper notebook ready for your logo']),
+    dict(design='C', theme='Wood and bamboo gifts',
+         name='Wood And Bamboo Gifts', angle='Warm wood and bamboo',
+         subject='Warm wood, quiet mark',
+         headline='Warm wood, quiet mark.',
+         subline='Wood and bamboo gifts with a warm finish, branded with your logo.',
+         items=['GG1506', 'GG1571', 'GG1577', 'GG1603', 'GG1718', 'GG1380'],
+         descs=['Bamboo piece with a warm natural grain', 'Smooth wood finish, quietly premium', 'Light wood accent for any desk', 'Natural wood that calms the workspace', 'Bamboo detail with a soft touch', 'Cotton piece with a clean, simple cut']),
 ]
 
 

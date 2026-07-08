@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-08",
+  "theme": "Coloured cotton bags",
+  "season": "Mid H2, sustainable-material everyday-carry gifting",
+  "design": "B",
+  "campaign_code": "GG-20260708-5",
+  "campaign_name": "Coloured Cotton Bags - 08 Jul 2026",
+  "subject": "Cotton in your colours",
+  "skus": [
+    "GG1257",
+    "GG1258",
+    "GG1259",
+    "GG1260",
+    "GG1336",
+    "GG1377"
+  ],
+  "products": [
+    {
+      "name": "Hamma",
+      "sku": "GG1257",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2584-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1257"
+    },
+    {
+      "name": "Osole+ Colour",
+      "sku": "GG1258",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2589-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1258"
+    },
+    {
+      "name": "Osole++ Colour",
+      "sku": "GG1259",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2590-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1259"
+    },
+    {
+      "name": "Osole Draw Colour",
+      "sku": "GG1260",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2591-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1260"
+    },
+    {
+      "name": "Zevra Colour",
+      "sku": "GG1336",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2868-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1336"
+    },
+    {
+      "name": "Jump",
+      "sku": "GG1377",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6140-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1377"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-08/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20coloured%20cotton%20bags%20options%20for%20our%20team."
+}
