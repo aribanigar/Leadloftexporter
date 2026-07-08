@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe — Post a job free. Candidates reach you direct. Zero commission, no placement fee. qckserve.in">
+  <defs>
+    <style>
+      .cap  { font-family: 'Arial Narrow','Poppins',Arial,sans-serif; font-weight:800; letter-spacing:-1px; }
+      .serif{ font-family: Georgia,'Times New Roman',serif; font-style:italic; }
+      .body { font-family: 'Poppins',Arial,sans-serif; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- top-left blank square reserved for logo (~140px) -->
+  <rect x="72" y="72" width="140" height="140" fill="none"/>
+
+  <!-- kicker -->
+  <text x="240" y="150" class="serif" font-size="34" fill="#FF6B00">hire local, no middleman</text>
+  <text x="240" y="188" class="body" font-size="22" fill="#8C8C8C" letter-spacing="3">JOBS · INDIA · ZERO COMMISSION</text>
+
+  <!-- STATEMENT HERO: one bold sentence -->
+  <text x="72" y="360" class="cap" font-size="118" fill="#FFFFFF">POST A JOB.</text>
+  <text x="72" y="480" class="cap" font-size="118" fill="#FFFFFF">HIRE DIRECT.</text>
+  <text x="72" y="600" class="cap" font-size="118" fill="#FF6B00">PAY NOTHING.</text>
+
+  <!-- the giant device: what it costs -->
+  <text x="72" y="720" class="body" font-size="24" fill="#8C8C8C" letter-spacing="3">WHAT IT COSTS YOU</text>
+  <text x="60" y="880" class="cap" font-size="300" fill="#FF6B00">₹0</text>
+
+  <!-- orange band: what free means -->
+  <rect x="0" y="930" width="1080" height="270" fill="#ef6723"/>
+  <text x="72" y="1015" class="serif" font-size="34" fill="#1A1A1A">what free means</text>
+  <g class="body" fill="#FFFFFF" font-size="30">
+    <text x="72"  y="1085">✓ List the role — free</text>
+    <text x="72"  y="1140">✓ Candidates apply direct to you</text>
+    <text x="600" y="1085">✓ No consultancy cut</text>
+    <text x="600" y="1140">✓ No placement fee, ever</text>
+  </g>
+
+  <!-- footer wordmark -->
+  <text x="72" y="1290" class="cap" font-size="40" fill="#FFFFFF">qckserve.in</text>
+  <text x="1008" y="1290" text-anchor="end" class="body" font-size="22" fill="#8C8C8C">India’s free local marketplace</text>
+</svg>

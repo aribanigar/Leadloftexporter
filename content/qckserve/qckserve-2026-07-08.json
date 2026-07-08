@@ -1,0 +1,64 @@
+{
+  "date": "2026-07-08",
+  "business": "qckserve",
+  "topic": "Hire local, free — post a job, candidates reach you direct",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Post a job free — candidates reach you direct",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<title>Post a job free — candidates reach you direct — qckserve.in</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#1A1A1A; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;\">\n<!-- preheader (hidden) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#1A1A1A; opacity:0;\">\n  Free to post. Candidates apply direct. No consultancy, no placement fee. Hire local for &#8377;0.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n  <!-- 600px frame -->\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#1A1A1A; border-radius:16px; overflow:hidden;\">\n\n    <!-- logo zone -->\n    <tr><td style=\"padding:28px 40px 8px 40px; font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">\n      qckserve.in\n    </td></tr>\n    <tr><td style=\"padding:0 40px; font-family:Georgia,serif; font-style:italic; font-size:17px; color:#FF6B00;\">\n      hire local, no middleman\n    </td></tr>\n\n    <!-- STATEMENT HERO: one bold sentence -->\n    <tr><td style=\"padding:26px 40px 6px 40px; font-family:'Arial Narrow','Poppins',Arial,sans-serif; font-weight:800; font-size:52px; line-height:52px; letter-spacing:-1.5px; color:#FFFFFF;\">\n      Post a job.<br />Hire direct.<br /><span style=\"color:#FF6B00;\">Pay nothing.</span>\n    </td></tr>\n\n    <!-- one clear body block, under 90 words before CTA -->\n    <tr><td style=\"padding:18px 40px 4px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      Hiring for your shop, office or site? You should not lose a month&rsquo;s salary to a consultant just to find someone.\n    </td></tr>\n    <tr><td style=\"padding:6px 40px 20px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; line-height:26px; color:#D8D8D8;\">\n      On QckServe you post the role for <strong style=\"color:#FFFFFF;\">free</strong>. Candidates apply <strong style=\"color:#FFFFFF;\">straight to you</strong>. No consultancy. No commission. No placement fee.\n    </td></tr>\n\n    <!-- primary CTA (bulletproof button) -->\n    <tr><td style=\"padding:0 40px 32px 40px;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr><td align=\"center\" bgcolor=\"#FF6B00\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:16px 34px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#1A1A1A; text-decoration:none; border-radius:12px;\">\n            Post a job &mdash; free &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- hero poster band -->\n    <tr><td style=\"font-size:0; line-height:0;\">\n      <img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-08.svg\"\n           width=\"600\" alt=\"QckServe — Post a job free. Candidates reach you direct. Zero commission, no placement fee. qckserve.in\"\n           style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\" />\n    </td></tr>\n\n    <!-- ORANGE band: the memorable device (giant zero) + what free means -->\n    <tr><td bgcolor=\"#ef6723\" style=\"padding:34px 40px;\">\n      <div style=\"font-family:Georgia,serif; font-style:italic; font-size:16px; color:#1A1A1A;\">what a job post costs here</div>\n      <div style=\"font-family:'Arial Narrow','Poppins',Arial,sans-serif; font-weight:800; font-size:88px; line-height:84px; letter-spacing:-2px; color:#FFFFFF; padding:4px 0 6px 0;\">\n        &#8377;0\n      </div>\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:15px; line-height:24px; color:#1A1A1A;\">\n        No agency fee. No cut of the salary. What you save stays in the business.\n      </div>\n    </td></tr>\n\n    <!-- DARK: what free means checklist -->\n    <tr><td style=\"padding:34px 40px 10px 40px; font-family:'Poppins',Arial,sans-serif; font-size:13px; font-weight:700; letter-spacing:3px; color:#8C8C8C;\">\n      WHAT FREE MEANS\n    </td></tr>\n    <tr><td style=\"padding:0 40px 28px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-family:'Poppins',Arial,sans-serif;\">\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:20px; font-weight:800; color:#FF6B00;\">&#10003;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">List the role &mdash; title, pay, location. Free.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:20px; font-weight:800; color:#FF6B00;\">&#10003;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">Candidates call and message you directly.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:20px; font-weight:800; color:#FF6B00;\">&#10003;</td>\n          <td valign=\"top\" style=\"padding-bottom:18px; font-size:16px; line-height:22px; color:#FFFFFF;\">No consultancy in the middle taking a cut.</td>\n        </tr>\n        <tr>\n          <td width=\"34\" valign=\"top\" style=\"font-size:20px; font-weight:800; color:#FF6B00;\">&#10003;</td>\n          <td valign=\"top\" style=\"font-size:16px; line-height:22px; color:#FFFFFF;\">No placement fee &mdash; from you or the candidate.</td>\n        </tr>\n      </table>\n    </td></tr>\n\n    <!-- LIGHT closing CTA band -->\n    <tr><td bgcolor=\"#FCF9F8\" style=\"padding:36px 40px; text-align:center;\">\n      <div style=\"font-family:'Poppins',Arial,sans-serif; font-size:24px; line-height:30px; font-weight:800; letter-spacing:-0.5px; color:#1A1A1A;\">\n        Your team. Hired direct. For free.\n      </div>\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\" style=\"margin:20px auto 0 auto;\">\n        <tr><td align=\"center\" bgcolor=\"#1A1A1A\" style=\"border-radius:12px;\">\n          <a href=\"https://qckserve.in\" target=\"_blank\"\n             style=\"display:inline-block; padding:15px 32px; font-family:'Poppins',Arial,sans-serif; font-size:15px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">\n            Post your first role now &#8594;\n          </a>\n        </td></tr>\n      </table>\n    </td></tr>\n\n    <!-- footer -->\n    <tr><td style=\"padding:26px 40px 34px 40px; font-family:'Poppins',Arial,sans-serif; font-size:12px; line-height:18px; color:#8C8C8C;\">\n      QckServe &middot; India&rsquo;s free local marketplace &middot; qckserve.in<br />\n      Zero commission. Free listings. Owner-direct, always.\n    </td></tr>\n\n  </table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-08.svg",
+      "tags": [
+        "jobs",
+        "promo",
+        "email"
+      ],
+      "notes": "Wednesday Jobs email — Statement-hero archetype (one bold sentence 'Post a job. Hire direct. Pay nothing.' + a clean 'what free means' checklist; giant ₹0 device). Anchor: local hiring is surging (fresher postings up ~16% YoY, ~32% of hiring now in Tier-2 cities) and the fair-hiring standard is 'employer pays, never the candidate' — QckServe makes it free on both sides. National, not city-scoped; no competitor named."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "📢 Staff hire karna hai?\nQckServe pe job post karo bilkul FREE. Na consultancy, na commission — candidate seedha aapko call karega.\n\nSalary ka ek rupya bhi kisi beech waale ko nahi. ₹0 fee.\n\nAbhi post karo → qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-08.svg",
+      "tags": [
+        "jobs",
+        "promo",
+        "whatsapp"
+      ],
+      "notes": "Hinglish B2C, local hiring / owner-direct angle, <=1 emoji, ends with qckserve.in."
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Dukaan, office ya site ke liye banda chahiye? Consultancy ko mahine ki salary dene ki zaroorat nahi. 📢\n\nQckServe pe job post karo FREE. Na consultancy, na commission, na beech ka aadmi. Candidate seedha aapse baat karega.\n\n₹0 to post. ₹0 placement fee. Hire on your terms.\nPost a job free → qckserve.in\n\n#QckServe #HireLocal #FreeJobPosting #NoCommission #JobsIndia",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-08.svg",
+      "tags": [
+        "jobs",
+        "promo",
+        "caption",
+        "instagram"
+      ],
+      "notes": "Instagram Hinglish caption, strong hook + 5 hashtags."
+    },
+    {
+      "channel": "sms",
+      "content": "QckServe: Post a job FREE. No consultancy, no commission - candidates reach you direct. No placement fee, ever. qckserve.in",
+      "tags": [
+        "jobs",
+        "promo",
+        "sms"
+      ],
+      "notes": "One-line English SMS, <160 chars."
+    },
+    {
+      "channel": "other",
+      "title": "[2026-07-08] Hire local, free — post a job, candidates reach you direct (Image Prompt)",
+      "content": "Editorial local-hiring marketplace promo poster, vertical 4:5, QckServe brand.\n\nSCENE: a bright small Indian business in the morning — a shop or small office where a friendly owner greets a new hire directly, no consultant or agent in frame; warm, everyday, real.\nSUBJECT: the owner-to-candidate handshake as the emotional focus — confident, welcoming, human; the moment a local job is filled directly.\nPHONE-UI MOCKUP: a floating smartphone shows the QckServe app job-post screen — a role card with title, pay, location, an 'Apply / Call owner' button, and a bold '₹0 to post' badge.\nCOLOUR SYSTEM: flat colour blocking, NO gradients — deep charcoal #1A1A1A base, primary orange #ef6723, accent #FF6B00, off-white #FCF9F8 for cards; one accent used sparingly.\nLIGHTING: soft clean morning daylight, gentle shadows, crisp and optimistic.\nTYPE HIERARCHY: one oversized condensed headline 'POST A JOB. HIRE DIRECT.', an italic-serif kicker 'hire local, no middleman', small 'qckserve.in' wordmark bottom-left.\nEYE FLOW: bold statement headline → giant ₹0 → handshake → phone UI → wordmark.\nCAMERA: 35mm, eye-level, shallow depth of field, editorial magazine framing.\nPERFORMANCE LAYER: high thumb-stopping contrast, mobile-first legibility, one memorable device (the giant ₹0 posting fee).\nReserve the TOP-LEFT logo zone empty (~140px square) — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "jobs",
+        "image-prompt",
+        "other"
+      ],
+      "notes": "AI image prompt in QckServe production format; Jobs vertical."
+    }
+  ]
+}
