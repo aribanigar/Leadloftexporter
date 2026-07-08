@@ -1,3 +1,5 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+
+scratchpad/

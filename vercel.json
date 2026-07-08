@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/email/:path*", "destination": "/public/email/:path*" }
+  ]
+}

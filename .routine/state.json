@@ -1,0 +1,14 @@
+{
+  "runs": [
+    {
+      "date": "2026-07-08",
+      "industries": ["Construction and Real Estate", "Education and Research"],
+      "services": ["Social Media", "SEO / AEO / GEO / SRX", "Website Design", "ERP Building", "AI Work Studio", "SchoolOS (School ERP)"],
+      "items": 24,
+      "images": ["photo-*.jpg (6)", "card-*.jpg (6)", "logo-white.png", "mark.png", "icon-*.png (3 linked + facebook)"],
+      "seed_status": "FAILED - Supabase project restricted, HTTP 402 exceed_egress_quota. Owner must upgrade plan or remove spend caps. Re-run once restored: python3 publish_rest.py --folder hudace .routine/batches/2026-07-08/batch.json (idempotent)."
+    }
+  ],
+  "used_industries": ["Construction and Real Estate", "Education and Research"],
+  "next_note": "Rotate to 2 new industries next run (e.g. Agribusiness, Financial Services, Retail, Manufacturing, Oil Gas and Energy, Professional Services, Government)."
+}
