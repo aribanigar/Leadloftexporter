@@ -121,6 +121,20 @@
     // Called after each successful queue step so Pipeline/Prospecting stay in sync.
     connectResult: (linkedin_url, action) =>
       call("connectResult", { linkedin_url, action }),
+    // Case #2 bulk-message 24h sent-history — backend-synced layer so the
+    // local dedupe survives extension reinstall / browser change / new
+    // device. Backend is at api/app/api/v1/extension.py (POST + GET
+    // /case2-message-sent). Both calls are best-effort: the local
+    // chrome.storage + linkedin.com localStorage mirror remain the
+    // fast-path. If the network call fails we just fall back to local.
+    case2MessageSent: (linkedin_url) =>
+      call("case2MessageSent", { linkedin_url }),
+    case2MessageSentList: (since_ms) =>
+      call("case2MessageSentList", { since_ms }),
+    // List of LinkedIn URLs the workspace ALREADY has as leads. Used by
+    // bulk Save All Leads to skip already-saved profiles upfront — no tab
+    // opened, no scrape wasted. Backend: GET /extension/known-urls.
+    knownUrls: () => call("knownUrls"),
     geminiAnswer: ({ question, kind, options }) =>
       new Promise((resolve) => {
         try {

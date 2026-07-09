@@ -41,8 +41,8 @@ TOOLS
 Power BI, Tableau, Google Analytics, SQL, Excel/VBA, Meta Ads Manager, Google Ads, LinkedIn Ads`;
 
 const DEFAULTS = {
-  apiUrl: "https://leadloftexporter-1.onrender.com",
-  apiKey: "lcx_M0enR28l06REA6X7iWCmMSpQ5jb3M06sJ7FvEJ5NLTI",
+  apiUrl: "https://leadloftexporter.onrender.com",
+  apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
   enabled: true,
   autopilot: false,
   showOverlay: true,

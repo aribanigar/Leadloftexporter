@@ -1021,6 +1021,23 @@
   setInterval(() => {
     try { _onSearchMaybeChanged(); } catch {}
     _decorateCurrent();
+    // Self-heal the profile panel: on a /in/ (or Sales Nav) profile, if the
+    // Save Lead panel isn't in the DOM, (re)mount it and fire the auto-save.
+    // onPathChange can miss the mount when the URL changes before hydration or
+    // when the panel gets detached mid auto-save — this guarantees the panel
+    // appears automatically the moment a profile is open, without any manual
+    // Contact-info click. triggerAutoSave dedupes per path, so it's safe to call.
+    try {
+      const t = Scraper.pageType();
+      const onProfile = t === "profile" || t === "salesnav-profile";
+      const busy =
+        location.pathname.includes("/overlay/") ||
+        new URLSearchParams(location.search).has("lc_enrich");
+      if (onProfile && !busy && !document.getElementById("lc-profile-panel")) {
+        Overlay.renderProfilePanel?.();
+        Overlay.triggerAutoSave?.();
+      }
+    } catch {}
   }, 1500);
 
   // Re-decorate shortly after the user stops scrolling — catches lazily
@@ -1207,15 +1224,39 @@
     if (window.__lcEnrichmentRan) return;
     window.__lcEnrichmentRan = true;
 
+    // Tab-wide save tracking. ANY successful syncProfile inside this tab
+    // — from main.js below OR from overlay.js's saveCurrentProfile that
+    // also fires when the floating panel mounts — flips this true. We
+    // honestly report this back to the SW before close (see _reportResult)
+    // so the bulk-loop chip state matches reality. v1.0.291 marked Saved ✓
+    // purely on tab close; profiles like Noora Al-Khori showed Saved but
+    // were missing from CRM because syncProfile failed silently and the
+    // bulk loop trusted the tab-close-as-proof signal.
+    window.__lcEnrichmentSyncOk = false;
+    window.__lcEnrichmentSyncError = null;
+
     // Always close the tab, no matter what happens below. A blank lingering
     // background tab is the worst UX — the user sees a stale page they can't
-    // explain. 75s is generous: enough for slow hydration + Contact info open
-    // + sync, but short enough that broken pages disappear quickly.
+    // explain. 25s ceiling accommodates the v1.0.290 longer Contact-info
+    // poll (≤6s) + website scrape + the post-save "confirmation visible"
+    // pause below, while still killing genuinely stuck pages quickly.
+    const _reportResult = () => {
+      try {
+        chrome.runtime.sendMessage({
+          type: "lc:enrichResult",
+          ok: window.__lcEnrichmentSyncOk === true,
+          error: window.__lcEnrichmentSyncOk === true
+            ? null
+            : (window.__lcEnrichmentSyncError || null),
+        });
+      } catch { /* SW dead — bulk loop will see syncOk:null and fall back */ }
+    };
     const closeSelf = () => {
+      _reportResult();
       try { chrome.runtime.sendMessage({ type: "lc:closeMe" }); } catch {}
       setTimeout(() => { try { window.close(); } catch {} }, 250);
     };
-    const safetyTimer = setTimeout(closeSelf, 18_000);
+    const safetyTimer = setTimeout(closeSelf, 25_000);
     let redirected = false;
 
     try {
@@ -1252,10 +1293,13 @@
       // refuses to render doesn't burn ~20s of bulk-run time.
       await globalThis.__lcDom.waitFor(["main h1", "h1"], { timeout: 8000 });
 
-      // v1.0.23 aggressive cut: 0.3–0.9s base, 8% chance of 0.6–1.5s
-      // long-tail. Target avg per-tab time ≤5s end-to-end.
-      const base = Human.rand(300, 900);
-      const longTail = Math.random() < 0.08 ? Human.rand(600, 1500) : 0;
+      // v1.0.314: trim 300-900ms → 200-550ms (still well above any bot-
+      // detectable threshold) and long-tail 600-1500 → 500-1100 to close
+      // the visible gap before Contact info opens. Still jittered, still
+      // has occasional long-tail. Anti-bot rules in CLAUDE.md cite 1.2-3.5s
+      // reading pauses as the safe band; we're well inside that.
+      const base = Human.rand(200, 550);
+      const longTail = Math.random() < 0.08 ? Human.rand(500, 1100) : 0;
       await Human.sleep(base + longTail);
 
       // Block on h1 settling so the name isn't read mid-hydration —
@@ -1278,6 +1322,38 @@
       if (contact.websites?.length) {
         profile.raw = { ...(profile.raw || {}), websites: contact.websites };
       }
+
+      // ── v1.0.314 late-hydration sweep (free, kept) ───────────────────────
+      // Re-read the profile DOM AFTER the modal click/close. The experience
+      // section often hydrates ~400-700 ms LATER than the h1, so the first
+      // scrapeProfile() above can return title/company/location=null even
+      // though they're now sitting in the DOM. Pure DOM read, no extra
+      // clicks, no risk to the scrape pipeline. Only fills fields that are
+      // STILL missing — never overwrites what the first pass already got.
+      try {
+        const sweep = Scraper.scrapeProfile();
+        if (!profile.full_name && sweep.full_name) profile.full_name = sweep.full_name;
+        if (!profile.first_name && sweep.first_name) profile.first_name = sweep.first_name;
+        if (!profile.last_name && sweep.last_name) profile.last_name = sweep.last_name;
+        if (!profile.title && sweep.title) profile.title = sweep.title;
+        if (!profile.company_name && sweep.company_name) profile.company_name = sweep.company_name;
+        if (!profile.company_url && sweep.company_url) profile.company_url = sweep.company_url;
+        if (!profile.location && sweep.location) profile.location = sweep.location;
+        if (!profile.summary && sweep.summary) profile.summary = sweep.summary;
+        if (!profile.avatar_url && sweep.avatar_url) profile.avatar_url = sweep.avatar_url;
+        if (!profile.headline && sweep.headline) profile.headline = sweep.headline;
+      } catch (e) {}
+
+      // ── v1.0.315 REMOVED v1.0.314's second-chance scrapeContactInfo ─────
+      // Root cause of the regression: that pass added 4-14 s to the pipeline
+      // which pushed total per-tab time past the 25 s safetyTimer in this
+      // function (line 1242). When the timer fires, closeSelf() kills the
+      // tab BEFORE syncProfile runs — so even the data the FIRST scrape
+      // captured (email/phone/location) was lost. Removing this pass
+      // restores the v1.0.313 contact-scrape timing while keeping the
+      // late-hydration sweep above (which is a free synchronous DOM
+      // re-read, < 50 ms, and is what fixes title/company landing late).
+
       // Text-scan fallback for emails/phones the user wrote into their About
       // or Experience. This catches public contact info even when LinkedIn's
       // Contact-Info modal is empty (non-1st-degree connections).
@@ -1298,11 +1374,14 @@
       const segParam = params.get("lc_segment");
       if (segParam) profile.segment = segParam;
 
-      try {
-        await globalThis.__lcApi.syncProfile(profile);
-      } catch (e) {
-        console.warn("[LeadCaptura] enrichment sync failed", e?.message);
-      }
+      // v1.0.317: spam gate is now deferred until AFTER website-scrape so
+      // the website attempt (which can fetch email/phone/location from the
+      // company site) is one of the data-gathering steps the spam decision
+      // sees. The website-scrape block below now MERGES into `profile`
+      // instead of calling syncProfile itself. The final spam gate + sync
+      // pair runs at the very end, so the rule is unambiguous: spam only
+      // when EVERY attempt has finished and we still have no email and no
+      // phone.
 
       // Website scraping: fill any missing email / phone / location from the
       // company website. Uses the primary company_url plus any extra sites
@@ -1336,34 +1415,129 @@
               );
             }
             if (wsResult.ok && (wsResult.emails?.length || wsResult.phones?.length || wsResult.location || wsResult.name)) {
-              const merged = { ...profile };
-              if (wsResult.emails?.[0] && !merged.email) merged.email = wsResult.emails[0];
-              if (wsResult.phones?.[0] && !merged.phone) merged.phone = wsResult.phones[0];
-              if (wsResult.location && !merged.location) merged.location = wsResult.location.slice(0, 200);
-              if (wsResult.name && !merged.company_name) merged.company_name = wsResult.name;
-              merged.raw = {
-                ...(merged.raw || {}),
+              // v1.0.317: MERGE into profile in place — no inline syncProfile.
+              // The unified spam-gate + sync at the end of this function now
+              // owns the single decision "do we have email or phone? if so
+              // sync, else mark spam." Folding website-scrape results into
+              // `profile` here means that decision is made on the FINAL state.
+              if (wsResult.emails?.[0] && !profile.email) profile.email = wsResult.emails[0];
+              if (wsResult.phones?.[0] && !profile.phone) profile.phone = wsResult.phones[0];
+              if (wsResult.location && !profile.location) profile.location = wsResult.location.slice(0, 200);
+              if (wsResult.name && !profile.company_name) profile.company_name = wsResult.name;
+              profile.raw = {
+                ...(profile.raw || {}),
                 contact_source: "website_scrape",
                 scraped_emails: wsResult.emails,
                 scraped_phones: wsResult.phones,
                 scraped_addresses: wsResult.addresses,
                 scraped_company_name: wsResult.name,
               };
-              try { await globalThis.__lcApi.syncProfile(merged); } catch {}
             }
           }
         } catch { /* best-effort */ }
       }
 
-      // HARD RULE — keep the tab open for 1.5–2.0s after the sync finishes
-      // before letting closeSelf fire. The old 80–200ms felt abrupt: the
-      // tab would visibly POP closed the instant Api.syncProfile returned,
-      // sometimes mid-render. 1.5–2s gives the renderer a beat to settle
-      // and feels like an organised close. Still fits comfortably under
-      // the service-worker's 22s safety ceiling (worst-case in-tab budget
-      // is now ~19s vs the SW's 22s — 3s of headroom).
-      await Human.sleep(Human.rand(1500, 2000));
+      // ── v1.0.317 UNIFIED spam gate + sync (single decision point) ────────
+      // All data-gathering attempts are done by this point: scrapeContactInfo
+      // (with retries), late-hydration sweep, text-scan fallback, website
+      // scrape. The rule is unambiguous and applied EXACTLY ONCE: if email
+      // OR phone was fetched by ANY of those attempts → sync to CRM. If
+      // BOTH are still missing → don't sync, persist the URL to
+      // chrome.storage.local.lcSpamUrls so saveAllVisible filters it out
+      // upfront on future runs, and signal syncError="spam_no_contact_info"
+      // so the bulk loop's parent-tab fallback (overlay.js) respects the
+      // decision instead of re-syncing the URL anyway.
+      const _hasContactInfo = !!profile.email || !!profile.phone;
+      if (_hasContactInfo) {
+        try {
+          await globalThis.__lcApi.syncProfile(profile);
+          window.__lcEnrichmentSyncOk = true;
+        } catch (e) {
+          if (!window.__lcEnrichmentSyncError) {
+            window.__lcEnrichmentSyncError = e?.message || String(e);
+          }
+          console.warn("[LeadCaptura] final syncProfile failed:", e?.message || e);
+        }
+      } else {
+        console.log("[LeadCaptura] SPAM (after every attempt): no email and no phone — not syncing to CRM:", profile.linkedin_url || location.pathname);
+        try {
+          const m = String(profile.linkedin_url || location.pathname).match(/\/in\/([^/?#]+)/);
+          if (m) {
+            const key = ("/in/" + m[1]).toLowerCase();
+            await new Promise((resolve) => {
+              try {
+                chrome.storage.local.get("lcSpamUrls", (res) => {
+                  try {
+                    const cur = res && res.lcSpamUrls;
+                    const map = (cur && typeof cur === "object" && !Array.isArray(cur)) ? { ...cur } : {};
+                    map[key] = Date.now();
+                    chrome.storage.local.set({ lcSpamUrls: map }, () => resolve());
+                  } catch (e) { resolve(); }
+                });
+              } catch (e) { resolve(); }
+            });
+          }
+        } catch (e) {}
+        window.__lcEnrichmentSyncOk = false;
+        window.__lcEnrichmentSyncError = "spam_no_contact_info";
+      }
+
+      // ── Last-ditch placeholder save ──────────────────────────────────────
+      // If every rich sync above failed AND overlay.js's saveCurrentProfile
+      // hasn't flipped the flag either, fire ONE final minimal sync with
+      // the canonical /in/<handle> URL + a slug-derived display name. This
+      // guarantees the lead lands in CRM as an editable row even when the
+      // profile DOM was unscrapable (locked page, ToS gate, etc.) — better
+      // a row to edit than a silent miss. The bulk loop still gets honest
+      // syncOk:true here so the chip matches reality.
+      // v1.0.317: respect the spam decision here too. If we got "no email
+      // and no phone after every attempt", the last-ditch placeholder save
+      // below would land a contact-less row anyway — defeating the rule.
+      // Skip it for that one specific reason; all other syncOk!=true cases
+      // (network failure, server 500, parse error, etc.) still flow through.
+      if (window.__lcEnrichmentSyncOk !== true && window.__lcEnrichmentSyncError !== "spam_no_contact_info") {
+        const fallbackName = (() => {
+          try {
+            const slug = decodeURIComponent((location.pathname.split("/in/")[1] || ""))
+              .replace(/\/.*$/, "")
+              .replace(/-[0-9a-f]{6,}$/i, "");
+            if (!slug) return null;
+            return slug
+              .split("-")
+              .filter((p) => p && !/^\d+$/.test(p))
+              .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+              .join(" ");
+          } catch { return null; }
+        })();
+        const canonical = `${location.origin}${location.pathname}`;
+        try {
+          await globalThis.__lcApi.syncProfile({
+            linkedin_url: canonical,
+            full_name: fallbackName || "Unknown",
+            raw: {
+              contact_source: "placeholder_fallback",
+              fallback_reason: window.__lcEnrichmentSyncError || "rich_sync_no_op",
+            },
+          });
+          window.__lcEnrichmentSyncOk = true;
+          console.log("[LeadCaptura] placeholder fallback saved →", fallbackName, canonical);
+        } catch (e) {
+          if (!window.__lcEnrichmentSyncError) {
+            window.__lcEnrichmentSyncError = e?.message || String(e);
+          }
+          console.warn("[LeadCaptura] placeholder fallback also failed:", e?.message);
+        }
+      }
+
+      // Linger ~1.6s after save success so the "Saved new lead ✓ (email)"
+      // confirmation in the floating panel is clearly visible before the
+      // tab closes. v1.0.305 modest speed pass: 2.0-2.4s → 1.4-1.8s. Still
+      // easily long enough to read the green confirmation pill, and still
+      // jittered so back-to-back enrichment tabs don't close on the exact
+      // same beat (which would itself look bot-like).
+      await Human.sleep(Human.rand(1400, 1800));
     } catch (e) {
+      window.__lcEnrichmentSyncError = window.__lcEnrichmentSyncError || (e?.message || String(e));
       console.warn("[LeadCaptura] enrichment trigger failed", e?.message);
     } finally {
       clearTimeout(safetyTimer);

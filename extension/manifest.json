@@ -1,26 +1,16 @@
 {
   "manifest_version": 3,
   "name": "LeadCaptura — LinkedIn Capture",
-  "version": "1.0.290",
+  "version": "1.0.344",
   "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "tabs",
-    "alarms",
-    "notifications"
-  ],
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms", "notifications"],
   "host_permissions": [
-    "https://leadloftexporter.onrender.com/*",
-    "https://leadloftexporter-1.onrender.com/*",
+    "https://www.linkedin.com/*",
     "https://linkedin.com/*",
-    "https://www.linkedin.com/*"
+    "https://leadloftexporter.onrender.com/*",
+    "https://leadloftexporter.vercel.app/*"
   ],
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "LeadCaptura",
@@ -46,9 +36,7 @@
         "https://www.linkedin.com/*",
         "https://linkedin.com/*"
       ],
-      "js": [
-        "content/interceptor.js"
-      ],
+      "js": ["content/interceptor.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -57,9 +45,16 @@
         "https://www.linkedin.com/*",
         "https://linkedin.com/*"
       ],
-      "css": [
-        "content/overlay.css"
+      "js": ["content/bg_visibility.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.linkedin.com/*",
+        "https://linkedin.com/*"
       ],
+      "css": ["content/overlay.css"],
       "js": [
         "content/lib/storage.js",
         "content/lib/human.js",
@@ -74,13 +69,8 @@
       "all_frames": false
     },
     {
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ],
-      "js": [
-        "content/connect_all_on_page.js"
-      ],
+      "matches": ["https://leadloftexporter.vercel.app/*"],
+      "js": ["content/content_hub_push.js"],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -89,25 +79,15 @@
         "https://www.linkedin.com/*",
         "https://linkedin.com/*"
       ],
-      "js": [
-        "content/mass_apply_jobs.js"
-      ],
+      "js": ["content/connect_all_on_page.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "content/overlay.css",
-        "icons/icon16.png",
-        "icons/icon48.png",
-        "icons/icon128.png"
-      ],
-      "matches": [
-        "https://www.linkedin.com/*",
-        "https://linkedin.com/*"
-      ]
+      "resources": ["content/overlay.css", "icons/*"],
+      "matches": ["https://*.linkedin.com/*"]
     }
   ]
 }

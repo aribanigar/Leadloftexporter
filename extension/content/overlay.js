@@ -201,7 +201,13 @@
   // ---------- Profile panel (compact top-right card on /in/ pages) ----------
 
   async function mountProfilePanel() {
-    if (state.profilePanel) return state.profilePanel;
+    // Re-create if the stored panel was detached from the DOM (LinkedIn can
+    // re-render <html>'s children, or a cleanup pass removed it). Returning a
+    // detached orphan here made renderProfilePanel populate an invisible node —
+    // the user saw NO Save Lead panel until something forced a fresh mount.
+    if (state.profilePanel && document.documentElement.contains(state.profilePanel)) {
+      return state.profilePanel;
+    }
     const settings = await Storage.getSettings();
     if (!settings.showOverlay) return null;
     const root = el("div", { id: "lc-profile-panel", class: "lc-card" });
@@ -271,8 +277,18 @@
   async function renderProfilePanel() {
     const root = await mountProfilePanel();
     if (!root) return;
-    const opts = await ensureOptions();
-    const connected = !!opts;
+    // Show the panel INSTANTLY. ensureOptions() calls the backend, which
+    // cold-starts on Render and can take seconds — never block the panel on it.
+    // Assume connected (workspace creds are baked in) and resolve in the
+    // background, only re-rendering if a genuine connection error surfaces.
+    const connected = state.options ? true : (state.connectError ? false : true);
+    if (!state.options && !state.connectError && !state._optionsInFlight) {
+      state._optionsInFlight = true;
+      ensureOptions().then(() => {
+        state._optionsInFlight = false;
+        if (state.connectError) renderProfilePanel();
+      });
+    }
     const scraped = Scraper.scrapeCurrentPage();
     const profile = scraped.profile;
     // LinkedIn hydrates the profile h1 asynchronously. Start a
@@ -504,8 +520,8 @@
       flashStatus("Opening Contact info…");
       try {
         const contact = await Scraper.scrapeContactInfo({
-          timeoutMs: 3000,
-          settleMs: 400,
+          timeoutMs: 6000,
+          settleMs: 600,
           allowPushStateFallback: true,
         });
         console.log("[LeadCaptura] auto-opened modal scraped:", contact);
@@ -583,10 +599,39 @@
     };
     // Tag with the segment the user picked in the toolbar, if any.
     if (state.selection.segmentName) enriched.segment = state.selection.segmentName;
+
+    // Late re-read of display fields. The current-company linked entity (e.g.
+    // "Al Jazi Real Estate") and the profile photo render a beat AFTER the
+    // name/headline text, so the initial scrape can miss them and Company/avatar
+    // land empty in the CRM. We're now past the Contact-info step (~1–3s in), so
+    // the top card is fully hydrated — re-scrape and fill ONLY the fields that
+    // are still empty. Read-only; does not touch the modal/contact-info flow.
+    if (
+      location.pathname.startsWith("/in/") &&
+      !location.pathname.includes("/overlay/") &&
+      !location.pathname.includes("/details/contact-info") &&
+      Scraper.scrapeProfile
+    ) {
+      try {
+        const _late = Scraper.scrapeProfile();
+        if (_late) {
+          if (!enriched.company_name && _late.company_name) enriched.company_name = _late.company_name;
+          if (!enriched.title && _late.title) enriched.title = _late.title;
+          if (!enriched.avatar_url && _late.avatar_url) enriched.avatar_url = _late.avatar_url;
+        }
+      } catch {}
+    }
+
     flashStatus("Saving…");
     let result;
     try {
       result = await Api.syncProfile(enriched);
+      // Share success with main.js's enrichment-trigger reporter so the
+      // bulk-loop chip state is true when EITHER path saved the lead.
+      // Without this, a tab where overlay.js's panel-driven save succeeded
+      // but main.js's own syncProfile failed would still report syncOk:false
+      // and the bulk loop would mark "Save failed" even though CRM has the row.
+      try { window.__lcEnrichmentSyncOk = true; } catch {}
       const fields = [
         enriched.email && "email",
         enriched.phone && "phone",
@@ -740,9 +785,15 @@
     if (state.connectActive || state.messageActive) return;
     try {
       const d = await new Promise((res) =>
-        chrome.storage.local.get(["lcConnectRun", "lcMessageRun"], res)
+        chrome.storage.local.get(["lcConnectRun", "lcMessageRun", "lc_connect_queue"], res)
       );
       if (d?.lcConnectRun?.active || d?.lcMessageRun?.active) return;
+      // The legacy profile-navigation Connect All (driven from main.js via
+      // lc_connect_queue) sets none of the *Run flags. The 1.5s panel self-heal
+      // in main.js calls triggerAutoSave directly, so without this guard a
+      // mid-run panel re-mount could fire the Contact-info click and race the
+      // Connect click. Bail while that queue is active.
+      if (d?.lc_connect_queue?.urls?.length > 0) return;
     } catch {}
 
     const path = location.pathname;
@@ -757,7 +808,11 @@
       if (!opts) return; // Not connected to workspace
 
       // v1.0.23 aggressive cut: 0.4–1.2s base, 8% chance of 0.8–2.0s
-      // long-tail. Target avg per-profile time ≤5s end-to-end.
+      // long-tail. Target avg per-profile time ≤5s end-to-end. This hydration
+      // delay is LOAD-BEARING: it lets the "Contact info" link render so the
+      // scrape clicks the real link instead of falling back to history.pushState
+      // — the pushState path corrupts LinkedIn routing (clicking Connections
+      // re-opened the last-saved profile). Do not replace with an early poll.
       const base = 400 + Math.floor(Math.random() * 800);
       const bonus = Math.random() < 0.08 ? 800 + Math.floor(Math.random() * 1200) : 0;
       await new Promise((r) => setTimeout(r, base + bonus));
@@ -1383,6 +1438,133 @@
         flashStatus("All selected profiles already saved — nothing new to enrich.", "warn");
         return;
       }
+
+      // ── Backend-synced CRM dedupe (additive on top of local cache) ───
+      // The local _isContacted cache only sees what THIS browser/extension
+      // has saved. Profiles already in the CRM from CSV import, web-app
+      // saves, teammate saves, or another browser/device get missed →
+      // we waste a tab + a scrape + a "view" against the user's LinkedIn
+      // account. Ask the backend for its full known-URL set and apply it
+      // as a second filter. On any failure (offline, 401, etc.) we fall
+      // back silently to the local filter alone.
+      try {
+        flashStatus("Checking CRM for already-saved profiles…");
+        const knownResp = await Api.knownUrls();
+        const known = new Set((knownResp && knownResp.urls) || []);
+        if (known.size) {
+          const norm = (u) => {
+            try {
+              const m = String(u).match(/\/in\/([^/?#]+)/);
+              return m ? ("/in/" + m[1]).toLowerCase() : null;
+            } catch (e) { return null; }
+          };
+          const beforeCrm = urls.length;
+          const fresh = [];
+          let crmSkipped = 0;
+          for (const u of urls) {
+            const k = norm(u);
+            if (k && known.has(k)) {
+              crmSkipped++;
+              // Mirror into the local contacted cache so future runs in
+              // THIS browser skip these instantly without a backend call.
+              try { _markContacted(u); } catch (e) {}
+            } else {
+              fresh.push(u);
+            }
+          }
+          urls = fresh;
+          if (crmSkipped > 0) {
+            flashStatus(
+              `Skipped ${crmSkipped} profile${crmSkipped > 1 ? "s" : ""} already in CRM ` +
+              `(${beforeCrm - crmSkipped} fresh to enrich)`,
+              "ok"
+            );
+            console.log("[LeadCaptura] CRM dedupe: " + crmSkipped + " already-saved, " + urls.length + " fresh");
+          }
+          if (!urls.length) {
+            flashStatus("All selected profiles are already in your CRM — nothing new to enrich.", "warn");
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("[LeadCaptura] CRM known-urls fetch failed (falling back to local cache):", e?.message || e);
+      }
+    }
+
+    // ── Final URL dedupe ──────────────────────────────────────────────────
+    // LinkedIn occasionally surfaces the same profile twice on a page (e.g.
+    // a sticky "people you may know" card duplicating a search result, or
+    // two distinct anchors on one card with slightly different query strings
+    // like ?miniProfileUrn=...). Without normalize-and-dedupe here, the
+    // bulk loop opens TWO background tabs for the same person, scrapes
+    // twice, and counts toward the LinkedIn safety quota twice. Normalize
+    // each URL to /in/<handle> (lowercased), keep the FIRST full URL for
+    // that handle, and drop subsequent dupes. Purely additive — runs after
+    // the existing local + CRM filters.
+    if (urls.length > 1) {
+      const beforeDedupe = urls.length;
+      const seen = new Set();
+      const uniq = [];
+      for (const u of urls) {
+        let key = u;
+        try {
+          const m = String(u).match(/\/in\/([^/?#]+)/);
+          if (m) key = ("/in/" + m[1]).toLowerCase();
+          else key = String(u).split(/[?#]/)[0].toLowerCase();
+        } catch (e) { /* fall back to raw URL as key */ }
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniq.push(u);
+      }
+      const removed = beforeDedupe - uniq.length;
+      if (removed > 0) {
+        console.log("[LeadCaptura] dedupe: " + removed + " duplicate URL(s) removed before opening tabs");
+      }
+      urls = uniq;
+    }
+
+    // ── v1.0.316 spam-URL filter ──────────────────────────────────────────
+    // Profiles previously scraped and found to have NO email and NO phone
+    // are marked as spam in chrome.storage.local.lcSpamUrls by main.js's
+    // enrichment-trigger spam gate. Skip them here so we don't waste a tab
+    // re-scraping a profile we already know yields nothing. Same /in/<handle>
+    // normalisation as the dedupe block above. Purely additive — runs only
+    // after every other filter, and is a no-op when the spam map is empty
+    // (which it is on a fresh install).
+    if (urls.length) {
+      try {
+        const spamRes = await new Promise((resolve) => {
+          try { chrome.storage.local.get("lcSpamUrls", (r) => resolve(r || {})); }
+          catch (e) { resolve({}); }
+        });
+        const spam = (spamRes && spamRes.lcSpamUrls && typeof spamRes.lcSpamUrls === "object" && !Array.isArray(spamRes.lcSpamUrls)) ? spamRes.lcSpamUrls : {};
+        if (Object.keys(spam).length) {
+          const norm = (u) => {
+            const m = String(u).match(/\/in\/([^/?#]+)/);
+            return m ? ("/in/" + m[1]).toLowerCase() : null;
+          };
+          const before = urls.length;
+          urls = urls.filter((u) => {
+            const k = norm(u);
+            return !(k && spam[k]);
+          });
+          const skipped = before - urls.length;
+          if (skipped > 0) {
+            flashStatus(
+              `Skipped ${skipped} profile${skipped > 1 ? "s" : ""} previously marked spam ` +
+              `(no email/phone found before)`,
+              "ok"
+            );
+            console.log("[LeadCaptura] spam filter: " + skipped + " URL(s) skipped");
+          }
+          if (!urls.length) {
+            flashStatus("All selected profiles are previously-marked spam — nothing new to enrich.", "warn");
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("[LeadCaptura] spam filter check failed:", e?.message || e);
+      }
     }
 
     // INTENTIONAL: no syncSearch pre-save. Card-level scrapes can pick up
@@ -1472,11 +1654,77 @@
           rateLimited = true;
           break outerLoop;
         }
-        if (resp.ok && !resp.timedOut) {
+        // Ground truth: the enrichment tab reports its actual syncProfile
+        // outcome via lc:enrichResult → resp.syncOk. v1.0.291 used tab-close
+        // as proof of save, which lied when the in-tab sync failed silently
+        // (Noora Al-Khori symptom: chip Saved ✓, CRM empty). We now:
+        //   • syncOk === true              → trust it, mark Saved ✓
+        //   • syncOk === false             → the tab tried hard and failed
+        //                                    (including the placeholder
+        //                                    last-ditch save) — try ONE
+        //                                    more parent-tab fallback
+        //   • syncOk === null              → no report received (very old
+        //                                    extension build or trigger
+        //                                    crashed before reporting) —
+        //                                    treat the same as false
+        //   • !resp.ok / resp.timedOut     → tab didn't even reach the
+        //                                    trigger — direct fallback
+        const tabClosedCleanly = resp.ok && !resp.timedOut;
+        // v1.0.317 — RESPECT THE SPAM RULE.
+        // When the in-tab spam gate refuses to sync (no email AND no phone),
+        // it reports syncError="spam_no_contact_info". The parent-tab
+        // fallback below is for network/sync failures — NOT for a
+        // deliberate decision to not save this profile. Without this guard,
+        // every spam profile would still land in CRM via the fallback,
+        // completely defeating the spam rule. Skip the fallback, set a
+        // clear chip state, mark the URL contacted locally so we don't
+        // re-attempt within this browser session, and move on.
+        if (tabClosedCleanly && resp.syncError === "spam_no_contact_info") {
+          _setChipState(profile.linkedin_url, "error", "Skipped — no contact info");
+          _markContacted(profile.linkedin_url);
+          console.log("[LeadCaptura] bulk: " + profile.linkedin_url + " skipped (spam rule — no email/phone)");
+        } else if (tabClosedCleanly && resp.syncOk === true) {
           _setChipState(profile.linkedin_url, "saved", "Saved ✓");
+          _markContacted(profile.linkedin_url);
           totalEnriched++;
         } else {
-          _setChipState(profile.linkedin_url, "error", resp.timedOut ? "Timed out" : "Failed");
+          // Parent-tab fallback. Two independent network paths × two
+          // independent service-worker invocations — both have to fail
+          // for the lead to be genuinely lost.
+          let fallbackSaved = false;
+          try {
+            await Api.syncProfile({
+              linkedin_url: profile.linkedin_url,
+              full_name: profile.full_name || _labelFromUrl(profile.linkedin_url),
+              raw: {
+                contact_source: "bulk_parent_fallback",
+                fallback_reason: tabClosedCleanly
+                  ? (resp.syncError || (resp.syncOk === null ? "no_report" : "in_tab_sync_failed"))
+                  : (resp.timedOut ? "tab_timed_out" : (resp.error || "tab_open_failed")),
+              },
+            });
+            fallbackSaved = true;
+            _setChipState(profile.linkedin_url, "saved", "Saved ✓");
+            _markContacted(profile.linkedin_url);
+            totalEnriched++;
+            console.log("[LeadCaptura] bulk parent-tab fallback saved →", profile.linkedin_url);
+          } catch (fallbackErr) {
+            console.warn(
+              "[LeadCaptura] bulk save failed for",
+              profile.linkedin_url,
+              "tabClosedCleanly=", tabClosedCleanly,
+              "syncOk=", resp.syncOk,
+              "syncError=", resp.syncError,
+              "fallbackErr=", fallbackErr?.message || fallbackErr
+            );
+          }
+          if (!fallbackSaved) {
+            _setChipState(
+              profile.linkedin_url,
+              "error",
+              resp.timedOut ? "Timed out" : "Save failed"
+            );
+          }
         }
 
         // Gap between enrichment tabs. Keeps ≤5s end-to-end target while
@@ -1721,17 +1969,7 @@
     for (const d of candidates) {
       if (!_isVisible(d)) continue;
       const t = (d.textContent || "").toLowerCase();
-      // Regular LinkedIn invitation modal — unchanged.
       if (/add a note to your invitation|send without a note|personalize your invitation/.test(t))
-        return d;
-      // Sales Navigator invitation modal — different wording, same purpose:
-      // heading "Send invitation" + a personal-message textarea + a primary
-      // "Send Invitation" button. We require BOTH "include a personal message"
-      // AND "send invitation" so we never false-match an unrelated dialog that
-      // happens to mention "send invitation". The regular LinkedIn detection
-      // above runs first and short-circuits, so this branch only ever runs on
-      // Sales Nav and the existing LinkedIn path is untouched.
-      if (/include a personal message/.test(t) && /\bsend invitation\b/.test(t))
         return d;
     }
     return null;
@@ -1933,7 +2171,9 @@
     // Connect All run after the first invite. Guard the anchor so the click can
     // only open the in-page invitation modal, never navigate. Profile #1 proved
     // LinkedIn opens the modal via JS (it didn't navigate), so blocking the
-    // href fallback is safe. Guard auto-removes after 2.5s.
+    // href fallback is safe. Guard auto-removes after 2.5s. (Restored from
+    // v1.0.267 baseline — its absence was why "Send without a note" never
+    // landed: the page silently navigated away before STEP 3 could click.)
     const _navAnchor =
       (connectBtn.tagName === "A" && connectBtn.getAttribute("href"))
         ? connectBtn
@@ -1981,6 +2221,9 @@
 
     // Phase A: ~12 aggressive automated rounds (~6s). No spotlight yet — if the
     // auto-click lands the user never sees a manual prompt (sends in realtime).
+    // The spotlight's dark backdrop rectangles interfere with LinkedIn's React
+    // click pipeline; v1.0.323's "show spotlight at dialog open" regressed
+    // the auto-click. Reverted to v1.0.258 timing: spotlight is Phase B only.
     for (let attempt = 0; attempt < 12 && _invitationModalOpen(); attempt++) {
       const landed = await _awaitServiceWorkerMainWorldClick();
       if (landed) {
@@ -2176,113 +2419,6 @@
     const { dispatchHumanClick } = globalThis.__lcDom;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    // ── Sales-Nav-only spotlight ─────────────────────────────────────────
-    // A self-contained spotlight that does NOT share IDs or state with
-    // _showButtonSpotlight / _showSendSpotlight, so nothing in the existing
-    // spotlight pipeline can tear it down. Always renders a banner + ring +
-    // arrow at the top stacking context, sized either from the target's
-    // rect (preferred) or center-of-viewport (fallback). Lives for `holdMs`
-    // ms and survives target detachment.
-    const _snSpotlightShow = (target, title, subtitle, holdMs) => {
-      _snSpotlightHide();
-      const Z = "2147483647";
-      const wrap = document.createElement("div");
-      wrap.id = "lc-sn-spotlight-wrap";
-      // The wrap itself is invisible — it just hosts our children at top z.
-      wrap.style.cssText =
-        "position:fixed!important;left:0!important;top:0!important;" +
-        "width:0!important;height:0!important;pointer-events:none!important;" +
-        "z-index:" + Z + "!important;";
-
-      const ring = document.createElement("div");
-      ring.id = "lc-sn-spotlight-ring";
-      ring.style.cssText =
-        "position:fixed!important;pointer-events:none!important;z-index:" + Z + "!important;" +
-        "border-radius:12px!important;" +
-        "box-shadow:0 0 0 4px rgba(10,102,194,0.95)," +
-        "0 0 28px 10px rgba(10,102,194,0.75)," +
-        "0 0 0 9999px rgba(0,0,0,0.45)!important;" +
-        "transition:left .12s linear,top .12s linear,width .12s linear,height .12s linear!important;";
-
-      const banner = document.createElement("div");
-      banner.id = "lc-sn-spotlight-banner";
-      banner.style.cssText =
-        "position:fixed!important;left:50%!important;top:24px!important;" +
-        "transform:translateX(-50%)!important;pointer-events:none!important;" +
-        "z-index:" + Z + "!important;" +
-        "background:linear-gradient(135deg,#0a66c2,#004182)!important;" +
-        "color:#fff!important;padding:14px 28px!important;border-radius:14px!important;" +
-        "box-shadow:0 14px 36px rgba(0,0,0,0.55)!important;" +
-        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif!important;" +
-        "font-weight:800!important;text-align:center!important;min-width:280px!important;" +
-        "white-space:nowrap!important;";
-      banner.innerHTML =
-        '<div style="font-size:17px;font-weight:800;margin-bottom:4px;">' + title + '</div>' +
-        '<div style="font-size:12px;font-weight:500;opacity:0.92;">' + subtitle + '</div>';
-
-      const arrow = document.createElement("div");
-      arrow.id = "lc-sn-spotlight-arrow";
-      arrow.textContent = "👇";
-      arrow.style.cssText =
-        "position:fixed!important;pointer-events:none!important;z-index:" + Z + "!important;" +
-        "font-size:32px!important;line-height:1!important;" +
-        "filter:drop-shadow(0 4px 6px rgba(0,0,0,0.6))!important;" +
-        "animation:lc-sn-bounce 0.7s ease-in-out infinite alternate!important;";
-
-      if (!document.getElementById("lc-sn-bounce-style")) {
-        const st = document.createElement("style");
-        st.id = "lc-sn-bounce-style";
-        st.textContent = "@keyframes lc-sn-bounce { from { transform: translateY(0); } to { transform: translateY(8px); } }";
-        document.head.appendChild(st);
-      }
-
-      document.body.appendChild(wrap);
-      document.body.appendChild(ring);
-      document.body.appendChild(banner);
-      document.body.appendChild(arrow);
-
-      const place = () => {
-        let r = null;
-        if (target && target.isConnected) {
-          try { r = target.getBoundingClientRect(); } catch {}
-        }
-        if (r && r.width >= 1 && r.height >= 1) {
-          const pad = 6;
-          ring.style.setProperty("left", Math.max(0, r.left - pad) + "px", "important");
-          ring.style.setProperty("top", Math.max(0, r.top - pad) + "px", "important");
-          ring.style.setProperty("width", (r.width + pad * 2) + "px", "important");
-          ring.style.setProperty("height", (r.height + pad * 2) + "px", "important");
-          ring.style.setProperty("display", "block", "important");
-          const cx = r.left + r.width / 2;
-          arrow.style.setProperty("left", (cx - 16) + "px", "important");
-          arrow.style.setProperty("top", Math.max(80, r.top - 48) + "px", "important");
-          arrow.style.setProperty("display", "block", "important");
-        } else {
-          // Fallback: keep banner visible center-top, hide the ring/arrow.
-          ring.style.setProperty("display", "none", "important");
-          arrow.style.setProperty("display", "none", "important");
-        }
-      };
-      place();
-      const tickId = setInterval(place, 100);
-      const t = setTimeout(() => {
-        clearInterval(tickId);
-        _snSpotlightHide();
-      }, holdMs);
-      _snSpotlightState = { wrap, ring, banner, arrow, tickId, t };
-    };
-    const _snSpotlightHide = () => {
-      const s = _snSpotlightState;
-      if (!s) return;
-      try { clearInterval(s.tickId); } catch {}
-      try { clearTimeout(s.t); } catch {}
-      try { s.wrap.remove(); } catch {}
-      try { s.ring.remove(); } catch {}
-      try { s.banner.remove(); } catch {}
-      try { s.arrow.remove(); } catch {}
-      _snSpotlightState = null;
-    };
-
     // STEP 1: bring card into view & click the "..." trigger.
     try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
     await sleep(250 + Math.random() * 250);
@@ -2351,9 +2487,9 @@
     // the overlay so the real click below still lands on the button). The
     // spotlight freezes in place if the target detaches mid-show — Sales Nav
     // sometimes closes the dropdown the instant we insert DOM nodes near it.
-    _snSpotlightShow(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 2000);
+    _showButtonSpotlight(connectItem, "⚡ Step 2 — Sending invite", "auto-clicking 'Connect'", 1100);
     console.log("[LeadCaptura] salesNav step 3 → spotlight requested");
-    await sleep(1300);
+    await sleep(950);
 
     // If our original connectItem detached during the spotlight wait (dropdown
     // closed), find it again. Otherwise the click below would target a node
@@ -2376,10 +2512,10 @@
       try { await dispatchHumanClick(clickTarget); } catch {}
     } else {
       console.log("[LeadCaptura] salesNav step 3 ✗ Connect item unrecoverable");
-      _snSpotlightHide();
+      _removeSpotlight();
       return { ok: false, reason: "connect_item_lost" };
     }
-    _snSpotlightHide();
+    _removeSpotlight();
     await sleep(500 + Math.random() * 400);
 
     // STEP 4: did the invitation modal open?
@@ -2412,49 +2548,11 @@
     // STEP 5: invitation modal — same spotlight flow as the regular LinkedIn
     // connect path. Auto-click is tried but isTrusted=false means LinkedIn
     // gates this on a real user click; the spotlight makes it one-tap.
-    //
-    // Sales Nav-specific path: find the "Send Invitation" button INSIDE the
-    // detected SN modal (not via the generic _findSendWithoutNoteButton, which
-    // searches the whole document and can miss the button on SN). Use the
-    // proven _showButtonSpotlight (same simple, direct-anchor variant we use on
-    // the Connect dropdown item at step 3) so the ring is guaranteed to render
-    // around the right button. Identical click sequence as before.
-    const _findSalesNavSendInvitationBtn = () => {
-      const modal = _findInvitationModal();
-      if (!modal) return null;
-      const all = Array.from(modal.querySelectorAll(
-        "button, [role='button'], .artdeco-button"
-      ));
-      // 1. Exact text/aria match on "Send Invitation" / "Send invitation".
-      for (const b of all) {
-        if (!_isVisible(b) || b.disabled) continue;
-        const t = (b.textContent || "").replace(/\s+/g, " ").trim();
-        const a = (b.getAttribute("aria-label") || "").trim();
-        if (/^send invitation$/i.test(t) || /^send invitation$/i.test(a)) return b;
-      }
-      // 2. Artdeco primary button inside the modal, as long as it isn't Cancel/Close.
-      const primary = modal.querySelector(
-        ".artdeco-button--primary, [data-test-dialog-primary-btn]"
-      );
-      if (primary && _isVisible(primary) && !primary.disabled) {
-        const t = (primary.textContent || "").replace(/\s+/g, " ").trim();
-        if (!/^(cancel|close|dismiss|back)$/i.test(t)) return primary;
-      }
-      return null;
-    };
-
-    const snSendBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
-    if (snSendBtn) {
-      _snSpotlightShow(snSendBtn, "⚡ Step 3 — Sending invitation", "auto-clicking 'Send Invitation'", 2000);
-      console.log("[LeadCaptura] salesNav step 5 → spotlight on Send Invitation", {
-        t: (snSendBtn.textContent || "").trim().slice(0, 40),
-      });
-      await sleep(1300);
-    }
+    _showSendSpotlight();
     console.log("[LeadCaptura] salesNav step 5 → modal opened, spotlight shown");
 
     for (let attempt = 0; attempt < 4 && _invitationModalOpen(); attempt++) {
-      const sendBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
+      const sendBtn = _findSendWithoutNoteButton();
       if (!sendBtn) { await sleep(400); continue; }
       if (attempt === 0) {
         _tryServiceWorkerMainWorldClick();
@@ -2467,7 +2565,7 @@
     for (let w = 0; w < 150 && _invitationModalOpen(); w++) {
       await sleep(300);
       if (w > 0 && w % 17 === 0) {
-        const retryBtn = _findSalesNavSendInvitationBtn() || _findSendWithoutNoteButton();
+        const retryBtn = _findSendWithoutNoteButton();
         if (retryBtn) {
           _tryServiceWorkerMainWorldClick();
           _tryMainWorldClick(retryBtn);
@@ -2476,7 +2574,7 @@
       }
     }
 
-    _snSpotlightHide();
+    _removeSpotlight();
     if (!_invitationModalOpen()) {
       console.log("[LeadCaptura] salesNav step 5 ✓ invitation sent");
       return { ok: true };
@@ -2516,18 +2614,6 @@
         b.getAttribute("aria-disabled") !== "true"
     );
     return byText || null;
-  }
-
-  // LinkedIn's "Show more results" infinite-scroll load button (connections /
-  // people-search list). Used by "Message Everyone" to pull the next batch.
-  function _findShowMoreResultsButton() {
-    let b = document.querySelector("button.scaffold-finite-scroll__load-button");
-    if (b && !b.disabled && _isVisible(b)) return b;
-    b = Array.from(document.querySelectorAll("button")).find((x) => {
-      const t = (x.textContent || "").replace(/\s+/g, " ").trim();
-      return /^show more results$/i.test(t) && !x.disabled && _isVisible(x);
-    });
-    return b || null;
   }
 
   // A signature of the current results page — changes when we paginate.
@@ -2610,24 +2696,35 @@
   // "Connect" button is a simplified control that does NOT always open the
   // "Add a note?" modal reliably. The full-page profile button is the one
   // LinkedIn's own UX always uses, and it consistently triggers the modal.
-  // In-page gap between consecutive connect actions. Same 4-tier human-paced
-  // distribution the profile-navigation queue used (5-10s / 11-19s / 21-33s /
-  // 38-60s) — fast enough to feel responsive, slow + varied enough to stay
-  // under LinkedIn's bot radar. Do not flatten this into a fixed delay.
+  // In-page gap between consecutive connect actions. Faster 4-tier human-paced
+  // distribution (2.5-5.5s / 6-11s / 12-20s / 22-35s) — quicker throughput than
+  // the old 5-60s spread while still randomised with a long tail so it doesn't
+  // read as a fixed robotic cadence. Do not flatten this into a fixed delay.
+  // NOTE: faster = higher LinkedIn throttling risk; keep the variance + tail.
   function _connectGap() {
     const r = Math.random();
-    return r < 0.60 ? 5000 + Math.random() * 5000
-      : r < 0.82 ? 11000 + Math.random() * 8000
-      : r < 0.93 ? 21000 + Math.random() * 12000
-      : 38000 + Math.random() * 22000;
+    return r < 0.62 ? 2500 + Math.random() * 3000
+      : r < 0.85 ? 6000 + Math.random() * 5000
+      : r < 0.95 ? 12000 + Math.random() * 8000
+      : 22000 + Math.random() * 13000;
   }
 
   async function connectAllVisible() {
-    // Sales Navigator path — in-place dropdown flow, no navigation.
-    // SalesNav lacks the simple Connect button on cards; the only path is the
-    // "..." More options dropdown → Connect → invitation modal. Restored in
-    // v1.0.165 after the v1.0.155 nav-driven rewrite accidentally dropped it.
-    if (location.pathname.startsWith("/sales/")) {
+    // v1.0.323: inline (no-navigation) Connect All for both Sales Navigator
+    // AND regular LinkedIn people-search. Per user spec: bottom-toolbar
+    // "Connect All" → walks down the visible cards, clicks each card's
+    // native "+ Connect" button, spotlights "Send without a note" in the
+    // invitation modal, clicks it, waits for the modal to close, moves to
+    // the next card on the same page. Auto-paginates when no selection.
+    //
+    // The legacy navigation-driven path (urls[0] → main.js connect queue)
+    // is preserved below for any non-search surface that doesn't expose a
+    // card-level Connect button — but in practice everything reachable from
+    // the bottom-toolbar button now takes the inline path.
+    if (
+      location.pathname.startsWith("/sales/") ||
+      location.pathname.startsWith("/search/results/people")
+    ) {
       return await _connectAllVisibleSalesNav();
     }
 
@@ -2707,75 +2804,57 @@
         for (const url of urls) {
           if (state.connectCancel) break outer;
 
-          // Per-card error isolation: a single bad card (a classify/lookup/chip
-          // call throwing on a node LinkedIn re-rendered after the previous
-          // invite) must NOT kill the whole run. Without this, the loop sent
-          // invite #1 then threw on #2 and silently ended — looking like "it
-          // stops after the first connect". One bad card → "failed" → continue.
-          try {
-            if (state.avoidDuplicates && _isContacted(url)) {
-              skipped++;
-              _setChipState(url, "saved", "Already contacted");
-              continue;
-            }
+          if (state.avoidDuplicates && _isContacted(url)) {
+            skipped++;
+            _setChipState(url, "saved", "Already contacted");
+            continue;
+          }
 
-            // Clear any leftover invitation dialog / backdrop from the previous
-            // send before touching the next card — a lingering modal scrim
-            // intercepts the next Connect click.
-            if (_invitationModalOpen()) { _closeAnyDialog(); await sleep(500); }
+          const card = _cardForUrl(url);
+          const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
+          const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
 
-            const card = _cardForUrl(url);
-            const presetBtn = _actionBtnForUrl(url) || (card ? _findConnectButtonInCard(card) : null);
-            const cls = presetBtn ? _classifyButton(presetBtn) : (card ? _cardConnectState(card) : "unknown");
+          if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
+          if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
+          if (cls === "unknown" || !card) { skipped++; continue; }
 
-            if (cls === "pending") { skipped++; _setChipState(url, "saved", "Pending"); continue; }
-            if (cls === "connected") { skipped++; _setChipState(url, "saved", "Connected"); continue; }
-            if (cls === "unknown" || !card) { skipped++; continue; }
+          processed++;
+          _setChipState(url, "saving", "Connecting…");
 
-            processed++;
-            _setChipState(url, "saving", "Connecting…");
-
-            let result;
-            if (cls === "follow") {
-              // Follow-only cards: try Connect via overflow first, fall back to Follow.
-              const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
-              if (_overflowResult.ok) {
-                result = _overflowResult;
-              } else if (
-                _overflowResult.reason === "no_more_btn" ||
-                _overflowResult.reason === "no_connect_in_dropdown" ||
-                _overflowResult.reason === "dropdown_did_not_open"
-              ) {
-                result = await _sendFollowOnCard(card, presetBtn);
-              } else {
-                result = _overflowResult;
-              }
-            } else if (cls === "salesnav-connectable") {
-              try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
-              await sleep(300 + Math.random() * 400);
-              result = await _sendConnectViaSalesNavDropdown(card);
+          let result;
+          if (cls === "follow") {
+            // Follow-only cards: try Connect via overflow first, fall back to Follow.
+            const _overflowResult = await _sendConnectViaSalesNavDropdown(card);
+            if (_overflowResult.ok) {
+              result = _overflowResult;
+            } else if (
+              _overflowResult.reason === "no_more_btn" ||
+              _overflowResult.reason === "no_connect_in_dropdown" ||
+              _overflowResult.reason === "dropdown_did_not_open"
+            ) {
+              result = await _sendFollowOnCard(card, presetBtn);
             } else {
-              try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
-              await sleep(300 + Math.random() * 300);
-              result = await _sendConnectOnCard(card, presetBtn);
+              result = _overflowResult;
             }
+          } else if (cls === "salesnav-connectable") {
+            try { card.scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 400);
+            result = await _sendConnectViaSalesNavDropdown(card);
+          } else {
+            try { (presetBtn || card).scrollIntoView({ block: "center", inline: "center" }); } catch {}
+            await sleep(300 + Math.random() * 300);
+            result = await _sendConnectOnCard(card, presetBtn);
+          }
 
-            if (result.ok) {
-              if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
-              else { sent++; _setChipState(url, "saved", "Invited ✓"); }
-              _markContacted(url);
-              try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
-            } else {
-              failed++;
-              _setChipState(url, "error", "Skipped");
-              if (_invitationModalOpen()) _closeAnyDialog();
-            }
-          } catch (err) {
-            // One card blew up — record it and move on; never end the run.
+          if (result.ok) {
+            if (result.followed) { followed++; _setChipState(url, "saved", "Followed ✓"); }
+            else { sent++; _setChipState(url, "saved", "Invited ✓"); }
+            _markContacted(url);
+            try { Api?.connectResult?.(url, result.followed ? "followed" : "connected").catch(() => {}); } catch {}
+          } else {
             failed++;
-            try { _setChipState(url, "error", "Skipped"); } catch {}
-            try { if (_invitationModalOpen()) _closeAnyDialog(); } catch {}
-            try { console.log("[LeadCaptura] connect: card error, continuing →", err?.message || err); } catch {}
+            _setChipState(url, "error", "Skipped");
+            if (_invitationModalOpen()) _closeAnyDialog();
           }
 
           flashStatus(`${summarise()} (${processed})`);
@@ -5566,8 +5645,6 @@
   let _arrowEl = null;
   let _skipBtnEl = null;
   let _spotlightSkipCb = null;
-  // Sales-Nav-only spotlight (isolated from the LinkedIn pipeline).
-  let _snSpotlightState = null;
 
   function _playSpotlightBeep() {
     try {
@@ -6414,14 +6491,16 @@
       .replace(/\{company\}/gi, company);
   }
 
-  // Human-paced gap between message sends — longer than Connect All because
-  // typing a message is a bigger signal than an invite click.
+  // Human-paced gap between message sends — still a bit longer than Connect All
+  // (typing a message is a bigger signal than an invite click), but faster than
+  // the old 10-140s spread. Max tail cut from ~140s to ~80s; typical send now
+  // lands in 6-30s instead of 10-90s. Keep the tail so it stays human-shaped.
   function _msgGap() {
     const r = Math.random();
-    return r < 0.55 ? 10000 + Math.random() * 15000    // 10-25s  (55%)
-      : r < 0.80 ? 28000 + Math.random() * 22000       // 28-50s  (25%)
-      : r < 0.93 ? 55000 + Math.random() * 35000       // 55-90s  (13%)
-      : 95000 + Math.random() * 45000;                   // 95-140s (7%)
+    return r < 0.60 ? 6000 + Math.random() * 9000      // 6-15s   (60%)
+      : r < 0.85 ? 16000 + Math.random() * 14000       // 16-30s  (25%)
+      : r < 0.95 ? 30000 + Math.random() * 20000       // 30-50s  (10%)
+      : 55000 + Math.random() * 25000;                   // 55-80s  (5%)
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -7534,44 +7613,6 @@
     aiRow.appendChild(aiLabel);
     wrap.appendChild(aiRow);
 
-    // "Message Everyone" — auto-load more pages via "Show more results".
-    const everyoneRow = document.createElement("div");
-    everyoneRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
-    const everyoneCheck = document.createElement("input");
-    everyoneCheck.type = "checkbox";
-    everyoneCheck.id = "lc-msg-everyone";
-    everyoneCheck.style.cssText = "cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;";
-    const everyoneLabel = document.createElement("label");
-    everyoneLabel.htmlFor = "lc-msg-everyone";
-    everyoneLabel.style.cssText = "font-size:12px;color:#475569;cursor:pointer;user-select:none;";
-    everyoneLabel.textContent = "Message everyone — keep clicking “Show more results” until done";
-    everyoneRow.appendChild(everyoneCheck);
-    everyoneRow.appendChild(everyoneLabel);
-    wrap.appendChild(everyoneRow);
-
-    // "Start after N people" — skip the first N of the visible list.
-    const startAfterRow = document.createElement("div");
-    startAfterRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:8px;";
-    const startAfterLabel = document.createElement("label");
-    startAfterLabel.htmlFor = "lc-msg-start-after";
-    startAfterLabel.style.cssText = "font-size:12px;color:#475569;user-select:none;";
-    startAfterLabel.textContent = "Start after (skip first):";
-    const startAfterInput = document.createElement("input");
-    startAfterInput.type = "number";
-    startAfterInput.id = "lc-msg-start-after";
-    startAfterInput.min = "0";
-    startAfterInput.value = "0";
-    startAfterInput.style.cssText =
-      "width:64px;border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px;" +
-      "font-size:13px;font-family:inherit;color:#1e293b;outline:none;";
-    const startAfterSuffix = document.createElement("span");
-    startAfterSuffix.style.cssText = "font-size:12px;color:#94a3b8;";
-    startAfterSuffix.textContent = "people";
-    startAfterRow.appendChild(startAfterLabel);
-    startAfterRow.appendChild(startAfterInput);
-    startAfterRow.appendChild(startAfterSuffix);
-    wrap.appendChild(startAfterRow);
-
     const footer = document.createElement("div");
     footer.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:10px;";
 
@@ -7594,11 +7635,9 @@
       const msg = ta.value.trim();
       if (!msg) { ta.focus(); return; }
       const useAI = aiCheck.checked;
-      const loadMore = everyoneCheck.checked;
-      const startAfter = Math.max(0, parseInt(startAfterInput.value, 10) || 0);
       wrap.remove();
       _msgComposerEl = null;
-      await _startMessageAll(msg, useAI, { loadMore, startAfter });
+      await _startMessageAll(msg, useAI);
     };
 
     footer.appendChild(cancelBtn);
@@ -7716,19 +7755,13 @@
     return profile;
   }
 
-  async function _startMessageAll(message, useAI = false, opts = {}) {
+  async function _startMessageAll(message, useAI = false) {
     const { sleep } = globalThis.__lcHuman;
     const { dispatchHumanClick, typeIntoEditable } = globalThis.__lcDom;
-
-    const startAfter = Math.max(0, parseInt(opts.startAfter, 10) || 0);
-    const loadMore = !!opts.loadMore;   // "Message Everyone" — auto "Show more results" pagination
 
     const userSelected = state.selectedUrls.size > 0;
     let urls = (userSelected ? Array.from(state.selectedUrls) : _allChipUrls())
       .filter((u) => u && u.includes("/in/"));
-    // "Start after N people": skip the first N of the visible list. Only applies
-    // to the full visible list (not an explicit checkbox selection).
-    if (startAfter > 0 && !userSelected) urls = urls.slice(startAfter);
     if (!urls.length) { flashStatus("No profiles to message", "warn"); return; }
 
     state.messageActive = true;
@@ -7736,22 +7769,14 @@
     try { renderToolbar(); } catch {}
 
     let sent = 0, skipped = 0, failed = 0;
-    const processedUrls = new Set();   // dedup across "Show more results" page loads
-    flashStatus(`Message All started — ${urls.length} profile${urls.length === 1 ? "" : "s"}`, "ok");
-    _lcToast(`⚡ Message All — ${urls.length} card${urls.length === 1 ? "" : "s"}`, 2500);
+    const total = urls.length;
+    flashStatus(`Message All started — ${total} profile${total === 1 ? "" : "s"}`, "ok");
+    _lcToast(`⚡ Message All — ${total} card${total === 1 ? "" : "s"}`, 2500);
 
     try {
-      let pageGuard = 0;
-      // Outer loop: message the current batch, then — when "Message Everyone"
-      // is on — click "Show more results", wait, re-decorate, and message the
-      // newly loaded cards. Repeats until no more button / nothing new / Stop.
-      while (true) {
-      const total = urls.length;
       for (let i = 0; i < urls.length; i++) {
         if (state.messageCancel) break;
         const url = urls[i];
-        if (processedUrls.has(url)) continue;   // already handled on a prior page
-        processedUrls.add(url);
         const idx = i + 1;
 
         // Wrap each iteration so a thrown error in any helper counts as a
@@ -8018,91 +8043,6 @@
           _lcToast(`✗ ${idx}/${total} — error: ${(err && err.message) || err}`, 3000);
           try { _closeMsgOverlay(); } catch {}
         }
-      }
-
-      // ── "Message Everyone" pagination ──
-      // Two page-styles to handle:
-      //   A) "Show more results" load-more button (scaffold-finite-scroll —
-      //      connections page, some search variants). Click → cards stream
-      //      into the SAME page, no URL change.
-      //   B) Numeric pagination + "Next" button (people search results page
-      //      shown in the user's screenshot: pages 64/65/66… Next ›). Click
-      //      → URL changes to page=N+1, the whole results list re-renders.
-      // Without (B), "Message everyone" stopped at the end of the current
-      // page on the people-search layout because the load-more button
-      // simply doesn't exist there.
-      // 'Message everyone' tick is dominant — ignore userSelected here so
-      // pagination always advances when ticked. (Pre-selected URLs only
-      // gate the FIRST-page recipient list above; once we move to the
-      // next page, we want ALL its cards.)
-      if (!loadMore || state.messageCancel) break;
-      // INLINED button lookup (no helper function dependency) so this stays
-      // resilient against any closure-scope hiccup. Two LinkedIn page styles
-      // to handle:
-      //   (A) numeric pages + Next pagination button — people-search results.
-      //       Selectors: button.artdeco-pagination__button--next,
-      //                  button[aria-label='Next'], or text "Next" button.
-      //   (B) "Show more results" infinite-scroll — connections / variants.
-      let pageBtn = null;
-      let pageMode = null;
-      try {
-        // Show more results (load-more) — try first since it's cheaper.
-        const moreBtn =
-          document.querySelector("button.scaffold-finite-scroll__load-button") ||
-          Array.from(document.querySelectorAll("button")).find((x) => {
-            const t = (x.textContent || "").replace(/\s+/g, " ").trim();
-            return /^show more results$/i.test(t);
-          });
-        if (moreBtn && !moreBtn.disabled && moreBtn.getAttribute("aria-disabled") !== "true") {
-          pageBtn = moreBtn;
-          pageMode = "loadmore";
-        }
-        if (!pageBtn) {
-          // Next pagination button — page 79 → 80, etc.
-          const nextCands = [
-            document.querySelector("button.artdeco-pagination__button--next"),
-            document.querySelector("button[aria-label='Next']"),
-            ...Array.from(document.querySelectorAll("button")).filter((b) =>
-              /^next\b/i.test((b.textContent || "").replace(/\s+/g, " ").trim())
-            ),
-          ].filter(Boolean);
-          for (const b of nextCands) {
-            if (!b.disabled && b.getAttribute("aria-disabled") !== "true") {
-              pageBtn = b;
-              pageMode = "next";
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("[LeadCaptura] pagination button lookup threw:", e?.message);
-      }
-      if (!pageBtn) break;                       // no more pages → done
-      _lcToast(
-        pageMode === "next" ? "⏭ Loading next page…" : "⏭ Loading more results…",
-        1800
-      );
-      const sigBefore = _pageSignature();
-      try { pageBtn.scrollIntoView({ block: "center" }); } catch {}
-      await sleep(400 + Math.random() * 300);
-      try { await dispatchHumanClick(pageBtn); } catch { try { pageBtn.click(); } catch {} }
-      // Numeric pagination triggers a real route change and the results list
-      // can take 3-6s to fully re-render. Load-more is faster (~2s). Wait
-      // for the page signature to flip OR until we hit a generous ceiling.
-      const waitCeiling = pageMode === "next" ? 8000 : 3500;
-      const waitStart = Date.now();
-      while (Date.now() - waitStart < waitCeiling) {
-        await sleep(400);
-        if (_pageSignature() !== sigBefore) break;
-      }
-      // Extra settle so the chip-decorate pass below sees the final DOM.
-      await sleep(pageMode === "next" ? 1500 : 700);
-      try { decorateSearchCards(); } catch {}    // chip the freshly loaded cards
-      await sleep(700 + Math.random() * 400);
-      const fresh = _allChipUrls().filter((u) => u && u.includes("/in/") && !processedUrls.has(u));
-      if (!fresh.length) break;                  // nothing new appeared → stop
-      urls = fresh;
-      if (++pageGuard > 200) break;              // hard safety cap
       }
     } finally {
       state.messageActive = false;
@@ -8898,13 +8838,14 @@
     transition: "transform 0.15s ease, box-shadow 0.15s ease",
   };
 
-  function _mountFab(id, label, onClick) {
+  function _mountFab(id, label, onClick, extraStyle) {
     if (document.getElementById(id)) return;
     const btn = document.createElement("button");
     btn.id = id;
     btn.type = "button";
     btn.textContent = label;
     Object.assign(btn.style, FAB_BASE_STYLE);
+    if (extraStyle) Object.assign(btn.style, extraStyle);
     btn.addEventListener("mouseenter", () => {
       btn.style.transform = "translateY(-2px)";
       btn.style.boxShadow = "0 8px 24px rgba(10, 102, 194, 0.6)";
@@ -8919,6 +8860,16 @@
 
   function _unmountFab(id) {
     document.getElementById(id)?.remove();
+  }
+
+  // v1.0.319: update an already-mounted FAB's visible label in place.
+  // _mountFab bails on re-mount (so the label set at first mount sticks),
+  // which is why the v1.0.318 Connect FAB stayed static. _syncFabs runs
+  // every 1500ms — calling this from there keeps the label live without
+  // touching _mountFab's existing semantics or any other FAB.
+  function _updateFabLabel(id, label) {
+    const btn = document.getElementById(id);
+    if (btn && btn.textContent !== label) btn.textContent = label;
   }
 
   function _showToast(msg, ms = 2500) {
@@ -9080,16 +9031,28 @@
   // CASE #2 — Connection List "Message All"
   // ════════════════════════════════════════════════════════════════════
   const CASE2_FAB_ID = "lc-case2-fab";
+  // v1.0.318: side FAB for Connect All on people-search pages, sitting
+  // 60px above the Message All FAB so they stack instead of overlapping.
+  // Mirrors what the user remembers as "the side connect all button."
+  // The bottom-toolbar "Connect All / Connect N" button (line ~1249) is
+  // unchanged — this is just a second entry point for the same flow.
+  const CONNECT_FAB_ID = "lc-connect-fab";
   const CASE2_COMPOSER_ID = "lc-case2-composer";
   const _case2State = { running: false, cancelled: false };
 
   // ───────── Sent-history & checkbox-selection persistence (Case #2) ─────────
   const CASE2_SENT_KEY = "lcCase2SentUrls";
+  // Durable mirror keyed to the linkedin.com ORIGIN (page localStorage), NOT
+  // the extension. chrome.storage.local is tied to the extension ID, so
+  // reinstalling / swapping the unpacked build (new ID) wipes it — that's why
+  // already-messaged people stopped being remembered. Content scripts share
+  // the host page's localStorage, so this survives extension reinstalls and
+  // version changes; it only clears if the user clears linkedin.com site data.
+  const CASE2_SENT_LS_KEY = "__lc_case2_sent_v1";
   const CASE2_CB_CLASS = "lc-case2-cb";
   const CASE2_LI_DECORATED = "lc-case2-li-decorated";
   // Rolling window: anyone messaged more than 24h ago becomes messageable
-  // again. Storage shape: { "/in/<handle>": timestampMs, ... }. (24h so the
-  // same person isn't re-messaged within a day across repeated runs.)
+  // again. Storage shape: { "/in/<handle>": timestampMs, ... }.
   const CASE2_SENT_TTL_MS = 24 * 60 * 60 * 1000;
 
   // Case #2 is active on the connections list AND on /search/results/people/
@@ -9156,12 +9119,57 @@
     catch (e) { return false; }
   }
 
-  // Load raw {url:timestamp} map from storage (1s timeout-safe).
+  // ── Durable linkedin.com-origin mirror (survives extension reinstall) ──
+  // Read the {url:timestamp} map from the host page's localStorage. This is
+  // the source of truth that outlives the extension ID.
+  function _loadSentMapFromLS() {
+    try {
+      const raw = window.localStorage.getItem(CASE2_SENT_LS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function _saveSentMapToLS(map) {
+    try { window.localStorage.setItem(CASE2_SENT_LS_KEY, JSON.stringify(map)); }
+    catch (e) { /* private mode / quota — chrome.storage still has it */ }
+  }
+  // Single writer: persist to BOTH the durable localStorage mirror AND
+  // chrome.storage.local so the two stay in lockstep. localStorage is the
+  // one that survives a reinstall; chrome.storage is kept for continuity.
+  function _persistSentMap(map) {
+    _saveSentMapToLS(map);
+    if (_runtimeAlive()) {
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: map }); } catch (e) {}
+    }
+  }
+
+  // Load raw {url:timestamp} map, MERGING the durable localStorage mirror with
+  // chrome.storage.local (union; newest timestamp wins per URL). 1s
+  // timeout-safe. If the extension context is gone, the localStorage mirror
+  // alone still answers — which is exactly what makes the memory survive a
+  // reinstall: a fresh extension ID has an empty chrome.storage, but the
+  // linkedin.com localStorage still holds the full history.
   function _loadSentMapRaw() {
     return new Promise((resolve) => {
-      if (!_runtimeAlive()) { resolve({}); return; }
+      const lsMap = _loadSentMapFromLS();
+      if (!_runtimeAlive()) { resolve(lsMap); return; }
       let done = false;
-      const finish = (v) => { if (done) return; done = true; resolve(v); };
+      const finish = (chromeMap) => {
+        if (done) return; done = true;
+        const merged = { ...lsMap };
+        for (const [url, ts] of Object.entries(chromeMap || {})) {
+          if (typeof ts === "number" && (!(url in merged) || ts > merged[url])) {
+            merged[url] = ts;
+          }
+        }
+        // If chrome.storage was empty but localStorage had data (post-reinstall),
+        // re-seed chrome.storage so both stores converge again.
+        if (!Object.keys(chromeMap || {}).length && Object.keys(merged).length) {
+          try { chrome.storage.local.set({ [CASE2_SENT_KEY]: merged }); } catch (e) {}
+        }
+        resolve(merged);
+      };
       const t = setTimeout(() => finish({}), 1000);
       try {
         chrome.storage.local.get(CASE2_SENT_KEY, (result) => {
@@ -9191,16 +9199,15 @@
         didPrune = true; // expired entry — will drop on next write
       }
     }
-    // Best-effort prune so storage stays tidy (no await needed).
-    if (didPrune && _runtimeAlive()) {
-      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: pruned }); } catch (e) {}
+    // Best-effort prune so storage stays tidy (writes BOTH stores).
+    if (didPrune) {
+      _persistSentMap(pruned);
     }
     return set;
   }
 
   async function _markSent(url) {
     if (!url) return;
-    if (!_runtimeAlive()) return;
     try {
       const map = await _loadSentMapRaw();
       const now = Date.now();
@@ -9211,15 +9218,27 @@
         }
       }
       map[url] = now;
-      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: map }); } catch (e) {}
+      // Persist to BOTH the durable localStorage mirror and chrome.storage.
+      // Not gated on _runtimeAlive() any more: even if the extension context
+      // is stale, the localStorage write still records the send so it's
+      // remembered after the next reload.
+      _persistSentMap(map);
+      // ── Third durable layer: mirror to the LeadCaptura backend ────────
+      // The local two-store mirror survives extension reinstall, but NOT
+      // a browser change / new device / Chrome profile switch / clearing
+      // linkedin.com site data. Backend sync makes the 24h memory truly
+      // permanent. Fire-and-forget so the send loop doesn't wait on the
+      // network. Backend de-dupes by URL + auto-prunes weekly.
+      try { Api.case2MessageSent(url).catch(() => {}); } catch (e) {}
     } catch (e) {}
   }
 
   async function _clearSentHistory() {
-    if (!_runtimeAlive()) return;
-    try {
-      chrome.storage.local.set({ [CASE2_SENT_KEY]: {} });
-    } catch (e) {}
+    // Clear BOTH stores so "Reset History" truly forgets everyone.
+    try { window.localStorage.removeItem(CASE2_SENT_LS_KEY); } catch (e) {}
+    if (_runtimeAlive()) {
+      try { chrome.storage.local.set({ [CASE2_SENT_KEY]: {} }); } catch (e) {}
+    }
   }
 
   // Mount a checkbox top-right of each connection card. Tracks the
@@ -9340,25 +9359,37 @@
 
     wrap.innerHTML =
       '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:6px;">Message All Visible Connections</div>' +
-      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 24 hours are auto-skipped (older entries expire). Random 15-30s gap.</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">If any card checkboxes are selected, only those are messaged. Otherwise sends to all visible. Profiles messaged in the last 24 hours are auto-skipped (older entries expire). Remembered even if you reinstall the extension. Random 15-30s gap.</div>' +
       '<textarea data-role="ta" placeholder="Type your message..." style="width:100%;height:100px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:13px;resize:vertical;box-sizing:border-box;outline:none;font-family:inherit;color:#1e293b;"></textarea>' +
-      // "Message Everyone" — auto-click "Show more results" until the page runs out.
-      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
-      '<input data-role="everyone" type="checkbox" id="lc-c2-everyone" style="cursor:pointer;width:15px;height:15px;accent-color:#0a66c2;">' +
-      '<label for="lc-c2-everyone" style="font-size:12px;color:#475569;cursor:pointer;user-select:none;">Message everyone — keep clicking “Show more results” until done</label>' +
-      '</div>' +
-      // "Start after N people" — skip the first N entries of the list.
-      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
-      '<label for="lc-c2-start-after" style="font-size:12px;color:#475569;user-select:none;">Start after (skip first):</label>' +
-      '<input data-role="startAfter" type="number" id="lc-c2-start-after" min="0" value="0" style="width:64px;border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;color:#1e293b;outline:none;">' +
-      '<span style="font-size:12px;color:#94a3b8;">people</span>' +
-      '</div>' +
+      // Attachment picker — purely additive. When no files are chosen the
+      // send flow is unchanged. The hidden <input> holds the user's chosen
+      // files; chips below let them review/remove before starting.
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">' +
+      '<button data-role="attach" type="button" style="padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;font-size:12px;color:#334155;font-family:inherit;display:inline-flex;align-items:center;gap:5px;">📎 Attach files</button>' +
+      '<span style="font-size:11px;color:#94a3b8;">PNG, PDF, DOC, etc. — optional, sent with every message</span>' +
+      "</div>" +
+      '<input data-role="file" type="file" multiple accept="image/*,.ai,.psd,.pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.xls,.xlsx,.txt,.eml,.mov,.mp4" style="display:none;">' +
+      '<div data-role="attach-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>' +
+      // Auto-pagination toggle — when ON, after the current page finishes,
+      // click LinkedIn\'s "Next" pagination button and continue messaging the
+      // newly-loaded page. Default ON. Setting persists per-tab in storage.
+      '<label data-role="autopage-row" style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:#475569;cursor:pointer;user-select:none;">' +
+      '<input data-role="autopage" type="checkbox" checked style="margin:0;width:14px;height:14px;cursor:pointer;">' +
+      '<span>📑 Continue on next page after this one finishes (auto-paginate)</span>' +
+      '</label>' +
       '<div data-role="stats" style="font-size:11px;color:#64748b;margin-top:8px;min-height:14px;"></div>' +
       '<div data-role="status" style="font-size:12px;color:#64748b;margin-top:4px;min-height:16px;"></div>' +
+      // Collapsible history panel — purely additive. Hidden by default; the
+      // "View History" button below toggles it. Lists every profile that's
+      // been messaged in the last 24h (newest first) with a "name · how long
+      // ago" line. Reads the same persistent map the dedupe gate uses, so
+      // what you see here is exactly what would be skipped on the next run.
+      '<div data-role="history-panel" style="display:none;margin-top:10px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;max-height:220px;overflow:auto;padding:8px 10px;font-size:12px;color:#1e293b;"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">' +
       '<div data-role="progress" style="font-size:12px;color:#64748b;"></div>' +
       '<div style="display:flex;gap:6px;">' +
       '<button data-role="reset" type="button" style="padding:6px 12px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;cursor:pointer;font-size:12px;color:#b91c1c;font-family:inherit;" title="Clear remembered \'already-messaged\' history">Reset History</button>' +
+      '<button data-role="view-history" type="button" style="padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;font-size:12px;color:#334155;font-family:inherit;" title="See who has been messaged in the last 24h">📋 View History</button>' +
       '<button data-role="cancel" type="button" style="padding:7px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:13px;color:#475569;font-family:inherit;">Cancel</button>' +
       '<button data-role="start" type="button" style="padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#0a66c2,#004182);cursor:pointer;font-size:13px;color:#fff;font-weight:600;font-family:inherit;">Start</button>' +
       "</div></div>";
@@ -9372,8 +9403,149 @@
     const cancelBtn = wrap.querySelector("[data-role='cancel']");
     const startBtn = wrap.querySelector("[data-role='start']");
     const resetBtn = wrap.querySelector("[data-role='reset']");
-    const everyoneCheck = wrap.querySelector("[data-role='everyone']");
-    const startAfterInput = wrap.querySelector("[data-role='startAfter']");
+    const viewHistoryBtn = wrap.querySelector("[data-role='view-history']");
+    const historyPanel = wrap.querySelector("[data-role='history-panel']");
+    const attachBtn = wrap.querySelector("[data-role='attach']");
+    const fileInput = wrap.querySelector("[data-role='file']");
+    const attachListEl = wrap.querySelector("[data-role='attach-list']");
+
+    // Files the user has chosen to attach to EVERY message in this run.
+    // Real File objects, reusable across recipients via a fresh DataTransfer
+    // per dialog. Lives only for the composer's lifetime — no persistence.
+    const attachments = [];
+
+    const _fmtBytes = (n) => {
+      if (n < 1024) return n + " B";
+      if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
+      return (n / (1024 * 1024)).toFixed(1) + " MB";
+    };
+    const renderAttachments = () => {
+      attachListEl.textContent = "";
+      attachments.forEach((file, idx) => {
+        const chip = document.createElement("span");
+        Object.assign(chip.style, {
+          display: "inline-flex", alignItems: "center", gap: "6px",
+          padding: "4px 8px", borderRadius: "999px",
+          background: "rgba(10,102,194,0.08)", border: "1px solid #bcd4ee",
+          fontSize: "11px", color: "#1e3a5f", maxWidth: "190px",
+        });
+        const label = document.createElement("span");
+        Object.assign(label.style, {
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        });
+        label.textContent = file.name + " · " + _fmtBytes(file.size);
+        label.title = file.name;
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.textContent = "×";
+        Object.assign(rm.style, {
+          border: "none", background: "transparent", cursor: "pointer",
+          fontSize: "14px", lineHeight: "1", color: "#64748b", padding: "0",
+        });
+        rm.title = "Remove";
+        rm.onclick = () => { attachments.splice(idx, 1); renderAttachments(); };
+        chip.appendChild(label);
+        chip.appendChild(rm);
+        attachListEl.appendChild(chip);
+      });
+    };
+
+    attachBtn.onclick = () => { if (!_case2State.running) fileInput.click(); };
+    fileInput.onchange = () => {
+      for (const f of Array.from(fileInput.files || [])) {
+        // De-dup by name+size so re-picking the same file doesn't double-add.
+        if (!attachments.some((a) => a.name === f.name && a.size === f.size)) {
+          attachments.push(f);
+        }
+      }
+      // Reset the native input so the SAME file can be re-selected later if
+      // the user removes then re-adds it.
+      fileInput.value = "";
+      renderAttachments();
+    };
+
+    // ── Content Hub → Message All handoff ─────────────────────────────────
+    // If the user clicked "Push to Extension" on a card in the web app,
+    // content_hub_push.js stashed { text, imageDataUrl } in
+    // chrome.storage.local. Pre-fill the message box + add the photo as an
+    // attachment, then clear the key so it doesn't re-apply. Purely additive:
+    // does nothing when there's no pending push.
+    //
+    // applyPush is exposed on window so the global storage.onChanged listener
+    // (registered once, below) can push content into THIS open composer live —
+    // no extension reload / composer reopen needed when the user pushes from
+    // the hub while the composer is already on screen.
+    const applyPush = (p) => {
+      try {
+        if (!p || typeof p !== "object") return;
+        if (!p.ts || Date.now() - p.ts > 3600000) {
+          try { chrome.storage.local.remove("lcMessageAllPush"); } catch (e) {}
+          return;
+        }
+        if (p.text && !ta.value.trim()) ta.value = String(p.text);
+        if (p.imageDataUrl) {
+          fetch(p.imageDataUrl)
+            .then((r) => r.blob())
+            .then((blob) => {
+              const name = p.imageName || "content-photo.png";
+              const file = new File([blob], name, { type: blob.type || "image/png" });
+              if (!attachments.some((a) => a.name === file.name && a.size === file.size)) {
+                attachments.push(file);
+                renderAttachments();
+              }
+            })
+            .catch(() => { /* image unavailable — text still loaded */ });
+        }
+        statusEl.textContent = "📥 Loaded from Content Hub" +
+          (p.title ? " — " + p.title : "") + " ✓";
+        try { _lcToast("📥 Content loaded from Hub" + (p.title ? " — " + p.title : "")); } catch (e) {}
+        // One-shot: clear so re-opening the composer starts clean.
+        try { chrome.storage.local.remove("lcMessageAllPush"); } catch (e) {}
+      } catch (e) {}
+    };
+    // Expose this composer's applier; the global listener calls it on a live push.
+    window.__lcCase2ApplyPush = applyPush;
+    // Initial read on open (handles the push-then-open ordering).
+    (function _loadContentHubPush() {
+      try {
+        if (!(typeof chrome !== "undefined" && chrome.storage && chrome.storage.local)) return;
+        chrome.storage.local.get("lcMessageAllPush", (res) => {
+          if (chrome.runtime && chrome.runtime.lastError) return;
+          applyPush(res && res.lcMessageAllPush);
+        });
+      } catch (e) {}
+    })();
+
+    // ── Backend-synced 24h sent-log hydration ─────────────────────────────
+    // Pull the workspace's durable sent-log from the LeadCaptura backend and
+    // merge into the local two-store mirror, so a freshly-installed
+    // extension (or a new browser / new device) immediately knows who was
+    // messaged in the last 24h. Fire-and-forget — the local fast-path runs
+    // regardless. We merge by writing each url through _persistSentMap so
+    // the next _loadSentSet() picks it up from localStorage instantly.
+    (async function _hydrateCase2FromBackend() {
+      try {
+        const resp = await Api.case2MessageSentList();
+        const entries = (resp && resp.entries) || [];
+        if (!entries.length) return;
+        const map = await _loadSentMapRaw();
+        let added = 0;
+        for (const e of entries) {
+          if (!e || typeof e.url !== "string" || typeof e.ts !== "number") continue;
+          if (!(e.url in map) || e.ts > map[e.url]) {
+            map[e.url] = e.ts;
+            added++;
+          }
+        }
+        if (added) {
+          _persistSentMap(map);
+          try { refreshStats(); } catch (err) {}
+          console.log("[Case2] hydrated " + added + " entries from backend sent-log");
+        }
+      } catch (e) {
+        // Backend not reachable → local mirror is the source of truth, no harm.
+      }
+    })();
 
     // Refresh stats periodically.
     const refreshStats = async () => {
@@ -9395,6 +9567,113 @@
       await _clearSentHistory();
       _decorateCase2Cards();
       refreshStats();
+      if (historyPanel && historyPanel.style.display !== "none") renderHistoryPanel();
+    };
+
+    // Render the contents of the history panel from the persistent sent map.
+    // Newest first; each row = "Display Name · 14m ago" with the linkedin
+    // path as a small caption. Pure read — never mutates the map.
+    const _agoLabel = (ms) => {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return s + "s ago";
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + "m ago";
+      const h = Math.floor(m / 60);
+      return h + "h " + (m - h * 60) + "m ago";
+    };
+    const _nameFromPath = (path) => {
+      try {
+        const slug = decodeURIComponent((path || "").replace(/^.*\/in\//, "").replace(/\/.*$/, ""));
+        if (!slug) return path;
+        return slug
+          .replace(/-[0-9a-f]{6,}$/i, "")
+          .split("-")
+          .filter((p) => p && !/^\d+$/.test(p))
+          .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+          .join(" ") || path;
+      } catch (e) { return path; }
+    };
+    async function renderHistoryPanel() {
+      if (!historyPanel) return;
+      historyPanel.textContent = "";
+      try {
+        const map = await _loadSentMapRaw();
+        const now = Date.now();
+        const rows = Object.entries(map)
+          .filter(([, ts]) => typeof ts === "number" && (now - ts) < CASE2_SENT_TTL_MS)
+          .sort((a, b) => b[1] - a[1]); // newest first
+        if (!rows.length) {
+          historyPanel.innerHTML =
+            '<div style="color:#94a3b8;font-style:italic;padding:6px 2px;">No messages sent in the last 24h yet.</div>';
+          return;
+        }
+        const head = document.createElement("div");
+        Object.assign(head.style, {
+          fontWeight: "700", color: "#334155", marginBottom: "6px",
+          paddingBottom: "6px", borderBottom: "1px solid #e2e8f0",
+        });
+        head.textContent = "Messaged in the last 24h — " + rows.length + " profile" + (rows.length === 1 ? "" : "s");
+        historyPanel.appendChild(head);
+        for (const [path, ts] of rows) {
+          const row = document.createElement("div");
+          Object.assign(row.style, {
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "5px 2px", borderBottom: "1px solid #eef2f7", gap: "8px",
+          });
+          const left = document.createElement("div");
+          Object.assign(left.style, { display: "flex", flexDirection: "column", minWidth: "0" });
+          const nameLink = document.createElement("a");
+          nameLink.href = "https://www.linkedin.com" + path;
+          nameLink.target = "_blank";
+          nameLink.rel = "noopener";
+          nameLink.textContent = _nameFromPath(path);
+          Object.assign(nameLink.style, {
+            color: "#0a66c2", textDecoration: "none", fontWeight: "600",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            maxWidth: "260px",
+          });
+          const caption = document.createElement("div");
+          caption.textContent = path;
+          Object.assign(caption.style, {
+            color: "#94a3b8", fontSize: "10px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            maxWidth: "260px",
+          });
+          left.appendChild(nameLink);
+          left.appendChild(caption);
+          const ago = document.createElement("div");
+          ago.textContent = _agoLabel(now - ts);
+          Object.assign(ago.style, { color: "#64748b", fontSize: "11px", whiteSpace: "nowrap" });
+          row.appendChild(left);
+          row.appendChild(ago);
+          historyPanel.appendChild(row);
+        }
+      } catch (e) {
+        historyPanel.textContent = "Could not load history: " + (e && e.message);
+      }
+    }
+
+    // Auto-refresh the history panel every 3s while it's open so the user
+    // sees new sends appear in real time during a run — without touching
+    // _case2Run. The timer is owned by the composer wrap, so it dies when
+    // the composer closes.
+    let historyTimer = null;
+    viewHistoryBtn.onclick = async () => {
+      if (historyPanel.style.display === "none") {
+        await renderHistoryPanel();
+        historyPanel.style.display = "block";
+        viewHistoryBtn.textContent = "▲ Hide History";
+        if (!historyTimer) {
+          historyTimer = setInterval(() => {
+            if (historyPanel.style.display === "none") return;
+            renderHistoryPanel();
+          }, 3000);
+        }
+      } else {
+        historyPanel.style.display = "none";
+        viewHistoryBtn.textContent = "📋 View History";
+        if (historyTimer) { clearInterval(historyTimer); historyTimer = null; }
+      }
     };
 
     cancelBtn.onclick = () => {
@@ -9413,13 +9692,15 @@
       if (!msg) { ta.focus(); return; }
       startBtn.disabled = true;
       ta.disabled = true;
+      attachBtn.disabled = true;
+      const autoPageEl = wrap.querySelector("[data-role='autopage']");
+      const autoPaginate = !!(autoPageEl && autoPageEl.checked);
+      if (autoPageEl) autoPageEl.disabled = true;
       cancelBtn.textContent = "Stop";
       _case2State.running = true;
       _case2State.cancelled = false;
-      const loadMore = !!everyoneCheck?.checked;
-      const startAfter = Math.max(0, parseInt(startAfterInput?.value, 10) || 0);
       try {
-        await _case2Run(msg, statusEl, progressEl, { loadMore, startAfter });
+        await _case2RunWithPagination(msg, statusEl, progressEl, attachments, autoPaginate);
       } catch (e) {
         statusEl.textContent = "❌ " + (e.message || e);
       } finally {
@@ -9427,6 +9708,9 @@
         _case2State.cancelled = false;
         startBtn.disabled = false;
         ta.disabled = false;
+        attachBtn.disabled = false;
+        const _ape = wrap.querySelector("[data-role='autopage']");
+        if (_ape) _ape.disabled = false;
         cancelBtn.textContent = "Close";
         cancelBtn.disabled = false;
         cancelBtn.onclick = () => wrap.remove();
@@ -9435,6 +9719,40 @@
 
     ta.focus();
   }
+
+  // ── Live Content Hub push listener (registered once) ──────────────────────
+  // When the user clicks "Push to Extension" in the web app, chrome.storage's
+  // lcMessageAllPush key changes. This fires in every LinkedIn tab in real
+  // time — no extension reload / tab refresh needed. If a Message All composer
+  // is already open we fill it live; otherwise (on a Case #2 page) we auto-open
+  // the composer, which reads the push on mount and applies it.
+  (function _registerContentHubPushListener() {
+    try {
+      if (window.__lcCase2PushListener) return;
+      if (!(typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)) return;
+      window.__lcCase2PushListener = true;
+      chrome.storage.onChanged.addListener((changes, area) => {
+        try {
+          if (area !== "local" || !changes.lcMessageAllPush) return;
+          const nv = changes.lcMessageAllPush.newValue;
+          if (!nv || typeof nv !== "object") return; // removal/clear — ignore
+          const composer = document.getElementById(CASE2_COMPOSER_ID);
+          if (composer && typeof window.__lcCase2ApplyPush === "function") {
+            // Composer already open → fill it live.
+            window.__lcCase2ApplyPush(nv);
+          } else if (_isCase2Page()) {
+            // No composer open but we're on a connections/search page →
+            // auto-open it; its on-mount read applies the push.
+            try { _showCase2Composer(); } catch (e) {}
+          } else {
+            // Not on a Case #2 page — leave the push queued; it'll apply the
+            // next time the user opens Message All. Just nudge them.
+            try { _lcToast("📥 Content ready from Hub — open Message All on your connections page"); } catch (e) {}
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+  })();
 
   // Find all Message buttons on the connection list — robust to aria-label
   // variations and lazy rendering. Returns DOM-ordered array.
@@ -9537,88 +9855,260 @@
     return buttons;
   }
 
-  async function _case2Run(messageText, statusEl, progressEl, opts) {
-    opts = opts || {};
-    const loadMore = !!opts.loadMore;       // "Message Everyone" — auto-page via "Show more results"
-    const startAfter = Math.max(0, parseInt(opts.startAfter, 10) || 0);
+  // Locate the attachment <input type="file"> for the CURRENTLY open compose
+  // dialog. Scope to the same .msg-form as the editor we just typed into so
+  // we never set files on a stale/preloaded dialog's input.
+  function _findMsgFileInput(editor) {
+    try {
+      const form = editor && editor.closest(
+        "form.msg-form, .msg-form, [class*='msg-form']"
+      );
+      if (form) {
+        const inp = form.querySelector(
+          "input.msg-form__attachment-upload-input[type='file'], input[type='file'][class*='attachment-upload']"
+        );
+        if (inp) return inp;
+      }
+    } catch (e) {}
+    // Fallback: newest attachment input anywhere (across shadow roots).
+    const all = _queryAllAcrossShadows(
+      "input.msg-form__attachment-upload-input[type='file']"
+    );
+    if (all.length) return all[all.length - 1];
+    const all2 = _queryAllAcrossShadows("input[type='file'][accept*='pdf']");
+    return all2.length ? all2[all2.length - 1] : null;
+  }
 
+  // Attach the chosen files to the open compose dialog by programmatically
+  // setting the hidden file input's FileList (DataTransfer) and dispatching
+  // a native change event — the same path LinkedIn's own picker triggers.
+  // We never click the attach trigger button (that opens the OS picker,
+  // which we can't drive). Returns true if an upload preview was observed.
+  async function _case2AttachFiles(editor, files, statusEl, i, total, name) {
+    if (!files || !files.length) return true;
+    const input = _findMsgFileInput(editor);
+    if (!input) {
+      console.warn("[Case2] attachment input not found — sending text only");
+      return false;
+    }
+    try {
+      const dt = new DataTransfer();
+      for (const f of files) dt.items.add(f);
+      input.files = dt.files;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch (e) {
+      console.warn("[Case2] failed to set attachment files:", e.message || e);
+      return false;
+    }
+    statusEl.textContent =
+      "[" + (i + 1) + "/" + total + "] Uploading " + files.length +
+      " file" + (files.length > 1 ? "s" : "") + " for " + name + "...";
+    // Wait for the upload to register — poll for an attachment preview, with
+    // a generous ceiling for larger files. Always settle afterwards so the
+    // upload finalizes before we read the (re-enabled) Send button.
+    const deadline = Date.now() + 25000;
+    let previewSeen = false;
+    while (Date.now() < deadline) {
+      if (_case2State.cancelled) break;
+      await sleep(500);
+      const previews = _queryAllAcrossShadows(
+        ".msg-form__attachment-item, .msg-form__attachments li, " +
+        "[class*='attachment'][class*='preview'], [class*='file-attachment'], " +
+        "[class*='attachment-card']"
+      ).filter((el) => {
+        try { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+        catch (e) { return false; }
+      });
+      if (previews.length) { previewSeen = true; break; }
+    }
+    await sleep(previewSeen ? 1200 : 2500);
+    return previewSeen;
+  }
+
+  // Find LinkedIn's filtered-search Next pagination button. Stable hook:
+  // data-testid="pagination-controls-next-button-visible". The "-hidden"
+  // variant exists for the Previous button and for cases where Next is not
+  // shown (last page); we deliberately match only the VISIBLE one.
+  // Falls back to <span>Next</span> climb only if the data-testid drifts.
+  function _findCase2NextPageBtn() {
+    // Primary: stable data-testid as in the user-supplied DOM.
+    const primary = document.querySelector(
+      "button[data-testid='pagination-controls-next-button-visible']"
+    );
+    if (primary && !primary.disabled) {
+      const r = primary.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return primary;
+    }
+    // Fallback: data-testid that contains "next" (defensive against class
+    // renames) but does NOT include "hidden" / "prev".
+    const all = document.querySelectorAll(
+      "button[data-testid*='pagination'][data-testid*='next']"
+    );
+    for (const b of all) {
+      const tid = b.getAttribute("data-testid") || "";
+      if (/hidden|prev/i.test(tid)) continue;
+      if (b.disabled) continue;
+      const r = b.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      return b;
+    }
+    // Last-resort: find a <span>Next</span> and climb to its <button>.
+    const spans = document.querySelectorAll("span");
+    for (const s of spans) {
+      const t = (s.textContent || "").trim();
+      if (t !== "Next") continue;
+      const btn = s.closest("button");
+      if (!btn || btn.disabled) continue;
+      const tid = btn.getAttribute("data-testid") || "";
+      // Reject the Send button and any pagination-prev / hidden variant.
+      if (/msg-form__send|prev|hidden/i.test(tid + " " + (btn.className || ""))) continue;
+      const r = btn.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      return btn;
+    }
+    return null;
+  }
+
+  // Read the currently-active page number from LinkedIn's pagination
+  // (the <button> with aria-current="true"). Used to detect that the
+  // click actually advanced — Next click + page number change = success.
+  function _readCurrentPageNum() {
+    const cur = document.querySelector(
+      "button[data-testid^='pagination-indicator-'][aria-current='true']"
+    );
+    if (!cur) return null;
+    const lbl = cur.getAttribute("aria-label") || "";
+    const m = lbl.match(/Page\s+(\d+)/i);
+    if (m) return parseInt(m[1], 10);
+    const t = (cur.textContent || "").trim();
+    if (/^\d+$/.test(t)) return parseInt(t, 10);
+    return null;
+  }
+
+  // Click Next and wait for the page to actually change. Resolves with
+  // { ok, fromPage, toPage }. Strictly read-only on failure paths.
+  async function _case2GoToNextPage(statusEl) {
+    const before = _readCurrentPageNum();
+    const nextBtn = _findCase2NextPageBtn();
+    if (!nextBtn) return { ok: false, reason: "no_next_button" };
+    if (statusEl) statusEl.textContent = "📑 Loading next page…";
+    // Scroll Next into view + human click.
+    try { nextBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
+    await sleep(400);
+    try { nextBtn.click(); } catch (e) { _pointerClick(nextBtn); }
+    // Wait up to 15s for the active page indicator to change OR for the
+    // connection card list to re-render (mutation-based fallback for the
+    // unfiltered network surface which paginates without numbers).
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      if (_case2State.cancelled) return { ok: false, reason: "cancelled" };
+      await sleep(400);
+      const after = _readCurrentPageNum();
+      if (before != null && after != null && after !== before) {
+        return { ok: true, fromPage: before, toPage: after };
+      }
+    }
+    // Page number didn\'t change but Next was clicked — treat as ok if the
+    // Next button is still findable but cards are present. Otherwise fail.
+    const cards = _findConnectionCards();
+    return cards.length ? { ok: true, fromPage: before, toPage: null } : { ok: false, reason: "no_card_refresh" };
+  }
+
+  // Wrapper around _case2Run that adds auto-pagination — purely additive.
+  // Calls the existing _case2Run once per page, clicks Next between pages.
+  // When autoPaginate=false this is byte-for-byte equivalent to calling
+  // _case2Run directly (single-page run). The inner _case2Run function is
+  // NOT modified by this change.
+  async function _case2RunWithPagination(messageText, statusEl, progressEl, attachments, autoPaginate) {
+    let pageNum = _readCurrentPageNum() || 1;
+    let totalPagesRun = 0;
+    while (true) {
+      if (_case2State.cancelled) break;
+      if (statusEl && pageNum) {
+        statusEl.textContent = "📄 Page " + pageNum + " — starting…";
+      }
+      // Run the existing single-page send loop. Untouched.
+      await _case2Run(messageText, statusEl, progressEl, attachments);
+      totalPagesRun++;
+      if (_case2State.cancelled) break;
+      if (!autoPaginate) break;
+      // Scroll back to top so the Next button is in view + the next page\'s
+      // cards render predictably from the top.
+      try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
+      await sleep(800);
+      // Inter-page gap — same family as the inter-message gap (10–20s) so
+      // the click pattern stays human-paced across the full session.
+      const gapMs = 10000 + Math.floor(Math.random() * 10000);
+      const gapS = Math.round(gapMs / 1000);
+      for (let s = gapS; s > 0; s--) {
+        if (_case2State.cancelled) break;
+        if (statusEl) statusEl.textContent = "📑 Next page in " + s + "s…";
+        await sleep(1000);
+      }
+      if (_case2State.cancelled) break;
+      const adv = await _case2GoToNextPage(statusEl);
+      if (!adv.ok) {
+        if (statusEl) {
+          statusEl.textContent = adv.reason === "no_next_button"
+            ? "✓ Done — no more pages (ran " + totalPagesRun + " page" + (totalPagesRun > 1 ? "s" : "") + ")"
+            : "Stopped paginating: " + adv.reason;
+        }
+        break;
+      }
+      pageNum = adv.toPage || (pageNum + 1);
+      // Let new <li> nodes hydrate before the next _case2Run scans them.
+      await sleep(1800);
+    }
+  }
+
+  async function _case2Run(messageText, statusEl, progressEl, attachments = []) {
     statusEl.textContent = "Looking for Message buttons...";
     try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) {}
     await sleep(400);
 
-    // Cross-batch state for "Message Everyone".
-    const processedUrls = new Set();
-    let sent = 0, failed = 0;
-    let totalAttempted = 0;        // running denominator across pages
+    const allButtons = _findCase2MessageButtons();
+    if (!allButtons.length) {
+      statusEl.textContent = "❌ No Message buttons found on the page";
+      return;
+    }
+
+    // Load sent set + selected set.
+    const sentSet = await _loadSentSet();
+    const selectedSet = _selectedUrlsFromCheckboxes();
+    const hasSelection = selectedSet.size > 0;
+
+    // Build {btn, url, name, li} list and filter.
+    const allCands = allButtons.map((btn) => {
+      const li = btn.closest("li");
+      const url = _getProfileUrlFromLi(li);
+      return { btn, url, li };
+    });
     let skippedAlreadySent = 0;
     let skippedNotSelected = 0;
-    let skippedStartAfter = 0;
-    progressEl.textContent = "0 sent · 0 failed · 0/0";
+    const buttons = [];
+    for (const c of allCands) {
+      if (!c.url) { buttons.push(c.btn); continue; } // no URL → can't dedupe, still try
+      if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
+      if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
+      buttons.push(c.btn);
+    }
 
-    // Outer loop: process the current batch, then (if Message Everyone is on)
-    // click "Show more results", wait, re-scan, and continue with the new tail.
-    while (true) {
-      if (_case2State.cancelled) break;
-
-      const allButtons = _findCase2MessageButtons();
-      if (!allButtons.length) {
-        if (totalAttempted === 0) {
-          statusEl.textContent = "❌ No Message buttons found on the page";
-          return;
-        }
-        break;
-      }
-
-      const sentSet = await _loadSentSet();
-      const selectedSet = _selectedUrlsFromCheckboxes();
-      const hasSelection = selectedSet.size > 0;
-
-      // Build {btn,url,li} list — and skip rows already processed this run.
-      const allCands = allButtons.map((btn) => {
-        const li = btn.closest("li");
-        const url = _getProfileUrlFromLi(li);
-        return { btn, url, li };
-      });
-      const buttons = [];
-      const urls = [];
-      for (const c of allCands) {
-        if (c.url && processedUrls.has(c.url)) continue;       // already done in a previous batch
-        if (!c.url) { buttons.push(c.btn); urls.push(""); continue; }
-        if (sentSet.has(c.url)) { skippedAlreadySent++; continue; }
-        if (hasSelection && !selectedSet.has(c.url)) { skippedNotSelected++; continue; }
-        buttons.push(c.btn);
-        urls.push(c.url);
-      }
-
-      // Honour "Start after N" — only on the very first batch and only when the
-      // user hasn't ticked specific cards via checkbox.
-      if (totalAttempted === 0 && startAfter > 0 && !hasSelection && buttons.length > startAfter) {
-        skippedStartAfter = startAfter;
-        buttons.splice(0, startAfter);
-        urls.splice(0, startAfter);
-      }
-
-      const batchTotal = buttons.length;
-      if (!batchTotal) {
-        if (!loadMore) {
-          if (totalAttempted === 0) {
-            statusEl.textContent =
-              "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 24h" +
-              (hasSelection ? " · " + skippedNotSelected + " not selected" : "") +
-              (skippedStartAfter ? " · " + skippedStartAfter + " skipped via start-after" : "");
-          }
-          break;
-        }
-        // Else fall through to the "Show more results" step.
-      }
-      if (batchTotal && totalAttempted === 0 && (skippedAlreadySent || skippedNotSelected || skippedStartAfter)) {
-        statusEl.textContent =
-          "Starting (" + batchTotal + " in this batch · " + skippedAlreadySent + " messaged in last 24h" +
-          (hasSelection ? " · " + skippedNotSelected + " not selected" : "") +
-          (skippedStartAfter ? " · skipped first " + skippedStartAfter : "") + ")";
-        await sleep(800);
-      }
-      totalAttempted += batchTotal;
+    const total = buttons.length;
+    if (!total) {
+      statusEl.textContent =
+        "✓ Nothing to send — " + skippedAlreadySent + " messaged in last 24h" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "");
+      return;
+    }
+    if (skippedAlreadySent || skippedNotSelected) {
+      statusEl.textContent =
+        "Starting (" + total + " to send · " + skippedAlreadySent + " skipped as already-messaged" +
+        (hasSelection ? " · " + skippedNotSelected + " not selected" : "") + ")";
+      await sleep(800);
+    }
+    let sent = 0, failed = 0;
+    progressEl.textContent = "0 sent · 0 failed · 0/" + total;
 
     for (let i = 0; i < buttons.length; i++) {
       if (_case2State.cancelled) break;
@@ -9635,17 +10125,48 @@
         if (nameEl) name = (nameEl.textContent || "").trim();
       }
       if (!name) name = "Unknown";
-      // Mark this URL as processed up-front so a "Show more results" page
-      // that still includes it won't re-attempt the same person.
-      const curUrl = urls[i];
-      if (curUrl) processedUrls.add(curUrl);
-      statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] Messaging " + name + "...";
+
+      // ── Defense-in-depth 24h dedupe (gated on INTENT to send) ─────────
+      // The run-start snapshot misses three real cases:
+      //   • fire-and-forget chrome.storage write from a prior run hasn't
+      //     flushed yet when the user hits Start again
+      //   • LinkedIn renders the same profile twice in the same list
+      //     (pinned card, sticky featured row)
+      //   • another linkedin.com tab just marked this URL between our
+      //     start-time snapshot and right now
+      // So we (a) re-read the sentSet at the top of every iteration and
+      // skip if THIS URL is now in it, and (b) IMMEDIATELY pre-mark the
+      // URL as sent BEFORE clicking — so even if the send itself fails
+      // or the user hits Stop mid-click, the 24h gate still holds and
+      // this profile is never re-messaged. Per user's hardcode rule:
+      // "if I text a person now, I should NOT be able to text him via
+      // tool again for next 24 hours" — the gate is on intent, not on
+      // delivery confirmation.
+      const _liForGate = btn.closest("li");
+      const _urlForGate = _liForGate ? _getProfileUrlFromLi(_liForGate) : null;
+      if (_urlForGate) {
+        const freshSentSet = await _loadSentSet();
+        if (freshSentSet.has(_urlForGate)) {
+          console.log("[Case2] LATE-SKIP " + name + " (" + _urlForGate + ") — already in 24h history");
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ⏭ " + name + " — already messaged in last 24h";
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
+          await sleep(300); // brief beat so the skip is visible
+          continue;
+        }
+        // Pre-mark BEFORE the click. localStorage is synchronous so the
+        // next iteration / tab / run sees this immediately; chrome.storage
+        // flushes async but converges within ms.
+        try { await _markSent(_urlForGate); } catch (e) {}
+        console.log("[Case2] pre-marked " + name + " (" + _urlForGate + ") — clicking Message…");
+      }
+
+      statusEl.textContent = "[" + (i + 1) + "/" + total + "] Messaging " + name + "...";
 
       try {
         // STEP 1: Scroll button into view + click.
         if (!document.body.contains(btn)) {
           failed++;
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
           continue;
         }
         try { btn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
@@ -9676,7 +10197,7 @@
         // STEP 4: Find the NEW editor (one that wasn't in editorsBefore).
         // This avoids the false-positive where my code finds a cached/preload
         // editor in shadow DOM that isn't connected to the visible dialog.
-        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] Waiting for textbox to mount...";
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] Waiting for textbox to mount...";
         const findNewEditor = () => {
           const editors = _queryAllAcrossShadows(
             "div.msg-form__contenteditable[contenteditable='true']"
@@ -9690,10 +10211,10 @@
         const editor = await _waitForObserver(findNewEditor, 25000);
         if (!editor) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Textbox not found for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Textbox not found for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
           continue;
         }
 
@@ -9701,21 +10222,33 @@
         const typed = await _typeIntoEditor(editor, messageText);
         if (!typed) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Could not type for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Could not type for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
           continue;
         }
 
-        // STEP 6: Find Send button (poll until enabled).
-        const sendBtn = await _waitForObserver(() => _findSendBtn(true), 5000);
+        // STEP 5b: Attach files (only when the user chose some). No-op
+        // otherwise, so the text-only flow is byte-for-byte unchanged.
+        if (attachments && attachments.length) {
+          try {
+            await _case2AttachFiles(editor, attachments, statusEl, i, total, name);
+          } catch (e) {
+            console.warn("[Case2] attach step error:", e.message || e);
+          }
+        }
+
+        // STEP 6: Find Send button (poll until enabled). Give uploads extra
+        // headroom — LinkedIn keeps Send disabled until the file finishes.
+        const sendTimeout = (attachments && attachments.length) ? 20000 : 5000;
+        const sendBtn = await _waitForObserver(() => _findSendBtn(true), sendTimeout);
         if (!sendBtn) {
           failed++;
-          statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Send disabled for " + name;
+          statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Send disabled for " + name;
           _closeMsgDialog();
           await sleep(1000);
-          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+          progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
           continue;
         }
 
@@ -9725,7 +10258,7 @@
 
         // Success.
         sent++;
-        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ✅ Sent to " + name;
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ✅ Sent to " + name;
 
         // Persist: mark this profile URL as messaged so future runs skip it.
         try {
@@ -9755,7 +10288,7 @@
         _closeMsgDialog();
         await sleep(800);
 
-        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
 
         // STEP 9: Random 15-30s gap between messages (skip if last or cancelled).
         if (i < buttons.length - 1 && !_case2State.cancelled) {
@@ -9769,51 +10302,14 @@
         }
       } catch (e) {
         failed++;
-        statusEl.textContent = "[" + (i + 1) + "/" + batchTotal + "] ❌ Error: " + (e.message || e);
+        statusEl.textContent = "[" + (i + 1) + "/" + total + "] ❌ Error: " + (e.message || e);
         try { _closeMsgDialog(); } catch (err) {}
         await sleep(1000);
-        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + batchTotal;
+        progressEl.textContent = sent + " sent · " + failed + " failed · " + (i + 1) + "/" + total;
       }
     }
 
-      // ── "Message Everyone" pagination — handle BOTH page styles ──
-      // (A) "Show more results" load-more (connections / some search variants)
-      // (B) Numeric "Next page" pagination (people-search results page)
-      if (!loadMore || _case2State.cancelled) break;
-      let pageBtn = _findShowMoreResultsButton();
-      let pageMode = "loadmore";
-      if (!pageBtn) {
-        pageBtn = _findNextPageButton();
-        pageMode = "next";
-      }
-      if (!pageBtn) {
-        statusEl.textContent = "No more results to load — finishing.";
-        await sleep(800);
-        break;
-      }
-      statusEl.textContent = pageMode === "next" ? "Loading next page…" : "Loading more results…";
-      const sigBefore = _pageSignature();
-      try { pageBtn.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) {}
-      await sleep(400);
-      try { pageBtn.click(); } catch (e) { _pointerClick(pageBtn); }
-      // Numeric pagination triggers a real route change and the results list
-      // re-renders; wait for the page signature to flip OR until a ceiling.
-      const waitCeiling = pageMode === "next" ? 8000 : 3500;
-      const waitStart = Date.now();
-      while (Date.now() - waitStart < waitCeiling) {
-        await sleep(400);
-        if (_pageSignature() !== sigBefore) break;
-      }
-      // Extra settle so the case2-decorate pass below sees the final DOM.
-      await sleep(pageMode === "next" ? 1500 : 1500);
-      // Trigger fresh decoration so newly mounted cards get checkboxes/chips.
-      try { _decorateCase2Cards(); } catch (e) {}
-      await sleep(400);
-    }
-
-    statusEl.textContent =
-      "Done. " + sent + " sent, " + failed + " failed" +
-      (loadMore ? " (across all pages)" : "") + ".";
+    statusEl.textContent = "Done. " + sent + " sent, " + failed + " failed.";
   }
 
   // —— Self-mounting watcher ——————————————————————————————————————
@@ -9822,6 +10318,13 @@
     const path = location.pathname;
     const onProfile = path.startsWith("/in/");
     const onConnections = _isCase2Page();
+    // v1.0.318: Connect All side FAB shows on the people-search page where
+    // connectAllVisible() actually does work (the connections-list page is
+    // people you're already connected to, so a "Connect All" there would be
+    // a no-op). The bottom-toolbar Connect All button still appears on the
+    // same page — this FAB is a second entry point sitting next to the
+    // existing Message All FAB, mirroring the integration the user had.
+    const onPeopleSearch = path.startsWith("/search/results/people");
 
     if (onProfile) {
       _mountFab(CASE1_FAB_ID, "✉️ Send Message", _showCase1Composer);
@@ -9842,6 +10345,20 @@
         document.getElementById(CASE2_COMPOSER_ID)?.remove();
       }
     }
+
+    // v1.0.332: "Connect All on Page" lives in its OWN standalone content
+    // script — extension/content/connect_all_on_page.js, registered
+    // separately in manifest.json. The overlay.js patchwork from
+    // v1.0.328-v1.0.331 has been removed entirely. The standalone script
+    // is a byte-for-byte restore of v1.0.245 which the user confirmed
+    // worked previously.
+    //
+    // Why isolated? Per the original v1.0.240 commit message: "Adding it
+    // to overlay.js's script list (or its IIFE) would couple lifetimes
+    // and risk leaking state into the existing Connect All flow." The
+    // standalone file has its own singleton guard (window.__lc_cap_loaded),
+    // its own setInterval mount lifecycle, its own 4-step send engine.
+    // No interaction with state.connectActive / connectAllVisible.
   }
 
   // Initial mount once body is ready.
@@ -9864,4 +10381,14 @@
     }
   }
   _initWhenReady();
+
+  // v1.0.328: the standalone top-level Connect FAB watchdog (v1.0.321-327)
+  // is REMOVED. The FAB now mounts inside _syncFabs the same way Message
+  // All does — that path has been proven to work for months. The watchdog
+  // approach was overengineered and kept regressing on small detail bugs.
+  try {
+    let _lcVerForLog = "?";
+    try { _lcVerForLog = chrome.runtime.getManifest().version; } catch (_) {}
+    console.log("[LeadCaptura] v" + _lcVerForLog + " — Connect All on Page FAB mounted via _syncFabs");
+  } catch (e) {}
 })();
