@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-09",
+  "theme": "Tech and desk",
+  "season": "Back to office",
+  "design": "C",
+  "campaign_code": "GG-20260709-3",
+  "campaign_name": "Tech and desk - 09 Jul 2026",
+  "subject": "Tech for every desk",
+  "skus": [
+    "GG1068",
+    "GG1526",
+    "GG1097",
+    "GG1536",
+    "GG1663"
+  ],
+  "products": [
+    {
+      "name": "Techmate Wireless",
+      "sku": "GG1068",
+      "desc": "Wireless charging pad that clears the desk cable clutter",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2080-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1068"
+    },
+    {
+      "name": "Techmate Bamboo",
+      "sku": "GG1526",
+      "desc": "Bamboo charging stand for phone and earbuds",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6898-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1526"
+    },
+    {
+      "name": "Hubbam",
+      "sku": "GG1097",
+      "desc": "Bamboo USB hub that adds ports in seconds",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2143-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1097"
+    },
+    {
+      "name": "Charge Up",
+      "sku": "GG1536",
+      "desc": "Compact power bank for a full day off the socket",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6947-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1536"
+    },
+    {
+      "name": "Wirestand",
+      "sku": "GG1663",
+      "desc": "Fold-flat stand that props the phone at eye level",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9692-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1663"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20tech%20and%20desk%20range%20with%20our%20logo."
+}

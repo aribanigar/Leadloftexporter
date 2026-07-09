@@ -1,0 +1,47 @@
+{
+  "date": "2026-07-09",
+  "theme": "Notebooks and writing",
+  "season": "Back to office",
+  "design": "B",
+  "campaign_code": "GG-20260709-5",
+  "campaign_name": "Notebooks and writing - 09 Jul 2026",
+  "subject": "Notebooks worth keeping",
+  "skus": [
+    "GG1025",
+    "GG1091",
+    "GG1602",
+    "GG1067"
+  ],
+  "products": [
+    {
+      "name": "Sonora",
+      "sku": "GG1025",
+      "desc": "Hardcover notebook with an elastic band and ribbon",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3789-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1025"
+    },
+    {
+      "name": "Breta",
+      "sku": "GG1091",
+      "desc": "Softcover notebook that lies flat on the desk",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2118-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1091"
+    },
+    {
+      "name": "Bern",
+      "sku": "GG1602",
+      "desc": "Aluminium pen with a smooth, weighted feel",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8893-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1602"
+    },
+    {
+      "name": "Olympia",
+      "sku": "GG1067",
+      "desc": "Classic ballpoint that writes clean every time",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2067-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1067"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20notebooks%20and%20pens%20range%20with%20our%20logo."
+}

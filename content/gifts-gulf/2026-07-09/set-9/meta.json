@@ -1,0 +1,47 @@
+{
+  "date": "2026-07-09",
+  "theme": "Office and desk essentials",
+  "season": "Back to office",
+  "design": "C",
+  "campaign_code": "GG-20260709-9",
+  "campaign_name": "Office and desk essentials - 09 Jul 2026",
+  "subject": "Desk kit, cleanly branded",
+  "skus": [
+    "GG1436",
+    "GG1439",
+    "GG1562",
+    "GG1524"
+  ],
+  "products": [
+    {
+      "name": "Ergopad",
+      "sku": "GG1436",
+      "desc": "Desk pad that gives the mouse a smooth surface",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6411-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1436"
+    },
+    {
+      "name": "Superpad",
+      "sku": "GG1439",
+      "desc": "Felt desk mat that frames a tidy workspace",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6416-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1439"
+    },
+    {
+      "name": "Conference",
+      "sku": "GG1562",
+      "desc": "Zipped folder that keeps papers and pen together",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7597-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1562"
+    },
+    {
+      "name": "Everwrite",
+      "sku": "GG1524",
+      "desc": "Reusable notebook you wipe clean and write again",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6892-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1524"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20office%20and%20desk%20range%20with%20our%20logo."
+}

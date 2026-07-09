@@ -1,0 +1,63 @@
+{
+  "date": "2026-07-09",
+  "theme": "Premium drinkware",
+  "season": "Mid-year",
+  "design": "A",
+  "campaign_code": "GG-20260709-1",
+  "campaign_name": "Premium drinkware - 09 Jul 2026",
+  "subject": "Drinkware they keep",
+  "skus": [
+    "GG1542",
+    "GG1621",
+    "GG1409",
+    "GG1347",
+    "GG1666",
+    "GG1112"
+  ],
+  "products": [
+    {
+      "name": "Aira",
+      "sku": "GG1542",
+      "desc": "Double-wall steel bottle that keeps drinks cold all day",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6971-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1542"
+    },
+    {
+      "name": "Aspen",
+      "sku": "GG1621",
+      "desc": "Vacuum tumbler with a press-fit lid for the desk",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9225-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1621"
+    },
+    {
+      "name": "Brace",
+      "sku": "GG1409",
+      "desc": "Leak-proof stainless bottle with a secure screw cap",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6276-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1409"
+    },
+    {
+      "name": "Svalur",
+      "sku": "GG1347",
+      "desc": "Ceramic-lined mug that holds heat cup after cup",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2903-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1347"
+    },
+    {
+      "name": "Kenya",
+      "sku": "GG1666",
+      "desc": "Insulated travel mug sized for the daily commute",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9708-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1666"
+    },
+    {
+      "name": "Nomu",
+      "sku": "GG1112",
+      "desc": "Slim bottle that slides into any bag pocket",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2187-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1112"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20drinkware%20range%20with%20our%20logo."
+}

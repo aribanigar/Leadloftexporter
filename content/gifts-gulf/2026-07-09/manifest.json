@@ -1,0 +1,136 @@
+{
+  "date": "2026-07-09",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "campaign_code": "GG-20260709-1",
+      "campaign_name": "Premium drinkware - 09 Jul 2026",
+      "subject": "Drinkware they keep",
+      "skus": [
+        "GG1542",
+        "GG1621",
+        "GG1409",
+        "GG1347",
+        "GG1666",
+        "GG1112"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Bags and travel",
+      "campaign_code": "GG-20260709-2",
+      "campaign_name": "Bags and travel - 09 Jul 2026",
+      "subject": "Bags they carry daily",
+      "skus": [
+        "GG1061",
+        "GG1124",
+        "GG1410",
+        "GG1667"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Tech and desk",
+      "campaign_code": "GG-20260709-3",
+      "campaign_name": "Tech and desk - 09 Jul 2026",
+      "subject": "Tech for every desk",
+      "skus": [
+        "GG1068",
+        "GG1526",
+        "GG1097",
+        "GG1536",
+        "GG1663"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Eco and sustainable",
+      "campaign_code": "GG-20260709-4",
+      "campaign_name": "Eco and sustainable - 09 Jul 2026",
+      "subject": "Lighter footprint, branded",
+      "skus": [
+        "GG1610",
+        "GG1400",
+        "GG1708",
+        "GG1414",
+        "GG1452"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Notebooks and writing",
+      "campaign_code": "GG-20260709-5",
+      "campaign_name": "Notebooks and writing - 09 Jul 2026",
+      "subject": "Notebooks worth keeping",
+      "skus": [
+        "GG1025",
+        "GG1091",
+        "GG1602",
+        "GG1067"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Executive onboarding",
+      "campaign_code": "GG-20260709-6",
+      "campaign_name": "Executive onboarding - 09 Jul 2026",
+      "subject": "Welcome kits done right",
+      "skus": [
+        "GG1424",
+        "GG1437",
+        "GG1052",
+        "GG1017"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Event giveaways",
+      "campaign_code": "GG-20260709-7",
+      "campaign_name": "Event giveaways - 09 Jul 2026",
+      "subject": "Giveaways that move fast",
+      "skus": [
+        "GG1027",
+        "GG1024",
+        "GG1023",
+        "GG1274",
+        "GG1707"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Seasonal occasions",
+      "campaign_code": "GG-20260709-8",
+      "campaign_name": "Seasonal occasions - 09 Jul 2026",
+      "subject": "Sunny season, branded",
+      "skus": [
+        "GG1206",
+        "GG1202",
+        "GG1546",
+        "GG1189"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Office and desk essentials",
+      "campaign_code": "GG-20260709-9",
+      "campaign_name": "Office and desk essentials - 09 Jul 2026",
+      "subject": "Desk kit, cleanly branded",
+      "skus": [
+        "GG1436",
+        "GG1439",
+        "GG1562",
+        "GG1524"
+      ]
+    }
+  ]
+}

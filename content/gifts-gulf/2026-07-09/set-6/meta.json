@@ -1,0 +1,47 @@
+{
+  "date": "2026-07-09",
+  "theme": "Executive onboarding",
+  "season": "Onboarding wave",
+  "design": "C",
+  "campaign_code": "GG-20260709-6",
+  "campaign_name": "Executive onboarding - 09 Jul 2026",
+  "subject": "Welcome kits done right",
+  "skus": [
+    "GG1424",
+    "GG1437",
+    "GG1052",
+    "GG1017"
+  ],
+  "products": [
+    {
+      "name": "Yuki Backpack",
+      "sku": "GG1424",
+      "desc": "Water-resistant backpack that anchors the welcome kit",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6354-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1424"
+    },
+    {
+      "name": "Ameland",
+      "sku": "GG1437",
+      "desc": "Copper vacuum bottle that feels premium in hand",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6413-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1437"
+    },
+    {
+      "name": "Eleganci",
+      "sku": "GG1052",
+      "desc": "Bonded-leather notebook for the first-week notes",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7109-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1052"
+    },
+    {
+      "name": "Premier",
+      "sku": "GG1017",
+      "desc": "Metal pen that signs the welcome letter in style",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3350-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1017"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20build%20an%20onboarding%20kit%20with%20our%20logo."
+}

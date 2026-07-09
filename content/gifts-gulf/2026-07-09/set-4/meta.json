@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-09",
+  "theme": "Eco and sustainable",
+  "season": "Mid-year",
+  "design": "A",
+  "campaign_code": "GG-20260709-4",
+  "campaign_name": "Eco and sustainable - 09 Jul 2026",
+  "subject": "Lighter footprint, branded",
+  "skus": [
+    "GG1610",
+    "GG1400",
+    "GG1708",
+    "GG1414",
+    "GG1452"
+  ],
+  "products": [
+    {
+      "name": "Organic Cottonel",
+      "sku": "GG1610",
+      "desc": "Organic cotton tote that replaces single-use bags",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8973-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1610"
+    },
+    {
+      "name": "Grow Notebook",
+      "sku": "GG1400",
+      "desc": "Seed-paper notebook that grows into herbs when planted",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6225-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1400"
+    },
+    {
+      "name": "Tuko RPET",
+      "sku": "GG1708",
+      "desc": "Backpack made from recycled plastic bottles",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9918-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1708"
+    },
+    {
+      "name": "Aspen Cork",
+      "sku": "GG1414",
+      "desc": "Cork-wrapped bottle with a natural, warm finish",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6313-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1414"
+    },
+    {
+      "name": "Memo Seed",
+      "sku": "GG1452",
+      "desc": "Seed-topped pencil you can plant after the last note",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6511-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1452"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20eco%20and%20sustainable%20range%20with%20our%20logo."
+}

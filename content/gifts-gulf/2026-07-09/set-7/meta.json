@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-09",
+  "theme": "Event giveaways",
+  "season": "Event season",
+  "design": "A",
+  "campaign_code": "GG-20260709-7",
+  "campaign_name": "Event giveaways - 09 Jul 2026",
+  "subject": "Giveaways that move fast",
+  "skus": [
+    "GG1027",
+    "GG1024",
+    "GG1023",
+    "GG1274",
+    "GG1707"
+  ],
+  "products": [
+    {
+      "name": "Glop Cap",
+      "sku": "GG1027",
+      "desc": "Cotton cap that keeps your brand on show",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc1447-10.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1027"
+    },
+    {
+      "name": "Totecolor",
+      "sku": "GG1024",
+      "desc": "Bright cotton tote for the booth handout",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3787-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1024"
+    },
+    {
+      "name": "Cartoon Pen",
+      "sku": "GG1023",
+      "desc": "Colourful ballpoint that clicks smooth every time",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3780-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1023"
+    },
+    {
+      "name": "Retro Keyring",
+      "sku": "GG1274",
+      "desc": "Compact keyring that travels on every set of keys",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2630-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1274"
+    },
+    {
+      "name": "Icecube",
+      "sku": "GG1707",
+      "desc": "Slim bottle that keeps the crowd hydrated",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9915-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1707"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20event%20giveaways%20range%20with%20our%20logo."
+}

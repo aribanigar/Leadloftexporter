@@ -1,0 +1,47 @@
+{
+  "date": "2026-07-09",
+  "theme": "Bags and travel",
+  "season": "Event season",
+  "design": "B",
+  "campaign_code": "GG-20260709-2",
+  "campaign_name": "Bags and travel - 09 Jul 2026",
+  "subject": "Bags they carry daily",
+  "skus": [
+    "GG1061",
+    "GG1124",
+    "GG1410",
+    "GG1667"
+  ],
+  "products": [
+    {
+      "name": "Valley Backpack",
+      "sku": "GG1061",
+      "desc": "Padded laptop backpack with a clean branded panel",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2050-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1061"
+    },
+    {
+      "name": "Bai Backpack",
+      "sku": "GG1124",
+      "desc": "Roll-top daypack for commute and travel",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2231-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1124"
+    },
+    {
+      "name": "Zurich",
+      "sku": "GG1410",
+      "desc": "Business backpack with a smart pocket layout",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6279-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1410"
+    },
+    {
+      "name": "Taske Duffel",
+      "sku": "GG1667",
+      "desc": "Water-resistant duffel for weekend trips",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9731-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1667"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20bags%20and%20travel%20range%20with%20our%20logo."
+}

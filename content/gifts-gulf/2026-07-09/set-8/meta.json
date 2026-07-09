@@ -1,0 +1,47 @@
+{
+  "date": "2026-07-09",
+  "theme": "Seasonal occasions",
+  "season": "Summer",
+  "design": "B",
+  "campaign_code": "GG-20260709-8",
+  "campaign_name": "Seasonal occasions - 09 Jul 2026",
+  "subject": "Sunny season, branded",
+  "skus": [
+    "GG1206",
+    "GG1202",
+    "GG1546",
+    "GG1189"
+  ],
+  "products": [
+    {
+      "name": "Maldi Beach",
+      "sku": "GG1206",
+      "desc": "Roomy beach bag for sunny days out",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2485-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1206"
+    },
+    {
+      "name": "Sporttle",
+      "sku": "GG1202",
+      "desc": "Sport bottle with a quick-flip drinking spout",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2470-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1202"
+    },
+    {
+      "name": "Rays Cap",
+      "sku": "GG1546",
+      "desc": "Lightweight cap that shades the summer sun",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6982-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1546"
+    },
+    {
+      "name": "Feltsea",
+      "sku": "GG1189",
+      "desc": "Felt tote that carries the essentials in style",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2416-07.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1189"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-09/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20I%20would%20like%20to%20see%20the%20summer%20gifting%20range%20with%20our%20logo."
+}
