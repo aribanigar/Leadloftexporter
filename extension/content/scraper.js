@@ -292,16 +292,40 @@
     return null;
   }
 
-  function _findAvatar(card) {
+  function _findAvatar(card, fullName) {
     if (!card) return null;
-    const imgs = card.querySelectorAll("img");
-    for (const img of imgs) {
-      const src = img.getAttribute("src") || "";
-      if (src.includes("/profile-displayphoto") || src.includes("media.licdn.com") || src.includes("profile-")) {
-        return src;
-      }
-    }
-    return imgs[0]?.getAttribute("src") || null;
+    const name = (fullName || "").trim();
+    // Score every img so we pick the PROFILE PHOTO, not the banner/cover image
+    // (which is also on media.licdn.com and appears FIRST in the DOM — the old
+    // "first licdn img" logic returned the banner, so the CRM showed initials).
+    const cands = Array.from(card.querySelectorAll("img")).map((img) => {
+      const src =
+        img.getAttribute("src") ||
+        img.getAttribute("data-delayed-url") ||
+        img.getAttribute("data-ghost-url") ||
+        "";
+      const alt = img.getAttribute("alt") || "";
+      const cls = img.className || "";
+      let s = 0;
+      if (/profile-displayphoto/i.test(src)) s += 20;              // the photo path
+      if (/displaybackground|backgroundimage|cover|banner/i.test(src + " " + cls)) s -= 30;
+      if (name && alt && alt.includes(name)) s += 8;
+      if (/profile-picture|presence-entity__image|pv-top-card|evi-image/i.test(cls)) s += 8;
+      if (/media\.licdn\.com/i.test(src)) s += 2;
+      // Structural cues — decisive when LinkedIn serves BOTH the photo and the
+      // banner as generic media.licdn.com/dms/image/v2 URLs with no descriptive
+      // path segment (the tie case where the DOM-first banner would otherwise
+      // win the stable sort). The banner lives inside a background/cover
+      // container; the photo inside a photo/avatar container or a "…photo" button.
+      if (img.closest("[class*='background'],[class*='cover'],[class*='banner'],[class*='backdrop']")) s -= 30;
+      if (/\b(background|cover|banner)\b/i.test(alt)) s -= 30;
+      if (img.closest("[class*='profile-photo'],[class*='profile-picture'],[class*='top-card__photo'],[class*='pv-top-card-profile-picture'],button[aria-label*='photo' i]")) s += 12;
+      return { src, s };
+    }).filter((c) => c.src && /^https?:/i.test(c.src));
+    cands.sort((a, b) => b.s - a.s);
+    // Require a positive score — a bare banner (negative) is worse than null,
+    // which lets the CRM render clean initials instead of a wrong image.
+    return cands.length && cands[0].s > 0 ? cands[0].src : null;
   }
 
   // Wait for the h1 to stop changing before we read the name. LinkedIn
@@ -328,6 +352,153 @@
     }
   }
 
+  // Derive { title, company } from a LinkedIn headline. Handles THREE shapes:
+  //   1. "Title at Company"  /  "Title @ Company"        → split on the separator
+  //   2. "Founder Acme, Beta & Gamma" (role, no "at")    → role keyword = title,
+  //      first org after it (up to , / & / and / bullet) = company
+  //   3. anything else                                    → whole string = title
+  // Case 2 is what fixes profiles like "Founder Evolvin' Global, Nia Coffee …"
+  // whose headline never contains " at " or "@", so both title and company
+  // were coming back blank before.
+  const _ROLE_RE =
+    /^(co[-\s]?founder|founder|co[-\s]?owner|owner|ceo|cto|coo|cfo|cmo|cio|cpo|chief\s+[a-z]+\s+officer|managing\s+director|director|vice\s+president|vp|president|head\s+of\s+[a-z&\/\s]+?|head|chair(?:man|woman|person)?|managing\s+partner|partner|principal|consultant|advisor|board\s+member|manager|lead)\b/i;
+  // Roles that are unambiguous standalone entities — essentially never the first
+  // word of a single compound job title. ONLY these may have a company carved
+  // out of a comma/bullet-separated headline. Weak roles ("Lead", "Head",
+  // "Director", "Manager", "Principal", "VP", "Partner", "Consultant") are
+  // routinely the first word of ONE title ("Lead Generation Specialist",
+  // "Director of Photography", "VP Engineering", "Principal Engineer") and must
+  // NEVER be split — the old branch both truncated the title AND fabricated a
+  // company from the remainder.
+  // Strong roles are ALWAYS "of/at a COMPANY", never "of a department" — so for
+  // these, both " of/at X" and ", X" reliably introduce the current company.
+  // Deliberately EXCLUDES "managing director" etc. ("Managing Director of
+  // Operations" → Operations is a dept, not the company).
+  const _STRONG_ROLE_RE =
+    /^(co[-\s]?founder|founder|co[-\s]?owner|owner|ceo|cto|coo|cfo|cmo|cio|cpo|chief\s+[a-z]+\s+officer)\b/i;
+  function _splitTitleCompany(headline) {
+    if (!headline) return { title: null, company: null };
+    const primary = String(headline).split("|")[0].trim();
+    const sep = primary.match(/\s+at\s+|\s*@\s*/i);
+    if (sep) {
+      return {
+        title: primary.slice(0, sep.index).trim() || null,
+        company: primary.slice(sep.index + sep[0].length).trim() || null,
+      };
+    }
+    const role = primary.match(_ROLE_RE);
+    if (role) {
+      // Only carve out a company for a STRONG standalone role, and only when the
+      // org is explicitly introduced — by " of/at X" ("Founder of Acme Corp",
+      // "CEO of Nike") or by a comma/bullet ("Founder Evolvin' Global, Nia
+      // Coffee", "CEO, Acme Corp"). Weak roles ("Lead", "Director", "VP",
+      // "Head", "Principal", "Manager") are the first word of ONE compound title
+      // ("Lead Generation Specialist", "Director of Photography") and are kept
+      // WHOLE — never split, never truncated. (& / " and " are excluded: they
+      // join two roles, e.g. "Co-Founder and CTO".) When no company is confidently
+      // extracted, the /company/ DOM link is the fallback source.
+      const rest = primary.slice(role[0].length);
+      if (_STRONG_ROLE_RE.test(primary)) {
+        let company = null;
+        const ofAt = rest.match(/^\s*(?:of|at)\s+(.+)$/i);
+        if (ofAt) {
+          company = (ofAt[1].split(/\s*[,·•]\s*/)[0] || "").trim();
+        } else if (/[,·•]/.test(rest)) {
+          company = (rest.split(/\s*[,·•]\s*/).map((s) => s.trim()).filter(Boolean)[0] || "")
+            .replace(/^(?:of|at)\s+/i, "")
+            .trim();
+        }
+        if (company && company.length > 1) {
+          return { title: role[0].trim() || primary, company };
+        }
+      }
+      return { title: primary || null, company: null };
+    }
+    return { title: primary || null, company: null };
+  }
+
+  // The current-company linked entity ("Nia Coffee") is the most reliable
+  // company source on a profile — more accurate than headline parsing. Scan the
+  // top-card region (widening scope) for the first real /company/ link.
+  function _currentCompanyFromDom(card, selfName) {
+    const scopes = [
+      card,
+      document.querySelector(
+        "section.pv-top-card, .pv-top-card, [data-view-name='profile-card'], .scaffold-layout__main"
+      ),
+      document.querySelector("main"),
+    ].filter(Boolean);
+    for (const scope of scopes) {
+      for (const a of scope.querySelectorAll("a[href*='/company/']")) {
+        // Never take a company link from an ad, promo, or a "people you may
+        // know / more profiles" sidebar — those live in <aside> and ad/promo
+        // containers and would return e.g. "Arrow Electronics" (the ad) instead
+        // of the person's real current company.
+        if (a.closest(
+          "aside, .scaffold-layout__aside, [class*='ad-banner'], [class*='ads-'], " +
+          "[data-view-name*='ad'], [componentkey*='ADS'], [class*='similar'], " +
+          "[class*='browsemap'], [class*='pymk'], [aria-label*='promoted' i]"
+        )) continue;
+        const raw = _txt(a);
+        if (!raw) continue;
+        const stripped = raw.split(/\s*[·•|]\s*/)[0].trim();
+        if (
+          stripped &&
+          stripped.length > 1 &&
+          stripped.length < 120 &&
+          stripped !== selfName &&
+          !_isActionLabel(stripped) &&
+          !/^[\d,.\s]+(followers?|employees?|connections?)/i.test(stripped)
+        ) {
+          return stripped;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Position-based headline finder — class-independent, so it survives
+  // LinkedIn markup churn (the class-based selectors kept missing, leaving
+  // Title blank for e.g. "Business Development and Client Relations Manager").
+  // Returns the first standalone LEAF text line inside the top card that isn't
+  // the name, a degree badge, connections count, or an action label.
+  function _headlineFromCard(card, fullName) {
+    if (!card) return null;
+    const name = (fullName || "").trim();
+    for (const n of card.querySelectorAll("div, span, p")) {
+      // Prefer leaves — skip wrappers whose text comes from a child element
+      // (avoids concatenated "name + headline + location" blobs).
+      let childText = false;
+      for (const c of n.children) {
+        const ct = _txt(c);
+        if (ct && ct.length >= 3) { childText = true; break; }
+      }
+      if (childText) continue;
+      const t = _txt(n);
+      if (!t || t.length < 4 || t.length > 220) continue;
+      if (name && t.includes(name)) continue;
+      if (/^\d[\d,]*\+?\s*(connections?|followers?|mutual)/i.test(t)) continue;
+      if (/·\s*(1st|2nd|3rd)\b/i.test(t)) continue;
+      if (/^(connect|message|follow(ing)?|pending|more|contact info|save in sales navigator|open to|add profile|enhance profile|open profile|view profile)\b/i.test(t)) continue;
+      if (_isFeedNoise(t)) continue;
+      return t.replace(/\s*·\s*contact\s*info\s*$/i, "").split("\n")[0].trim();
+    }
+    return null;
+  }
+
+  // High-precision "is this string actually a LOCATION, not a headline/title?"
+  // Used to stop a headline-less profile's location line from poisoning the
+  // title. Requires an explicit country/region keyword AND a short length, so it
+  // (almost) never misfires on a real title — callers additionally gate on
+  // role/"at"/"@" so department words like "EMEA Region" inside a real title are
+  // still safe.
+  const _STRONG_GEO_RE = /\b(area|metro|greater|region|province|county|district|emirates|uae|united arab emirates|saudi arabia|qatar|kuwait|bahrain|oman|united kingdom|england|scotland|wales|united states|america|india|pakistan|canada|australia|singapore|germany|france|spain|italy|netherlands|switzerland|ireland|new zealand|south africa|nigeria|kenya)\b/i;
+  function _looksLikeLocation(s) {
+    const t = (s || "").trim();
+    if (!t || t.length > 60) return false;
+    return _STRONG_GEO_RE.test(t);
+  }
+
   function scrapeProfile() {
     const { h1, card } = _findTopCard();
     let fullName = _cleanPersonName(_txt(h1));
@@ -344,17 +515,32 @@
     // Headline: the text line directly under the name. Multiple fallbacks
     // because LinkedIn sometimes wraps it in different structures.
     let headline = null;
-    if (h1) {
-      // Try the immediate next sibling first
+    const _hScope = card || document.querySelector("main") || document;
+    // Strategy A — known headline selectors (bare .text-body-medium last since
+    // that class is reused elsewhere).
+    for (const sel of [
+      ".text-body-medium.break-words",
+      "div.text-body-medium[data-generated-suggestion-target]",
+      ".pv-text-details__left-panel .text-body-medium",
+      "[data-view-name='profile-card'] .text-body-medium",
+    ]) {
+      const hEl = _hScope.querySelector(sel);
+      const t = hEl && _txt(hEl);
+      if (t && t.length > 2 && t.length < 240 && t !== fullName && !_isFeedNoise(t) &&
+          !/^(connect|message|follow|more|premium)\b/i.test(t) &&
+          !/contact info|\d+\s*(connections?|followers?)/i.test(t)) {
+        headline = t; break;
+      }
+    }
+    // Strategy B — class-independent position scan (the reliable one).
+    if (!headline) headline = _headlineFromCard(_hScope, fullName);
+    // Strategy C — legacy sibling walk.
+    if (!headline && h1) {
       let n = h1.nextElementSibling;
       while (n && !headline) {
         const t = _txt(n);
-        if (
-          t &&
-          t.length > 4 &&
-          !_isFeedNoise(t) &&
-          !/connect|message|follow|more|premium/i.test(t)
-        ) {
+        if (t && t.length > 4 && !_isFeedNoise(t) &&
+            !/connect|message|follow|more|premium/i.test(t)) {
           headline = t;
         }
         n = n.nextElementSibling;
@@ -407,40 +593,26 @@
       }
     }
 
-    const avatar = _findAvatar(card);
+    const avatar = _findAvatar(card, fullName);
 
     // Company: parse from headline ("Title at Company") as a reliable
     // fallback. The Experience section's first row varies too wildly to
     // depend on without classes.
-    let companyName = null;
-    let title = null;
-    if (headline) {
-      // Strip pipe-separated specializations before extracting title/company.
-      // "Head of Events at HEC Paris Doha | Executive Education | Aviation"
-      //  → primary = "Head of Events at HEC Paris Doha"
-      //  → title = "Head of Events", company = "HEC Paris Doha"
-      const primary = headline.split("|")[0].trim();
-      const parts = primary.split(/\s+at\s+/i);
-      if (parts.length >= 2) {
-        title = parts[0].trim();
-        companyName = parts.slice(1).join(" at ").trim();
-      } else {
-        title = primary;
-      }
-    }
+    // Title + company. Parse the headline for the title (role keyword or
+    // "Title at/@  Company"), then PREFER the linked current-company entity
+    // (e.g. "Nia Coffee") over the headline-derived org — the linked entity is
+    // what LinkedIn shows as the person's current company and is more accurate.
+    const _tc = _splitTitleCompany(headline);
+    let title = _tc.title;
+    let companyName = _currentCompanyFromDom(card, fullName) || _tc.company;
 
-    // Fallback 1: company page link inside the top card. LinkedIn wraps company
-    // names in <a href="/company/<slug>/"> — stable across layout rotations.
-    // Strip "· Full-time" / "· 2 years" type suffixes from the link text.
-    if (!companyName && card) {
-      const compEl = card.querySelector("a[href*='/company/']");
-      if (compEl) {
-        const raw = _txt(compEl);
-        if (raw && raw.length > 1 && raw.length < 120 && !_isActionLabel(raw) && raw !== fullName) {
-          const stripped = raw.split(/\s*[·•|]\s*/)[0].trim();
-          if (stripped && stripped.length > 1) companyName = stripped;
-        }
-      }
+    // Guard: on headline-less profiles the position scan can surface the
+    // LOCATION line as the "headline", which would poison the title. If the
+    // derived title is location-shaped (country/region keyword) and carries no
+    // role or "at"/"@" company signal, drop it — a blank title beats a city.
+    if (title && !/\s+at\s+|\s*@\s*/i.test(title) && !_ROLE_RE.test(title) && _looksLikeLocation(title)) {
+      if (!location_) location_ = title;
+      title = null;
     }
 
     // Fallback 2: "Company · Role-type" or "Company · Duration" text in the
@@ -519,14 +691,31 @@
    */
 
   function _findContactInfoLink() {
-    // Hard reject for avatar / cover-photo overlay anchors. Without this
+    // Hard reject for avatar / cover-photo overlay anchors and any
+    // descendant of an <img>/<button> in the avatar area. Without this
     // a stray text fallback can return an `<a href=".../overlay/photo/">`
     // whose tooltip happens to contain "contact info" — clicking it
     // opens the avatar lightbox instead of the Contact info modal,
     // which is the bug the user reported during enrichment runs.
     function _isAvatarOverlay(n) {
-      const href = (n?.getAttribute?.("href") || "");
-      return /\/overlay\/(photo|edit-photo|cover)/i.test(href);
+      if (!n) return false;
+      const href = (n.getAttribute?.("href") || "");
+      if (/\/overlay\/(photo|edit-photo|cover)/i.test(href)) return true;
+      // Belt-and-suspenders: reject anything whose nearest <a> ancestor is
+      // an avatar-overlay anchor, OR which lives inside the avatar's
+      // dedicated image container. Catches the rare case where LinkedIn
+      // wraps the avatar's clickable region around a sibling text node.
+      try {
+        const a = n.closest?.("a[href]");
+        if (a && a !== n) {
+          const ah = a.getAttribute("href") || "";
+          if (/\/overlay\/(photo|edit-photo|cover)/i.test(ah)) return true;
+        }
+        if (n.closest?.(".pv-top-card-profile-picture, .pv-top-card__photo, [data-test-id*='profile-picture']")) {
+          return true;
+        }
+      } catch {}
+      return false;
     }
     const strict = [
       "a[href*='/overlay/contact-info/']",
@@ -537,12 +726,26 @@
       const el = document.querySelector(sel);
       if (el && !_isAvatarOverlay(el)) return el;
     }
-    return Array.from(document.querySelectorAll("a, button")).find((n) => {
-      if (_isAvatarOverlay(n)) return false;
-      const txt = (n.textContent || "").trim();
-      const lbl = (n.getAttribute("aria-label") || "").trim();
-      return /^contact info$/i.test(txt) || /contact info/i.test(lbl);
-    });
+    // Text/aria fallback — scope to the profile TOP-CARD area first so we
+    // don't accidentally match an unrelated "Contact info" string elsewhere
+    // on the page (help tooltip, sidebar promo, footer link, etc.).
+    const topCard = document.querySelector(
+      "section.pv-top-card, .pv-top-card, [data-view-name='profile-card'], main"
+    );
+    const scopes = topCard ? [topCard, document] : [document];
+    for (const scope of scopes) {
+      const hit = Array.from(scope.querySelectorAll("a, button")).find((n) => {
+        if (_isAvatarOverlay(n)) return false;
+        const txt = (n.textContent || "").trim();
+        const lbl = (n.getAttribute("aria-label") || "").trim();
+        // Whole-string match for textContent so we don't match a button
+        // whose label happens to CONTAIN "Contact info" as part of a
+        // longer phrase (e.g. "View Sara's contact info hint").
+        return /^contact info$/i.test(txt) || /^contact info$/i.test(lbl);
+      });
+      if (hit) return hit;
+    }
+    return undefined;
   }
 
   // Find the element that contains the Contact info fields.
@@ -1093,8 +1296,8 @@
   }
 
   async function scrapeContactInfo({
-    timeoutMs = 3000,
-    settleMs = 400,
+    timeoutMs = 6000,
+    settleMs = 600,
     allowPushStateFallback = false,
   } = {}) {
     if (!location.pathname.startsWith("/in/")) {
@@ -1118,25 +1321,40 @@
     if (!_isValidContactModal(modal)) modal = null;
 
     if (!modal) {
+      // One deadline for the ENTIRE modal-finding phase (retry-click loop + the
+      // dialog poll below) so a slow-hydrating profile can't stack the retry
+      // loop ON TOP of timeoutMs. Previously the loop ran unbudgeted (~4.8s)
+      // before the poll's own timeoutMs even started — a ~15s block on the
+      // auto-save path (timeoutMs 6000). Now both share this budget.
+      const _ciDeadline = Date.now() + timeoutMs;
       if (!isOverlayUrl) {
-        const link = _findContactInfoLink();
-        if (link) {
-          // Remember the actual path so the pushState fallback uses it.
-          const _linkHref = link.getAttribute("href") || "";
-          if (_linkHref.includes("contact-info")) {
-            try {
-              const _u = new URL(_linkHref, location.href);
-              _contactInfoPath = _u.pathname;
-            } catch {}
+        // Click the real "Contact info" anchor, RETRYING until the modal opens.
+        // LinkedIn binds the React click handler a beat AFTER the link renders,
+        // so a single early click frequently no-ops — that's the "misfire" where
+        // email/phone/website/location come back empty. We re-find + re-click and
+        // poll for the modal between attempts, BEFORE resorting to the pushState
+        // fallback (which mutates the URL). Plain .click() only — dispatchHumanClick's
+        // cursor path can trip the photo lightbox; _findContactInfoLink already
+        // whole-word-matches "Contact info" and rejects avatar-overlay anchors,
+        // so the click can never land on the profile picture.
+        for (let attempt = 0; attempt < 4 && !modal && Date.now() < _ciDeadline; attempt++) {
+          const link = _findContactInfoLink();
+          if (link) {
+            const _linkHref = link.getAttribute("href") || "";
+            if (_linkHref.includes("contact-info")) {
+              try { _contactInfoPath = new URL(_linkHref, location.href).pathname; } catch {}
+            }
+            try { link.click(); } catch {}
+            // Give THIS click up to ~1.2s to open a valid contact-info modal.
+            for (let w = 0; w < 8 && !modal; w++) {
+              await _sleep(150);
+              const _cand = _findContactModal();
+              if (_isValidContactModal(_cand)) { modal = _cand; break; }
+            }
+          } else {
+            // Link not rendered yet — wait and re-find on the next attempt.
+            await _sleep(250);
           }
-          // Use a plain .click() on the contact-info anchor — it is a simple
-          // navigation link that LinkedIn's SPA intercepts via React's delegated
-          // root handler. dispatchHumanClick() was previously used here but it
-          // calls simulateCursorMove() which fires mousemove events along a path
-          // that passes over the profile picture, and its bubbling pointer events
-          // can accidentally trigger LinkedIn's photo lightbox when the contact
-          // info link is positioned near the avatar.
-          try { link.click(); } catch {}
         }
       }
 
@@ -1146,8 +1364,7 @@
       // profile photo lightbox (also a div[role='dialog']) — causing the photo
       // viewer to open instead of (or before) the contact info panel. We now
       // loop, skipping non-contact dialogs, until the right one appears or the
-      // timeout elapses.
-      const _ciDeadline = Date.now() + timeoutMs;
+      // timeout elapses. (Shares _ciDeadline with the retry-click loop above.)
       const _ciSelectors = [
         "div[role='dialog'][aria-labelledby*='contact' i]",
         "div[role='dialog'][aria-label*='Contact' i]",
@@ -1213,20 +1430,26 @@
 
     let data = _scrapeFromContactModal(modal);
 
-    // Re-poll the modal in an organised, human-paced way so React has time
-    // to hydrate ALL four fields (email / phone / website / address) before
-    // we read and close. Previous budget was 3 x 350ms = ~1s total, which
-    // bailed out before LinkedIn finished rendering the later blocks
-    // (website + address commonly appear 0.5-3s AFTER email/phone). New
-    // budget: 6 polls x 600ms = ~3.6s total, with a small randomised
-    // jitter so the cadence doesn't look mechanical to bot-detection. We
-    // still short-circuit the loop the moment all 4 fields are present.
-    for (let attempt = 0; attempt < 6; attempt++) {
-      if (data.email && data.phone && data.website && data.address) break;
-      // 600ms base + 0-150ms jitter — slower per-tick than v1.0.288's 350ms,
-      // but the cap is bounded so a missing field can't hang the Save button.
-      await _sleep(600 + Math.floor(Math.random() * 150));
+    // Retry up to 5 more times if the modal opened but the contents weren't
+    // rendered yet. LinkedIn's modal markup hydrates in waves — the
+    // mailto:/tel: anchors can take 1-4s to appear after the dialog mounts,
+    // the address/website blocks even longer. We DO NOT bail the moment we
+    // see email or phone (the v1.0.289 regression) — that's why Save Lead
+    // was missing website/address/company even when the user could see
+    // them in the modal. Instead we keep merging fields across attempts
+    // and only stop once we have EVERYTHING the modal can offer, OR once
+    // the polling budget is spent. v1.0.305 modest speed-up: 6→5 attempts
+    // and 550-700ms→480-600ms per gap. The bg_visibility shim added in
+    // v1.0.304 means React now hydrates at full speed even in background
+    // tabs, so the extra defensive retry budget is no longer needed in
+    // typical cases — we keep 5 retries × ~540ms = ~2.7s for the rare slow
+    // profile. Each new pass re-resolves the modal (LinkedIn occasionally
+    // remounts it and we'd otherwise read from a detached node).
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (data.email && data.phone && data.address && data.website) break;
+      await _sleep(480 + Math.floor(Math.random() * 120));
       modal = _findContactModal() || modal;
+      if (!_isValidContactModal(modal)) continue;
       const next = _scrapeFromContactModal(modal);
       // Merge — preserve any field we already captured (LinkedIn sometimes
       // remounts the modal and we lose a field we had a moment ago).
@@ -1234,30 +1457,35 @@
         email: data.email || next.email,
         phone: data.phone || next.phone,
         website: data.website || next.website,
+        websites: (() => {
+          const a = Array.isArray(data.websites) ? data.websites : [];
+          const b = Array.isArray(next.websites) ? next.websites : [];
+          const merged = [];
+          for (const u of [...a, ...b]) if (u && !merged.includes(u)) merged.push(u);
+          return merged.length ? merged : (data.websites || next.websites);
+        })(),
         address: data.address || next.address,
       };
     }
 
-    // Gentle settle BEFORE we close the modal — gives the Save Lead UI a
-    // beat to update with the freshly-captured fields, AND lets any
-    // late-mounting field (rare website/address ticks) still slot in
-    // instead of getting truncated by an instant close. ~800ms feels
-    // organised to the user (the panel no longer "flashes" closed).
-    await _sleep(800);
+    // Settle BEFORE closing — the modal is still animating in for the user
+    // and a too-eager close looks bot-like AND occasionally races LinkedIn's
+    // own DOM updates (we've seen the email anchor land in the very last tick
+    // before close, especially on slow connections). v1.0.305: 700→550ms now
+    // that the bg_visibility shim keeps React running at full speed.
+    await _sleep(550);
 
     // Always close the modal when not on the overlay URL directly.
     // When didPushState is true, clicking × triggers LinkedIn's SPA router to
     // navigate back to /in/<handle> — that's the cleanest URL restore path.
     if (!isOverlayUrl) {
       _closeContactModal();
-      // Settle AFTER close so LinkedIn's modal slide-out animation finishes
-      // and the URL restore lands BEFORE saveCurrentProfile races on to the
-      // syncProfile step. Without this, the handoff felt "rushed" — the
-      // Save Lead button reappeared and the floating panel re-flowed at full
-      // speed the instant the modal vanished. ~700ms is the animation length
-      // LinkedIn uses; pacing the close to match it makes the whole flow
-      // feel organised end-to-end.
-      await _sleep(700);
+      // Brief post-close settle so the close-animation completes before the
+      // caller (saveCurrentProfile / enrichment trigger) advances. Without it
+      // the foreground tab visibly "blinks" closed and the chip's confirmation
+      // pill appears before the modal is gone — disorienting on slow profiles.
+      // v1.0.305: 600→450ms, paired with the upstream retry-loop speedup.
+      await _sleep(450);
     }
     return data;
   }
@@ -1404,7 +1632,27 @@
     // failure just means we get the truncated text, same as before.
     try { await _expandProfileSections(); } catch {}
 
-    const base = scrapeProfile();
+    let base = scrapeProfile();
+
+    // If the experience block hasn't hydrated yet, give it one short wait
+    // and re-scrape. Without this we save the lead with company_name=null
+    // even though LinkedIn rendered it ~700ms later. Cap is 1.2s so the
+    // happy path (company already there) isn't penalised.
+    if (!base.company_name || !base.title) {
+      for (let i = 0; i < 3; i++) {
+        await _sleep(400);
+        const next = scrapeProfile();
+        base = {
+          ...base,
+          title: base.title || next.title,
+          company_name: base.company_name || next.company_name,
+          company_url: base.company_url || next.company_url,
+          location: base.location || next.location,
+          summary: base.summary || next.summary,
+        };
+        if (base.company_name && base.title) break;
+      }
+    }
     try {
       // Step 1: is the Contact info popup currently open and visible?
       // If yes, trust ONLY the popup — do not fall through to text-scan,
@@ -1415,7 +1663,29 @@
       const modalWasVisible = !!visibleModal;
 
       // Step 2: regular modal scrape (also opens the modal if not open).
-      const contact = await scrapeContactInfo();
+      let contact = await scrapeContactInfo();
+
+      // Step 2b: SECOND-CHANCE scrape. If we got nothing useful (no email,
+      // no phone, no address, no website), the click might have raced
+      // LinkedIn's React mount — the link was wired up a tick after we
+      // clicked. Retry the scrape with a longer timeout + settle. We do
+      // NOT manually click the link here a second time — scrapeContactInfo
+      // itself finds and clicks the link if no modal is open. A redundant
+      // outer click + the inner click would race LinkedIn's React handler
+      // and could bleed the second event onto an adjacent overlay anchor
+      // (the avatar's /overlay/photo/ link), opening the avatar lightbox
+      // instead of the Contact info modal. Single-clicker rule.
+      if (
+        !modalWasVisible &&
+        !contact.email &&
+        !contact.phone &&
+        !contact.address &&
+        !contact.website
+      ) {
+        await _sleep(800);
+        contact = await scrapeContactInfo({ timeoutMs: 7000, settleMs: 900 });
+      }
+
       if (contact.email) base.email = contact.email;
       if (contact.phone) base.phone = contact.phone;
       if (contact.website && !base.company_url) base.company_url = contact.website;
@@ -1429,6 +1699,28 @@
         const fromText = _scrapeFromProfileText();
         if (!base.email && fromText.email) base.email = fromText.email;
         if (!base.phone && fromText.phone) base.phone = fromText.phone;
+      }
+
+      // Step 4: final late-hydration sweep. By now the modal has been open
+      // for 2-7s, the user has been viewing the profile that whole time, and
+      // the experience / headline sections are essentially guaranteed to be
+      // rendered. Re-scrape and fill any field that's STILL missing — this
+      // catches the case where the very first scrapeProfile() ran before
+      // LinkedIn's React had hydrated the experience block at all (the
+      // primary cause of company_name=null saves the user reported).
+      if (!base.company_name || !base.title || !base.location || !base.full_name) {
+        const finalSweep = scrapeProfile();
+        base = {
+          ...base,
+          full_name: base.full_name || finalSweep.full_name,
+          first_name: base.first_name || finalSweep.first_name,
+          last_name: base.last_name || finalSweep.last_name,
+          title: base.title || finalSweep.title,
+          company_name: base.company_name || finalSweep.company_name,
+          company_url: base.company_url || finalSweep.company_url,
+          location: base.location || finalSweep.location,
+          summary: base.summary || finalSweep.summary,
+        };
       }
 
       // Normalize phone country code now that both phone and location are known.
@@ -1689,21 +1981,36 @@
             (t.includes(",") || /\b(india|uae|usa|uk|qatar|emirates|states|kingdom|america|saudi|hong kong)\b/i.test(t))
         ) || null;
     }
-    const avatar = card.querySelector("img")?.getAttribute("src") || null;
+    const avatar = _findAvatar(card, name);
     const [first_name, ...rest] = name.split(/\s+/);
     const sub = headline || "";
-    // Split on first "|" before splitting on " at " so pipe-separated
+    // Split on first "|" before extracting company so pipe-separated
     // specializations ("Head of Events at HEC | Education | Aviation") don't
     // bleed into the company name field.
-    const primarySub = sub.split("|")[0].trim();
+    // Extract Title + Company from the headline. Handles "Title at Company",
+    // "Title @ Company", AND separator-less "Founder Acme, Beta" (role keyword
+    // → title, first org → company) via the shared _splitTitleCompany helper.
+    const _tc = _splitTitleCompany(sub);
+    let cardTitle = _tc.title;
+    let cardCompany = _tc.company;
+    // Fallback: a company link rendered inside the card (LinkedIn wraps company
+    // names in <a href="/company/<slug>/">), used when the headline has no
+    // parseable company.
+    if (!cardCompany) {
+      const compEl = card.querySelector("a[href*='/company/']");
+      const compTxt = compEl && _txt(compEl);
+      if (compTxt && compTxt.length > 1 && compTxt.length < 120 && !_isActionLabel(compTxt)) {
+        cardCompany = compTxt.split(/\s*[·•|]\s*/)[0].trim();
+      }
+    }
     return {
       linkedin_url: url,
       full_name: name,
       first_name,
       last_name: rest.join(" ") || null,
       headline: sub || null,
-      title: primarySub.split(/\s+at\s+/i)[0] || null,
-      company_name: primarySub.split(/\s+at\s+/i).slice(1).join(" at ") || null,
+      title: cardTitle ? cardTitle.slice(0, 240) : null,
+      company_name: cardCompany ? cardCompany.slice(0, 200) : null,
       location: location_,
       avatar_url: avatar,
       raw: { source_url: location.href, page_type: "search-people" },

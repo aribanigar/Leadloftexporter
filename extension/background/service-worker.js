@@ -7,8 +7,8 @@
  */
 
 const DEFAULT_SETTINGS = {
-  apiUrl: "https://leadloftexporter-1.onrender.com",
-  apiKey: "lcx_M0enR28l06REA6X7iWCmMSpQ5jb3M06sJ7FvEJ5NLTI",
+  apiUrl: "https://leadloftexporter.onrender.com",
+  apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
   enabled: true,
   // Autopilot defaults ON so bulk-message / connect jobs queued from the CRM
   // start sending immediately when the user opens any LinkedIn tab. The popup
@@ -23,6 +23,17 @@ const SAFE_ZONES = {
   perHour: 250,  // burst ceiling — ~4/min sustained, allows quick batches
   perDay: 2000,  // daily cap
 };
+
+// Per-tab capture of the enrichment trigger's actual syncProfile outcome.
+// The lc:openProfileTab handler resolves on tab close, but tab close alone
+// is NOT proof a save succeeded — main.js:maybeRunEnrichmentTrigger
+// catches sync errors and closes anyway. Without this map, the bulk loop
+// in overlay.js would mark "Saved ✓" for tabs whose syncProfile silently
+// failed (Noora Al-Khori v1.0.291 bug — chip showed Saved, CRM was empty).
+// The trigger posts lc:enrichResult right before close; we read it back
+// in finish() and forward as syncOk / syncError to the bulk loop, which
+// then has ground truth to decide whether to mark "Saved ✓" or fall back.
+const _enrichResults = new Map(); // tabId -> { ok: bool, error: string|null }
 
 // In-memory mirror of the enrichment timestamps. The async chrome.storage
 // read-modify-write in recordEnrich() races when 20 cards are clicked at
@@ -84,6 +95,105 @@ function sleep(ms) {
 // Errors panel. The common failure is "Tabs cannot be edited right now
 // (user may be dragging a tab)", which is transient: we retry a few times
 // with a short backoff, reading lastError each time so it's never unchecked.
+// Pin an enrichment tab so Chrome doesn't kill it while we're scraping.
+// Chrome has TWO process-level powers over background tabs that the
+// v1.0.304 visibility shim CAN'T defeat:
+//   • autoDiscardable=true (default): Chrome can discard the tab entirely
+//     to free memory — the page is killed; our content scripts vanish
+//     mid-scrape and the tab returns nothing.
+//   • Frozen state: after ~5 min hidden the tab is suspended (all JS
+//     stops). Our tabs live 22-28s so freezing is rare, but Chrome's
+//     Memory Saver can be more aggressive on low-memory machines.
+// Flipping autoDiscardable=false on every enrichment tab tells Chrome
+// "this one is in active use, keep it alive" — the cheapest and most
+// reliable way to guarantee the page keeps running until WE close it.
+// Errors are swallowed (chrome.runtime.lastError just read & discarded)
+// because this is best-effort hardening, not a hard requirement.
+function pinEnrichmentTab(tabId) {
+  if (tabId == null) return;
+  try {
+    chrome.tabs.update(tabId, { autoDiscardable: false }, () => {
+      void chrome.runtime.lastError; // swallow "no such tab" on already-closed
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+// Force a backgrounded enrichment tab into the "active" web-lifecycle state.
+// This defeats Chrome's THIRD throttling layer that the visibility shim and
+// autoDiscardable=false can't touch: the C++ renderer-process scheduler.
+// Even when the JS-level `document.hidden` says "visible," Chrome's
+// scheduler still runs hidden-tab renderers at a fraction of foreground
+// CPU. requestAnimationFrame, IntersectionObserver, fetch priority — all
+// throttled at the OS process level. That's why bulk enrichment "only
+// gets the name" until the user clicks the tab: clicking flips the
+// renderer to active and the deferred React commits flood in.
+//
+// Page.setWebLifecycleState({state:"active"}) is the official Chrome
+// DevTools Protocol command that overrides this — it tells the scheduler
+// "treat this renderer as foreground even though it's hidden." The tab
+// then runs at full CPU and hydrates the Contact info modal in
+// milliseconds, not "whenever the user happens to click."
+//
+// We hold the `debugger` permission already (used elsewhere for the
+// trusted Send-Without-Note click). The yellow "debugging this browser"
+// infobar that Chrome shows only appears on the AFFECTED tab — and our
+// enrichment tabs are background-only and self-close in ~22 s, so the
+// user never actually sees it.
+//
+// Idempotent + best-effort: attach failures (DevTools already open on
+// this tab, Chrome too old to support the command, etc.) are swallowed.
+// The shim + autoDiscardable fallbacks still apply in those cases.
+async function pinTabActive(tabId) {
+  if (tabId == null) return;
+  try {
+    await new Promise((resolve, reject) => {
+      try {
+        chrome.debugger.attach({ tabId }, "1.3", () => {
+          const err = chrome.runtime.lastError;
+          if (err) return reject(new Error(err.message || "attach_failed"));
+          resolve();
+        });
+      } catch (e) { reject(e); }
+    });
+  } catch (e) {
+    // Couldn't attach — already attached (DevTools open) or permission
+    // missing. Visibility shim + autoDiscardable still help.
+    console.log("[LeadCaptura SW] pinTabActive: debugger.attach failed, falling back:", e?.message || e);
+    return;
+  }
+  try {
+    await new Promise((resolve) => {
+      try {
+        chrome.debugger.sendCommand(
+          { tabId },
+          "Page.setWebLifecycleState",
+          { state: "active" },
+          () => { void chrome.runtime.lastError; resolve(); }
+        );
+      } catch (e) { resolve(); }
+    });
+    // Belt-and-suspenders second command: make Chrome's scheduler treat
+    // this renderer as a FOCUSED tab regardless of actual focus. This is
+    // additive — if the command isn't supported or the previous attach
+    // already failed, the callback's lastError is swallowed and nothing
+    // changes. Cannot affect the scraper or any content-script logic.
+    await new Promise((resolve) => {
+      try {
+        chrome.debugger.sendCommand(
+          { tabId },
+          "Emulation.setFocusEmulationEnabled",
+          { enabled: true },
+          () => { void chrome.runtime.lastError; resolve(); }
+        );
+      } catch (e) { resolve(); }
+    });
+    console.log("[LeadCaptura SW] tab " + tabId + " pinned active+focused (no throttling)");
+  } catch (e) { /* best-effort */ }
+  // Do NOT detach here — detaching reverts the lifecycle state. Chrome
+  // auto-detaches when the tab closes (which is the only exit path for
+  // our enrichment tabs — they self-close via lc:closeMe).
+}
+
 function safeRemoveTab(tabId, done, attempt = 0) {
   if (tabId == null) { done?.(); return; }
   chrome.tabs.remove(tabId, () => {
@@ -207,6 +317,15 @@ const handlers = {
     fetchJson(`/extension/jobs/${jobId}/result`, { method: "POST", body: result }),
   connectResult: ({ linkedin_url, action }) =>
     fetchJson("/extension/connect-result", { method: "POST", body: { linkedin_url, action } }),
+  // Case #2 24h sent-log (backend-synced; see api/app/api/v1/extension.py).
+  case2MessageSent: ({ linkedin_url }) =>
+    fetchJson("/extension/case2-message-sent", { method: "POST", body: { linkedin_url } }),
+  case2MessageSentList: ({ since_ms }) =>
+    fetchJson(
+      "/extension/case2-message-sent" +
+        (since_ms ? `?since_ms=${encodeURIComponent(since_ms)}` : "")
+    ),
+  knownUrls: () => fetchJson("/extension/known-urls"),
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -730,6 +849,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           enrichUrl = target + (target.includes("?") ? "&" : "?") + "lc_enrich=1";
         }
         chrome.tabs.create({ url: enrichUrl, active: false }, (tab) => {
+          pinEnrichmentTab(tab?.id);
+          pinTabActive(tab?.id);
           sendResponse({ ok: true, tabId: tab?.id });
         });
       } catch (e) {
@@ -807,6 +928,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         chrome.tabs.create({ url: openUrl, active }, (tab) => {
           const tabId = tab?.id;
+          pinEnrichmentTab(tabId);
+          pinTabActive(tabId);
           if (!awaitClose) {
             sendResponse({ ok: true, tabId });
             return;
@@ -819,7 +942,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             resolved = true;
             chrome.tabs.onRemoved.removeListener(onRemoved);
             clearTimeout(safetyTimer);
-            sendResponse({ ok: true, tabId, ...extra });
+            // Read the trigger's own outcome report. If we have one, surface
+            // the truth (syncOk:true/false). If we have nothing (trigger
+            // crashed, message never arrived, very old extension build),
+            // syncOk:null tells the bulk loop to TREAT IT AS A FAILURE and
+            // fall back. We never assume success on the absence of evidence.
+            const er = _enrichResults.get(tabId);
+            _enrichResults.delete(tabId);
+            sendResponse({
+              ok: true,
+              tabId,
+              syncOk: er ? er.ok : null,
+              syncError: er?.error || null,
+              ...extra,
+            });
           };
           const onRemoved = (closedId) => {
             if (closedId === tabId) finish();
@@ -827,18 +963,36 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           chrome.tabs.onRemoved.addListener(onRemoved);
           const safetyTimer = setTimeout(() => {
             // If the tab is still open, force-close it so we don't pile up.
-            // 22s ceiling: enough headroom for the worst-case pipeline
-            // (8s h1 + 1s read + 8.5s contact-info polling + 4s margin) so
-            // genuinely slow profiles don't report "Timed out", but short
-            // enough that a single stuck profile can't stall the bulk run.
+            // 28s ceiling: enough headroom for the v1.0.290 / v1.0.291
+            // pipeline (8s h1 + 1.2s read + 6s contact-info polling + 1.3s
+            // pre/post-close settle + 3.6s confirmation-visible linger +
+            // ~6s margin for website scrape) so genuinely slow profiles
+            // don't report "Timed out", but short enough that a single
+            // stuck profile can't stall the bulk run.
             safeRemoveTab(tabId);
             finish({ timedOut: true });
-          }, 22_000);
+          }, 28_000);
         });
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });
       }
     })();
+    return true;
+  }
+  // Enrichment trigger reports the actual syncProfile outcome from inside
+  // the background tab just before it self-closes. We stash it keyed by
+  // tabId so lc:openProfileTab's finish() can surface it as ground truth
+  // to the bulk loop. Without this, the bulk loop trusts "tab closed" as
+  // proof of save — which is the Noora Al-Khori bug (chip lies, CRM empty).
+  if (msg?.type === "lc:enrichResult") {
+    const tabId = _sender?.tab?.id;
+    if (tabId != null) {
+      _enrichResults.set(tabId, {
+        ok: !!msg.ok,
+        error: msg.error ? String(msg.error).slice(0, 240) : null,
+      });
+    }
+    sendResponse({ ok: true });
     return true;
   }
   // The enrichment-trigger content script asks us to close its own tab.
@@ -1313,6 +1467,54 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
       });
     }
   } catch {}
+
+  // One-time migration: rotate the OLD pre-set default workspace API key over
+  // to the new one. Pre-existing installs cached the old default in
+  // chrome.storage.local on first save, which then wins the merge over
+  // DEFAULTS forever — so just bumping DEFAULTS.apiKey only helps fresh
+  // installs. This flips any storage that's still on the old default value;
+  // a user who pasted their OWN generated key is left untouched (their key
+  // doesn't match the old default, so it stays).
+  try {
+    const KNOWN_OLD_DEFAULTS = new Set([
+      "lcx_lqpLWLIgFoMLKCTs7-Xj38dKp9QCe2BG60BQ5N59Uo8",
+    ]);
+    const NEW_DEFAULT = "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E";
+    const { settings } = await chrome.storage.local.get("settings");
+    if (settings && KNOWN_OLD_DEFAULTS.has(settings.apiKey)) {
+      await chrome.storage.local.set({
+        settings: { ...settings, apiKey: NEW_DEFAULT },
+      });
+    }
+  } catch {}
+
+  // One-time wipe of the poisoned "already-contacted" URL cache. v1.0.291
+  // marked URLs as contacted purely on enrichment-tab close — even when the
+  // in-tab syncProfile silently failed — so the cache holds URLs that are
+  // NOT in CRM yet are greyed out as "Contacted" in the search-card chips.
+  // The Avoid Duplicate Outreach toggle then SKIPS them on re-runs,
+  // perpetuating the missing-from-CRM problem (Noora Al-Khori symptom).
+  // v1.0.292+ only marks contacted after a verified save, so once the cache
+  // is wiped, it self-heals: genuinely-saved URLs get re-added on next
+  // bulk pass (backend dedupes by linkedin_url — harmless re-save), and the
+  // truly-missing leads finally land in CRM. Idempotent: keyed by a
+  // sentinel so it only runs once per workspace.
+  try {
+    const { lcContactedWipedV292 } = await chrome.storage.local.get("lcContactedWipedV292");
+    if (!lcContactedWipedV292) {
+      await chrome.storage.local.remove("lc_contacted_urls");
+      await chrome.storage.local.set({ lcContactedWipedV292: true });
+      console.log("[LeadCaptura SW] wiped lc_contacted_urls (v292 one-time migration)");
+    }
+  } catch {}
+});
+
+// GC the per-tab enrichment-result map whenever a tab closes for ANY
+// reason. lc:openProfileTab's finish() already deletes on awaited closes,
+// but the per-card fire-and-forget path (awaitClose:false) never runs
+// finish(), so its trigger's lc:enrichResult would otherwise leak forever.
+chrome.tabs.onRemoved.addListener((closedId) => {
+  _enrichResults.delete(closedId);
 });
 
 // Tiny periodic heartbeat to keep the worker alive while the user is on LI
