@@ -9069,7 +9069,11 @@
   function _normalizeProfileUrl(href) {
     if (!href) return null;
     const m = href.match(/\/in\/([^/?#]+)/);
-    return m ? "/in/" + m[1] : null;
+    // Lowercase to match the backend's _normalize_in_path (which lowercases),
+    // so backend-hydrated 24h sent-log entries match locally-captured keys.
+    // LinkedIn vanity handles are already lowercase, so this is a no-op on
+    // real data — it only closes a cross-store casing gap.
+    return m ? ("/in/" + m[1]).toLowerCase() : null;
   }
 
   function _getProfileUrlFromLi(li) {
@@ -9077,6 +9081,30 @@
     const link = li.querySelector("a[href*='/in/']");
     if (!link) return null;
     return _normalizeProfileUrl(link.getAttribute("href"));
+  }
+
+  // Robust profile-URL resolver for a Message BUTTON. The send path used
+  // btn.closest("li") + _getProfileUrlFromLi, which returns null when the
+  // card is NOT an <li> (LinkedIn ships <div> result cards on some search
+  // layouts). A null URL means the 24h dedupe can't record the send — so the
+  // person is re-messaged on the next run/reload. This is a STRICT SUPERSET:
+  // it returns the SAME value as before when the <li> path works, and only
+  // adds a fallback (scan up to 6 ancestors for the card's own /in/ link)
+  // when that path yields nothing. It never changes a previously non-null
+  // result, so it cannot regress any currently-working card.
+  function _profileUrlForButton(btn) {
+    if (!btn) return null;
+    const viaLi = _getProfileUrlFromLi(btn.closest("li"));
+    if (viaLi) return viaLi;
+    let node = btn.parentElement;
+    for (let hops = 0; node && hops < 6; hops++, node = node.parentElement) {
+      const link = node.querySelector && node.querySelector("a[href*='/in/']");
+      if (link) {
+        const u = _normalizeProfileUrl(link.getAttribute("href"));
+        if (u) return u;
+      }
+    }
+    return null;
   }
 
   // Find connection cards on the page. Tries traditional class selectors
@@ -10081,7 +10109,7 @@
     // Build {btn, url, name, li} list and filter.
     const allCands = allButtons.map((btn) => {
       const li = btn.closest("li");
-      const url = _getProfileUrlFromLi(li);
+      const url = _profileUrlForButton(btn);
       return { btn, url, li };
     });
     let skippedAlreadySent = 0;
@@ -10142,8 +10170,7 @@
       // "if I text a person now, I should NOT be able to text him via
       // tool again for next 24 hours" — the gate is on intent, not on
       // delivery confirmation.
-      const _liForGate = btn.closest("li");
-      const _urlForGate = _liForGate ? _getProfileUrlFromLi(_liForGate) : null;
+      const _urlForGate = _profileUrlForButton(btn);
       if (_urlForGate) {
         const freshSentSet = await _loadSentSet();
         if (freshSentSet.has(_urlForGate)) {
@@ -10263,7 +10290,7 @@
         // Persist: mark this profile URL as messaged so future runs skip it.
         try {
           const liForBtn = btn.closest("li");
-          const url = _getProfileUrlFromLi(liForBtn);
+          const url = _profileUrlForButton(btn);
           if (url) {
             await _markSent(url);
             // Visually update the card's chip to "Messaged" state.
