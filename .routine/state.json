@@ -1,0 +1,22 @@
+{
+  "brand": "hudace",
+  "industries_all": [
+    "Agribusiness","Consumer Products","Life Sciences and Healthcare","Retail","Wholesale Distribution",
+    "Aerospace and Defense","Automotive","High Tech","Industrial Manufacturing","Mill Products",
+    "Chemicals","Mining","Oil Gas and Energy","Utilities",
+    "Construction and Real Estate","Media Sports and Entertainment","Professional Services","Telecommunications","Travel and Transportation",
+    "Defense and Security","Education and Research","Government","Financial Services"
+  ],
+  "used_industries": ["Retail","Construction and Real Estate"],
+  "last_run": "2026-07-09",
+  "runs": [
+    {
+      "date": "2026-07-09",
+      "industries": ["Retail","Construction and Real Estate"],
+      "services": ["Social Media","SEO / AEO / GEO / SRX","Website Design","ERP Building","AI Work Studio","SchoolOS"],
+      "items": 24,
+      "seeded": false,
+      "seed_error": "Supabase REST 402 exceed_egress_quota (project restricted; owner must upgrade/remove spend caps)"
+    }
+  ]
+}
