@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" font-family="'Poppins','Arial',sans-serif">
+  <defs>
+    <clipPath id="frame"><rect x="0" y="0" width="1080" height="1350" rx="0"/></clipPath>
+  </defs>
+
+  <!-- backdrop -->
+  <g clip-path="url(#frame)">
+    <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+    <!-- top-left logo reserve (~140px), left blank for manual logo -->
+    <rect x="64" y="60" width="140" height="140" fill="none"/>
+
+    <!-- kicker: italic serif accent for editorial contrast -->
+    <text x="230" y="130" font-family="Georgia,'Times New Roman',serif" font-style="italic"
+          font-size="34" fill="#FF6B00">the free classifieds</text>
+    <text x="230" y="178" font-size="26" letter-spacing="6" fill="#FCF9F8" opacity="0.72">QCKSERVE.IN</text>
+
+    <!-- oversized headline -->
+    <text x="64" y="320" font-size="118" font-weight="800" letter-spacing="-4" fill="#FCF9F8">SELL WHAT</text>
+    <text x="64" y="432" font-size="118" font-weight="800" letter-spacing="-4" fill="#FCF9F8">YOU DON'T</text>
+    <text x="64" y="544" font-size="118" font-weight="800" letter-spacing="-4" fill="#FF6B00">USE.</text>
+    <text x="64" y="612" font-size="34" fill="#FCF9F8" opacity="0.75">Turn idle stuff at home into cash — today.</text>
+
+    <!-- ========== the coupon / ticket device (the star) ========== -->
+    <g>
+      <!-- ticket body -->
+      <rect x="64" y="700" width="952" height="470" rx="24" fill="#FCF9F8"/>
+      <!-- perforation notches (left + right of the cut line) -->
+      <circle cx="64"  cy="935" r="30" fill="#1A1A1A"/>
+      <circle cx="1016" cy="935" r="30" fill="#1A1A1A"/>
+      <!-- dashed perforation line -->
+      <line x1="110" y1="935" x2="970" y2="935" stroke="#1A1A1A" stroke-width="4"
+            stroke-dasharray="6 14" stroke-linecap="round" opacity="0.35"/>
+
+      <!-- top stub: the big number device -->
+      <text x="110" y="800" font-size="30" letter-spacing="4" fill="#1A1A1A" opacity="0.6">LISTING FEE</text>
+      <text x="98" y="905" font-family="Georgia,'Times New Roman',serif" font-size="150"
+            font-weight="700" fill="#ef6723">&#8377;0</text>
+      <!-- price strike, right side of stub -->
+      <text x="640" y="808" font-size="30" letter-spacing="3" fill="#1A1A1A" opacity="0.55">COMMISSION</text>
+      <text x="640" y="895" font-size="112" font-weight="800" fill="#1A1A1A">0%</text>
+
+      <!-- bottom stub: proof line + CTA -->
+      <text x="110" y="1010" font-size="30" fill="#1A1A1A" opacity="0.8">Free listings. Owner-direct. No middlemen.</text>
+      <!-- bulletproof-looking CTA chip -->
+      <rect x="110" y="1050" width="500" height="86" rx="16" fill="#ef6723"/>
+      <text x="360" y="1105" font-size="38" font-weight="700" fill="#FCF9F8" text-anchor="middle">List your item — free</text>
+      <text x="660" y="1105" font-size="34" font-family="Georgia,serif" font-style="italic" fill="#1A1A1A" opacity="0.7">no fees, ever</text>
+    </g>
+
+    <!-- footer -->
+    <text x="64" y="1290" font-size="34" font-weight="700" letter-spacing="1" fill="#FCF9F8">qckserve.in</text>
+    <text x="1016" y="1290" font-size="26" fill="#FCF9F8" text-anchor="end" opacity="0.6">Classifieds · India</text>
+  </g>
+</svg>
