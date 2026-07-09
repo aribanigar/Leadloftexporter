@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-09",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "High summer in the green meadows - Sonamarg and Gulmarg's pastures lush and cool with the gondola running, and the Dal like glass at dawn while the plains bake",
+      "subject": "The high meadows are cool, green and wide open",
+      "campaign_code": "VK-INR-B2C-20260709"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "C",
+      "theme": "Peak Yatra-week demand and loss-aversion - Pahalgam and Sonamarg going 3-4 weeks out and Srinagar busy; an unlisted stay loses the guest to a listed one",
+      "subject": "Every listed room is filling this week, except yours",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260709"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Peak-season rides and loss-aversion - airport runs, valley drives and golden-hour shikaras booking all day during the Yatra; an idle cab or boat loses the fare to a listed one",
+      "subject": "The golden-hour shikaras are booking without your boat",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260709"
+    }
+  ]
+}
