@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-10",
+  "theme": "Writing essentials",
+  "season": "Mid H2, summer everyday-carry and desk gifting",
+  "design": "C",
+  "campaign_code": "GG-20260710-9",
+  "campaign_name": "Writing Sets And Journals - 10 Jul 2026",
+  "subject": "The gift of good notes",
+  "skus": [
+    "GG1278",
+    "GG1279",
+    "GG1638",
+    "GG1664",
+    "GG1659",
+    "GG1582"
+  ],
+  "products": [
+    {
+      "name": "Lyon Set",
+      "sku": "GG1278",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2636-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1278"
+    },
+    {
+      "name": "Lyon",
+      "sku": "GG1279",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2637-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1279"
+    },
+    {
+      "name": "Neilo Set",
+      "sku": "GG1638",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9348-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1638"
+    },
+    {
+      "name": "Everwrite",
+      "sku": "GG1664",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9684-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1664"
+    },
+    {
+      "name": "Suber",
+      "sku": "GG1659",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9623-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1659"
+    },
+    {
+      "name": "Squared",
+      "sku": "GG1582",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8360-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1582"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-10/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-10/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20writing%20essentials%20options%20for%20our%20team."
+}
