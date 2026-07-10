@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-10",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Mid-summer deep green - lush high meadows and blooming gardens, Sonamarg's glaciers cool, the Dal glass at dawn while the plains bake",
+      "subject": "The valley is deep green, gardens in full bloom",
+      "campaign_code": "VK-INR-B2C-20260710"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "B",
+      "theme": "Peak Yatra-week rides and loss-aversion - airport runs, valley drives and golden-hour shikaras booking all day; an idle cab or boat loses the fare to a listed one",
+      "subject": "Tonight's shikara just went to another boat",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260710"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "theme": "Lakeside demand and loss-aversion - the Dal filling fast through the busy weeks; only listed boats get found, an unlisted deck loses tonight's guest",
+      "subject": "Tonight's lake guest picked a listed boat, not yours",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260710"
+    }
+  ]
+}
