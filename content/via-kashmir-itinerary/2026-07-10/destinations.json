@@ -1,0 +1,6 @@
+{
+  "india":   {"photo": "tajmahal",  "feat": "meghalaya", "place": "Agra, Uttar Pradesh", "region": "North India"},
+  "kashmir": {"photo": "kashmir",   "feat": "ladakh",    "place": "Kashmir",             "region": "North India"},
+  "saudi":   {"photo": "thailand",  "feat": "georgia",   "place": "Phuket, Thailand",    "region": "Southeast Asia"},
+  "dubai":   {"photo": "maldives",  "feat": "baku",      "place": "Maldives",            "region": "Indian Ocean"}
+}
