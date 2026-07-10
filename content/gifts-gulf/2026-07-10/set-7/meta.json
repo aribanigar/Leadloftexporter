@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-10",
+  "theme": "Event giveaways",
+  "season": "Mid H2, summer everyday-carry and desk gifting",
+  "design": "A",
+  "campaign_code": "GG-20260710-7",
+  "campaign_name": "Branded Tees And Caps - 10 Jul 2026",
+  "subject": "Wear the team colours",
+  "skus": [
+    "GG1724",
+    "GG1743",
+    "GG1735",
+    "GG1789",
+    "GG1784",
+    "GG1389"
+  ],
+  "products": [
+    {
+      "name": "Regent Fit",
+      "sku": "GG1724",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s00553-ce.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1724"
+    },
+    {
+      "name": "Regent Women",
+      "sku": "GG1743",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s01825-ag.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1743"
+    },
+    {
+      "name": "Regent Fit Kids",
+      "sku": "GG1735",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s01183-al.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1735"
+    },
+    {
+      "name": "Regent Kids",
+      "sku": "GG1789",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s11970-ag.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1789"
+    },
+    {
+      "name": "Pacific Women",
+      "sku": "GG1784",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s04440-aq.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1784"
+    },
+    {
+      "name": "Naima Cap",
+      "sku": "GG1389",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6176-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1389"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-10/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-10/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}

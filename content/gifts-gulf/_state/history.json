@@ -2858,5 +2858,158 @@
       "GG1718",
       "GG1380"
     ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260710-1",
+    "campaign_name": "Steel Water Bottles - 10 Jul 2026",
+    "subject": "Bottles built to last",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1263",
+      "GG1302",
+      "GG1329",
+      "GG1342",
+      "GG1371",
+      "GG1426"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260710-2",
+    "campaign_name": "Cotton Totes - 10 Jul 2026",
+    "subject": "Totes for the summer haul",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1471",
+      "GG1473",
+      "GG1487",
+      "GG1488",
+      "GG1489",
+      "GG1504"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260710-3",
+    "campaign_name": "Recycled Paper Notebooks - 10 Jul 2026",
+    "subject": "Pages made from waste",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1201",
+      "GG1224",
+      "GG1268",
+      "GG1295",
+      "GG1080",
+      "GG1070"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260710-4",
+    "campaign_name": "Desk Tech Gadgets - 10 Jul 2026",
+    "subject": "Tech that pulls its weight",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1265",
+      "GG1314",
+      "GG1348",
+      "GG1099",
+      "GG1570",
+      "GG1343"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260710-5",
+    "campaign_name": "Recycled Everyday Carry - 10 Jul 2026",
+    "subject": "Recycled and ready daily",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1186",
+      "GG1321",
+      "GG1543",
+      "GG1705",
+      "GG1165",
+      "GG1063"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260710-6",
+    "campaign_name": "Wood And Bamboo Gifts - 10 Jul 2026",
+    "subject": "Natural grain, your mark",
+    "theme": "Wood and bamboo",
+    "skus": [
+      "GG1572",
+      "GG1129",
+      "GG1167",
+      "GG1207",
+      "GG1272",
+      "GG1269"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260710-7",
+    "campaign_name": "Branded Tees And Caps - 10 Jul 2026",
+    "subject": "Wear the team colours",
+    "theme": "Event giveaways",
+    "skus": [
+      "GG1724",
+      "GG1743",
+      "GG1735",
+      "GG1789",
+      "GG1784",
+      "GG1389"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260710-8",
+    "campaign_name": "Steel Tumblers And Flasks - 10 Jul 2026",
+    "subject": "Flasks that hold the heat",
+    "theme": "Insulated drinkware",
+    "skus": [
+      "GG1498",
+      "GG1516",
+      "GG1537",
+      "GG1618",
+      "GG1639",
+      "GG1716"
+    ]
+  },
+  {
+    "date": "2026-07-10",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260710-9",
+    "campaign_name": "Writing Sets And Journals - 10 Jul 2026",
+    "subject": "The gift of good notes",
+    "theme": "Writing essentials",
+    "skus": [
+      "GG1278",
+      "GG1279",
+      "GG1638",
+      "GG1664",
+      "GG1659",
+      "GG1582"
+    ]
   }
 ]

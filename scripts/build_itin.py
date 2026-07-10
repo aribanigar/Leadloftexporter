@@ -160,8 +160,9 @@ def market_cfg(market, date):
           ar_head="ابنِ أي برنامج رحلة في دقيقتين",
           ar_body="لأي وجهة يطلبها عميلك - برنامج يومي أنيق بعلامتك التجارية، جاهز قبل المنافسين.",
           upre="Whatever they ask for", uhead="Any destination,<br/>quoted in minutes.",
-          wa=("Client koi bhi destination maange - Turkey, Maldives, Baku - 2 min me branded "
-              "day-by-day plan ready. مرحبا - ابنِ أي برنامج الآن: viakashmiritinerary.in/signup"),
+          wa=("Client can ask for any destination - Turkey, Maldives, Baku - and you send a "
+              "branded day-by-day plan in about 2 minutes. مرحبا - ابنِ أي برنامج رحلة الآن: "
+              "viakashmiritinerary.in/signup"),
           li=("Your clients book Istanbul, the Maldives, Baku, Bali - everywhere. ViaKashmir "
               "Itinerary builds a branded, day-by-day plan for any destination in about two "
               "minutes, so you reply first and win the client. viakashmiritinerary.in/signup"))
@@ -180,8 +181,9 @@ def market_cfg(market, date):
           ar_head="وجهة عميلك، برنامج جاهز في دقائق",
           ar_body="لأي مكان في العالم - برنامج يومي أنيق بعلامتك التجارية، جاهز للإرسال اليوم.",
           upre="Dubai moves fast", uhead="Any place.<br/>Quoted today.",
-          wa=("Dubai client koi bhi jagah chune - Maldives, Switzerland, Thailand - same-day "
-              "branded plan 2 min me. مرحبا - ابدأ الآن: viakashmiritinerary.in/signup"),
+          wa=("Dubai client can pick any destination - Maldives, Switzerland, Thailand - and you "
+              "send a same-day branded plan in about 2 minutes. مرحبا - ابدأ الآن: "
+              "viakashmiritinerary.in/signup"),
           li=("Dubai clients travel everywhere and expect a polished plan the same day. ViaKashmir "
               "Itinerary builds a branded, day-by-day itinerary for any destination in about two "
               "minutes. viakashmiritinerary.in/signup"))
