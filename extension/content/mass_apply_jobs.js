@@ -278,7 +278,7 @@
     const dialogs = Array.from(document.querySelectorAll('div[role="dialog"], .artdeco-modal'));
     for (const d of dialogs) if (visible(d) && isEasyApplyDialog(d)) return true;
     // Fallbacks — progress region or any apply-button selector visible.
-    return !!(
+    if (
       document.querySelector('[aria-label*="job application progress" i][role="region"]') ||
       document.querySelector(
         "button[data-easy-apply-next-button]," +
@@ -289,7 +289,11 @@
         "button[data-live-test-easy-apply-review-button]," +
         'button[aria-label="Review your application"]'
       )
-    );
+    ) return true;
+    // New SDUI form: a Next/Continue/Review/Submit action button in a non-page
+    // <footer>. runApplyModal() is only ever entered AFTER the Apply button was
+    // clicked, so this button existing means the SDUI apply form is open.
+    return !!sduiAnyActionBtn();
   }
 
   // The container we autofill WITHIN. This MUST be the Easy Apply modal —
@@ -323,6 +327,22 @@
     );
     if (btn) {
       const c = btn.closest("form, .artdeco-modal, div[role='dialog'], .jobs-easy-apply-modal");
+      if (c && visible(c)) return c;
+    }
+    // New SDUI form: anchor on its footer action button and climb to the
+    // nearest ancestor that also holds the step's form fields, so autofill is
+    // scoped to the apply form — never <document>. If a step has no fillable
+    // fields, fall back to the footer's parent (still a bounded container).
+    const sdui = sduiAnyActionBtn();
+    if (sdui) {
+      let c = sdui.closest("form");
+      if (!c) {
+        let node = (sdui.closest("footer") || sdui).parentElement;
+        for (let i = 0; node && i < 6; i++, node = node.parentElement) {
+          if (node.querySelector("input, select, textarea, [contenteditable='true'], fieldset")) { c = node; break; }
+        }
+        if (!c) c = (sdui.closest("footer") || sdui).parentElement;
+      }
       if (c && visible(c)) return c;
     }
     return null;   // safer than <document>
@@ -361,27 +381,66 @@
     return null;
   }
 
+  // ── New SDUI (hashed-class) apply form support ──────────────────────────
+  // LinkedIn's 2026 "SDUI" apply flow renders its action button as a plain
+  // <button> inside a <footer>, with NO aria-label and NO data-* hooks — only
+  // its visible text ("Next" / "Continue" / "Review" / "Submit application")
+  // and a per-instance `componentkey`. The classic Easy Apply selectors above
+  // never match it. This finder is a LAST-RESORT fallback used only after the
+  // existing selectors return null, so the proven Ember/Easy-Apply path is
+  // completely unchanged.
+  //
+  // Safety gates (so a page-chrome / pagination "Next" is never mistaken for
+  // the apply footer button): the element must (a) be a real <button>,
+  // (b) live inside a <footer>, (c) NOT be the global/page footer or a
+  // pagination control, and (d) have EXACTLY the expected action text.
+  function sduiFooterActionBtn(labelRe) {
+    const footers = Array.from(document.querySelectorAll("footer"));
+    for (const f of footers) {
+      if (f.matches("[role='contentinfo'], .global-footer, [class*='global-footer'], [class*='page-footer']")) continue;
+      if (f.closest("[role='contentinfo'], .global-footer, [class*='global-footer'], [class*='page-footer'], .artdeco-pagination")) continue;
+      for (const b of Array.from(f.querySelectorAll("button"))) {
+        if (!visible(b)) continue;
+        if (b.disabled || b.getAttribute("aria-disabled") === "true") continue;
+        if (b.closest(".artdeco-pagination")) continue;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        if (labelRe.test(t)) return b;
+      }
+    }
+    return null;
+  }
+  // Any SDUI apply-form action button (Next/Continue/Review/Submit) — used as
+  // a supplementary "the apply form is open / autofill here" signal.
+  function sduiAnyActionBtn() {
+    return sduiFooterActionBtn(
+      /^(next|continue to next step|continue|next step|review|review your application|review application|submit|submit application|send|send application)$/i
+    );
+  }
+
   function nextButton() {
     return qDoc([
       "button[data-easy-apply-next-button]",
       "button[data-live-test-easy-apply-next-button]",
       'button[aria-label="Continue to next step"]',
       'button[aria-label*="Continue to next" i]',
-    ]) || findActionByText(/^(next|continue to next step|continue|next step)$/i);
+    ]) || findActionByText(/^(next|continue to next step|continue|next step)$/i)
+       || sduiFooterActionBtn(/^(next|continue to next step|continue|next step)$/i);
   }
   function reviewButton() {
     return qDoc([
       "button[data-live-test-easy-apply-review-button]",
       'button[aria-label="Review your application"]',
       'button[aria-label*="Review your" i]',
-    ]) || findActionByText(/^(review|review your application|review application)$/i);
+    ]) || findActionByText(/^(review|review your application|review application)$/i)
+       || sduiFooterActionBtn(/^(review|review your application|review application)$/i);
   }
   function submitButton() {
     return qDoc([
       "button[data-live-test-easy-apply-submit-button]",
       'button[aria-label="Submit application"]',
       'button[aria-label*="Submit application" i]',
-    ]) || findActionByText(/^(submit|submit application|send|send application)$/i);
+    ]) || findActionByText(/^(submit|submit application|send|send application)$/i)
+       || sduiFooterActionBtn(/^(submit|submit application|send|send application)$/i);
   }
 
   // ─── proven click sequence, mirrored from overlay.js's working engine ───
