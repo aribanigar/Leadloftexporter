@@ -1184,6 +1184,87 @@
   }
   function resetLabel() { setLabel("Mass Apply Jobs"); }
 
+  // ─────────────── per-card single Auto Apply ────────────────
+  // Apply to ONE job card, using the exact same per-card flow (applyToCard +
+  // runApplyModal) the bulk loop uses — just for that single card. Wrapped in
+  // the same guards/lifecycle as run() so a single apply and the bulk run can
+  // never overlap (state.running is the mutex), stray popups are swept, and the
+  // toolbar/state always resets via try/finally.
+  async function runSingle(cardKey, chip) {
+    if (state.running) return;                 // bulk run or another single is active
+    state.running = true; state.cancel = false;
+    try { document.documentElement.classList.add("lc-mass-applying"); } catch (_) {}
+    try { injectRunStyles(); } catch (_) {}
+    try { startStrayWatcher(); } catch (_) {}
+    setLabel("Applying 1 job…");
+    try {
+      // Re-resolve the card fresh so we never act on a stale node.
+      let card = null;
+      try { card = collectJobCards().find(c => c.key === cardKey) || null; } catch (_) {}
+      if (!card) card = { key: cardKey, el: cardElForKey(cardKey), title: "" };
+      let result = "skipped";
+      try { result = await applyToCard(card); }
+      catch (e) { console.warn(TAG, "single apply error:", e); result = "skipped"; }
+      if (result === "applied") setLabel("Applied ✓ 1 job");
+      else if (result === "challenge") banner("LinkedIn challenge detected — stopping.");
+      else setLabel("Skipped (no in-app apply)");
+      if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
+      try { closeStrayModals(); } catch (_) {}
+    } finally {
+      try { stopStrayWatcher(); } catch (_) {}
+      try { document.documentElement.classList.remove("lc-mass-applying"); } catch (_) {}
+      try { removeRunStyles(); } catch (_) {}
+      state.running = false; state.cancel = false;
+      setTimeout(resetLabel, 6000);
+    }
+  }
+
+  // Inject a one-click "⚡ Auto Apply" chip on each job card (the same cards the
+  // bulk loop collects) so a single job can be applied to on its own. Purely
+  // additive: the chips are our own elements, they are hidden during any run by
+  // the existing .lc-mass-applying CSS, they never bubble their click to the
+  // card (capture-phase stopPropagation), and they don't affect card collection
+  // or the apply-button finder (which ignores our .lc-* elements).
+  function decorateCards() {
+    if (!onJobsResultsPage()) return;
+    let cards;
+    try { cards = collectJobCards(); } catch (_) { return; }
+    for (const card of cards) {
+      const host = card.el;
+      if (!host || !document.contains(host)) continue;
+      if (host.querySelector(":scope > .lc-job-apply-chip")) continue;
+      try {
+        // Give THIS card its own positioning context (only when static), so
+        // each absolute chip anchors to its own card, never a shared ancestor.
+        const pos = getComputedStyle(host).position;
+        if (!pos || pos === "static") host.style.position = "relative";
+      } catch (_) {}
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "lc-job-apply-chip";
+      chip.dataset.lcKey = card.key;
+      chip.textContent = "⚡ Auto Apply";
+      chip.title = "Apply to this one job";
+      chip.style.cssText = [
+        "position:absolute", "bottom:10px", "right:10px", "z-index:60",
+        "background:linear-gradient(135deg,#047857 0%,#059669 100%)",
+        "color:#fff", "border:none", "border-radius:999px",
+        "padding:4px 10px",
+        "font:700 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,sans-serif",
+        "letter-spacing:0.01em", "cursor:pointer",
+        "box-shadow:0 3px 10px rgba(5,150,105,0.35)", "user-select:none",
+      ].join(";");
+      chip.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        runSingle(card.key, chip);
+      }, true);
+      // Swallow the press so the card's own open-job handler never fires.
+      ["mousedown", "pointerdown"].forEach(t =>
+        chip.addEventListener(t, (e) => { e.stopPropagation(); }, true));
+      host.appendChild(chip);
+    }
+  }
+
   function mountButton() {
     if (btnEl || !document.body) return;
     btnEl = document.createElement("button");
@@ -1257,7 +1338,7 @@
 
   // ─────────────── mount lifecycle ───────────────────────────
   function maybeMount() {
-    if (onJobsResultsPage()) mountButton();
+    if (onJobsResultsPage()) { mountButton(); try { decorateCards(); } catch (_) {} }
     else unmountButton();
   }
   setInterval(maybeMount, 1500);
