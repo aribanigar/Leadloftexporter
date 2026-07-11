@@ -1089,6 +1089,34 @@
               idle = 0;
               continue;
             }
+            // Additive fallback — advance via the numbered page indicators
+            // (button[aria-label="Page N"][data-testid^="pagination-indicator-"])
+            // when the Next button above isn't usable. Runs ONLY after every
+            // card on this page is processed + the list is scroll-exhausted, so
+            // it never leaves a page early. Advances exactly one page (current
+            // aria-current="true" → current+1); on the last page there is no
+            // higher indicator, so it falls through to break (= done).
+            const pageBtns = Array.from(document.querySelectorAll(
+              'button[data-testid^="pagination-indicator-"][aria-label^="Page "]'
+            ));
+            if (pageBtns.length) {
+              const cur = pageBtns.find(b => b.getAttribute("aria-current") === "true");
+              const curNum = cur ? parseInt((cur.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) : NaN;
+              let target = null;
+              if (!isNaN(curNum)) {
+                target = pageBtns.find(b =>
+                  parseInt((b.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) === curNum + 1
+                );
+              }
+              if (target && !target.disabled && visible(target)) {
+                setLabel("Loading next page…");
+                humanClick(target);
+                await sleep(rand(2600, 4200));
+                processed.clear();
+                idle = 0;
+                continue;
+              }
+            }
             break;                       // no more cards, no more pages
           }
           if (++idle > 60) break;        // safety valve
