@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.348",
+    date: "Jul 11, 2026",
+    size: "285 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.348.zip",
+    latest: true,
+    changes: [
+      "Mass Apply (LinkedIn Jobs): support the CLASSIC (Ember) jobs layout. Cards there are <li data-occludable-job-id> / <div data-job-id class='job-card-container'> with the apply button <button id='jobs-apply-button-id' class='jobs-apply-button'> — these weren't being collected, so the run did nothing on that layout. The engine now also collects cards by their numeric job id and clicks the classic top-card Apply button.",
+      "Purely additive — the newer role=button / hashed-class layouts are unchanged; the classic-layout selectors only add cards the old passes couldn't see.",
+    ],
+  },
+  {
     version: "1.0.347",
     date: "Jul 11, 2026",
     size: "285 KB",
     file: "/extensions/leadcaptura-extension-v1.0.347.zip",
-    latest: true,
     changes: [
       "Mass Apply (LinkedIn Jobs): explicit support for LinkedIn's new fully-hashed-class job cards. Job cards are now also collected directly by their stable componentkey (job-card-component-ref-<id>), so detection survives any change to the Dismiss button's label, and the detail-pane apply button is matched by its exact 'Easy Apply to this job' / 'LinkedIn Apply to this job' label.",
       "Purely additive — nothing in the existing apply flow changed; these only add matches the old selectors could miss on the new layout.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Mass Apply (LinkedIn Jobs): support LinkedIn's new hashed-class 'SDUI' apply flow. The multi-step form it opens has no role=dialog, no progress region, and no data-easy-apply-* hooks, and its Next/Submit button sits in a plain <footer> with no aria-label — so the engine couldn't tell the form had opened and skipped those jobs. It now detects the SDUI form and clicks Next/Review/Submit by their footer button text.",
       "Fully additive: the classic Easy Apply path is unchanged; the new detection only runs when the old selectors find nothing, and it never clicks the Save-job button, the On-site/Full-time chips, or the 'Show match details' card.",
-    ],
-  },
-  {
-    version: "1.0.345",
-    date: "Jul 9, 2026",
-    size: "283 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.345.zip",
-    changes: [
-      "Bulk 'Message All': hardened the 24-hour already-messaged memory so it reliably skips anyone contacted in the last 24h — even after a page reload or on another device (backed by the local + CRM sent-log).",
-      "Fix: profile-URL capture now falls back to scanning the card when a Message button isn't inside an <li>, and URLs are lowercased to match the backend log — closing the gap that let some sends go unrecorded.",
     ],
   },
 ];
