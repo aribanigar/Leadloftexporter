@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-11",
+  "theme": "Event giveaways",
+  "season": "Peak summer, everyday-carry and desk gifting",
+  "design": "A",
+  "campaign_code": "GG-20260711-7",
+  "campaign_name": "Event Cotton Carry - 11 Jul 2026",
+  "subject": "Giveaways they take home",
+  "skus": [
+    "GG1413",
+    "GG1423",
+    "GG1425",
+    "GG1444",
+    "GG1586",
+    "GG1613"
+  ],
+  "products": [
+    {
+      "name": "Monaco",
+      "sku": "GG1413",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6292-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1413"
+    },
+    {
+      "name": "Borealis",
+      "sku": "GG1423",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6353-99.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1423"
+    },
+    {
+      "name": "Yuki Colour",
+      "sku": "GG1425",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6355-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1425"
+    },
+    {
+      "name": "Rassa Coloured",
+      "sku": "GG1444",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6442-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1444"
+    },
+    {
+      "name": "Mateusz",
+      "sku": "GG1586",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8450-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1586"
+    },
+    {
+      "name": "Moira",
+      "sku": "GG1613",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9041-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1613"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20event%20giveaways%20options%20for%20our%20team."
+}
