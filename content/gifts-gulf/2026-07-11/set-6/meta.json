@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-11",
+  "theme": "Wood and bamboo",
+  "season": "Peak summer, everyday-carry and desk gifting",
+  "design": "C",
+  "campaign_code": "GG-20260711-6",
+  "campaign_name": "Bamboo And Cork Gifts - 11 Jul 2026",
+  "subject": "Grain that feels premium",
+  "skus": [
+    "GG1642",
+    "GG1643",
+    "GG1402",
+    "GG1553",
+    "GG1273",
+    "GG1440"
+  ],
+  "products": [
+    {
+      "name": "Bern Bamboo",
+      "sku": "GG1642",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9482-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1642"
+    },
+    {
+      "name": "Rio Bamboo",
+      "sku": "GG1643",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9485-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1643"
+    },
+    {
+      "name": "Thursday",
+      "sku": "GG1402",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6240-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1402"
+    },
+    {
+      "name": "Sumatra",
+      "sku": "GG1553",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7318-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1553"
+    },
+    {
+      "name": "Corkpass",
+      "sku": "GG1273",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2624-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1273"
+    },
+    {
+      "name": "Coco",
+      "sku": "GG1440",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6418-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1440"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20wood%20and%20bamboo%20options%20for%20our%20team."
+}

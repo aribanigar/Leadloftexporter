@@ -3011,5 +3011,158 @@
       "GG1659",
       "GG1582"
     ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260711-1",
+    "campaign_name": "Steel Water Bottles - 11 Jul 2026",
+    "subject": "Steel that outlasts the year",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1290",
+      "GG1319",
+      "GG1520",
+      "GG1679",
+      "GG1171",
+      "GG1154"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260711-2",
+    "campaign_name": "Cotton Totes - 11 Jul 2026",
+    "subject": "Carry it, keep it",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1517",
+      "GG1521",
+      "GG1527",
+      "GG1528",
+      "GG1670",
+      "GG1681"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260711-3",
+    "campaign_name": "Paper Notebooks - 11 Jul 2026",
+    "subject": "Every idea, one page",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1587",
+      "GG1188",
+      "GG1213",
+      "GG1296",
+      "GG1558",
+      "GG1563"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260711-4",
+    "campaign_name": "Recycled Everyday Carry - 11 Jul 2026",
+    "subject": "Good gifts, less waste",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1353",
+      "GG1384",
+      "GG1252",
+      "GG1292",
+      "GG1323",
+      "GG1435"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260711-5",
+    "campaign_name": "Steel Flasks - 11 Jul 2026",
+    "subject": "Holds heat, holds cold",
+    "theme": "Insulated drinkware",
+    "skus": [
+      "GG1532",
+      "GG1534",
+      "GG1160",
+      "GG1161",
+      "GG1157",
+      "GG1155"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260711-6",
+    "campaign_name": "Bamboo And Cork Gifts - 11 Jul 2026",
+    "subject": "Grain that feels premium",
+    "theme": "Wood and bamboo",
+    "skus": [
+      "GG1642",
+      "GG1643",
+      "GG1402",
+      "GG1553",
+      "GG1273",
+      "GG1440"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260711-7",
+    "campaign_name": "Event Cotton Carry - 11 Jul 2026",
+    "subject": "Giveaways they take home",
+    "theme": "Event giveaways",
+    "skus": [
+      "GG1413",
+      "GG1423",
+      "GG1425",
+      "GG1444",
+      "GG1586",
+      "GG1613"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260711-8",
+    "campaign_name": "Brushed Metal Desk Pieces - 11 Jul 2026",
+    "subject": "Built in brushed metal",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1320",
+      "GG1438",
+      "GG1285",
+      "GG1286",
+      "GG1573",
+      "GG1601"
+    ]
+  },
+  {
+    "date": "2026-07-11",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260711-9",
+    "campaign_name": "Notebooks And Folders - 11 Jul 2026",
+    "subject": "Notes that stay put",
+    "theme": "Writing essentials",
+    "skus": [
+      "GG1508",
+      "GG1376",
+      "GG1450",
+      "GG1200",
+      "GG1596",
+      "GG1649"
+    ]
   }
 ]

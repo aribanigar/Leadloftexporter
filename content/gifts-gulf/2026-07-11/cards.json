@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-11",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Stainless steel that keeps drinks cold",
+      "out": "content/gifts-gulf/2026-07-11/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2671-77",
+          "sku": "GG1290",
+          "name": "Geiser",
+          "desc": "Stainless steel that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2776-01",
+          "sku": "GG1319",
+          "name": "Miyerba",
+          "desc": "Slim steel bottle that fits any bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Roomy cotton tote for the daily run",
+      "out": "content/gifts-gulf/2026-07-11/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6867-13",
+          "sku": "GG1517",
+          "name": "Kecil",
+          "desc": "Roomy cotton tote for the daily run",
+          "colours": 0
+        },
+        {
+          "code": "mo6869-13",
+          "sku": "GG1521",
+          "name": "Kecil Large",
+          "desc": "Cotton bag with a clean, simple cut",
+          "colours": 0
+        },
+        {
+          "code": "mo6899-13",
+          "sku": "GG1527",
+          "name": "Osole",
+          "desc": "Cotton shopper that folds away flat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Paper notebook for daily notes",
+      "out": "content/gifts-gulf/2026-07-11/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8476-03",
+          "sku": "GG1587",
+          "name": "Eduar",
+          "desc": "Paper notebook for daily notes",
+          "colours": 0
+        },
+        {
+          "code": "mo2414-13",
+          "sku": "GG1188",
+          "name": "Cornota",
+          "desc": "Bound pages that lie flat to write",
+          "colours": 0
+        },
+        {
+          "code": "mo2495-03",
+          "sku": "GG1213",
+          "name": "Burgus",
+          "desc": "Neat notebook for meetings and lists",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Made from recycled material, clean finish",
+      "out": "content/gifts-gulf/2026-07-11/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2920-02",
+          "sku": "GG1353",
+          "name": "Daykit",
+          "desc": "Made from recycled material, clean finish",
+          "colours": 0
+        },
+        {
+          "code": "mo6167-03",
+          "sku": "GG1384",
+          "name": "Montecool",
+          "desc": "Recycled carry that folds away small",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Insulated steel that holds the heat",
+      "out": "content/gifts-gulf/2026-07-11/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6934-03",
+          "sku": "GG1532",
+          "name": "Inari",
+          "desc": "Insulated steel that holds the heat",
+          "colours": 0
+        },
+        {
+          "code": "mo6938-03",
+          "sku": "GG1534",
+          "name": "Ivalo",
+          "desc": "Slim steel flask for the bag",
+          "colours": 0
+        },
+        {
+          "code": "mo2344-27",
+          "sku": "GG1160",
+          "name": "Lox Plus",
+          "desc": "Recycled steel built for daily use",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Bamboo piece with a warm natural grain",
+      "out": "content/gifts-gulf/2026-07-11/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9482-40",
+          "sku": "GG1642",
+          "name": "Bern Bamboo",
+          "desc": "Bamboo piece with a warm natural grain",
+          "colours": 0
+        },
+        {
+          "code": "mo9485-16",
+          "sku": "GG1643",
+          "name": "Rio Bamboo",
+          "desc": "Smooth bamboo finish, quietly premium",
+          "colours": 0
+        },
+        {
+          "code": "mo6240-03",
+          "sku": "GG1402",
+          "name": "Thursday",
+          "desc": "Light bamboo accent for any desk",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Cotton tote they will actually carry",
+      "out": "content/gifts-gulf/2026-07-11/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6292-03",
+          "sku": "GG1413",
+          "name": "Monaco",
+          "desc": "Cotton tote they will actually carry",
+          "colours": 0
+        },
+        {
+          "code": "mo6353-99",
+          "sku": "GG1423",
+          "name": "Borealis",
+          "desc": "Cotton bag with a clean, classic look",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Brushed metal piece for everyday work",
+      "out": "content/gifts-gulf/2026-07-11/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2777-03",
+          "sku": "GG1320",
+          "name": "Mukava",
+          "desc": "Brushed metal piece for everyday work",
+          "colours": 0
+        },
+        {
+          "code": "mo6417-16",
+          "sku": "GG1438",
+          "name": "Melis",
+          "desc": "Smart little tool that clears the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo2653-03",
+          "sku": "GG1285",
+          "name": "Bergamo ++",
+          "desc": "Compact metal accent that keeps things tidy",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Tidy notebook for the desk",
+      "out": "content/gifts-gulf/2026-07-11/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6835-03",
+          "sku": "GG1508",
+          "name": "Arpu",
+          "desc": "Tidy notebook for the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo6141-06",
+          "sku": "GG1376",
+          "name": "Arco Clean",
+          "desc": "Bound pages that lie flat to write",
+          "colours": 0
+        },
+        {
+          "code": "mo6489-13",
+          "sku": "GG1450",
+          "name": "Compact",
+          "desc": "Neat notebook for meetings and lists",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

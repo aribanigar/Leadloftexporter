@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-11",
+  "theme": "Insulated drinkware",
+  "season": "Peak summer, everyday-carry and desk gifting",
+  "design": "B",
+  "campaign_code": "GG-20260711-5",
+  "campaign_name": "Steel Flasks - 11 Jul 2026",
+  "subject": "Holds heat, holds cold",
+  "skus": [
+    "GG1532",
+    "GG1534",
+    "GG1160",
+    "GG1161",
+    "GG1157",
+    "GG1155"
+  ],
+  "products": [
+    {
+      "name": "Inari",
+      "sku": "GG1532",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6934-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1532"
+    },
+    {
+      "name": "Ivalo",
+      "sku": "GG1534",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6938-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1534"
+    },
+    {
+      "name": "Lox Plus",
+      "sku": "GG1160",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2344-27.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1160"
+    },
+    {
+      "name": "Lox",
+      "sku": "GG1161",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2343-27.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1161"
+    },
+    {
+      "name": "Scribi 3",
+      "sku": "GG1157",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2334-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1157"
+    },
+    {
+      "name": "Scribi 2",
+      "sku": "GG1155",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2333-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1155"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-11/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20insulated%20drinkware%20options%20for%20our%20team."
+}
