@@ -1110,13 +1110,22 @@
 
         // Clean up before the next job — close any stray modals (preferences
         // match / feedback / premium upsell) and the Easy Apply modal if it's
-        // still around. NO TIMER between jobs (per user spec) — proceed
-        // immediately to the next card. A short settle pause covers DOM
-        // transitions only.
+        // still around. A short settle pause covers DOM transitions only.
         if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
         try { closeStrayModals(); } catch (_) {}
         await sleep(400);
         try { closeStrayModals(); } catch (_) {}
+
+        // Human-pace gap between jobs — ~45s (with a small jitter) so LinkedIn's
+        // "applying at a fast pace" safeguard doesn't pause LinkedIn Apply and
+        // put the account at risk. Cancellable: checks state.cancel every
+        // second so Stop is immediate; shows a live countdown in the label.
+        const gapMs = 45000 + Math.floor(Math.random() * 6000); // 45–51s
+        for (let remain = Math.round(gapMs / 1000); remain > 0 && !state.cancel; remain--) {
+          setLabel("Next job in " + remain + "s · " + state.applied + " applied");
+          await sleep(1000);
+        }
+        if (state.cancel) break;
         setLabel("Next job · " + state.applied + " applied");
       }
     } finally {
