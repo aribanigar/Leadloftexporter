@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.357",
+    date: "Jul 11, 2026",
+    size: "286 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.357.zip",
+    latest: true,
+    changes: [
+      "Mass Apply (LinkedIn Jobs): fixed the bug where it jumped to the next page after only the first job — it now scrolls down and applies every job on the current page before paginating.",
+      "Background applying: the run now keeps going even when you switch to another tab, so you don't have to stay on the LinkedIn page. (Chrome shows a 'DevTools is debugging this browser' banner on the LinkedIn tab while a run is active — that's expected and it's only the extension keeping the tab awake.)",
+    ],
+  },
+  {
     version: "1.0.356",
     date: "Jul 11, 2026",
     size: "286 KB",
     file: "/extensions/leadcaptura-extension-v1.0.356.zip",
-    latest: true,
     changes: [
       "Extension Options page redesigned to be compact and clean — wider layout, tighter spacing, and the Auto-Apply profile now lays its fields out in columns so it's no longer a long, elongated page.",
       "No behaviour change: your saved profile is still used to fill LinkedIn job forms exactly as before.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Auto-Apply profile (Extension Options): expanded with the questions Gulf and European Easy Apply forms actually ask — nationality, current job title, highest education, languages, residency/visa status, driving license, preferred work mode, LinkedIn/portfolio and more.",
       "Salary now has a currency selector (SAR/AED/QAR/EUR/GBP/USD…), and there's a dedicated 'Save profile' button on the card. The auto-apply uses every field.",
-    ],
-  },
-  {
-    version: "1.0.354",
-    date: "Jul 11, 2026",
-    size: "285 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.354.zip",
-    changes: [
-      "Auto-Apply profile (Extension Options): removed the demo 'Todd' data, made the form compact, and fixed a disconnect so the profile you fill is now actually used by LinkedIn auto-apply.",
-      "Self-learning answers: when auto-apply hits a question your profile can't answer and you answer it (or LinkedIn prefills it from a past application), it's remembered and auto-filled on every future job. Unknown required fields are now left blank instead of guessed.",
     ],
   },
 ];
