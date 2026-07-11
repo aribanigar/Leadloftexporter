@@ -75,6 +75,24 @@ html, body {
 .search-btns { display: flex; gap: 8px; }
 .search-btns .btn { flex: 1; margin-top: 0; }
 
+/* Update-available banner */
+.update-section { background: #ecfdf5; border-bottom: 1px solid #d1fae5; }
+.update-card { }
+.update-head { display: flex; align-items: center; gap: 7px; }
+.update-ico {
+  width: 20px; height: 20px; display: grid; place-items: center;
+  background: #059669; color: #fff; border-radius: 6px; font-weight: 800; font-size: 12px;
+}
+.update-title { font-weight: 700; color: #065f46; font-size: 13px; }
+.update-ver {
+  margin-left: auto; font-size: 11px; font-weight: 700; color: #047857;
+  background: #d1fae5; padding: 2px 8px; border-radius: 999px;
+}
+.update-btn { background: #059669 !important; }
+.update-btn:hover { background: #047857 !important; }
+.update-steps { color: #475569; font-size: 11.5px; line-height: 1.5; margin: 8px 0 0; }
+.update-steps .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: #f1f5f9; padding: 0 4px; border-radius: 4px; }
+
 .status {
   padding: 8px 14px;
   font-size: 12px;

@@ -1473,16 +1473,30 @@
   // bulk loop already uses, so nothing else has to change.
   const _selected = new Set();
 
-  // Keep this tab running at full speed even when it's in the background, so
-  // the auto-apply keeps going while the user works in another tab. The
-  // service worker pins the tab "active" via chrome.debugger
-  // (Page.setWebLifecycleState), which stops Chrome from throttling/freezing a
-  // hidden tab's timers. Best-effort: if the SW/debugger is unavailable the run
-  // still works while the tab is visible. Turned off in each run's finally.
+  // Keep the tab responsive in the background while a run is active — WITHOUT
+  // chrome.debugger, which pops Chrome's "…started debugging this browser"
+  // banner. Instead we play a continuous, inaudible low-gain tone: Chrome treats
+  // a tab that is playing audio as active, exempting it from background timer
+  // throttling / tab freezing, so the run keeps going when the tab isn't
+  // focused. Gain is ~-60 dB (silent in practice). Best-effort — if the browser
+  // blocks audio, the run still proceeds (fastest while the tab is visible).
+  // Turned off in each run's finally. No chrome.* calls, no permissions.
+  let _keepAliveOsc = null, _keepAliveGain = null;
   function keepAwake(on) {
     try {
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
-        chrome.runtime.sendMessage({ type: "lc:massApplyKeepAwake", on: !!on }, () => { void chrome.runtime.lastError; });
+      if (on) {
+        const ctx = _ensureAudio();
+        if (!ctx || _keepAliveOsc) return;
+        _keepAliveOsc = ctx.createOscillator();
+        _keepAliveGain = ctx.createGain();
+        _keepAliveGain.gain.value = 0.001;      // inaudible, but registers as audio
+        _keepAliveOsc.frequency.value = 440;
+        _keepAliveOsc.connect(_keepAliveGain);
+        _keepAliveGain.connect(ctx.destination);
+        _keepAliveOsc.start();
+      } else {
+        if (_keepAliveOsc) { try { _keepAliveOsc.stop(); } catch (_) {} try { _keepAliveOsc.disconnect(); } catch (_) {} _keepAliveOsc = null; }
+        if (_keepAliveGain) { try { _keepAliveGain.disconnect(); } catch (_) {} _keepAliveGain = null; }
       }
     } catch (_) {}
   }

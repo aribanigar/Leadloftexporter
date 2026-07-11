@@ -4567,22 +4567,33 @@
     return gap;
   }
 
-  // Keep this tab running at full speed even when it's in the background, so the
-  // Apply All run never stalls because the user switched to another tab — it
-  // keeps applying until it finishes or Stop is pressed. Reuses the service
-  // worker's existing keep-awake handler, which pins whichever tab SENT the
-  // message active via chrome.debugger (Page.setWebLifecycleState) and stops
-  // Chrome from throttling a hidden tab's timers. This is a plain message send —
-  // it does NOT touch the separate Mass Apply Jobs engine. Best-effort: if the
-  // SW/debugger is unavailable the run still works while the tab is visible.
+  // Keep this tab responsive in the background during an Apply All run — WITHOUT
+  // chrome.debugger, which pops Chrome's "…started debugging this browser"
+  // banner. A continuous inaudible low-gain tone (~-60 dB) marks the tab as
+  // playing audio, so Chrome exempts it from background timer throttling / tab
+  // freezing and the run keeps going when the tab isn't focused. Best-effort: if
+  // audio is blocked the run still works while the tab is visible. No chrome.*
+  // calls, no permissions, and it does NOT touch the Mass Apply Jobs engine.
   // Turned off in the run's finally.
+  let _lcKeepAliveCtx = null, _lcKeepAliveOsc = null, _lcKeepAliveGain = null;
   function _applyKeepAwake(on) {
     try {
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
-        chrome.runtime.sendMessage(
-          { type: "lc:massApplyKeepAwake", on: !!on },
-          () => { void chrome.runtime.lastError; }
-        );
+      if (on) {
+        if (_lcKeepAliveOsc) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!_lcKeepAliveCtx) _lcKeepAliveCtx = new AC();
+        if (_lcKeepAliveCtx.state === "suspended") { try { _lcKeepAliveCtx.resume(); } catch {} }
+        _lcKeepAliveOsc = _lcKeepAliveCtx.createOscillator();
+        _lcKeepAliveGain = _lcKeepAliveCtx.createGain();
+        _lcKeepAliveGain.gain.value = 0.001;     // inaudible, but registers as audio
+        _lcKeepAliveOsc.frequency.value = 440;
+        _lcKeepAliveOsc.connect(_lcKeepAliveGain);
+        _lcKeepAliveGain.connect(_lcKeepAliveCtx.destination);
+        _lcKeepAliveOsc.start();
+      } else {
+        if (_lcKeepAliveOsc) { try { _lcKeepAliveOsc.stop(); } catch {} try { _lcKeepAliveOsc.disconnect(); } catch {} _lcKeepAliveOsc = null; }
+        if (_lcKeepAliveGain) { try { _lcKeepAliveGain.disconnect(); } catch {} _lcKeepAliveGain = null; }
       }
     } catch {}
   }

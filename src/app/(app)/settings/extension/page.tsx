@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.362",
+    date: "Jul 11, 2026",
+    size: "294 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.362.zip",
+    latest: true,
+    changes: [
+      "Fixed Chrome's 'LeadCaptura started debugging this browser' banner during Mass Apply / Apply All — background running now uses a silent, inaudible keep-awake instead of the debugger, so no more notice on your tab.",
+      "New: the toolbar popup now shows an 'Update available' banner when a newer version is out, with a one-click download. Unzip it over your existing folder and reload — your API key, settings and saved answers are all kept.",
+    ],
+  },
+  {
     version: "1.0.361",
     date: "Jul 11, 2026",
     size: "294 KB",
     file: "/extensions/leadcaptura-extension-v1.0.361.zip",
-    latest: true,
     changes: [
       "Mass Apply Jobs now runs non-stop until you press Stop: when it finishes the last page it automatically restarts the whole sweep from page 1 (already-applied jobs are skipped) — it never ends on its own.",
       "A question no longer halts the run. It buzzes and gives you time to answer in the LinkedIn form; if you don't, it skips that one job and keeps going instead of getting stuck.",
