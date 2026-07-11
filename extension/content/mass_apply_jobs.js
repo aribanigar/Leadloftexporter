@@ -207,6 +207,36 @@
           : "";
         cards.push({ key: jid, el: cardEl, title });
       });
+    // Additive fourth pass — a newer hashed-class layout puts the stable
+    // componentkey="job-card-component-ref-<id>" on a PLAIN wrapper <div> while
+    // the clickable role="button" is a DESCENDANT carrying a different (UUID)
+    // componentkey. The second pass (which requires role="button" on the SAME
+    // element) misses these, and there is no Dismiss button or data-job-id
+    // either. Collect by the job-card-component-ref key on ANY element and use
+    // the inner role="button" as the click target. Deduped by key so a card
+    // already registered by the passes above is never processed twice.
+    document
+      .querySelectorAll('[componentkey^="job-card-component-ref"]')
+      .forEach(node => {
+        const key = node.getAttribute("componentkey");
+        if (!key || seen.has(key)) return;
+        // Click target: this element if it's itself role="button", else the
+        // first descendant role="button", else the element itself.
+        const clickable = (node.getAttribute("role") === "button")
+          ? node
+          : (node.querySelector('[role="button"]') || node);
+        if (!clickable) return;
+        seen.add(key);
+        const dis = node.querySelector('button[aria-label^="Dismiss "][aria-label$=" job"]');
+        let title = "";
+        if (dis) {
+          title = (dis.getAttribute("aria-label") || "").replace(/^Dismiss\s+/i, "").replace(/\s+job$/i, "").trim();
+        } else {
+          const t = node.querySelector('p span[aria-hidden="true"]') || node.querySelector("p");
+          title = t ? (t.textContent || "").replace(/\s+/g, " ").trim() : "";
+        }
+        cards.push({ key, el: clickable, title });
+      });
     return cards;
   }
 
@@ -221,6 +251,14 @@
         el = document.querySelector('div[data-job-id="' + esc + '"].job-card-container')
           || document.querySelector('li[data-occludable-job-id="' + esc + '"] div[data-job-id].job-card-container')
           || document.querySelector('li[data-occludable-job-id="' + esc + '"]');
+      } catch (_) {}
+    }
+    // Newer hashed-class fallback: the componentkey="job-card-component-ref-<id>"
+    // may sit on a plain wrapper whose clickable role="button" is a descendant.
+    if (!el && typeof key === "string" && key.indexOf("job-card-component-ref") === 0) {
+      try {
+        const host = document.querySelector('[componentkey="' + esc + '"]');
+        if (host) el = (host.getAttribute("role") === "button") ? host : (host.querySelector('[role="button"]') || host);
       } catch (_) {}
     }
     return el;
