@@ -334,6 +334,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.runtime.openOptionsPage(() => sendResponse({ ok: true }));
     return true;
   }
+  // Keep the mass-apply LinkedIn tab running at full speed while it's in the
+  // background, so jobs keep applying when the user is on another tab. Reuses
+  // pinTabActive() (chrome.debugger Page.setWebLifecycleState "active") — the
+  // same mechanism the enrichment tabs already use. on:false detaches. Purely
+  // additive: a new handler that touches no existing behaviour or integration.
+  if (msg?.type === "lc:massApplyKeepAwake") {
+    const tabId = _sender?.tab?.id;
+    if (tabId != null) {
+      if (msg.on) { pinTabActive(tabId).catch(() => {}); }
+      else {
+        try { chrome.debugger.detach({ tabId }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+      }
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
   // Run a click on "Send without a note" inside the PAGE's MAIN world.
   // Content scripts live in an isolated world; code injected via executeScript
   // with world:"MAIN" runs in the actual page context and can reach window.jQuery

@@ -272,8 +272,20 @@
   // render the rest. Find that container by climbing from a card to the first
   // scrollable ancestor.
   function listScroller() {
-    const btn = document.querySelector('button[aria-label^="Dismiss "][aria-label$=" job"]');
-    let el = btn ? btn.closest('div[role="button"]') : null;
+    // Anchor on an actual job card — present on EVERY layout — then climb to the
+    // first scrollable ancestor. The old anchor (Dismiss button →
+    // closest('div[role="button"]')) returned null on the 2026 hashed-class
+    // layout, where the Dismiss button has no role="button" ancestor. A null
+    // scroller made scrollListDown() a no-op, so the run couldn't load the rest
+    // of a virtualised page and paginated after only the first few cards.
+    let anchor = document.querySelector('[componentkey^="job-card-component-ref"]')
+      || document.querySelector('div[data-job-id].job-card-container')
+      || document.querySelector('li[data-occludable-job-id]');
+    if (!anchor) {
+      const btn = document.querySelector('button[aria-label^="Dismiss "][aria-label$=" job"]');
+      anchor = btn ? (btn.closest('div[role="button"]') || btn) : null;
+    }
+    let el = anchor;
     while (el && el !== document.body) {
       try {
         const s = getComputedStyle(el);
@@ -283,13 +295,34 @@
     }
     return null;
   }
-  function listScrollTop() { const s = listScroller(); return s ? Math.round(s.scrollTop) : Math.round(window.scrollY); }
+  function _firstCardEl() {
+    return document.querySelector('[componentkey^="job-card-component-ref"]')
+      || document.querySelector('div[data-job-id].job-card-container')
+      || document.querySelector('li[data-occludable-job-id]');
+  }
+  function _lastCardEl() {
+    const c = document.querySelectorAll(
+      '[componentkey^="job-card-component-ref"], div[data-job-id].job-card-container, li[data-occludable-job-id]'
+    );
+    return c.length ? c[c.length - 1] : null;
+  }
+  function listScrollTop() {
+    const s = listScroller();
+    if (s) return Math.round(s.scrollTop);
+    // No detectable scroll container: use the first card's viewport position as
+    // a scroll-position proxy so scroll progress is still measurable.
+    const c = _firstCardEl();
+    if (c) { try { return Math.round(c.getBoundingClientRect().top); } catch (_) {} }
+    return Math.round(window.scrollY);
+  }
   function scrollListDown() {
     const s = listScroller();
     if (s) { s.scrollBy(0, Math.round(s.clientHeight * 0.8)); return true; }
-    // Don't fall back to window.scrollBy — that scrolls the whole page into
-    // the LinkedIn footer (promo cards, language picker, etc.), and the
-    // wider scope makes the apply finder more likely to misfire too.
+    // Fallback for layouts where the scroll container can't be resolved: nudge
+    // the last rendered job card into view, which advances the virtualised list
+    // without scrolling the whole page into the LinkedIn footer.
+    const last = _lastCardEl();
+    if (last) { try { last.scrollIntoView({ block: "end", behavior: "instant" }); return true; } catch (_) {} }
     return false;
   }
 
@@ -1237,6 +1270,20 @@
   // ─────────────── main loop ─────────────────────────────────
   const state = { running: false, cancel: false, applied: 0, skipped: 0 };
 
+  // Keep this tab running at full speed even when it's in the background, so
+  // the auto-apply keeps going while the user works in another tab. The
+  // service worker pins the tab "active" via chrome.debugger
+  // (Page.setWebLifecycleState), which stops Chrome from throttling/freezing a
+  // hidden tab's timers. Best-effort: if the SW/debugger is unavailable the run
+  // still works while the tab is visible. Turned off in each run's finally.
+  function keepAwake(on) {
+    try {
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
+        chrome.runtime.sendMessage({ type: "lc:massApplyKeepAwake", on: !!on }, () => { void chrome.runtime.lastError; });
+      }
+    } catch (_) {}
+  }
+
   async function run() {
     if (state.running) return;
     state.running = true; state.cancel = false;
@@ -1247,12 +1294,14 @@
     try { document.documentElement.classList.add("lc-mass-applying"); } catch (_) {}
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
+    keepAwake(true);   // keep applying even when the tab is in the background
 
     // Process ONE freshly-rendered card per iteration, then scroll the
     // virtualised list to reveal more. This survives cards unmounting as the
     // list scrolls — we never hold a stale list, we re-collect every loop.
     const processed = new Set();
     let idle = 0;
+    let stuckScroll = 0;   // consecutive "list couldn't scroll" checks
 
     try {
       while (!state.cancel) {
@@ -1266,6 +1315,11 @@
           scrollListDown();
           await sleep(rand(900, 1500));
           if (listScrollTop() === before) {
+            // Require TWO consecutive "couldn't scroll" checks before treating
+            // the page as exhausted — guards against a transient during a
+            // virtualised re-render prematurely paginating (the reported bug:
+            // jumping to the next page after only the first job on the page).
+            if (++stuckScroll < 2) { continue; }
             // List can't scroll further → try the next results page.
             const nextPage = document.querySelector(
               'button[data-testid="pagination-controls-next-button-visible"]'
@@ -1275,7 +1329,7 @@
               humanClick(nextPage);
               await sleep(rand(2600, 4200));
               processed.clear();
-              idle = 0;
+              idle = 0; stuckScroll = 0;
               continue;
             }
             // Additive fallback — advance via the numbered page indicators
@@ -1302,17 +1356,19 @@
                 humanClick(target);
                 await sleep(rand(2600, 4200));
                 processed.clear();
-                idle = 0;
+                idle = 0; stuckScroll = 0;
                 continue;
               }
             }
             break;                       // no more cards, no more pages
           }
+          // Scroll moved → more of this page is loading; keep going.
+          stuckScroll = 0;
           if (++idle > 60) break;        // safety valve
           continue;
         }
 
-        idle = 0;
+        idle = 0; stuckScroll = 0;
         const card = fresh[0];
         processed.add(card.key);
         setLabel("Applying #" + processed.size + " · " + state.applied + " applied");
@@ -1346,6 +1402,7 @@
         setLabel("Next job · " + state.applied + " applied");
       }
     } finally {
+      keepAwake(false);
       try { stopStrayWatcher(); } catch (_) {}
       try { document.documentElement.classList.remove("lc-mass-applying"); } catch (_) {}
       try { removeRunStyles(); } catch (_) {}
@@ -1385,6 +1442,7 @@
     try { document.documentElement.classList.add("lc-mass-applying"); } catch (_) {}
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
+    keepAwake(true);
     setLabel("Applying 1 job…");
     try {
       // Re-resolve the card fresh so we never act on a stale node.
@@ -1400,6 +1458,7 @@
       if (applyFormPresent()) { try { await discardAndClose(); } catch (_) {} }
       try { closeStrayModals(); } catch (_) {}
     } finally {
+      keepAwake(false);
       try { stopStrayWatcher(); } catch (_) {}
       try { document.documentElement.classList.remove("lc-mass-applying"); } catch (_) {}
       try { removeRunStyles(); } catch (_) {}
