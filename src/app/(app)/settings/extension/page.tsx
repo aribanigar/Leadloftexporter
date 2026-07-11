@@ -19,11 +19,23 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.361",
+    date: "Jul 11, 2026",
+    size: "294 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.361.zip",
+    latest: true,
+    changes: [
+      "Mass Apply Jobs now runs non-stop until you press Stop: when it finishes the last page it automatically restarts the whole sweep from page 1 (already-applied jobs are skipped) — it never ends on its own.",
+      "A question no longer halts the run. It buzzes and gives you time to answer in the LinkedIn form; if you don't, it skips that one job and keeps going instead of getting stuck.",
+      "Jobs are now applied strictly top-to-bottom on each page, and it only moves to the next page once the whole page is done.",
+      "Next / Review / Submit application clicking hardened so applications submit reliably whenever the buttons are visible.",
+    ],
+  },
+  {
     version: "1.0.360",
     date: "Jul 11, 2026",
     size: "294 KB",
     file: "/extensions/leadcaptura-extension-v1.0.360.zip",
-    latest: true,
     changes: [
       "Mass Apply Jobs now runs until you stop it: it applies every job on the current page, then reliably moves to the next page (many more pagination fallbacks) and keeps going across all pages — it no longer stops early after one page.",
       "Needs an answer? If a job asks a question the auto-fill can't answer, Mass Apply now buzzes/beeps and pauses instead of skipping — type your answer into the LinkedIn form and it continues automatically. (Only 'Stop' ends the run.)",

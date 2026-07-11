@@ -440,6 +440,33 @@
     return (location.search !== prevSearch) || (!!nowFirstKey && nowFirstKey !== prevFirstKey);
   }
 
+  // Jump back to page 1 — used to restart a full sweep after the last page, so
+  // the run keeps going until the user stops it. Returns true if it navigated
+  // (i.e. there were multiple pages); false when already on page 1 / no pager.
+  async function goToFirstResultsPage() {
+    let p1 =
+      document.querySelector('button[data-testid^="pagination-indicator-"][aria-label="Page 1"]') ||
+      Array.from(document.querySelectorAll("li.artdeco-pagination__indicator--number button"))
+        .find(b => /^\s*1\s*$/.test((b.innerText || b.textContent || "").replace(/page/i, "").trim())) ||
+      null;
+    if (!p1 || p1.getAttribute("aria-current") === "true" || !visible(p1)) return false;
+
+    const prevSearch = location.search;
+    try { p1.scrollIntoView({ block: "center" }); } catch (_) {}
+    await sleep(rand(400, 800));
+    humanClick(p1);
+    const deadline = Date.now() + 9000;
+    while (Date.now() < deadline) {
+      if (state.cancel) return false;
+      if (location.search !== prevSearch) break;
+      await sleep(300);
+    }
+    await sleep(rand(1600, 2600));
+    // Scroll the list back to the very top so the sweep starts at the first card.
+    try { const sc = listScroller(); if (sc) sc.scrollTop = 0; } catch (_) {}
+    return location.search !== prevSearch;
+  }
+
   // The in-app apply control inside the right detail pane. Detects the older
   // "Easy Apply" label, the renamed "LinkedIn Apply to this job", and the
   // hashed-class new layouts — on BOTH <button> and <a>. The external "Apply
@@ -1236,15 +1263,21 @@
   // re-autofilling + re-clicking Next/Review/Submit each cycle, so the moment
   // the answer is present the form advances on its own. Returns true when the
   // step advanced (user answered), false only if the user pressed Stop.
+  // Bounded on purpose: the run must NEVER get permanently stuck on one job.
+  // We alert (buzz + banner) and give the user a window (~ANSWER_WINDOW_S) to
+  // type the answer — re-autofilling + re-clicking each cycle so the form
+  // advances the instant it's valid. If the window elapses with no answer we
+  // return false so the caller SKIPS this job and the run keeps going (it
+  // "restarts itself" on the next job). Returns true = advanced (user answered).
+  const ANSWER_WINDOW_S = 45;
   async function waitForUserAnswer(beforeText) {
-    banner("⏸ This job asks a question only you can answer — type it into the LinkedIn form. I'll continue automatically once it's filled. (Press Stop to cancel.)");
+    banner("⏸ This job asks a question only you can answer — type it into the LinkedIn form and I'll continue. If you don't, I'll skip this one and keep going. (Press Stop to end.)");
     try { buzz(); } catch (_) {}
-    let beat = 0;
-    while (!state.cancel) {
+    for (let beat = 0; beat < ANSWER_WINDOW_S && !state.cancel; beat++) {
       if (!applyFormPresent()) return true;          // user finished / closed the form
       if (modalText() !== beforeText) return true;   // step changed = user answered
-      // Flash the button label so it's obvious the run is paused on YOU.
-      setLabel(beat % 2 ? "⏸ Waiting for your answer…" : "⏸ Answer the question in the form");
+      const left = ANSWER_WINDOW_S - beat;
+      setLabel((beat % 2 ? "⏸ Waiting for your answer" : "⏸ Answer in the form") + " (" + left + "s)");
       // Every ~3s: buzz, then re-autofill + re-attempt the action button — if
       // the user has now filled the field, our click advances the form.
       if (beat % 3 === 0) {
@@ -1256,10 +1289,9 @@
           if (await waitAdvanced(beforeText, 1200)) return true;
         }
       }
-      beat++;
       await sleep(1000);   // 1s cadence keeps Stop responsive
     }
-    return false;          // cancelled
+    return false;          // window elapsed (skip + continue) or cancelled
   }
 
   // Walk the multi-step apply form. Returns "applied" | "skipped".
@@ -1486,6 +1518,17 @@
 
         let fresh = collectJobCards().filter(c => !processed.has(c.key));
         if (selectionMode) fresh = fresh.filter(c => targetKeys.has(c.key));
+        // Apply STRICTLY top-to-bottom in the visual list. collectJobCards()
+        // merges several layout passes, so sort by on-screen vertical position
+        // to guarantee the topmost un-applied card is always next (never jump
+        // around the page).
+        try {
+          fresh.sort((a, b) => {
+            const ta = a.el ? a.el.getBoundingClientRect().top : 0;
+            const tb = b.el ? b.el.getBoundingClientRect().top : 0;
+            return ta - tb;
+          });
+        } catch (_) {}
 
         // In selection mode we're done once every selected card has been
         // processed — no pagination, ever.
@@ -1538,8 +1581,23 @@
             continue;
           }
 
-          // Robustly confirmed: no more pages anywhere. Natural end.
-          break;
+          // Reached the last page. The user wants Mass Apply to keep running
+          // until THEY press Stop, so we DON'T end — we restart the whole sweep
+          // from page 1. Re-applying is safe: already-applied jobs are detected
+          // and skipped, and any jobs newly surfaced (or that the user has since
+          // answered) get applied. A short, cancellable watch pause avoids a
+          // hot loop when there is genuinely nothing left right now.
+          for (let s = 30; s > 0 && !state.cancel; s--) {
+            setLabel("All pages done — restarting in " + s + "s · " + state.applied + " applied, " + state.skipped + " skipped");
+            await sleep(1000);
+          }
+          if (state.cancel) break;
+          setLabel("Restarting sweep from page 1… · " + state.applied + " applied, " + state.skipped + " skipped");
+          try { await goToFirstResultsPage(); } catch (_) {}   // no-op if single page
+          try { const sc = listScroller(); if (sc) sc.scrollTop = 0; } catch (_) {}
+          processed.clear();
+          idle = 0; stuckScroll = 0; noNextTries = 0;
+          continue;   // never stops on its own — only Stop / challenge break the loop
         }
 
         idle = 0; stuckScroll = 0; noNextTries = 0;
