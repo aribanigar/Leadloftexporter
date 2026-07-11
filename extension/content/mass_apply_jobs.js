@@ -364,6 +364,25 @@
       if (!isInAppApply(el)) continue;
       return el;
     }
+    // Last-resort, document-wide fallback for the exact detail-pane apply button
+    // by aria-label ("Easy Apply to this job" / "LinkedIn Apply to this job"),
+    // in case the detail-pane root scoping above matched the wrong/stale pane on
+    // the fully-hashed layout. Additive — only runs when the scoped scan found
+    // nothing; still rejects forbidden subtrees (page footer, left job list, our
+    // own chips) and the external "company website" apply.
+    const exact = document.querySelectorAll(
+      'button[aria-label="Easy Apply to this job"],' +
+      'a[aria-label="Easy Apply to this job"],' +
+      'button[aria-label="LinkedIn Apply to this job"],' +
+      'a[aria-label="LinkedIn Apply to this job"]'
+    );
+    for (const el of exact) {
+      if (!visible(el)) continue;
+      if (el.disabled || el.getAttribute("aria-disabled") === "true") continue;
+      if (inForbiddenSubtree(el)) continue;
+      if (isExternal(el)) continue;
+      return el;
+    }
     return null;
   }
 
