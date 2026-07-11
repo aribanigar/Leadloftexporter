@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.354",
+    date: "Jul 11, 2026",
+    size: "285 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.354.zip",
+    latest: true,
+    changes: [
+      "Auto-Apply profile (Extension Options): removed the demo 'Todd' data, made the form compact, and fixed a disconnect so the profile you fill is now actually used by LinkedIn auto-apply.",
+      "Self-learning answers: when auto-apply hits a question your profile can't answer and you answer it (or LinkedIn prefills it from a past application), it's remembered and auto-filled on every future job. Unknown required fields are now left blank instead of guessed.",
+    ],
+  },
+  {
     version: "1.0.353",
     date: "Jul 11, 2026",
     size: "285 KB",
     file: "/extensions/leadcaptura-extension-v1.0.353.zip",
-    latest: true,
     changes: [
       "Mass Apply (LinkedIn Jobs): hardened the detail-pane apply-button finder with a document-wide fallback for the exact 'Easy Apply to this job' / 'LinkedIn Apply to this job' button, covering an edge case on the fully-hashed layout where the wrong pane could be scoped.",
       "Additive — only runs when the normal scan finds nothing; it still ignores the page footer, the left job list, and the external company-website apply.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Mass Apply (LinkedIn Jobs): fixed a newer hashed-class layout where the run skipped straight to the next page without applying. On that layout the stable job-card key sits on a plain wrapper while the clickable element is a child, so no cards were being collected — the engine now collects those cards and applies to all of them before paginating.",
       "Purely additive — earlier layouts are unchanged; this only adds cards the previous passes couldn't see.",
-    ],
-  },
-  {
-    version: "1.0.351",
-    date: "Jul 11, 2026",
-    size: "285 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.351.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): added a per-card '⚡ Auto Apply' button on each job card, so you can apply to a single job on its own — it runs the exact same apply flow as the bulk run, just for that one card.",
-      "Additive — the bulk run and apply logic are unchanged; the chip can't overlap a bulk run (they share one lock) and is hidden while any apply is in progress.",
     ],
   },
 ];
