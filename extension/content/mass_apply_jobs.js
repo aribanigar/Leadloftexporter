@@ -181,12 +181,48 @@
           : "";
         cards.push({ key, el: card, title });
       });
+    // Additive third pass — the CLASSIC (Ember) jobs layout renders each card
+    // as <li data-occludable-job-id="<id>"> containing
+    // <div data-job-id="<id>" class="job-card-container ...">. These have NO
+    // role="button" and NO componentkey, so the two passes above miss them.
+    // Collect them by their stable numeric job id (which cardElForKey can
+    // resolve back). Deduped by key so a card already found above is never
+    // double-processed; this only adds cards the other passes couldn't see.
+    document
+      .querySelectorAll('div[data-job-id].job-card-container, li[data-occludable-job-id]')
+      .forEach(node => {
+        const jid = node.getAttribute("data-job-id") || node.getAttribute("data-occludable-job-id");
+        if (!jid || seen.has(jid)) return;
+        // Prefer the inner clickable card container as the click target.
+        const cardEl = node.matches("div.job-card-container")
+          ? node
+          : (node.querySelector("div[data-job-id].job-card-container") || node);
+        if (!cardEl) return;
+        seen.add(jid);
+        const titleLink = cardEl.querySelector(
+          "a.job-card-list__title--link, a.job-card-container__link, a[aria-label]"
+        );
+        const title = titleLink
+          ? (titleLink.getAttribute("aria-label") || (titleLink.textContent || "").replace(/\s+/g, " ").trim())
+          : "";
+        cards.push({ key: jid, el: cardEl, title });
+      });
     return cards;
   }
 
   function cardElForKey(key) {
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(key) : key;
     let el = null;
-    try { el = document.querySelector('div[role="button"][componentkey="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]'); } catch (_) {}
+    try { el = document.querySelector('div[role="button"][componentkey="' + esc + '"]'); } catch (_) {}
+    // Classic (Ember) layout fallback: cards are keyed by their numeric job id
+    // on div[data-job-id].job-card-container (or li[data-occludable-job-id]).
+    if (!el) {
+      try {
+        el = document.querySelector('div[data-job-id="' + esc + '"].job-card-container')
+          || document.querySelector('li[data-occludable-job-id="' + esc + '"] div[data-job-id].job-card-container')
+          || document.querySelector('li[data-occludable-job-id="' + esc + '"]');
+      } catch (_) {}
+    }
     return el;
   }
 
@@ -266,6 +302,11 @@
       // this just pins the exact labels so the condition is unmistakable.
       if (aria === "easy apply to this job" || aria === "linkedin apply to this job") return true;
       if (/easy apply|linkedin apply/i.test(aria)) return true;
+      // Classic (Ember) top-card apply button: stable id + test hook, e.g.
+      // <button id="jobs-apply-button-id" data-live-test-job-apply-button
+      //   aria-label="LinkedIn Apply to <role> at <company>" class="jobs-apply-button">.
+      // Additive — the jobs-apply-button class check below already covers it.
+      if (el.id === "jobs-apply-button-id" || el.hasAttribute("data-live-test-job-apply-button")) return true;
       if (el.classList && el.classList.contains("jobs-apply-button")) return true;
       if (el.closest && el.closest(".jobs-apply-button__container, [class*='jobs-apply-button']")) return true;
       // The 2026 in-app control is an <a> pointing at LinkedIn's own
