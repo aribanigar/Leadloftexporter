@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" font-family="'Poppins','Arial',sans-serif">
+  <defs>
+    <clipPath id="frame"><rect x="0" y="0" width="1080" height="1350" rx="0"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+    <!-- top-left logo reserve (~140px), left blank for manual logo -->
+    <rect x="64" y="60" width="140" height="140" fill="none"/>
+
+    <!-- kicker: italic serif accent for editorial contrast -->
+    <text x="230" y="128" font-family="Georgia,'Times New Roman',serif" font-style="italic"
+          font-size="34" fill="#FF6B00">your shop, online</text>
+    <text x="230" y="176" font-size="26" letter-spacing="6" fill="#FCF9F8" opacity="0.72">QCKSERVE.IN</text>
+
+    <!-- oversized headline -->
+    <text x="64" y="308" font-size="112" font-weight="800" letter-spacing="-4" fill="#FCF9F8">PUT YOUR</text>
+    <text x="64" y="416" font-size="112" font-weight="800" letter-spacing="-4" fill="#FCF9F8">SHOP ONLINE.</text>
+    <text x="64" y="524" font-size="112" font-weight="800" letter-spacing="-4" fill="#FF6B00">FREE.</text>
+    <text x="64" y="590" font-size="34" fill="#FCF9F8" opacity="0.75">List every product. Keep every rupee. 0% commission.</text>
+
+    <!-- ========== product grid (the star) — tidy cards w/ price-strike ========== -->
+    <!-- row 1 -->
+    <g>
+      <rect x="64" y="648" width="452" height="230" rx="20" fill="#FCF9F8"/>
+      <rect x="88" y="672" width="150" height="182" rx="14" fill="#ef6723"/>
+      <text x="118" y="770" font-size="60" fill="#FCF9F8" text-anchor="middle" font-weight="800">S</text>
+      <text x="262" y="712" font-size="30" font-weight="700" fill="#1A1A1A">Handloom Saree</text>
+      <text x="262" y="770" font-size="52" font-weight="800" fill="#1A1A1A">&#8377;1,299</text>
+      <text x="262" y="812" font-size="24" fill="#1A1A1A" opacity="0.55" text-decoration="line-through">fee &#8377;234</text>
+      <text x="370" y="812" font-size="24" font-weight="700" fill="#ef6723">&#8594; &#8377;0</text>
+    </g>
+    <g>
+      <rect x="564" y="648" width="452" height="230" rx="20" fill="#FCF9F8"/>
+      <rect x="588" y="672" width="150" height="182" rx="14" fill="#1A1A1A"/>
+      <text x="618" y="770" font-size="60" fill="#FF6B00" text-anchor="middle" font-weight="800">T</text>
+      <text x="762" y="712" font-size="30" font-weight="700" fill="#1A1A1A">Steel Tiffin Set</text>
+      <text x="762" y="770" font-size="52" font-weight="800" fill="#1A1A1A">&#8377;449</text>
+      <text x="762" y="812" font-size="24" fill="#1A1A1A" opacity="0.55" text-decoration="line-through">fee &#8377;81</text>
+      <text x="856" y="812" font-size="24" font-weight="700" fill="#ef6723">&#8594; &#8377;0</text>
+    </g>
+    <!-- row 2 -->
+    <g>
+      <rect x="64" y="908" width="452" height="230" rx="20" fill="#FCF9F8"/>
+      <rect x="88" y="932" width="150" height="182" rx="14" fill="#1A1A1A"/>
+      <text x="118" y="1030" font-size="60" fill="#FF6B00" text-anchor="middle" font-weight="800">L</text>
+      <text x="262" y="972" font-size="30" font-weight="700" fill="#1A1A1A">LED Table Lamp</text>
+      <text x="262" y="1030" font-size="52" font-weight="800" fill="#1A1A1A">&#8377;899</text>
+      <text x="262" y="1072" font-size="24" fill="#1A1A1A" opacity="0.55" text-decoration="line-through">fee &#8377;162</text>
+      <text x="370" y="1072" font-size="24" font-weight="700" fill="#ef6723">&#8594; &#8377;0</text>
+    </g>
+    <g>
+      <rect x="564" y="908" width="452" height="230" rx="20" fill="#FCF9F8"/>
+      <rect x="588" y="932" width="150" height="182" rx="14" fill="#ef6723"/>
+      <text x="618" y="1030" font-size="60" fill="#FCF9F8" text-anchor="middle" font-weight="800">C</text>
+      <text x="762" y="972" font-size="30" font-weight="700" fill="#1A1A1A">Cricket Bat</text>
+      <text x="762" y="1030" font-size="52" font-weight="800" fill="#1A1A1A">&#8377;1,750</text>
+      <text x="762" y="1072" font-size="24" fill="#1A1A1A" opacity="0.55" text-decoration="line-through">fee &#8377;315</text>
+      <text x="856" y="1072" font-size="24" font-weight="700" fill="#ef6723">&#8594; &#8377;0</text>
+    </g>
+
+    <!-- band strip: the reassurance -->
+    <rect x="64" y="1174" width="952" height="70" rx="16" fill="#ef6723"/>
+    <text x="540" y="1219" font-size="34" font-weight="700" fill="#FCF9F8" text-anchor="middle">Every listing free &#183; 0% commission &#183; buyers reach you direct</text>
+
+    <!-- footer -->
+    <text x="64" y="1300" font-size="34" font-weight="700" letter-spacing="1" fill="#FCF9F8">qckserve.in</text>
+    <text x="1016" y="1300" font-size="26" fill="#FCF9F8" text-anchor="end" opacity="0.6">Store &#183; India</text>
+  </g>
+</svg>
