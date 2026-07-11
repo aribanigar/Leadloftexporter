@@ -1051,7 +1051,9 @@
     _runStyleEl.textContent =
       "html.lc-mass-applying .lc-job-apply-row { display: none !important; }" +
       "html.lc-mass-applying .lc-job-apply-chip { display: none !important; }" +
-      "html.lc-mass-applying [class*='lc-job-apply'] { display: none !important; }";
+      "html.lc-mass-applying [class*='lc-job-apply'] { display: none !important; }" +
+      "html.lc-mass-applying .lc-job-select { display: none !important; }" +
+      "html.lc-mass-applying #lc-massapply-selbar { display: none !important; }";
     document.head.appendChild(_runStyleEl);
   }
   function removeRunStyles() {
@@ -1270,6 +1272,14 @@
   // ─────────────── main loop ─────────────────────────────────
   const state = { running: false, cancel: false, applied: 0, skipped: 0 };
 
+  // ─────────────── Select-All / per-card selection ───────────────
+  // A user-driven subset of jobs to apply to. When NON-EMPTY, the Mass Apply
+  // button runs in "selection mode": it applies ONLY the selected cards and
+  // never paginates. When empty, behaviour is unchanged (apply everything,
+  // page by page). Purely additive — the keys are the same card keys the
+  // bulk loop already uses, so nothing else has to change.
+  const _selected = new Set();
+
   // Keep this tab running at full speed even when it's in the background, so
   // the auto-apply keeps going while the user works in another tab. The
   // service worker pins the tab "active" via chrome.debugger
@@ -1286,9 +1296,13 @@
 
   async function run() {
     if (state.running) return;
+    // Snapshot the selection at start. Non-empty ⇒ "selection mode": apply ONLY
+    // these cards and never paginate. Empty ⇒ apply everything (page by page).
+    const selectionMode = _selected.size > 0;
+    const targetKeys = selectionMode ? new Set(_selected) : null;
     state.running = true; state.cancel = false;
     state.applied = state.skipped = 0;
-    setLabel("Scanning jobs…");
+    setLabel(selectionMode ? ("Applying " + targetKeys.size + " selected…") : "Scanning jobs…");
 
     // Hide per-card Auto Apply chips, start the stray-popup watcher.
     try { document.documentElement.classList.add("lc-mass-applying"); } catch (_) {}
@@ -1307,7 +1321,12 @@
       while (!state.cancel) {
         if (isCheckpoint()) { banner("LinkedIn challenge detected — stopping."); break; }
 
-        const fresh = collectJobCards().filter(c => !processed.has(c.key));
+        let fresh = collectJobCards().filter(c => !processed.has(c.key));
+        if (selectionMode) fresh = fresh.filter(c => targetKeys.has(c.key));
+
+        // In selection mode we're done once every selected card has been
+        // processed — no pagination, ever.
+        if (selectionMode && processed.size >= targetKeys.size) break;
 
         if (!fresh.length) {
           // Nothing new rendered → scroll to load more.
@@ -1315,6 +1334,12 @@
           scrollListDown();
           await sleep(rand(900, 1500));
           if (listScrollTop() === before) {
+            if (selectionMode) {
+              // Selected cards may be virtualised out; require two consecutive
+              // "couldn't scroll" checks, then stop — never paginate.
+              if (++stuckScroll < 2) { continue; }
+              break;
+            }
             // Require TWO consecutive "couldn't scroll" checks before treating
             // the page as exhausted — guards against a transient during a
             // virtualised re-render prematurely paginating (the reported bug:
@@ -1408,6 +1433,9 @@
       try { removeRunStyles(); } catch (_) {}
       setLabel("Done · " + state.applied + " applied, " + state.skipped + " skipped");
       state.running = false; state.cancel = false;
+      // A selection run consumes the selection so the next Mass Apply click
+      // goes back to "apply everything" unless the user re-selects.
+      if (selectionMode) { try { clearSelection(); } catch (_) {} }
       setTimeout(resetLabel, 9000);
     }
   }
@@ -1420,7 +1448,9 @@
 
   // ─────────────── floating button UI ────────────────────────
   let btnEl = null;
+  let selBarEl = null;
   const BTN_ID = "lc-massapply-button";
+  const SELBAR_ID = "lc-massapply-selbar";
 
   function setLabel(text) {
     if (!btnEl) return;
@@ -1510,7 +1540,84 @@
       ["mousedown", "pointerdown"].forEach(t =>
         chip.addEventListener(t, (e) => { e.stopPropagation(); }, true));
       host.appendChild(chip);
+
+      // Per-card selection checkbox (top-left). Toggling it adds/removes this
+      // card's key from _selected; the Mass Apply button then applies only the
+      // selected set. Our own element — never bubbles to the card's open handler.
+      const sel = document.createElement("button");
+      sel.type = "button";
+      sel.className = "lc-job-select";
+      sel.dataset.lcKey = card.key;
+      styleSelectBox(sel, _selected.has(card.key));
+      sel.title = "Select this job for Mass Apply";
+      sel.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (_selected.has(card.key)) _selected.delete(card.key);
+        else _selected.add(card.key);
+        styleSelectBox(sel, _selected.has(card.key));
+        updateSelectionUi();
+      }, true);
+      ["mousedown", "pointerdown"].forEach(t =>
+        sel.addEventListener(t, (e) => { e.stopPropagation(); }, true));
+      host.appendChild(sel);
     }
+    updateSelectionUi();
+  }
+
+  // Paints a selection checkbox to reflect checked/unchecked.
+  function styleSelectBox(el, on) {
+    el.textContent = on ? "✓" : "";
+    el.style.cssText = [
+      "position:absolute", "top:10px", "left:10px", "z-index:60",
+      "width:22px", "height:22px", "border-radius:6px",
+      "display:inline-flex", "align-items:center", "justify-content:center",
+      "font:800 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,sans-serif",
+      "cursor:pointer", "user-select:none", "padding:0",
+      on ? "background:linear-gradient(135deg,#047857 0%,#059669 100%)" : "background:#ffffff",
+      on ? "color:#fff" : "color:transparent",
+      on ? "border:1.5px solid #047857" : "border:1.5px solid #94a3b8",
+      "box-shadow:0 2px 6px rgba(15,23,42,0.18)",
+    ].join(";");
+  }
+
+  // Keeps the Select-All bar label, its checkbox state, every rendered card
+  // checkbox, and the Mass Apply button label in sync with _selected. Safe to
+  // call often; it never touches the button text while a run is in progress
+  // (setLabel owns it then).
+  function updateSelectionUi() {
+    const n = _selected.size;
+    // Reconcile any rendered checkboxes (e.g. after a Select-All click).
+    try {
+      document.querySelectorAll(".lc-job-select").forEach((el) => {
+        const key = el.dataset.lcKey;
+        styleSelectBox(el, !!key && _selected.has(key));
+      });
+    } catch (_) {}
+    if (selBarEl) {
+      const lab = selBarEl.querySelector(".lc-sel-text");
+      if (lab) lab.textContent = n > 0 ? (n + " selected") : "Select jobs";
+      const clr = selBarEl.querySelector(".lc-sel-clear");
+      if (clr) clr.style.display = n > 0 ? "inline-flex" : "none";
+    }
+    if (btnEl && !state.running) {
+      const t = btnEl.querySelector(".lc-ma-text");
+      if (t) t.textContent = n > 0 ? ("Mass Apply (" + n + ")") : "Mass Apply Jobs";
+    }
+  }
+
+  // Selects every currently-rendered job card (one page's worth). LinkedIn's
+  // list is virtualised, so this is "select all visible/loaded" — the honest
+  // scope, surfaced in the toast.
+  function selectAllVisible() {
+    let cards = [];
+    try { cards = collectJobCards(); } catch (_) {}
+    for (const c of cards) _selected.add(c.key);
+    updateSelectionUi();
+  }
+
+  function clearSelection() {
+    _selected.clear();
+    updateSelectionUi();
   }
 
   function mountButton() {
@@ -1548,6 +1655,7 @@
       else run();
     });
     document.body.appendChild(btnEl);
+    mountSelBar();
 
     const style = document.createElement("style");
     style.id = "lc-massapply-style";
@@ -1559,8 +1667,63 @@
     document.head.appendChild(style);
   }
 
+  // Small "Select all / clear" pill that sits just above the Mass Apply button.
+  // Hidden while a run is active (the whole selection UI is a pre-run control).
+  function mountSelBar() {
+    if (selBarEl || !document.body) return;
+    selBarEl = document.createElement("div");
+    selBarEl.id = SELBAR_ID;
+    selBarEl.style.cssText = [
+      "position: fixed", "right: 18px", "bottom: 166px",
+      "z-index: 2147483646",
+      "display: inline-flex", "align-items: center", "gap: 6px",
+      "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif",
+    ].join(";");
+
+    const selAll = document.createElement("button");
+    selAll.type = "button";
+    selAll.className = "lc-sel-all";
+    selAll.style.cssText = [
+      "background:#ffffff", "color:#047857", "border:1.5px solid #059669",
+      "border-radius:999px", "padding:6px 12px",
+      "font-size:12px", "font-weight:700", "cursor:pointer", "user-select:none",
+      "box-shadow:0 4px 12px rgba(5,150,105,0.20)",
+      "display:inline-flex", "align-items:center", "gap:6px",
+    ].join(";");
+    selAll.innerHTML = '<span>☑</span><span class="lc-sel-text">Select jobs</span>';
+    selAll.title = "Select all jobs loaded on this page";
+    selAll.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (state.running) return;
+      selectAllVisible();
+    });
+
+    const clr = document.createElement("button");
+    clr.type = "button";
+    clr.className = "lc-sel-clear";
+    clr.textContent = "Clear";
+    clr.style.cssText = [
+      "background:#fff1f2", "color:#be123c", "border:1.5px solid #fecdd3",
+      "border-radius:999px", "padding:6px 10px",
+      "font-size:12px", "font-weight:700", "cursor:pointer", "user-select:none",
+      "display:none", "align-items:center",
+    ].join(";");
+    clr.title = "Clear the current selection";
+    clr.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (state.running) return;
+      clearSelection();
+    });
+
+    selBarEl.appendChild(selAll);
+    selBarEl.appendChild(clr);
+    document.body.appendChild(selBarEl);
+    updateSelectionUi();
+  }
+
   function unmountButton() {
     if (btnEl) { btnEl.remove(); btnEl = null; }
+    if (selBarEl) { selBarEl.remove(); selBarEl = null; }
     const s = document.getElementById("lc-massapply-style");
     if (s) s.remove();
   }
