@@ -163,6 +163,24 @@
         cards.push({ key, el: card, title: (btn.getAttribute("aria-label") || "")
           .replace(/^Dismiss\s+/i, "").replace(/\s+job$/i, "").trim() });
       });
+    // Additive second pass — the 2026 hashed-class SDUI layout keys each job
+    // card as componentkey="job-card-component-ref-<jobId>" on a
+    // div[role="button"]. Collect those directly so card detection survives
+    // any change to the Dismiss button's aria-label. Only adds cards the
+    // Dismiss-climb above didn't already register (dedup by key), so it can
+    // never double-process or change existing behaviour.
+    document
+      .querySelectorAll('div[role="button"][componentkey^="job-card-component-ref"]')
+      .forEach(card => {
+        const key = card.getAttribute("componentkey");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        const dis = card.querySelector('button[aria-label^="Dismiss "][aria-label$=" job"]');
+        const title = dis
+          ? (dis.getAttribute("aria-label") || "").replace(/^Dismiss\s+/i, "").replace(/\s+job$/i, "").trim()
+          : "";
+        cards.push({ key, el: card, title });
+      });
     return cards;
   }
 
@@ -241,6 +259,12 @@
     const isInAppApply = (el) => {
       const aria = (el.getAttribute("aria-label") || "").toLowerCase();
       const href = (el.getAttribute("href") || "").toLowerCase();
+      // Explicit match for the 2026 hashed-class detail-pane apply button,
+      // whose aria-label is exactly "Easy Apply to this job" or "LinkedIn
+      // Apply to this job" (with the linkedin-bug-medium glyph + "Easy Apply"
+      // text inside). Additive — the general regex below already covers these,
+      // this just pins the exact labels so the condition is unmistakable.
+      if (aria === "easy apply to this job" || aria === "linkedin apply to this job") return true;
       if (/easy apply|linkedin apply/i.test(aria)) return true;
       if (el.classList && el.classList.contains("jobs-apply-button")) return true;
       if (el.closest && el.closest(".jobs-apply-button__container, [class*='jobs-apply-button']")) return true;
