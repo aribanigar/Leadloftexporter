@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.356",
+    date: "Jul 11, 2026",
+    size: "286 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.356.zip",
+    latest: true,
+    changes: [
+      "Extension Options page redesigned to be compact and clean — wider layout, tighter spacing, and the Auto-Apply profile now lays its fields out in columns so it's no longer a long, elongated page.",
+      "No behaviour change: your saved profile is still used to fill LinkedIn job forms exactly as before.",
+    ],
+  },
+  {
     version: "1.0.355",
     date: "Jul 11, 2026",
     size: "286 KB",
     file: "/extensions/leadcaptura-extension-v1.0.355.zip",
-    latest: true,
     changes: [
       "Auto-Apply profile (Extension Options): expanded with the questions Gulf and European Easy Apply forms actually ask — nationality, current job title, highest education, languages, residency/visa status, driving license, preferred work mode, LinkedIn/portfolio and more.",
       "Salary now has a currency selector (SAR/AED/QAR/EUR/GBP/USD…), and there's a dedicated 'Save profile' button on the card. The auto-apply uses every field.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Auto-Apply profile (Extension Options): removed the demo 'Todd' data, made the form compact, and fixed a disconnect so the profile you fill is now actually used by LinkedIn auto-apply.",
       "Self-learning answers: when auto-apply hits a question your profile can't answer and you answer it (or LinkedIn prefills it from a past application), it's remembered and auto-filled on every future job. Unknown required fields are now left blank instead of guessed.",
-    ],
-  },
-  {
-    version: "1.0.353",
-    date: "Jul 11, 2026",
-    size: "285 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.353.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): hardened the detail-pane apply-button finder with a document-wide fallback for the exact 'Easy Apply to this job' / 'LinkedIn Apply to this job' button, covering an edge case on the fully-hashed layout where the wrong pane could be scoped.",
-      "Additive — only runs when the normal scan finds nothing; it still ignores the page footer, the left job list, and the external company-website apply.",
     ],
   },
 ];
