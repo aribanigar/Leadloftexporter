@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.350",
+    date: "Jul 11, 2026",
+    size: "285 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.350.zip",
+    latest: true,
+    changes: [
+      "Mass Apply (LinkedIn Jobs): more robust pagination. The engine already finishes every job on the current page before moving on; this adds a fallback so that, if the Next-page button isn't clickable, it advances via the numbered page indicators (Page 1 / Page 2 …) instead of stopping — and correctly stops on the last page.",
+      "Additive — only the between-page step changed; per-job applying is untouched, and it never leaves a page before all its jobs are done.",
+    ],
+  },
+  {
     version: "1.0.349",
     date: "Jul 11, 2026",
     size: "285 KB",
     file: "/extensions/leadcaptura-extension-v1.0.349.zip",
-    latest: true,
     changes: [
       "Mass Apply (LinkedIn Jobs): added a ~45-second human-pace wait between each job. LinkedIn now temporarily pauses 'LinkedIn Apply' when it detects a fast application pace — this gap keeps the run under that threshold so it isn't paused and your account isn't put at risk. A live countdown shows in the toolbar, and Stop is still instant.",
       "Additive — only the between-jobs gap changed; the apply flow itself is untouched.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Mass Apply (LinkedIn Jobs): support the CLASSIC (Ember) jobs layout. Cards there are <li data-occludable-job-id> / <div data-job-id class='job-card-container'> with the apply button <button id='jobs-apply-button-id' class='jobs-apply-button'> — these weren't being collected, so the run did nothing on that layout. The engine now also collects cards by their numeric job id and clicks the classic top-card Apply button.",
       "Purely additive — the newer role=button / hashed-class layouts are unchanged; the classic-layout selectors only add cards the old passes couldn't see.",
-    ],
-  },
-  {
-    version: "1.0.347",
-    date: "Jul 11, 2026",
-    size: "285 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.347.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): explicit support for LinkedIn's new fully-hashed-class job cards. Job cards are now also collected directly by their stable componentkey (job-card-component-ref-<id>), so detection survives any change to the Dismiss button's label, and the detail-pane apply button is matched by its exact 'Easy Apply to this job' / 'LinkedIn Apply to this job' label.",
-      "Purely additive — nothing in the existing apply flow changed; these only add matches the old selectors could miss on the new layout.",
     ],
   },
 ];
