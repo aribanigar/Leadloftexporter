@@ -90,6 +90,44 @@
     } catch (_) {}
   }
 
+  // ── Audio alert (buzz/beep) for "a question needs your answer" ──
+  // Web Audio needs a user gesture to start; the run always begins from the
+  // user's click on the Mass Apply button, so we create/resume the context then
+  // (see _ensureAudio() calls at run()/runSingle() start). Best-effort — if the
+  // browser blocks audio, the on-screen banner still alerts the user.
+  let _audioCtx = null;
+  function _ensureAudio() {
+    try {
+      if (!_audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) _audioCtx = new AC();
+      }
+      if (_audioCtx && _audioCtx.state === "suspended") _audioCtx.resume();
+    } catch (_) {}
+    return _audioCtx;
+  }
+  function beep(freq, ms) {
+    try {
+      const ctx = _ensureAudio();
+      if (!ctx) return;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = freq || 880;
+      g.gain.value = 0.09;
+      o.connect(g); g.connect(ctx.destination);
+      const now = ctx.currentTime;
+      o.start(now);
+      o.stop(now + (ms || 180) / 1000);
+    } catch (_) {}
+  }
+  // Two-tone attention buzz — distinct from a single beep so it clearly means
+  // "I need you."
+  function buzz() {
+    beep(920, 200);
+    setTimeout(() => { try { beep(660, 240); } catch (_) {} }, 240);
+  }
+
   function humanClick(el) {
     if (!el) return false;
     try {
@@ -324,6 +362,82 @@
     const last = _lastCardEl();
     if (last) { try { last.scrollIntoView({ block: "end", behavior: "instant" }); return true; } catch (_) {} }
     return false;
+  }
+
+  // Advance to the NEXT results page — robustly. LinkedIn rewrites its
+  // pagination markup constantly, so we try every known control in order
+  // (newest first) rather than a single selector; a single-selector miss was
+  // what made a run stop after one page. Returns true only when the page
+  // actually changed (detected by a URL-query change OR the top card's key
+  // changing), so the caller never mistakes "no-op click" for progress.
+  async function goToNextResultsPage() {
+    let nextBtn =
+      document.querySelector('button[data-testid="pagination-controls-next-button-visible"]:not([disabled])') ||
+      document.querySelector('button[data-testid="pagination-controls-next-button"]:not([disabled])') ||
+      document.querySelector('button[aria-label="View next page"]:not([disabled])') ||
+      document.querySelector('button[aria-label*="next page" i]:not([disabled])') ||
+      document.querySelector('.artdeco-pagination__button--next:not([disabled])') ||
+      null;
+
+    // Button whose visible label is a child <span> "Next" + a chevron icon.
+    if (!nextBtn) {
+      nextBtn = Array.from(document.querySelectorAll("button")).find(b => {
+        if (b.disabled || b.getAttribute("aria-disabled") === "true") return false;
+        const t = (b.innerText || b.textContent || "").replace(/\s+/g, " ").trim();
+        return /^next$/i.test(t) && b.querySelector("svg[id*='chevron-right' i], [class*='chevron-right']");
+      }) || null;
+    }
+
+    // Numbered indicators (data-testid form): click current+1.
+    if (!nextBtn) {
+      const pageBtns = Array.from(document.querySelectorAll(
+        'button[data-testid^="pagination-indicator-"][aria-label^="Page "]'
+      ));
+      if (pageBtns.length) {
+        const cur = pageBtns.find(b => b.getAttribute("aria-current") === "true");
+        const curNum = cur ? parseInt((cur.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) : NaN;
+        if (!isNaN(curNum)) {
+          nextBtn = pageBtns.find(b =>
+            parseInt((b.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) === curNum + 1
+          ) || null;
+        }
+      }
+    }
+
+    // Classic Ember indicators (<li> list): active → next sibling's button.
+    if (!nextBtn) {
+      const indicators = Array.from(document.querySelectorAll("li.artdeco-pagination__indicator--number"));
+      const activeIdx = indicators.findIndex(li =>
+        li.classList.contains("active") || li.querySelector("[aria-current]") || li.getAttribute("aria-current") === "true"
+      );
+      if (activeIdx >= 0 && activeIdx < indicators.length - 1) {
+        nextBtn = indicators[activeIdx + 1].querySelector("button");
+      }
+    }
+
+    if (!nextBtn || nextBtn.disabled || nextBtn.getAttribute("aria-disabled") === "true" || !visible(nextBtn)) {
+      return false;
+    }
+
+    const prevSearch = location.search;
+    const prevFirstKey = (collectJobCards()[0] || {}).key || "";
+    setLabel("Loading next page… · " + state.applied + " applied");
+    try { nextBtn.scrollIntoView({ block: "center" }); } catch (_) {}
+    await sleep(rand(500, 900));
+    humanClick(nextBtn);
+
+    // Wait up to 9s for the page to actually change.
+    const deadline = Date.now() + 9000;
+    while (Date.now() < deadline) {
+      if (state.cancel) return false;
+      if (location.search !== prevSearch) break;
+      const fk = (collectJobCards()[0] || {}).key || "";
+      if (fk && fk !== prevFirstKey) break;
+      await sleep(300);
+    }
+    await sleep(rand(1800, 2800));   // let the fresh page hydrate
+    const nowFirstKey = (collectJobCards()[0] || {}).key || "";
+    return (location.search !== prevSearch) || (!!nowFirstKey && nowFirstKey !== prevFirstKey);
   }
 
   // The in-app apply control inside the right detail pane. Detects the older
@@ -1115,6 +1229,39 @@
     return false;
   }
 
+  // A step won't advance because it asks something only the user can answer
+  // (a free-text screening question, a file we can't script, etc.). Instead of
+  // skipping the job, ALERT the user (buzz + beep + banner) and WAIT — polling
+  // until they fill it in and the form moves on (or they press Stop). We keep
+  // re-autofilling + re-clicking Next/Review/Submit each cycle, so the moment
+  // the answer is present the form advances on its own. Returns true when the
+  // step advanced (user answered), false only if the user pressed Stop.
+  async function waitForUserAnswer(beforeText) {
+    banner("⏸ This job asks a question only you can answer — type it into the LinkedIn form. I'll continue automatically once it's filled. (Press Stop to cancel.)");
+    try { buzz(); } catch (_) {}
+    let beat = 0;
+    while (!state.cancel) {
+      if (!applyFormPresent()) return true;          // user finished / closed the form
+      if (modalText() !== beforeText) return true;   // step changed = user answered
+      // Flash the button label so it's obvious the run is paused on YOU.
+      setLabel(beat % 2 ? "⏸ Waiting for your answer…" : "⏸ Answer the question in the form");
+      // Every ~3s: buzz, then re-autofill + re-attempt the action button — if
+      // the user has now filled the field, our click advances the form.
+      if (beat % 3 === 0) {
+        try { buzz(); } catch (_) {}
+        try { const sc = applyFormScope(); if (sc) autofill(sc); } catch (_) {}
+        const adv = submitButton() || reviewButton() || nextButton();
+        if (adv) {
+          humanClick(adv);
+          if (await waitAdvanced(beforeText, 1200)) return true;
+        }
+      }
+      beat++;
+      await sleep(1000);   // 1s cadence keeps Stop responsive
+    }
+    return false;          // cancelled
+  }
+
   // Walk the multi-step apply form. Returns "applied" | "skipped".
   // Mirrors overlay.js's proven _runEasyApplyModal: ONE click strategy at a
   // time, between each strategy verify the form actually advanced via
@@ -1161,6 +1308,13 @@
         humanClick(submit);
         let done = await waitAdvanced(beforeSubmit, 5000);
         if (!done) { escalateClick(submitButton() || submit); done = await waitAdvanced(beforeSubmit, 4000); }
+        // Submit didn't go through and the form is still open → a required
+        // field on the final step needs the user. Buzz + wait, then resume.
+        if (!done && applyFormPresent()) {
+          const answered = await waitForUserAnswer(beforeSubmit);
+          if (!answered) { await discardAndClose(); return "skipped"; }
+          if (applyFormPresent()) { continue; }   // advanced but not closed → re-loop
+        }
         await closePostSubmit();
         return "applied";
       }
@@ -1201,9 +1355,16 @@
 
       if (!advanced) {
         // The step has a validation error we couldn't satisfy. Try one more
-        // autofill+click pass before declaring stuck.
+        // autofill+click pass before concluding it needs the user.
         stuck++;
-        if (stuck >= 2) { await discardAndClose(); return "skipped"; }
+        if (stuck >= 2) {
+          // It needs a human answer → buzz + beep and WAIT for the user rather
+          // than skipping. Resume automatically once they've answered.
+          const answered = await waitForUserAnswer(before);
+          if (!answered) { await discardAndClose(); return "skipped"; }
+          stuck = 0;
+          continue;   // re-enter on the now-advanced step
+        }
       } else {
         stuck = 0;
       }
@@ -1309,6 +1470,7 @@
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
     keepAwake(true);   // keep applying even when the tab is in the background
+    _ensureAudio();    // unlock audio now (this run began from the user's click)
 
     // Process ONE freshly-rendered card per iteration, then scroll the
     // virtualised list to reveal more. This survives cards unmounting as the
@@ -1316,6 +1478,7 @@
     const processed = new Set();
     let idle = 0;
     let stuckScroll = 0;   // consecutive "list couldn't scroll" checks
+    let noNextTries = 0;   // consecutive failed attempts to reach the next page
 
     try {
       while (!state.cancel) {
@@ -1329,74 +1492,60 @@
         if (selectionMode && processed.size >= targetKeys.size) break;
 
         if (!fresh.length) {
-          // Nothing new rendered → scroll to load more.
+          // Nothing new rendered → scroll to load more of THIS page first.
           const before = listScrollTop();
           scrollListDown();
           await sleep(rand(900, 1500));
-          if (listScrollTop() === before) {
-            if (selectionMode) {
-              // Selected cards may be virtualised out; require two consecutive
-              // "couldn't scroll" checks, then stop — never paginate.
-              if (++stuckScroll < 2) { continue; }
-              break;
-            }
-            // Require TWO consecutive "couldn't scroll" checks before treating
-            // the page as exhausted — guards against a transient during a
-            // virtualised re-render prematurely paginating (the reported bug:
-            // jumping to the next page after only the first job on the page).
+          const moved = listScrollTop() !== before;
+
+          if (moved) {
+            // Scroll moved → more of this page is loading; keep going. High
+            // safety valve — if the list keeps moving but yields no new cards
+            // for a very long time, fall through to a pagination attempt rather
+            // than looping forever.
+            stuckScroll = 0;
+            if (++idle < 120) { continue; }
+          } else {
+            // Scroll didn't move. Require TWO consecutive "couldn't scroll"
+            // reads before treating the page as exhausted — guards against a
+            // transient during a virtualised re-render prematurely paginating.
             if (++stuckScroll < 2) { continue; }
-            // List can't scroll further → try the next results page.
-            const nextPage = document.querySelector(
-              'button[data-testid="pagination-controls-next-button-visible"]'
-            );
-            if (nextPage && !nextPage.disabled && visible(nextPage)) {
-              setLabel("Loading next page…");
-              humanClick(nextPage);
-              await sleep(rand(2600, 4200));
-              processed.clear();
-              idle = 0; stuckScroll = 0;
-              continue;
-            }
-            // Additive fallback — advance via the numbered page indicators
-            // (button[aria-label="Page N"][data-testid^="pagination-indicator-"])
-            // when the Next button above isn't usable. Runs ONLY after every
-            // card on this page is processed + the list is scroll-exhausted, so
-            // it never leaves a page early. Advances exactly one page (current
-            // aria-current="true" → current+1); on the last page there is no
-            // higher indicator, so it falls through to break (= done).
-            const pageBtns = Array.from(document.querySelectorAll(
-              'button[data-testid^="pagination-indicator-"][aria-label^="Page "]'
-            ));
-            if (pageBtns.length) {
-              const cur = pageBtns.find(b => b.getAttribute("aria-current") === "true");
-              const curNum = cur ? parseInt((cur.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) : NaN;
-              let target = null;
-              if (!isNaN(curNum)) {
-                target = pageBtns.find(b =>
-                  parseInt((b.getAttribute("aria-label") || "").replace(/\D/g, ""), 10) === curNum + 1
-                );
-              }
-              if (target && !target.disabled && visible(target)) {
-                setLabel("Loading next page…");
-                humanClick(target);
-                await sleep(rand(2600, 4200));
-                processed.clear();
-                idle = 0; stuckScroll = 0;
-                continue;
-              }
-            }
-            break;                       // no more cards, no more pages
           }
-          // Scroll moved → more of this page is loading; keep going.
-          stuckScroll = 0;
-          if (++idle > 60) break;        // safety valve
-          continue;
+
+          // ── This page is fully processed. ──
+          // Selection mode never paginates (it targets a fixed picked set).
+          if (selectionMode) break;
+
+          // Advance to the next page — robustly (many selectors). The run must
+          // keep going across ALL pages and only stop when the user presses
+          // Stop, a challenge appears, or there is genuinely no next page.
+          const advanced = await goToNextResultsPage();
+          if (advanced) {
+            processed.clear();
+            idle = 0; stuckScroll = 0; noNextTries = 0;
+            continue;
+          }
+
+          // Couldn't advance THIS attempt. Don't stop yet — LinkedIn may still
+          // be hydrating the pagination control, or a scroll nudge may reveal
+          // it. Retry a few times before concluding it's the last page.
+          if (++noNextTries < 5) {
+            setLabel("Looking for more jobs… · " + state.applied + " applied, " + state.skipped + " skipped");
+            // A gentle scroll to the very bottom often mounts the pager.
+            try { scrollListDown(); } catch (_) {}
+            await sleep(rand(1600, 2800));
+            stuckScroll = 0; idle = 0;
+            continue;
+          }
+
+          // Robustly confirmed: no more pages anywhere. Natural end.
+          break;
         }
 
-        idle = 0; stuckScroll = 0;
+        idle = 0; stuckScroll = 0; noNextTries = 0;
         const card = fresh[0];
         processed.add(card.key);
-        setLabel("Applying #" + processed.size + " · " + state.applied + " applied");
+        setLabel("Applying #" + processed.size + " · " + state.applied + " applied, " + state.skipped + " skipped");
 
         let result = "skipped";
         try { result = await applyToCard(card); }
@@ -1420,11 +1569,11 @@
         // second so Stop is immediate; shows a live countdown in the label.
         const gapMs = 45000 + Math.floor(Math.random() * 6000); // 45–51s
         for (let remain = Math.round(gapMs / 1000); remain > 0 && !state.cancel; remain--) {
-          setLabel("Next job in " + remain + "s · " + state.applied + " applied");
+          setLabel("Next job in " + remain + "s · " + state.applied + " applied, " + state.skipped + " skipped");
           await sleep(1000);
         }
         if (state.cancel) break;
-        setLabel("Next job · " + state.applied + " applied");
+        setLabel("Next job · " + state.applied + " applied, " + state.skipped + " skipped");
       }
     } finally {
       keepAwake(false);
@@ -1473,6 +1622,7 @@
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
     keepAwake(true);
+    _ensureAudio();    // unlock audio now (this run began from the user's click)
     setLabel("Applying 1 job…");
     try {
       // Re-resolve the card fresh so we never act on a stale node.
