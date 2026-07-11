@@ -72,6 +72,9 @@ html, body {
 .card.compact .grid2, .card.compact .grid3 { gap: 6px 14px; }
 .card.compact .divider { margin: 12px 0; }
 
+/* Narrow currency dropdown that sits beside a salary input in an .inp-row. */
+.cur-sel { flex: 0 0 118px; width: 118px; min-width: 118px; }
+
 .card-header {
   display: flex;
   align-items: center;

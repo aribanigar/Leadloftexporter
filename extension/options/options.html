@@ -133,6 +133,7 @@
           Your answers to the standard questions on LinkedIn Easy Apply forms. Fill what applies to you — leave a field blank to skip it. Anything the auto-apply can't answer from here is learned the first time you answer it, and reused automatically after that.
         </p>
 
+        <!-- Identity + contact -->
         <div class="grid2">
           <div class="field">
             <label class="lbl" for="ap_fullName">Full name</label>
@@ -144,36 +145,86 @@
           </div>
           <div class="field">
             <label class="lbl" for="ap_phone">Phone (with country code)</label>
-            <input id="ap_phone" class="inp" type="tel" placeholder="+1 555 123 4567" />
+            <input id="ap_phone" class="inp" type="tel" placeholder="+971 5x xxx xxxx" />
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_nationality">Nationality</label>
+            <input id="ap_nationality" class="inp" type="text" placeholder="e.g. Indian, British, Emirati" />
           </div>
           <div class="field">
             <label class="lbl" for="ap_city">City</label>
             <input id="ap_city" class="inp" type="text" placeholder="Your city" />
           </div>
           <div class="field">
-            <label class="lbl" for="ap_country">Country</label>
-            <input id="ap_country" class="inp" type="text" placeholder="Your country" />
+            <label class="lbl" for="ap_country">Country of residence</label>
+            <input id="ap_country" class="inp" type="text" placeholder="e.g. Saudi Arabia, Germany, UAE" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Professional -->
+        <div class="grid2">
+          <div class="field">
+            <label class="lbl" for="ap_jobTitle">Current / most recent job title</label>
+            <input id="ap_jobTitle" class="inp" type="text" placeholder="e.g. Marketing Manager" />
           </div>
           <div class="field">
             <label class="lbl" for="ap_years">Years of experience</label>
             <input id="ap_years" class="inp" type="text" placeholder="e.g. 5" />
           </div>
           <div class="field">
+            <label class="lbl" for="ap_education">Highest education</label>
+            <select id="ap_education" class="inp">
+              <option value="">Select…</option>
+              <option value="High school">High school</option>
+              <option value="Diploma">Diploma</option>
+              <option value="Bachelor's degree">Bachelor's degree</option>
+              <option value="Master's degree">Master's degree</option>
+              <option value="Doctorate / PhD">Doctorate / PhD</option>
+            </select>
+          </div>
+          <div class="field">
             <label class="lbl" for="ap_notice">Notice period / availability</label>
-            <input id="ap_notice" class="inp" type="text" placeholder="e.g. 30 days" />
+            <input id="ap_notice" class="inp" type="text" placeholder="e.g. Immediately, 30 days, 1 month" />
           </div>
           <div class="field">
-            <label class="lbl" for="ap_expectedSalary">Expected salary</label>
-            <input id="ap_expectedSalary" class="inp" type="text" placeholder="e.g. 25000" />
+            <label class="lbl" for="ap_languages">Languages</label>
+            <input id="ap_languages" class="inp" type="text" placeholder="e.g. English (fluent), Arabic (native)" />
           </div>
           <div class="field">
-            <label class="lbl" for="ap_currentSalary">Current salary</label>
-            <input id="ap_currentSalary" class="inp" type="text" placeholder="e.g. 20000" />
+            <label class="lbl" for="ap_linkedin">LinkedIn profile URL</label>
+            <input id="ap_linkedin" class="inp" type="url" placeholder="linkedin.com/in/you" />
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_website">Portfolio / website</label>
+            <input id="ap_website" class="inp" type="url" placeholder="yoursite.com (optional)" />
           </div>
         </div>
 
         <div class="divider"></div>
 
+        <!-- Salary (with currency) -->
+        <div class="grid2">
+          <div class="field">
+            <label class="lbl" for="ap_expectedSalary">Expected salary</label>
+            <div class="inp-row">
+              <input id="ap_expectedSalary" class="inp" type="text" placeholder="e.g. 25000" />
+              <select id="ap_expectedCurrency" class="inp cur-sel"></select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_currentSalary">Current salary</label>
+            <div class="inp-row">
+              <input id="ap_currentSalary" class="inp" type="text" placeholder="e.g. 20000" />
+              <select id="ap_currentCurrency" class="inp cur-sel"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Eligibility (Gulf + Europe) -->
         <div class="grid3">
           <div class="field">
             <label class="lbl" for="ap_workAuth">Authorized to work?</label>
@@ -183,7 +234,7 @@
             </select>
           </div>
           <div class="field">
-            <label class="lbl" for="ap_sponsorship">Need sponsorship?</label>
+            <label class="lbl" for="ap_sponsorship">Need visa sponsorship?</label>
             <select id="ap_sponsorship" class="inp">
               <option value="No">No</option>
               <option value="Yes">Yes</option>
@@ -196,7 +247,49 @@
               <option value="No">No</option>
             </select>
           </div>
+          <div class="field">
+            <label class="lbl" for="ap_visaStatus">Residency / visa status</label>
+            <select id="ap_visaStatus" class="inp">
+              <option value="">Select…</option>
+              <option value="Citizen">Citizen</option>
+              <option value="Permanent resident">Permanent resident</option>
+              <option value="Valid work visa / permit">Valid work visa / permit (Iqama, EU permit…)</option>
+              <option value="Residence visa (transferable)">Residence visa (transferable)</option>
+              <option value="Visit / tourist visa">Visit / tourist visa</option>
+              <option value="Require sponsorship">Require sponsorship</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_drivingLicense">Driving license?</label>
+            <select id="ap_drivingLicense" class="inp">
+              <option value="">Select…</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_workMode">Preferred work mode</label>
+            <select id="ap_workMode" class="inp">
+              <option value="">No preference</option>
+              <option value="On-site">On-site</option>
+              <option value="Hybrid">Hybrid</option>
+              <option value="Remote">Remote</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="ap_gender">Gender</label>
+            <select id="ap_gender" class="inp">
+              <option value="Prefer not to say">Prefer not to say</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
         </div>
+
+        <div class="actions" style="margin-top:6px">
+          <button class="btn primary" id="ap_save" type="button">💾 Save profile</button>
+        </div>
+        <div id="ap_status" class="status"></div>
       </section>
 
       <!-- AI answers -->

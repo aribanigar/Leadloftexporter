@@ -661,16 +661,25 @@
     full_name: "",
     email: "",
     phone: "",
+    nationality: "",
     city: "",
     country: "",
+    current_title: "",
     years_of_experience: "",
     years_in_role: "",
+    education: "",
     notice_period_days: "",
+    languages: "",
     expected_salary: "",
+    expected_salary_currency: "",
     current_salary: "",
+    current_salary_currency: "",
     willing_to_relocate: "Yes",
     authorized_to_work: "Yes",
     require_sponsorship: "No",
+    visa_status: "",
+    driving_license: "",
+    work_mode: "",
     gender: "Prefer not to say",
     ethnicity: "Prefer not to say",
     veteran_status: "Prefer not to say",
@@ -750,15 +759,25 @@
     if (/\b(full name|your name|first and last name|name)\b/.test(l) && !/company|manager|reference|user ?name|file/.test(l)) return APPLY_PROFILE.full_name;
     if (/e-?mail/.test(l)) return APPLY_PROFILE.email;
     if (/phone|mobile|contact number/.test(l)) return APPLY_PROFILE.phone;
+    if (/nationality|citizenship/.test(l)) return APPLY_PROFILE.nationality;
     if (/\bcity\b|current location|which city/.test(l)) return APPLY_PROFILE.city;
-    if (/\bcountry\b/.test(l)) return APPLY_PROFILE.country;
+    if (/\bcountry\b|country of residence/.test(l)) return APPLY_PROFILE.country;
+    if (/current (job )?title|present title|current role|most recent (job )?title|job title/.test(l)) return APPLY_PROFILE.current_title;
+    if (/highest (level of )?education|education level|qualification|degree/.test(l)) return APPLY_PROFILE.education;
+    if (/language/.test(l)) return APPLY_PROFILE.languages;
+    if (/driving licen|driver'?s? licen/.test(l)) return APPLY_PROFILE.driving_license;
+    if (/visa status|residenc|iqama|work permit|residence permit/.test(l)) return APPLY_PROFILE.visa_status;
+    if (/on-?site|hybrid|remote|work (mode|arrangement|setting)/.test(l)) return APPLY_PROFILE.work_mode;
     if (/years.*experience|how many years|total experience|relevant experience/.test(l)) return APPLY_PROFILE.years_of_experience;
     if (/notice period/.test(l)) return APPLY_PROFILE.notice_period_days;
+    if (/expected .*currency|currency.*expected/.test(l)) return APPLY_PROFILE.expected_salary_currency;
+    if (/current .*currency|currency.*current|salary currency/.test(l)) return APPLY_PROFILE.current_salary_currency;
     if (/expected (salary|ctc|compensation)|salary expectation/.test(l)) return APPLY_PROFILE.expected_salary;
     if (/current (salary|ctc|compensation)|present salary/.test(l)) return APPLY_PROFILE.current_salary;
     if (/willing to relocate|open to relocat|relocation/.test(l)) return APPLY_PROFILE.willing_to_relocate;
     if (/authori[sz]ed to work|right to work|work authori/.test(l)) return APPLY_PROFILE.authorized_to_work;
     if (/sponsorship|require .* visa|visa sponsor/.test(l)) return APPLY_PROFILE.require_sponsorship;
+    if (/\bgender\b/.test(l)) return APPLY_PROFILE.gender;
     if (/linkedin.*url|linkedin profile/.test(l)) return APPLY_PROFILE.linkedin_url;
     if (/portfolio/.test(l)) return APPLY_PROFILE.portfolio_url;
     if (/github/.test(l)) return APPLY_PROFILE.github_url;

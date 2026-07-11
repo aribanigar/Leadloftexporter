@@ -20,15 +20,27 @@ const DEFAULTS = {
     fullName: "",
     email: "",
     phone: "",
+    nationality: "",
     city: "",
     country: "",
+    jobTitle: "",
     years: "",
+    education: "",
     notice: "",
+    languages: "",
+    linkedin: "",
+    website: "",
     expectedSalary: "",
+    expectedCurrency: "",
     currentSalary: "",
+    currentCurrency: "",
     workAuth: "Yes",
     sponsorship: "No",
     relocate: "Yes",
+    visaStatus: "",
+    drivingLicense: "",
+    workMode: "",
+    gender: "Prefer not to say",
   },
   // Auto-apply: AI fallback (Option B)
   aiEnabled: false,
@@ -48,13 +60,12 @@ async function load() {
   // data is never touched.
   const ap = merged.applicationProfile || {};
   if (ap.fullName === "Todd Santner" || ap.email === "access.toddproject@gmail.com") {
-    merged.applicationProfile = {
-      fullName: "", email: "", phone: "", city: "", country: "",
-      years: "", notice: "", expectedSalary: "", currentSalary: "",
+    merged.applicationProfile = Object.assign({}, DEFAULTS.applicationProfile, {
       workAuth: ap.workAuth || "Yes",
       sponsorship: ap.sponsorship || "No",
       relocate: ap.relocate || "Yes",
-    };
+      gender: ap.gender || "Prefer not to say",
+    });
   }
   if (typeof merged.cvText === "string" && /^\s*TODD SANTNER/.test(merged.cvText)) {
     merged.cvText = "";
@@ -291,28 +302,106 @@ function syncAiFields() {
   $("#claude-fields").style.display = provider === "claude" ? "" : "none";
 }
 
+// Currency options for the salary fields — Gulf + Europe + common. First entry
+// is a blank placeholder so no currency is assumed until the user picks one.
+const CURRENCIES = [
+  ["", "—"],
+  ["SAR", "SAR — Saudi Riyal"], ["AED", "AED — UAE Dirham"], ["QAR", "QAR — Qatari Riyal"],
+  ["KWD", "KWD — Kuwaiti Dinar"], ["BHD", "BHD — Bahraini Dinar"], ["OMR", "OMR — Omani Rial"],
+  ["EUR", "EUR — Euro"], ["GBP", "GBP — British Pound"], ["CHF", "CHF — Swiss Franc"],
+  ["SEK", "SEK — Swedish Krona"], ["NOK", "NOK — Norwegian Krone"], ["DKK", "DKK — Danish Krone"],
+  ["PLN", "PLN — Polish Złoty"], ["USD", "USD — US Dollar"], ["EGP", "EGP — Egyptian Pound"],
+  ["JOD", "JOD — Jordanian Dinar"], ["TRY", "TRY — Turkish Lira"], ["INR", "INR — Indian Rupee"],
+];
+function fillCurrencySelect(sel) {
+  if (!sel || sel.options.length) return;
+  for (const [val, label] of CURRENCIES) {
+    const o = document.createElement("option");
+    o.value = val; o.textContent = label;
+    sel.appendChild(o);
+  }
+}
+
+// Read every Application-profile field from the form into one object (UI names).
+function collectApplicationProfile() {
+  return {
+    fullName: $("#ap_fullName").value.trim(),
+    email: $("#ap_email").value.trim(),
+    phone: $("#ap_phone").value.trim(),
+    nationality: $("#ap_nationality").value.trim(),
+    city: $("#ap_city").value.trim(),
+    country: $("#ap_country").value.trim(),
+    jobTitle: $("#ap_jobTitle").value.trim(),
+    years: $("#ap_years").value.trim(),
+    education: $("#ap_education").value,
+    notice: $("#ap_notice").value.trim(),
+    languages: $("#ap_languages").value.trim(),
+    linkedin: $("#ap_linkedin").value.trim(),
+    website: $("#ap_website").value.trim(),
+    expectedSalary: $("#ap_expectedSalary").value.trim(),
+    expectedCurrency: $("#ap_expectedCurrency").value,
+    currentSalary: $("#ap_currentSalary").value.trim(),
+    currentCurrency: $("#ap_currentCurrency").value,
+    workAuth: $("#ap_workAuth").value,
+    sponsorship: $("#ap_sponsorship").value,
+    relocate: $("#ap_relocate").value,
+    visaStatus: $("#ap_visaStatus").value,
+    drivingLicense: $("#ap_drivingLicense").value,
+    workMode: $("#ap_workMode").value,
+    gender: $("#ap_gender").value,
+  };
+}
+
 // Mirror the Application-profile fields into the key the auto-apply engine
 // actually reads (chrome.storage.local["lc_apply_profile"]), mapping the UI
 // field names to the engine's field names. Without this the profile you fill
 // here never reaches the LinkedIn auto-apply autofill. Additive — writes its
 // own key and never touches `settings` or any integration.
 async function syncApplyProfileToEngine() {
+  const a = collectApplicationProfile();
   const p = {
-    full_name: $("#ap_fullName").value.trim(),
-    email: $("#ap_email").value.trim(),
-    phone: $("#ap_phone").value.trim(),
-    city: $("#ap_city").value.trim(),
-    country: $("#ap_country").value.trim(),
-    years_of_experience: $("#ap_years").value.trim(),
-    years_in_role: $("#ap_years").value.trim(),
-    notice_period_days: $("#ap_notice").value.trim(),
-    expected_salary: $("#ap_expectedSalary").value.trim(),
-    current_salary: $("#ap_currentSalary").value.trim(),
-    authorized_to_work: $("#ap_workAuth").value,
-    require_sponsorship: $("#ap_sponsorship").value,
-    willing_to_relocate: $("#ap_relocate").value,
+    full_name: a.fullName,
+    email: a.email,
+    phone: a.phone,
+    nationality: a.nationality,
+    city: a.city,
+    country: a.country,
+    current_title: a.jobTitle,
+    years_of_experience: a.years,
+    years_in_role: a.years,
+    education: a.education,
+    notice_period_days: a.notice,
+    languages: a.languages,
+    linkedin_url: a.linkedin,
+    website: a.website,
+    portfolio_url: a.website,
+    expected_salary: a.expectedSalary,
+    expected_salary_currency: a.expectedCurrency,
+    current_salary: a.currentSalary,
+    current_salary_currency: a.currentCurrency,
+    authorized_to_work: a.workAuth,
+    require_sponsorship: a.sponsorship,
+    willing_to_relocate: a.relocate,
+    visa_status: a.visaStatus,
+    driving_license: a.drivingLicense,
+    work_mode: a.workMode,
+    gender: a.gender,
   };
   try { await chrome.storage.local.set({ lc_apply_profile: p }); } catch (_) {}
+}
+
+// Save ONLY the Application profile (used by the card's own Save button) —
+// persists to settings + syncs to the engine, without the connection test or
+// permission prompts that the top-level Save runs. Touches no integration.
+async function saveApplicationProfileOnly() {
+  const el = $("#ap_status");
+  try {
+    await save({ applicationProfile: collectApplicationProfile() });
+    await syncApplyProfileToEngine();
+    if (el) { el.textContent = "Profile saved ✓ — auto-apply will use these answers."; el.className = "status ok"; }
+  } catch (e) {
+    if (el) { el.textContent = "Couldn't save: " + (e.message || e); el.className = "status err"; }
+  }
 }
 
 async function onSave() {
@@ -326,20 +415,7 @@ async function onSave() {
     autoEnrichOnSave: $("#autoEnrichOnSave").checked,
     syncLinkedInMessages: $("#syncLinkedInMessages").checked,
     webScrapeEnabled: $("#webScrapeEnabled").checked,
-    applicationProfile: {
-      fullName: $("#ap_fullName").value.trim(),
-      email: $("#ap_email").value.trim(),
-      phone: $("#ap_phone").value.trim(),
-      city: $("#ap_city").value.trim(),
-      country: $("#ap_country").value.trim(),
-      years: $("#ap_years").value.trim(),
-      notice: $("#ap_notice").value.trim(),
-      expectedSalary: $("#ap_expectedSalary").value.trim(),
-      currentSalary: $("#ap_currentSalary").value.trim(),
-      workAuth: $("#ap_workAuth").value,
-      sponsorship: $("#ap_sponsorship").value,
-      relocate: $("#ap_relocate").value,
-    },
+    applicationProfile: collectApplicationProfile(),
     aiEnabled: $("#aiEnabled").checked,
     aiProvider: $("#aiProvider").value,
     geminiApiKey: $("#geminiApiKey").value.trim(),
@@ -393,19 +469,33 @@ async function init() {
   $("#docs-link").href = `${settings.apiUrl.replace(/:8000$/, ":3000") || "http://localhost:3000"}/settings/api-keys`;
 
   // Application profile (Option A)
+  fillCurrencySelect($("#ap_expectedCurrency"));
+  fillCurrencySelect($("#ap_currentCurrency"));
   const ap = settings.applicationProfile || {};
   $("#ap_fullName").value = ap.fullName || "";
   $("#ap_email").value = ap.email || "";
   $("#ap_phone").value = ap.phone || "";
+  $("#ap_nationality").value = ap.nationality || "";
   $("#ap_city").value = ap.city || "";
   $("#ap_country").value = ap.country || "";
+  $("#ap_jobTitle").value = ap.jobTitle || "";
   $("#ap_years").value = ap.years || "";
+  $("#ap_education").value = ap.education || "";
   $("#ap_notice").value = ap.notice || "";
+  $("#ap_languages").value = ap.languages || "";
+  $("#ap_linkedin").value = ap.linkedin || "";
+  $("#ap_website").value = ap.website || "";
   $("#ap_expectedSalary").value = ap.expectedSalary || "";
+  $("#ap_expectedCurrency").value = ap.expectedCurrency || "";
   $("#ap_currentSalary").value = ap.currentSalary || "";
+  $("#ap_currentCurrency").value = ap.currentCurrency || "";
   $("#ap_workAuth").value = ap.workAuth || "Yes";
   $("#ap_sponsorship").value = ap.sponsorship || "No";
   $("#ap_relocate").value = ap.relocate || "Yes";
+  $("#ap_visaStatus").value = ap.visaStatus || "";
+  $("#ap_drivingLicense").value = ap.drivingLicense || "";
+  $("#ap_workMode").value = ap.workMode || "";
+  $("#ap_gender").value = ap.gender || "Prefer not to say";
 
   // AI (Option B)
   $("#aiEnabled").checked = !!settings.aiEnabled;
@@ -422,6 +512,7 @@ async function init() {
   syncAiFields();
 
   $("#save").addEventListener("click", onSave);
+  $("#ap_save").addEventListener("click", saveApplicationProfileOnly);
   $("#test").addEventListener("click", testConnection);
   $("#test-gemini").addEventListener("click", testGemini);
   $("#toggle-show").addEventListener("click", () => {
