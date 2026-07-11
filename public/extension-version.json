@@ -1,5 +1,5 @@
 {
-  "version": "1.0.362",
-  "zip": "/extensions/leadcaptura-extension-v1.0.362.zip",
-  "notes": "Removed Chrome's 'debugging this browser' banner during Mass Apply / Apply All (no more chrome.debugger on your tab). Added an in-extension 'Update available' notice in the toolbar popup."
+  "version": "1.0.363",
+  "zip": "/extensions/leadcaptura-extension-v1.0.363.zip",
+  "notes": "Mass Apply Jobs: fixed jumping to the next page after only the first few jobs — now applies every job on a page top-to-bottom before paginating, and can never stop itself (only Stop ends it)."
 }
