@@ -4228,6 +4228,9 @@
       if (action.type === "submit") {
         _showApplyBanner("📤 Submitting application…", `"${heading}"`);
         await sleep(400 + Math.random() * 300);
+        // Spotlight the Submit button as a cue, then click (cue is removed first).
+        await _spotlightActionCue(action.btn, "📤 Submitting application", `"${heading}"`);
+        if (state.applyCancel) return { ok: false, reason: "cancelled" };
         await dispatchHumanClick(action.btn);
         // Poll up to 4s for modal to close or show success confirmation.
         let confirmed = false;
@@ -4267,7 +4270,16 @@
 
       // Strategy 1: human pointer click (fires pointer events LinkedIn SPA listens for).
       const freshBtn1 = _modalActionButton(_easyApplyModal() || modal);
-      if (freshBtn1) await dispatchHumanClick(freshBtn1.btn);
+      if (freshBtn1) {
+        // Spotlight the Next/Review button as a cue, then click (cue removed first).
+        await _spotlightActionCue(
+          freshBtn1.btn,
+          `⏩ Step ${step + 1}/${totalHint} — ${heading}`,
+          `clicking '${action.type === "review" ? "Review" : "Next"}'`
+        );
+        if (state.applyCancel) return { ok: false, reason: "cancelled" };
+        await dispatchHumanClick(freshBtn1.btn);
+      }
 
       // Poll up to 4s for the form to advance.
       // _waitAdvanced returns null (modal closed → advanced), the new modal element
@@ -4555,6 +4567,41 @@
     return gap;
   }
 
+  // Keep this tab running at full speed even when it's in the background, so the
+  // Apply All run never stalls because the user switched to another tab — it
+  // keeps applying until it finishes or Stop is pressed. Reuses the service
+  // worker's existing keep-awake handler, which pins whichever tab SENT the
+  // message active via chrome.debugger (Page.setWebLifecycleState) and stops
+  // Chrome from throttling a hidden tab's timers. This is a plain message send —
+  // it does NOT touch the separate Mass Apply Jobs engine. Best-effort: if the
+  // SW/debugger is unavailable the run still works while the tab is visible.
+  // Turned off in the run's finally.
+  function _applyKeepAwake(on) {
+    try {
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
+        chrome.runtime.sendMessage(
+          { type: "lc:massApplyKeepAwake", on: !!on },
+          () => { void chrome.runtime.lastError; }
+        );
+      }
+    } catch {}
+  }
+
+  // Brief spotlight cue on the modal's action button (Next / Review / Submit)
+  // right BEFORE auto-apply clicks it, so the user sees exactly what is about to
+  // be pressed. LOAD-BEARING ORDERING: _showButtonSpotlight paints a full-screen
+  // dark backdrop that can interfere with LinkedIn's React click pipeline (see
+  // the Connect-flow notes; v1.0.323's "spotlight during click" regressed the
+  // auto-click). So we SHOW the cue, hold briefly, REMOVE it, and only then does
+  // the caller click — the backdrop is never present during the actual click.
+  // Cancellable-aware: a pressed Stop cuts the hold short.
+  async function _spotlightActionCue(btn, title, subtitle) {
+    if (!btn) return;
+    try { _showButtonSpotlight(btn, title, subtitle, 0); } catch {}
+    await _cancellableSleep(850);
+    try { _removeSpotlight(); } catch {}
+  }
+
   // Bulk auto-apply. `onlyKeys` (optional) restricts to specific cards (used by
   // the per-card Auto Apply button); otherwise it uses the tick selection, or
   // every visible job when nothing is ticked. Automatically pages through results.
@@ -4583,6 +4630,7 @@
 
     state.applyActive = true;
     state.applyCancel = false;
+    _applyKeepAwake(true);   // keep applying even when the tab is backgrounded
     // Hide every per-card "Auto Apply" chip for the duration of the run — once
     // the automated workflow starts there's nothing for the user to click, and
     // a stray chip floating over the open Easy Apply modal looks broken. The
@@ -4697,6 +4745,7 @@
         if (!cont) break;
       }
     } finally {
+      _applyKeepAwake(false);   // release the background keep-awake pin
       state.applyActive = false;
       state.applyCancel = false;
       state.applyProgress = null;
