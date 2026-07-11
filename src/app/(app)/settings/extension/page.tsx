@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.352",
+    date: "Jul 11, 2026",
+    size: "285 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.352.zip",
+    latest: true,
+    changes: [
+      "Mass Apply (LinkedIn Jobs): fixed a newer hashed-class layout where the run skipped straight to the next page without applying. On that layout the stable job-card key sits on a plain wrapper while the clickable element is a child, so no cards were being collected — the engine now collects those cards and applies to all of them before paginating.",
+      "Purely additive — earlier layouts are unchanged; this only adds cards the previous passes couldn't see.",
+    ],
+  },
+  {
     version: "1.0.351",
     date: "Jul 11, 2026",
     size: "285 KB",
     file: "/extensions/leadcaptura-extension-v1.0.351.zip",
-    latest: true,
     changes: [
       "Mass Apply (LinkedIn Jobs): added a per-card '⚡ Auto Apply' button on each job card, so you can apply to a single job on its own — it runs the exact same apply flow as the bulk run, just for that one card.",
       "Additive — the bulk run and apply logic are unchanged; the chip can't overlap a bulk run (they share one lock) and is hidden while any apply is in progress.",
@@ -37,16 +47,6 @@ const RELEASES: Release[] = [
     changes: [
       "Mass Apply (LinkedIn Jobs): more robust pagination. The engine already finishes every job on the current page before moving on; this adds a fallback so that, if the Next-page button isn't clickable, it advances via the numbered page indicators (Page 1 / Page 2 …) instead of stopping — and correctly stops on the last page.",
       "Additive — only the between-page step changed; per-job applying is untouched, and it never leaves a page before all its jobs are done.",
-    ],
-  },
-  {
-    version: "1.0.349",
-    date: "Jul 11, 2026",
-    size: "285 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.349.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): added a ~45-second human-pace wait between each job. LinkedIn now temporarily pauses 'LinkedIn Apply' when it detects a fast application pace — this gap keeps the run under that threshold so it isn't paused and your account isn't put at risk. A live countdown shows in the toolbar, and Stop is still instant.",
-      "Additive — only the between-jobs gap changed; the apply flow itself is untouched.",
     ],
   },
 ];
