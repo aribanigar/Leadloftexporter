@@ -20,6 +20,43 @@ function setStatus(msg, level = "") {
   el.className = "status " + level;
 }
 
+// Numeric version compare: returns 1 if a > b, -1 if a < b, 0 if equal.
+function cmpVersion(a, b) {
+  const pa = String(a).split("."), pb = String(b).split(".");
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = parseInt(pa[i] || "0", 10), nb = parseInt(pb[i] || "0", 10);
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+// Check the hosted version manifest and, if a newer build exists, reveal the
+// "Update extension" banner. Purely additive + best-effort: any failure
+// (offline, blocked) leaves the popup exactly as before. The download opens the
+// versioned zip; the user unzips over the SAME folder and reloads — chrome
+// keeps the extension ID (so chrome.storage.local: API key, settings, learned
+// answers, application profile all persist).
+const VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
+async function checkForUpdate() {
+  try {
+    const cur = chrome.runtime.getManifest().version;
+    const res = await fetch(VERSION_MANIFEST_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const info = await res.json();
+    const latest = info && info.version;
+    if (!latest || cmpVersion(latest, cur) <= 0) return;   // already up to date
+    const zip = info.zip || "/leadcaptura-extension.zip";
+    const zipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+    const verEl = $("#update-ver");
+    if (verEl) verEl.textContent = "v" + cur + " → v" + latest;
+    const sec = $("#update-section");
+    if (sec) sec.hidden = false;
+    const btn = $("#update-download");
+    if (btn) btn.addEventListener("click", () => { chrome.tabs.create({ url: zipUrl }); });
+  } catch (_) { /* offline / blocked — silently skip */ }
+}
+
 function callApi(action, payload) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ type: "lc:api", action, payload }, (response) => {
@@ -31,6 +68,8 @@ function callApi(action, payload) {
 }
 
 async function init() {
+  checkForUpdate();   // fire-and-forget; shows the update banner if one exists
+
   const settings = await getSettings();
   $("#autopilot-toggle").checked = !!settings.autopilot;
   $("#autopilot-toggle").addEventListener("change", async (e) => {

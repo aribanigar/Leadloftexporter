@@ -1,0 +1,5 @@
+{
+  "version": "1.0.362",
+  "zip": "/extensions/leadcaptura-extension-v1.0.362.zip",
+  "notes": "Removed Chrome's 'debugging this browser' banner during Mass Apply / Apply All (no more chrome.debugger on your tab). Added an in-extension 'Update available' notice in the toolbar popup."
+}
