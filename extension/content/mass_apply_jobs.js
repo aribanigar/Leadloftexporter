@@ -354,14 +354,35 @@
     return Math.round(window.scrollY);
   }
   function scrollListDown() {
-    const s = listScroller();
-    if (s) { s.scrollBy(0, Math.round(s.clientHeight * 0.8)); return true; }
-    // Fallback for layouts where the scroll container can't be resolved: nudge
-    // the last rendered job card into view, which advances the virtualised list
-    // without scrolling the whole page into the LinkedIn footer.
+    let did = false;
+    // 1) Scroll the last rendered card into view — this reliably pushes the list
+    //    to the bottom edge of what's loaded, which is what triggers LinkedIn to
+    //    lazy-render the NEXT batch (works on every layout, container or not).
     const last = _lastCardEl();
-    if (last) { try { last.scrollIntoView({ block: "end", behavior: "instant" }); return true; } catch (_) {} }
-    return false;
+    if (last) { try { last.scrollIntoView({ block: "end", behavior: "instant" }); did = true; } catch (_) {} }
+    // 2) Belt-and-suspenders: also nudge the detected scroll container down.
+    const s = listScroller();
+    if (s) { try { s.scrollBy(0, Math.round(s.clientHeight * 0.9)); did = true; } catch (_) {} }
+    return did;
+  }
+
+  // The key of the visually-LOWEST rendered job card. As the list loads more,
+  // this advances; when it stops changing across scroll attempts we've reached
+  // the true bottom of the page. This is far more reliable than scrollTop for
+  // deciding "is there more of this page to load?" — it works whether the list
+  // is virtualised (constant DOM count) or append-only (growing count), and it
+  // doesn't depend on correctly resolving the scroll container.
+  function lastRenderedKey() {
+    let best = "", maxTop = -Infinity;
+    let cards;
+    try { cards = collectJobCards(); } catch (_) { return ""; }
+    for (const c of cards) {
+      try {
+        const t = c.el ? c.el.getBoundingClientRect().top : -Infinity;
+        if (t > maxTop) { maxTop = t; best = c.key; }
+      } catch (_) {}
+    }
+    return best;
   }
 
   // Advance to the NEXT results page — robustly. LinkedIn rewrites its
@@ -1528,6 +1549,7 @@
 
     try {
       while (!state.cancel) {
+       try {
         if (isCheckpoint()) { banner("LinkedIn challenge detected — stopping."); break; }
 
         let fresh = collectJobCards().filter(c => !processed.has(c.key));
@@ -1549,27 +1571,32 @@
         if (selectionMode && processed.size >= targetKeys.size) break;
 
         if (!fresh.length) {
-          // Nothing new rendered → scroll to load more of THIS page first.
-          const before = listScrollTop();
+          // No un-applied card is rendered right now. Before paginating we must
+          // be SURE the whole page is applied — so scroll to load more and check
+          // whether new cards actually appear at the bottom (lastRenderedKey).
+          // This is what fixes "applied 3 jobs then jumped to the next page":
+          // the old check watched scrollTop, which didn't move reliably on this
+          // layout, so it paginated after only the visible cards. Watching the
+          // bottom card's key is reliable on every layout.
+          const lastBefore = lastRenderedKey();
           scrollListDown();
-          await sleep(rand(900, 1500));
-          const moved = listScrollTop() !== before;
+          await sleep(rand(1000, 1600));
+          const lastAfter = lastRenderedKey();
 
-          if (moved) {
-            // Scroll moved → more of this page is loading; keep going. High
-            // safety valve — if the list keeps moving but yields no new cards
-            // for a very long time, fall through to a pagination attempt rather
-            // than looping forever.
+          if (lastAfter && lastAfter !== lastBefore) {
+            // New cards loaded at the bottom → there is more of THIS page to
+            // apply. Keep going (very high safety valve against an infinite
+            // load loop).
             stuckScroll = 0;
-            if (++idle < 120) { continue; }
+            if (++idle < 300) { continue; }
           } else {
-            // Scroll didn't move. Require TWO consecutive "couldn't scroll"
-            // reads before treating the page as exhausted — guards against a
-            // transient during a virtualised re-render prematurely paginating.
-            if (++stuckScroll < 2) { continue; }
+            // Bottom card didn't advance. Require THREE consecutive confirmations
+            // (with a nudge + wait between) before concluding the page is fully
+            // applied — a virtualised re-render can momentarily stall.
+            if (++stuckScroll < 3) { await sleep(rand(600, 1000)); continue; }
           }
 
-          // ── This page is fully processed. ──
+          // ── This page is fully applied, top to bottom. ──
           // Selection mode never paginates (it targets a fixed picked set).
           if (selectionMode) break;
 
@@ -1646,6 +1673,14 @@
         }
         if (state.cancel) break;
         setLabel("Next job · " + state.applied + " applied, " + state.skipped + " skipped");
+       } catch (loopErr) {
+          // A transient DOM/timing error must NEVER stop the run — log it, close
+          // any stray modal, pause briefly, and let the loop continue. Only Stop
+          // (state.cancel) or a LinkedIn challenge ends Mass Apply.
+          console.warn(TAG, "run loop error (continuing):", loopErr);
+          try { closeStrayModals(); } catch (_) {}
+          await sleep(1200);
+       }
       }
     } finally {
       keepAwake(false);
