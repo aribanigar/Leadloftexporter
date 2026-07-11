@@ -3,42 +3,7 @@ const $ = (s) => document.querySelector(s);
 
 // Pre-seeded CV so Gemini auto-answers work out of the box. The user can
 // replace this in the textarea at any time.
-const DEFAULT_CV = `TODD SANTNER
-Business Growth & Marketing Strategist | Program Manager | Digital Transformation Leader
-Email: access.toddproject@gmail.com
-LinkedIn: linkedin.com/in/todd-santner
-
-PROFESSIONAL SUMMARY
-Results-driven Business Growth & Marketing Strategist and Program Manager with 9+ years of cross-functional experience spanning strategic marketing, digital transformation, program management, and revenue operations across global markets including the GCC and APAC regions. Proven track record of delivering measurable ROI through performance marketing, high-impact content creation, vendor lifecycle management, and data-driven decision-making. Certified in Agile Project Management, SEO, Marketing Analytics, and AI Foundations.
-
-KEY ACHIEVEMENTS
-- Delivered $4M+ in incremental revenue through strategic advertiser engagement programs at Meta (APAC)
-- Architected the Escalation Elites program, unlocking $65M in revenue recovery across APAC markets
-- Improved client retention by 6-10% at Gartner through data-driven service strategy and segmentation
-- Saved 40+ hours weekly via workflow automation and Power BI dashboards
-- Founded and scaled AlDhaheriya Marketing, driving growth for SME clients
-- Led 20+ integrated marketing campaigns achieving 4,000+ views in the first month
-
-EXPERIENCE
-Business Development Manager & Founder | AlDhaheriya Marketing | Oct 2023 - Present | Riyadh, Saudi Arabia
-Program Manager - SBG, APAC | Meta | Jun 2023 - Aug 2025 | India
-Principal/Senior Associate - Service Strategy | Gartner | May 2019 - Jun 2023 | Gurgaon, India
-Business Associate | Asahi India Glass Limited | Sep 2016 - Apr 2019 | Gurgaon, India
-Team Lead - Digital Marketing | InstaLively (acquired by Hike) | 2015 | New Delhi, India
-
-CORE COMPETENCIES
-Strategic Marketing, Performance Marketing, Content Strategy & Production, Brand Development, SEO & Digital Advertising, Campaign Management, Program Management, Agile & Waterfall, Sprint Planning, Vendor Lifecycle Management, Cross-functional Leadership, Strategic Partnerships, Data & Analytics, Power BI & Tableau, SQL, Excel/VBA, Business Intelligence, KPI Monitoring, Marketing Analytics
-
-EDUCATION
-Digital Marketing | Indian School of Business | 2019-2020
-Business Analytics 360 (Excel, VBA, Tableau, SQL) | AnalytixLabs | 2019
-Economics Honours | Delhi University | 2013-2016
-
-CERTIFICATIONS
-Marketing and Customer Analytics - Wharton/Coursera; SEO Certified; Trusted AI Foundations; Agile Project Management - PRINCE2; Asana Workflow Certification
-
-TOOLS
-Power BI, Tableau, Google Analytics, SQL, Excel/VBA, Meta Ads Manager, Google Ads, LinkedIn Ads`;
+const DEFAULT_CV = "";
 
 const DEFAULTS = {
   apiUrl: "https://leadloftexporter.onrender.com",
@@ -52,13 +17,13 @@ const DEFAULTS = {
   webScrapeEnabled: true,
   // Auto-apply: pre-configured answers (Option A)
   applicationProfile: {
-    fullName: "Todd Santner",
-    email: "access.toddproject@gmail.com",
+    fullName: "",
+    email: "",
     phone: "",
-    city: "Riyadh",
-    country: "Saudi Arabia",
-    years: "9",
-    notice: "1 month",
+    city: "",
+    country: "",
+    years: "",
+    notice: "",
     expectedSalary: "",
     currentSalary: "",
     workAuth: "Yes",
@@ -77,7 +42,24 @@ const DEFAULTS = {
 
 async function load() {
   const { settings } = await chrome.storage.local.get("settings");
-  return Object.assign({}, DEFAULTS, settings || {});
+  const merged = Object.assign({}, DEFAULTS, settings || {});
+  // One-time cleanup: strip the old "Todd Santner" demo data if a previous
+  // build stored it. Only fires on the exact sentinel values, so real user
+  // data is never touched.
+  const ap = merged.applicationProfile || {};
+  if (ap.fullName === "Todd Santner" || ap.email === "access.toddproject@gmail.com") {
+    merged.applicationProfile = {
+      fullName: "", email: "", phone: "", city: "", country: "",
+      years: "", notice: "", expectedSalary: "", currentSalary: "",
+      workAuth: ap.workAuth || "Yes",
+      sponsorship: ap.sponsorship || "No",
+      relocate: ap.relocate || "Yes",
+    };
+  }
+  if (typeof merged.cvText === "string" && /^\s*TODD SANTNER/.test(merged.cvText)) {
+    merged.cvText = "";
+  }
+  return merged;
 }
 async function save(patch) {
   const cur = await load();
@@ -309,6 +291,30 @@ function syncAiFields() {
   $("#claude-fields").style.display = provider === "claude" ? "" : "none";
 }
 
+// Mirror the Application-profile fields into the key the auto-apply engine
+// actually reads (chrome.storage.local["lc_apply_profile"]), mapping the UI
+// field names to the engine's field names. Without this the profile you fill
+// here never reaches the LinkedIn auto-apply autofill. Additive — writes its
+// own key and never touches `settings` or any integration.
+async function syncApplyProfileToEngine() {
+  const p = {
+    full_name: $("#ap_fullName").value.trim(),
+    email: $("#ap_email").value.trim(),
+    phone: $("#ap_phone").value.trim(),
+    city: $("#ap_city").value.trim(),
+    country: $("#ap_country").value.trim(),
+    years_of_experience: $("#ap_years").value.trim(),
+    years_in_role: $("#ap_years").value.trim(),
+    notice_period_days: $("#ap_notice").value.trim(),
+    expected_salary: $("#ap_expectedSalary").value.trim(),
+    current_salary: $("#ap_currentSalary").value.trim(),
+    authorized_to_work: $("#ap_workAuth").value,
+    require_sponsorship: $("#ap_sponsorship").value,
+    willing_to_relocate: $("#ap_relocate").value,
+  };
+  try { await chrome.storage.local.set({ lc_apply_profile: p }); } catch (_) {}
+}
+
 async function onSave() {
   await save({
     apiUrl: $("#apiUrl").value.trim().replace(/\/+$/, ""),
@@ -342,6 +348,8 @@ async function onSave() {
     claudeModel: $("#claudeModel").value.trim() || "claude-haiku-4-5-20251001",
     cvText: $("#cvText").value,
   });
+  // Push the profile into the engine's key so LinkedIn auto-apply uses it.
+  await syncApplyProfileToEngine();
   // Pre-request the AI host permission if AI is enabled so the SW can fetch later.
   if ($("#aiEnabled").checked) {
     try { await ensureAiPermission($("#aiProvider").value); } catch {}

@@ -138,6 +138,9 @@
       const desc = Object.getOwnPropertyDescriptor(proto, "value");
       if (desc && desc.set) desc.set.call(el, value);
       else el.value = value;
+      // Mark our own writes so the learned-answers capture never records the
+      // engine's guesses as if they were the user's answers.
+      try { el.setAttribute("data-lc-autofilled", "1"); } catch (_) {}
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
     } catch (_) {}
@@ -651,12 +654,20 @@
   // Apply Profile — user's stored answers for repeat-question autofill.
   // Loaded from chrome.storage.local["lc_apply_profile"]; sensible defaults
   // until the user customises them. Future Options page lets the user edit.
+  // No hard-coded personal data — the user fills these in the extension Options
+  // page (Auto-Apply — Application profile), which writes lc_apply_profile.
+  // Neutral EEO defaults are kept so those optional questions still advance.
   let APPLY_PROFILE = {
-    years_of_experience: "9",
-    years_in_role: "9",
-    notice_period_days: "30",
-    expected_salary: "100000",
-    current_salary: "80000",
+    full_name: "",
+    email: "",
+    phone: "",
+    city: "",
+    country: "",
+    years_of_experience: "",
+    years_in_role: "",
+    notice_period_days: "",
+    expected_salary: "",
+    current_salary: "",
     willing_to_relocate: "Yes",
     authorized_to_work: "Yes",
     require_sponsorship: "No",
@@ -670,21 +681,77 @@
     website: "",
     cover_letter: "",
   };
+  // Learned answers — questions the engine has seen answered before (either
+  // prefilled by LinkedIn from the user's past manual applications, or entered
+  // by the user). Keyed by a normalized question label → answer. Persisted in
+  // chrome.storage.local["lc_learned_answers"] so it survives across jobs,
+  // pages, sessions, and grows smarter over time.
+  let LEARNED = {};
   try {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(["lc_apply_profile"], (res) => {
+      chrome.storage.local.get(["lc_apply_profile", "lc_learned_answers"], (res) => {
         if (res && res.lc_apply_profile && typeof res.lc_apply_profile === "object") {
           APPLY_PROFILE = Object.assign({}, APPLY_PROFILE, res.lc_apply_profile);
         }
+        if (res && res.lc_learned_answers && typeof res.lc_learned_answers === "object") {
+          LEARNED = Object.assign({}, res.lc_learned_answers);
+        }
       });
+      // Keep both in sync if the user edits the Options page mid-session.
+      try {
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area !== "local") return;
+          if (changes.lc_apply_profile && changes.lc_apply_profile.newValue) {
+            APPLY_PROFILE = Object.assign({}, APPLY_PROFILE, changes.lc_apply_profile.newValue);
+          }
+          if (changes.lc_learned_answers && changes.lc_learned_answers.newValue) {
+            LEARNED = Object.assign({}, changes.lc_learned_answers.newValue);
+          }
+        });
+      } catch (_) {}
     }
   } catch (_) {}
+
+  // Normalize a question label to a stable key for the learned-answers map.
+  function _normLabel(s) {
+    return (s || "").toString().toLowerCase()
+      .replace(/\*|\(required\)|required/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // Record an answer the user (or LinkedIn's prefill of the user's past answer)
+  // provided, so the engine can auto-answer the SAME question next time. Never
+  // records the engine's own writes (those are marked data-lc-autofilled).
+  function rememberAnswer(label, value) {
+    const key = _normLabel(label);
+    const val = (value == null ? "" : String(value)).trim();
+    if (!key || key.length < 3 || !val || val.length > 300) return;
+    if (LEARNED[key] === val) return;
+    LEARNED[key] = val;
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ lc_learned_answers: LEARNED });
+      }
+    } catch (_) {}
+  }
 
   // Map a question label → a sensible answer from the Apply Profile. Order
   // matters: specific patterns first. Returns null if no rule matches.
   function answerForLabel(rawLabel) {
     const l = (rawLabel || "").toLowerCase().replace(/\s+/g, " ").trim();
     if (!l) return null;
+    // 0) Learned answers win — anything the user has answered before for this
+    //    exact question is reused automatically.
+    const learned = LEARNED[_normLabel(rawLabel)];
+    if (learned != null && learned !== "") return learned;
+    // Identity fields from the saved profile.
+    if (/\b(full name|your name|first and last name|name)\b/.test(l) && !/company|manager|reference|user ?name|file/.test(l)) return APPLY_PROFILE.full_name;
+    if (/e-?mail/.test(l)) return APPLY_PROFILE.email;
+    if (/phone|mobile|contact number/.test(l)) return APPLY_PROFILE.phone;
+    if (/\bcity\b|current location|which city/.test(l)) return APPLY_PROFILE.city;
+    if (/\bcountry\b/.test(l)) return APPLY_PROFILE.country;
     if (/years.*experience|how many years|total experience|relevant experience/.test(l)) return APPLY_PROFILE.years_of_experience;
     if (/notice period/.test(l)) return APPLY_PROFILE.notice_period_days;
     if (/expected (salary|ctc|compensation)|salary expectation/.test(l)) return APPLY_PROFILE.expected_salary;
@@ -751,9 +818,16 @@
         setNativeValue(el, fromProfile);
         return;
       }
-      // 2) Number / experience-shaped questions → "9".
-      // 3) Anything else required-empty → "9" so the step still advances.
-      setNativeValue(el, type === "number" || looksLikeExperience(label) ? APPLY_PROFILE.years_of_experience : APPLY_PROFILE.years_of_experience);
+      // 2) Number / experience-shaped questions → the profile's years value
+      //    (only if the user set one — never a hard-coded guess).
+      if ((type === "number" || looksLikeExperience(label)) && APPLY_PROFILE.years_of_experience) {
+        setNativeValue(el, APPLY_PROFILE.years_of_experience);
+        return;
+      }
+      // 3) Otherwise leave it blank. Better to skip this job (it won't advance)
+      //    than to submit a random guess into a real question. Once the user
+      //    answers this question once (here or in a manual LinkedIn apply),
+      //    learnFromScope remembers it and future jobs auto-fill it.
     });
   }
 
@@ -787,6 +861,42 @@
     });
   }
 
+  // Resolve a form field's human label (for the learned-answers key).
+  function _labelForField(scope, el) {
+    let label = "";
+    const id = el.id;
+    if (id) {
+      const l = scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+      if (l) label = textOf(l);
+    }
+    return label || el.getAttribute("aria-label") || el.name || el.getAttribute("placeholder") || "";
+  }
+
+  // Learn the answers already present in this step — prefilled by LinkedIn from
+  // the user's past applications, or entered by the user — so the SAME question
+  // is auto-answered on future jobs. Skips fields the engine itself wrote
+  // (data-lc-autofilled) so it never learns its own guesses. Text inputs +
+  // selects only (those go through setNativeValue, which marks our writes).
+  function learnFromScope(scope) {
+    try {
+      scope.querySelectorAll("input, textarea").forEach(el => {
+        const type = (el.type || "").toLowerCase();
+        if (["hidden", "file", "checkbox", "radio", "submit", "button", "password"].includes(type)) return;
+        if (el.getAttribute("data-lc-autofilled") === "1") return;
+        const v = (el.value || "").trim();
+        if (!v) return;
+        rememberAnswer(_labelForField(scope, el), v);
+      });
+      scope.querySelectorAll("select").forEach(sel => {
+        if (sel.getAttribute("data-lc-autofilled") === "1") return;
+        const opt = sel.options && sel.options[sel.selectedIndex];
+        const txt = opt ? (opt.textContent || "").trim() : "";
+        if (!txt || /^select an option$/i.test(txt)) return;
+        rememberAnswer(_labelForField(scope, sel), txt);
+      });
+    } catch (_) {}
+  }
+
   function autofill(scope) {
     // CRITICAL: never operate at document scope. autofill on the whole page
     // clicks the BETA thumbs-down (opens the "Why are these results not
@@ -794,6 +904,9 @@
     // the Preferences-match popup). Both bugs were visible in the user's
     // 1.0.253 screenshots.
     if (!scope || scope === document || scope === document.body) return;
+    // Learn anything already answered in this step BEFORE we fill, so we
+    // capture the user's / LinkedIn's values and never our own writes.
+    try { learnFromScope(scope); } catch (_) {}
     try { fillSelects(scope); } catch (_) {}
     try { fillTextInputs(scope); } catch (_) {}
     try { fillRadios(scope); } catch (_) {}
