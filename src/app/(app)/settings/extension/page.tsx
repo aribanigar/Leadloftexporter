@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.364",
+    date: "Jul 11, 2026",
+    size: "294 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.364.zip",
+    latest: true,
+    changes: [
+      "Job checkboxes now sync live with Mass Apply: every un-applied job shows a tick, and the tick turns OFF the instant that job is applied — so you can watch progress drain top-to-bottom. Jobs already applied earlier show unticked and are skipped automatically.",
+      "Mass Apply applies every job on a page in order, then moves to the next page, and keeps going across all pages.",
+      "Added a dedicated red Stop button, and an auto-restart safeguard: if the run is ever interrupted (e.g. the tab reloads) it resumes by itself — it only truly stops when you press Stop.",
+    ],
+  },
+  {
     version: "1.0.363",
     date: "Jul 11, 2026",
     size: "294 KB",
     file: "/extensions/leadcaptura-extension-v1.0.363.zip",
-    latest: true,
     changes: [
       "Mass Apply Jobs: fixed the bug where it jumped to the next page after only the first few (visible) jobs. It now reliably scrolls the list and applies EVERY job on a page, top-to-bottom, before moving to the next page.",
       "Made the run crash-proof: a transient page error can no longer stop it — once started it keeps going until you press Stop (already-applied jobs are detected and skipped).",
