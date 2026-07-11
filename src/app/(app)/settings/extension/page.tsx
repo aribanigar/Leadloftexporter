@@ -19,11 +19,22 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.359",
+    date: "Jul 11, 2026",
+    size: "294 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.359.zip",
+    latest: true,
+    changes: [
+      "Bottom-toolbar 'Apply All' (LinkedIn Jobs) now matches the Mass Apply Jobs experience: it keeps applying even when you switch to another tab, and only stops when you press Stop — it no longer stalls in the background.",
+      "Spotlights added to Apply All: each 'Next', 'Review', and 'Submit application' button is highlighted just before it's clicked, so you can follow exactly what the auto-apply is doing.",
+      "The separate green Mass Apply Jobs button is unchanged.",
+    ],
+  },
+  {
     version: "1.0.358",
     date: "Jul 11, 2026",
     size: "294 KB",
     file: "/extensions/leadcaptura-extension-v1.0.358.zip",
-    latest: true,
     changes: [
       "Mass Apply (LinkedIn Jobs): you can now hand-pick which jobs to apply to. Each job card has a checkbox, plus a 'Select jobs' button (top-right, above Mass Apply) that selects everything loaded on the page — then click Mass Apply and it applies to just your selection.",
       "With nothing selected, Mass Apply behaves exactly as before (applies to every job, page by page). A selection run never changes pages — it applies only the jobs you ticked.",
@@ -37,16 +48,6 @@ const RELEASES: Release[] = [
     changes: [
       "Mass Apply (LinkedIn Jobs): fixed the bug where it jumped to the next page after only the first job — it now scrolls down and applies every job on the current page before paginating.",
       "Background applying: the run now keeps going even when you switch to another tab, so you don't have to stay on the LinkedIn page. (Chrome shows a 'DevTools is debugging this browser' banner on the LinkedIn tab while a run is active — that's expected and it's only the extension keeping the tab awake.)",
-    ],
-  },
-  {
-    version: "1.0.356",
-    date: "Jul 11, 2026",
-    size: "286 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.356.zip",
-    changes: [
-      "Extension Options page redesigned to be compact and clean — wider layout, tighter spacing, and the Auto-Apply profile now lays its fields out in columns so it's no longer a long, elongated page.",
-      "No behaviour change: your saved profile is still used to fill LinkedIn job forms exactly as before.",
     ],
   },
 ];
