@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe manifesto poster: your phone is your shop, list free, zero commission, all of India">
+  <defs>
+    <style>
+      .cap { font-family: 'Arial Narrow', 'Poppins', Arial, sans-serif; font-weight: 800; letter-spacing: -2px; }
+      .serif { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .body { font-family: 'Poppins', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed orange manifesto field -->
+  <rect width="1080" height="1350" fill="#ef6723"/>
+
+  <!-- Reserved top-left logo zone (~140px square) — Ariba places logo manually -->
+  <rect x="72" y="72" width="140" height="140" fill="none"/>
+
+  <!-- Kicker -->
+  <text x="240" y="168" class="serif" font-size="40" fill="#1A1A1A" opacity="0.85">a small manifesto for</text>
+
+  <!-- Hairline -->
+  <rect x="72" y="300" width="936" height="3" fill="#1A1A1A" opacity="0.25"/>
+
+  <!-- Oversized centered manifesto headline -->
+  <text x="540" y="470" text-anchor="middle" class="cap" font-size="150" fill="#FFFFFF">YOUR PHONE</text>
+  <text x="540" y="610" text-anchor="middle" class="cap" font-size="150" fill="#FFFFFF">IS YOUR</text>
+  <text x="540" y="756" text-anchor="middle" class="cap" font-size="152" fill="#1A1A1A">SHOPFRONT.</text>
+
+  <!-- Serif accent line -->
+  <text x="540" y="838" text-anchor="middle" class="serif" font-size="46" fill="#1A1A1A">list it. sell it. keep every rupee.</text>
+
+  <!-- The ONE visual device: giant zero fee promise on a dark band -->
+  <rect x="72" y="928" width="936" height="250" rx="16" fill="#1A1A1A"/>
+  <text x="132" y="1090" class="cap" font-size="200" fill="#ef6723">&#8377;0</text>
+  <text x="470" y="1030" class="body" font-size="40" font-weight="700" fill="#FFFFFF">commission. forever.</text>
+  <text x="470" y="1088" class="body" font-size="34" font-weight="400" fill="#FCF9F8" opacity="0.85">free listings. owner-direct.</text>
+  <text x="470" y="1140" class="body" font-size="34" font-weight="400" fill="#FCF9F8" opacity="0.85">all of India. no middlemen.</text>
+
+  <!-- Footer -->
+  <text x="72" y="1290" class="body" font-size="44" font-weight="800" fill="#1A1A1A">qckserve.in</text>
+  <text x="1008" y="1290" text-anchor="end" class="body" font-size="30" font-weight="600" fill="#FFFFFF">India&#8217;s free local marketplace</text>
+</svg>
