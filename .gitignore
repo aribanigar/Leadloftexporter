@@ -1,3 +1,6 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+scripts/.pxcache/
+__pycache__/
+*.pyc

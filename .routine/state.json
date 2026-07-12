@@ -1,0 +1,30 @@
+{
+  "routine": "content-hub-hudace",
+  "folder": "hudace",
+  "last_run": "2026-07-12",
+  "runs": [
+    {
+      "date": "2026-07-12",
+      "industries": ["Education and Research", "Construction and Real Estate"],
+      "services": [
+        "Social Media",
+        "SEO / AEO / GEO / SRX",
+        "Website Design",
+        "ERP Building",
+        "AI Work Studio",
+        "SchoolOS"
+      ],
+      "items": 24,
+      "seed_status": "blocked: supabase project restricted (exceed_egress_quota)"
+    }
+  ],
+  "industries_used": ["Education and Research", "Construction and Real Estate"],
+  "industries_pool": [
+    "Agribusiness", "Consumer Products", "Life Sciences and Healthcare", "Retail", "Wholesale Distribution",
+    "Aerospace and Defense", "Automotive", "High Tech", "Industrial Manufacturing", "Mill Products",
+    "Chemicals", "Mining", "Oil Gas and Energy", "Utilities",
+    "Construction and Real Estate", "Media Sports and Entertainment", "Professional Services", "Telecommunications", "Travel and Transportation",
+    "Defense and Security", "Education and Research", "Government",
+    "Financial Services"
+  ]
+}
