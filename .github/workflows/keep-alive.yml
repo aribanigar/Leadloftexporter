@@ -43,40 +43,36 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Ping Render API to keep it warm
-        env:
-          DEFAULT_URL: https://leadloftexporter-1.onrender.com
         run: |
           set -eu
-          # Order of preference: manual-run input → repo variable → default.
-          INPUT_URL="${{ github.event.inputs.url }}"
-          VAR_URL="${{ vars.API_URL }}"
-          API_URL="${INPUT_URL:-${VAR_URL:-$DEFAULT_URL}}"
-          echo "Target: $API_URL"
+          # Warm EVERY backend the app might be pointed at, so whichever URL the
+          # CRM frontend / extension actually use stays awake. The previous
+          # default (leadloftexporter-1.onrender.com) did NOT match the real
+          # production backend the extension + app use (leadloftexporter.onrender.com),
+          # so the container that actually serves login was spinning down and
+          # cold-starting (30-60s) — that is the "CRM is slow to load" symptom.
+          #
+          # Order: manual-run input → repo variable API_URL → the known hosts.
+          URLS="${{ github.event.inputs.url }} ${{ vars.API_URL }} https://leadloftexporter.onrender.com https://leadloftexporter-1.onrender.com"
 
-          # First request after spin-down can take 30-60s. Try up to 3 times
-          # with a 5s gap — anything that isn't a hard network failure
-          # counts as "container woke up" for our purposes (even a 404
-          # response means Render's gateway routed to a live worker).
-          for i in 1 2 3; do
+          # One poke per URL is enough to WAKE the container (the request reaching
+          # Render triggers the spin-up); we don't need to wait for the full cold
+          # response. Bounded max-time keeps each run cheap on Actions minutes.
+          seen=""
+          for BASE in $URLS; do
+            [ -z "$BASE" ] && continue
+            BASE="${BASE%/}"
+            case " $seen " in *" $BASE "*) continue;; esac   # dedup
+            seen="$seen $BASE"
             START=$(date +%s)
             CODE=$(curl -sS -o /dev/null \
               -w "%{http_code}" \
-              --max-time 90 \
-              --connect-timeout 30 \
+              --max-time 75 \
+              --connect-timeout 15 \
               --retry 0 \
-              "$API_URL/" || echo "000")
-            END=$(date +%s)
-            ELAPSED=$((END - START))
-            echo "Attempt $i: HTTP $CODE in ${ELAPSED}s"
-            if [ "$CODE" != "000" ]; then
-              echo "✓ API is awake (HTTP $CODE)"
-              exit 0
-            fi
-            sleep 5
+              "$BASE/health" || echo "000")
+            echo "[$BASE] HTTP $CODE in $(( $(date +%s) - START ))s"
           done
-          # All 3 attempts hit a hard network failure. Don't fail the
-          # workflow run — that would spam email notifications on every
-          # transient hiccup. The next scheduled run will try again in
-          # 10 minutes.
-          echo "::warning::All 3 ping attempts timed out; container may be down. Next attempt in 10 minutes."
+          # Never fail the run on a transient miss (would spam email); the next
+          # scheduled run retries. Reaching the container is what matters.
           exit 0

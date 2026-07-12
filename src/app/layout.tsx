@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { PWA } from "@/components/pwa";
+import { DeferredFonts } from "@/components/deferred-fonts";
 
 export const metadata: Metadata = {
   title: "LeadCaptura — LinkedIn Lead Generation",
@@ -34,23 +35,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        {/* Material Symbols — without this the icon ligatures (arrow_back,
-            more_vert, visibility, ads_click, …) render as raw text. */}
+        {/* Preconnect only — the actual font stylesheets are injected after
+            first paint by <DeferredFonts /> so they never block rendering.
+            (Inter body + Manrope headings + Material Symbols icon ligatures.) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* App typefaces — Inter (body) + Manrope (headings). Declared in the
-            CSS but never actually loaded before, so the app fell back to system
-            fonts. Loading them makes the inline Inter/Manrope styles render too. */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-        />
       </head>
       <body className="font-sans text-slate-900 antialiased">
+        <DeferredFonts />
         <Providers>{children}</Providers>
         <PWA />
       </body>
