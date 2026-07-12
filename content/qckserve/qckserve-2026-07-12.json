@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-12",
+  "business": "qckserve",
+  "topic": "Your phone is your shopfront",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Your phone is your shopfront",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\"/>\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"/>\n<title>Your phone is your shopfront</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#FCF9F8;\">\n<span style=\"display:none; font-size:1px; color:#FCF9F8; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;\">List free. Zero commission. Owner-direct. All of India. Your phone is all you need.</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr>\n<td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#FFFFFF; border-radius:16px; overflow:hidden;\">\n\n<!-- Logo zone: text only -->\n<tr>\n<td align=\"left\" style=\"background-color:#1A1A1A; padding:22px 40px;\">\n<span style=\"font-family:'Poppins',Arial,sans-serif; font-size:20px; font-weight:800; letter-spacing:-0.5px; color:#FFFFFF;\">qckserve.in</span>\n</td>\n</tr>\n\n<!-- HERO: full-bleed orange manifesto -->\n<tr>\n<td align=\"center\" style=\"background-color:#ef6723; padding:56px 40px 48px 40px;\">\n<p style=\"margin:0 0 14px 0; font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:19px; color:#1A1A1A;\">a small manifesto</p>\n<h1 style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:52px; line-height:0.98; font-weight:800; letter-spacing:-1.5px; color:#FFFFFF;\">Your phone is<br/>your <span style=\"color:#1A1A1A;\">shopfront.</span></h1>\n<p style=\"margin:22px 0 0 0; font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:22px; color:#1A1A1A;\">List it. Sell it. Keep every rupee.</p>\n</td>\n</tr>\n\n<!-- The ONE visual device: giant zero on dark band -->\n<tr>\n<td align=\"center\" style=\"background-color:#1A1A1A; padding:40px;\">\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n<tr>\n<td align=\"center\" width=\"46%\" style=\"vertical-align:middle;\">\n<div style=\"font-family:'Poppins',Arial,sans-serif; font-size:120px; line-height:1; font-weight:800; color:#ef6723;\">&#8377;0</div>\n</td>\n<td align=\"left\" width=\"54%\" style=\"vertical-align:middle;\">\n<p style=\"margin:0 0 6px 0; font-family:'Poppins',Arial,sans-serif; font-size:22px; font-weight:700; color:#FFFFFF;\">Commission. Forever.</p>\n<p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:400; line-height:1.5; color:#FCF9F8;\">Free listings.<br/>Owner-direct.<br/>No middlemen.</p>\n</td>\n</tr>\n</table>\n</td>\n</tr>\n\n<!-- PROOF: one idea per line -->\n<tr>\n<td align=\"center\" style=\"background-color:#FFFFFF; padding:44px 40px 8px 40px;\">\n<p style=\"margin:0 0 18px 0; font-family:'Poppins',Arial,sans-serif; font-size:19px; line-height:1.55; font-weight:400; color:#1A1A1A;\">India sells from its pocket now.</p>\n<p style=\"margin:0 0 18px 0; font-family:'Poppins',Arial,sans-serif; font-size:19px; line-height:1.55; font-weight:400; color:#1A1A1A;\">A room to rent. A bike to sell. A skill to offer.</p>\n<p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:19px; line-height:1.55; font-weight:700; color:#ef6723;\">One listing reaches every buyer nearby &mdash; free.</p>\n</td>\n</tr>\n\n<!-- CTA: bulletproof button, single -->\n<tr>\n<td align=\"center\" style=\"background-color:#FFFFFF; padding:36px 40px 48px 40px;\">\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n<tr>\n<td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:12px;\">\n<a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block; padding:18px 44px; font-family:'Poppins',Arial,sans-serif; font-size:18px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">Post your listing &mdash; free</a>\n</td>\n</tr>\n</table>\n<p style=\"margin:20px 0 0 0; font-family:'Poppins',Arial,sans-serif; font-size:14px; color:#666666;\">No fee to list. No cut when you sell.</p>\n</td>\n</tr>\n\n<!-- Hero poster band -->\n<tr>\n<td align=\"center\" style=\"background-color:#FCF9F8; padding:0;\">\n<img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-12.svg\" width=\"600\" alt=\"QckServe: Your phone is your shopfront. List free, zero commission, owner-direct, all of India.\" style=\"display:block; width:100%; max-width:600px; height:auto; border:0;\"/>\n</td>\n</tr>\n\n<!-- Footer -->\n<tr>\n<td align=\"center\" style=\"background-color:#1A1A1A; padding:32px 40px;\">\n<p style=\"margin:0 0 6px 0; font-family:'Poppins',Arial,sans-serif; font-size:18px; font-weight:800; color:#FFFFFF;\">qckserve.in</p>\n<p style=\"margin:0; font-family:'Poppins',Arial,sans-serif; font-size:13px; line-height:1.6; color:#9A9A9A;\">India&rsquo;s free local marketplace &middot; zero commission, always.</p>\n</td>\n</tr>\n\n</table>\n</td>\n</tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-12.svg",
+      "tags": [
+        "general",
+        "manifesto",
+        "promo"
+      ],
+      "notes": "Sunday General - Manifesto archetype: full-bleed orange hero, giant Rs.0 device, single CTA."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "Aapka phone hi aapki dukaan hai. 📱\nRoom, bike, ya koi bhi service — list karo bilkul free.\n₹0 commission. Owner-direct. Poore India mein.\nAbhi post karo 👉 qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-12.svg",
+      "tags": [
+        "general",
+        "whatsapp"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Your phone is your shopfront. 📱\n\nIndia ab jeb se bechta hai — ek room, ek bike, ek skill. QckServe pe list karo bilkul free. ₹0 commission, owner-direct, no middlemen. Poore India mein buyers tak pahuncho.\n\nList karo free 👉 qckserve.in\n\n#QckServe #FreeListing #LocalMarketplace #IndiaBusiness #ZeroCommission",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-12.svg",
+      "tags": [
+        "general",
+        "instagram"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "Your phone is your shopfront. List anything free on QckServe - Rs.0 commission, owner-direct, all India. qckserve.in",
+      "tags": [
+        "general",
+        "sms"
+      ]
+    },
+    {
+      "channel": "other",
+      "title": "[2026-07-12] Your phone is your shopfront (Image Prompt)",
+      "content": "SCENE: A confident young Indian shop owner standing in a sunlit local marketplace, holding up a smartphone toward the camera like a storefront sign. SUBJECT: warm, aspirational, everyday-entrepreneur energy; genuine smile; casual modern Indian attire. PHONE-UI MOCKUP: on the phone screen, a clean QckServe listing card — product photo, a bold 'Rs.0 to list' pill, a 'Message owner' button, no price-commission text; crisp app UI, rounded 14px corners. COLOUR SYSTEM: flat colour blocking, NO gradients — orange #ef6723 dominant field, deep charcoal #1A1A1A panels, off-white #FCF9F8 highlights, single accent #FF6B00. LIGHTING: bright natural midday light, soft directional fill, gentle shadow under the phone. TYPE HIERARCHY: one oversized condensed headline 'YOUR PHONE IS YOUR SHOPFRONT' upper area, small italic-serif kicker 'a small manifesto', tiny 'qckserve.in' lockup. EYE FLOW: face -> raised phone screen -> headline -> qckserve.in. CAMERA: 35mm, eye-level, shallow depth of field, subject sharp, market softly blurred. PERFORMANCE LAYER: high thumb-stopping contrast, mobile-first legibility, poster-grade clarity. RESERVE the TOP-LEFT square logo zone empty (logo placed manually). --ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "general",
+        "image-prompt"
+      ]
+    }
+  ]
+}
