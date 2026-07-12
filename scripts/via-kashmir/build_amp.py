@@ -192,6 +192,11 @@ def build(track, hero, feat, amp=False):
 </body></html>"""
 
 
+# copy fields that can be overridden per day so the HTML and AMP parts stay in sync
+COPY_KEYS = ("label", "hhead", "haccent", "hbody", "cta", "reassure", "strip",
+             "feat_title", "feat_line", "ceyebrow", "chead", "caccent", "cbody", "foot")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--track", required=True, choices=list(TRACKS))
@@ -199,8 +204,16 @@ def main():
     ap.add_argument("--amp")
     ap.add_argument("--hero")
     ap.add_argument("--feat")
+    for k in COPY_KEYS:
+        ap.add_argument("--" + k)
     a = ap.parse_args()
+    # apply per-day copy overrides onto this track's defaults (mutates the module dict
+    # for the duration of this run; build() reads TRACKS[track])
     s = TRACKS[a.track]
+    for k in COPY_KEYS:
+        v = getattr(a, k)
+        if v is not None:
+            s[k] = v
     hero = a.hero or s["hero"]
     feat = a.feat or s["feat"]
     if a.html:

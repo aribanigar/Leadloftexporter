@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-12",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "theme": "Mid-July peak green - the Dal glass-still at dawn, Mughal gardens in full bloom, Gulmarg's meadows carpeted with wildflowers while the plains bake",
+      "subject": "July in Kashmir is deep green and wide awake",
+      "campaign_code": "VK-INR-B2C-20260712"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "B",
+      "theme": "Peak-July loss-aversion - Kashmir full of travellers searching rooms now; the hotel that is listed gets booked, the unlisted one loses the guest next door",
+      "subject": "Peak July nights are booking every stay but yours",
+      "campaign_code": "VK-INR-B2B_HOTELS-20260712"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "C",
+      "theme": "Yatra-week rides and loss-aversion - airport runs, valley drives and golden-hour shikaras booking all day; an idle cab or boat loses the fare to a listed one",
+      "subject": "A July airport run just went to a listed cab",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260712"
+    }
+  ]
+}

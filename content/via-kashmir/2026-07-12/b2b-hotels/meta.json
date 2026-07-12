@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-12",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (India)",
+  "theme": "Peak-July loss-aversion - Kashmir full of travellers searching rooms now; the hotel that is listed gets booked, the unlisted one loses the guest next door",
+  "season": "Mid-summer (12 July 2026). The Amarnath Yatra is underway (registration 3 Jul - 12 Aug), so Pahalgam and Sonamarg roads run heavy with pilgrim traffic; start early and book ahead. Srinagar is warm by day and cool at dawn (~15-30C) with brief afternoon showers possible; the Mughal gardens are in full bloom and the Dal is calm and glass-still at first light. Gulmarg and the high meadows are lush and green with wildflowers out and the gondola running, while the plains sit above 40C. Valley travel runs roughly 7am-6pm.",
+  "design": "B",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_HOTELS-20260712",
+  "campaign_name": "Hotels Peak-July booking went to the stay next door [INR] - 12 Jul 2026",
+  "subject": "Peak July nights are booking every stay but yours",
+  "items": [
+    "VK-HOTELS-LISTING",
+    "VK-HOTELS-DEMAND",
+    "VK-HOTELS-DIRECT"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-12/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-12/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
