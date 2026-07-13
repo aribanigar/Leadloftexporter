@@ -58,9 +58,12 @@ export function NoticeBoard() {
     setCollapsed(typeof window !== "undefined" && localStorage.getItem(COLLAPSE_KEY) === "1");
   }, []);
 
-  // Real-time clock — re-render every second so timings & the clock stay live.
+  // Keep the clock + relative timings fresh. The display is minute-granular
+  // (HH:MM) and every "in N min" label changes on minute boundaries, so a 30s
+  // tick keeps everything current while avoiding a full board re-render every
+  // second (which was pure wasted CPU/battery).
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
 

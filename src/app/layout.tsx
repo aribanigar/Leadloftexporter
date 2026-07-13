@@ -32,6 +32,17 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Preconnect to the backend so the first API call (auth/me on load) skips the
+  // DNS + TLS handshake. NEXT_PUBLIC_API_URL is inlined at build time; only emit
+  // a real https origin (skip the localhost dev default).
+  let apiOrigin: string | null = null;
+  try {
+    const raw = process.env.NEXT_PUBLIC_API_URL;
+    if (raw && raw.startsWith("https://")) apiOrigin = new URL(raw).origin;
+  } catch {
+    apiOrigin = null;
+  }
+
   return (
     <html lang="en">
       <head>
@@ -40,6 +51,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             (Inter body + Manrope headings + Material Symbols icon ligatures.) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {apiOrigin && <link rel="preconnect" href={apiOrigin} crossOrigin="anonymous" />}
+        {apiOrigin && <link rel="dns-prefetch" href={apiOrigin} />}
       </head>
       <body className="font-sans text-slate-900 antialiased">
         <DeferredFonts />

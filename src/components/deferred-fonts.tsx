@@ -19,7 +19,12 @@ import { useEffect } from "react";
  */
 const FONT_STYLESHEETS = [
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap",
-  "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap",
+  // Only the FILL axis is ever varied in the app (filled vs outlined icons);
+  // weight/optical-size/grade are always the defaults (wght 400, opsz 24,
+  // GRAD 0). Requesting just FILL@0..1 keeps every icon (and both fill states)
+  // working while serving a much smaller variable font than the full 4-axis
+  // range that was requested before.
+  "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1&display=swap",
 ];
 
 export function DeferredFonts() {
