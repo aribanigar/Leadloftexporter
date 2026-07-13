@@ -1,3 +1,12 @@
 leadloft-exporter.zip
 *.zip
 .DS_Store
+
+# content routine build artifacts
+node_modules/
+package.json
+package-lock.json
+assets_build/preview_*.html
+assets_build/preview_*.png
+assets_build/*.woff2
+assets_build/shot.js

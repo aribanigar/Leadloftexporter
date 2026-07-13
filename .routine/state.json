@@ -1,0 +1,27 @@
+{
+  "last_run": "2026-07-13",
+  "used_industries": [
+    "Retail",
+    "Construction and Real Estate"
+  ],
+  "runs": [
+    {
+      "date": "2026-07-13",
+      "industries": [
+        "Retail",
+        "Construction and Real Estate"
+      ],
+      "services": [
+        "Social Media",
+        "SEO / AEO / GEO / SRX",
+        "Website Design",
+        "ERP Building",
+        "AI Work Studio",
+        "SchoolOS (School ERP)"
+      ],
+      "items": 24,
+      "seeded": false,
+      "seed_error": "Supabase project restricted (HTTP 402, exceed_egress_quota). Batch built and committed; seed publish_rest.py --folder hudace batch.json once service is restored."
+    }
+  ]
+}
