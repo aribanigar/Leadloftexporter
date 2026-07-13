@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="List your property free on QckServe. Zero brokerage. Owner to renter, direct.">
+  <defs>
+    <style>
+      .cond { font-family: 'Arial Narrow','Poppins',Arial,sans-serif; font-weight: 800; }
+      .sans { font-family: 'Poppins',Arial,sans-serif; }
+      .serif { font-family: 'Georgia','Times New Roman',serif; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- reserved 140px top-left logo square (kept blank; Ariba places logo manually) -->
+  <rect x="0" y="0" width="140" height="140" fill="#1A1A1A"/>
+
+  <!-- kicker -->
+  <text x="180" y="118" class="serif" font-size="34" fill="#FF6B00">for property owners &amp; renters</text>
+
+  <!-- giant ₹0 hero (the one memorable device) -->
+  <text x="60" y="560" class="cond" font-size="620" fill="#FF6B00" letter-spacing="-20">&#8377;0</text>
+  <text x="70" y="640" class="sans" font-size="46" font-weight="700" fill="#FCF9F8">brokerage. forever.</text>
+
+  <!-- headline -->
+  <text x="70" y="800" class="cond" font-size="150" fill="#FCF9F8" letter-spacing="-4">LIST YOUR</text>
+  <text x="70" y="945" class="cond" font-size="150" fill="#FCF9F8" letter-spacing="-4">PROPERTY</text>
+  <text x="70" y="1075" class="cond" font-size="150" fill="#FF6B00" letter-spacing="-4">FREE.</text>
+
+  <!-- flat orange band with the 4-step timeline -->
+  <rect x="0" y="1140" width="1080" height="150" fill="#FF6B00"/>
+  <text x="70"  y="1210" class="sans" font-size="30" font-weight="800" fill="#1A1A1A">1&#160; Post it</text>
+  <text x="330" y="1210" class="sans" font-size="30" font-weight="800" fill="#1A1A1A">2&#160; Owner-direct</text>
+  <text x="680" y="1210" class="sans" font-size="30" font-weight="800" fill="#1A1A1A">3&#160; No agent</text>
+  <text x="70"  y="1258" class="sans" font-size="30" font-weight="800" fill="#1A1A1A">4&#160; Keep the whole month's rent you'd have paid a broker</text>
+
+  <!-- footer wordmark -->
+  <text x="70" y="1325" class="sans" font-size="34" font-weight="700" fill="#FCF9F8">qckserve.in</text>
+  <text x="1010" y="1325" class="serif" font-size="26" fill="#8A8A8A" text-anchor="end">India's free local marketplace</text>
+</svg>
