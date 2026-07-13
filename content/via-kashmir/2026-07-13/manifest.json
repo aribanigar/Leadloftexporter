@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-13",
+  "business": "via-kashmir",
+  "market": "India",
+  "language": "en-IN",
+  "design_rotation": "A/B/C",
+  "tracks": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "theme": "Mid-July cool-green escape - the plains bake above 40C while Srinagar wakes near 15C: emerald meadows, Mughal gardens in full bloom, the Dal glass-still at dawn",
+      "subject": "Kashmir stays green and cool while the plains bake",
+      "campaign_code": "VK-INR-B2C-20260713"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "theme": "Yatra-week loss-aversion - airport runs, Pahalgam/Sonamarg drives and golden-hour shikaras booking all day; an idle cab or boat loses the fare to a listed one",
+      "subject": "A Yatra-week ride just went to a listed driver",
+      "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260713"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "theme": "Mid-July Dal Lake demand and loss-aversion - cool monsoon nights, travellers wanting the real houseboat stay; the unlisted boat loses tonight's guest to a listed one",
+      "subject": "A cool Dal Lake night just booked another houseboat",
+      "campaign_code": "VK-INR-B2B_HOUSEBOATS-20260713"
+    }
+  ]
+}

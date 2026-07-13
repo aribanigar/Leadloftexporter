@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-13",
+  "track": "b2b-cabs-shikaras",
+  "audience": "cab & shikara operators (India)",
+  "theme": "Yatra-week loss-aversion - airport runs, Pahalgam/Sonamarg drives and golden-hour shikaras booking all day; an idle cab or boat loses the fare to a listed one",
+  "season": "Mid-summer (13 July 2026). The Amarnath Yatra is underway (2 Jul - mid Aug), so Pahalgam and Sonamarg roads run heavy with pilgrim traffic; start early and book ahead. Srinagar is warm by day and cool at dawn (~15-32C) with frequent afternoon monsoon showers, so mornings are the window; the Mughal gardens are in full bloom and the Dal is glass-still at first light. Gulmarg and the high meadows are lush, green and cool (~10-18C) with the gondola running, while the plains sit above 40C. Valley travel runs roughly 7am-6pm.",
+  "design": "A",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B_CABS_SHIKARAS-20260713",
+  "campaign_name": "Cabs & shikaras Yatra-week rides loss-aversion [INR] - 13 Jul 2026",
+  "subject": "A Yatra-week ride just went to a listed driver",
+  "items": [
+    "VK-CAB-YATRA",
+    "VK-CAB-DRIVE",
+    "VK-SHIKARA-GOLD"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-13/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-13/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
