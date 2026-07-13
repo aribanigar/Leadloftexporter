@@ -1,0 +1,158 @@
+{
+  "date": "2026-07-13",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "generated_utc": "2026-07-13T01:08:56.446477Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Recycled steel bottles",
+      "campaign_code": "GG-20260713-1",
+      "campaign_name": "Recycled Steel Drinkware - 13 Jul 2026",
+      "subject": "Steel for the daily grind",
+      "skus": [
+        "GG1064",
+        "GG1346",
+        "GG1722",
+        "GG1530",
+        "GG1370",
+        "GG1369"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Bags and travel",
+      "angle": "Recycled travel bags",
+      "campaign_code": "GG-20260713-2",
+      "campaign_name": "Recycled Bags And Carry - 13 Jul 2026",
+      "subject": "Pack light, pack smart",
+      "skus": [
+        "GG1137",
+        "GG1313",
+        "GG1170",
+        "GG1312",
+        "GG1374",
+        "GG1093"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "Recycled notebooks",
+      "campaign_code": "GG-20260713-3",
+      "campaign_name": "Recycled Paper Notebooks - 13 Jul 2026",
+      "subject": "Pages made from less",
+      "skus": [
+        "GG1697",
+        "GG1721",
+        "GG1702",
+        "GG1310",
+        "GG1557",
+        "GG1456"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Tech and desk",
+      "angle": "Desk tech pieces",
+      "campaign_code": "GG-20260713-4",
+      "campaign_name": "Desk Tech And Gadgets - 13 Jul 2026",
+      "subject": "Gadgets that earn a spot",
+      "skus": [
+        "GG1538",
+        "GG1404",
+        "GG1240",
+        "GG1630",
+        "GG1304",
+        "GG1121"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Insulated drinkware",
+      "angle": "Insulated steel flasks",
+      "campaign_code": "GG-20260713-5",
+      "campaign_name": "Insulated Steel Flasks - 13 Jul 2026",
+      "subject": "One flask, all day",
+      "skus": [
+        "GG1495",
+        "GG1318",
+        "GG1496",
+        "GG1665",
+        "GG1429",
+        "GG1706"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Bamboo and jute",
+      "campaign_code": "GG-20260713-6",
+      "campaign_name": "Bamboo Jute And Recycled - 13 Jul 2026",
+      "subject": "Natural, and it shows",
+      "skus": [
+        "GG1470",
+        "GG1704",
+        "GG1432",
+        "GG1552",
+        "GG1144",
+        "GG1277"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Apparel and merch",
+      "angle": "Tees and hoodies",
+      "campaign_code": "GG-20260713-7",
+      "campaign_name": "Cotton Tees And Hoodies - 13 Jul 2026",
+      "subject": "Merch they will wear",
+      "skus": [
+        "GG1759",
+        "GG1760",
+        "GG1756",
+        "GG1786",
+        "GG1757",
+        "GG1773"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Mugs and cups",
+      "angle": "Mugs and cups",
+      "campaign_code": "GG-20260713-8",
+      "campaign_name": "Ceramic And Steel Mugs - 13 Jul 2026",
+      "subject": "The mug they pick first",
+      "skus": [
+        "GG1050",
+        "GG1245",
+        "GG1599",
+        "GG1522"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Writing essentials",
+      "angle": "Pens and writing",
+      "campaign_code": "GG-20260713-9",
+      "campaign_name": "Pens And Writing Sets - 13 Jul 2026",
+      "subject": "Sign here, in style",
+      "skus": [
+        "GG1597",
+        "GG1556",
+        "GG1039",
+        "GG1330",
+        "GG1650",
+        "GG1378"
+      ]
+    }
+  ]
+}

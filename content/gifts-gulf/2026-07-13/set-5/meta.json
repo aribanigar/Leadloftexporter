@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-13",
+  "theme": "Insulated drinkware",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "design": "B",
+  "campaign_code": "GG-20260713-5",
+  "campaign_name": "Insulated Steel Flasks - 13 Jul 2026",
+  "subject": "One flask, all day",
+  "skus": [
+    "GG1495",
+    "GG1318",
+    "GG1496",
+    "GG1665",
+    "GG1429",
+    "GG1706"
+  ],
+  "products": [
+    {
+      "name": "Athena",
+      "sku": "GG1495",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6750-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1495"
+    },
+    {
+      "name": "Suma Grip",
+      "sku": "GG1318",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2775-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1318"
+    },
+    {
+      "name": "Onto",
+      "sku": "GG1496",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6760-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1496"
+    },
+    {
+      "name": "Big Chan",
+      "sku": "GG1665",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9703-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1665"
+    },
+    {
+      "name": "Helsinki Large",
+      "sku": "GG1429",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6373-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1429"
+    },
+    {
+      "name": "Shiku",
+      "sku": "GG1706",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9909-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1706"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20insulated%20drinkware%20options%20for%20our%20team."
+}

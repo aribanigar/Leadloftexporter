@@ -3164,5 +3164,156 @@
       "GG1596",
       "GG1649"
     ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260713-1",
+    "campaign_name": "Recycled Steel Drinkware - 13 Jul 2026",
+    "subject": "Steel for the daily grind",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1064",
+      "GG1346",
+      "GG1722",
+      "GG1530",
+      "GG1370",
+      "GG1369"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260713-2",
+    "campaign_name": "Recycled Bags And Carry - 13 Jul 2026",
+    "subject": "Pack light, pack smart",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1137",
+      "GG1313",
+      "GG1170",
+      "GG1312",
+      "GG1374",
+      "GG1093"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260713-3",
+    "campaign_name": "Recycled Paper Notebooks - 13 Jul 2026",
+    "subject": "Pages made from less",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1697",
+      "GG1721",
+      "GG1702",
+      "GG1310",
+      "GG1557",
+      "GG1456"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260713-4",
+    "campaign_name": "Desk Tech And Gadgets - 13 Jul 2026",
+    "subject": "Gadgets that earn a spot",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1538",
+      "GG1404",
+      "GG1240",
+      "GG1630",
+      "GG1304",
+      "GG1121"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260713-5",
+    "campaign_name": "Insulated Steel Flasks - 13 Jul 2026",
+    "subject": "One flask, all day",
+    "theme": "Insulated drinkware",
+    "skus": [
+      "GG1495",
+      "GG1318",
+      "GG1496",
+      "GG1665",
+      "GG1429",
+      "GG1706"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260713-6",
+    "campaign_name": "Bamboo Jute And Recycled - 13 Jul 2026",
+    "subject": "Natural, and it shows",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1470",
+      "GG1704",
+      "GG1432",
+      "GG1552",
+      "GG1144",
+      "GG1277"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260713-7",
+    "campaign_name": "Cotton Tees And Hoodies - 13 Jul 2026",
+    "subject": "Merch they will wear",
+    "theme": "Apparel and merch",
+    "skus": [
+      "GG1759",
+      "GG1760",
+      "GG1756",
+      "GG1786",
+      "GG1757",
+      "GG1773"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260713-8",
+    "campaign_name": "Ceramic And Steel Mugs - 13 Jul 2026",
+    "subject": "The mug they pick first",
+    "theme": "Mugs and cups",
+    "skus": [
+      "GG1050",
+      "GG1245",
+      "GG1599",
+      "GG1522"
+    ]
+  },
+  {
+    "date": "2026-07-13",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260713-9",
+    "campaign_name": "Pens And Writing Sets - 13 Jul 2026",
+    "subject": "Sign here, in style",
+    "theme": "Writing essentials",
+    "skus": [
+      "GG1597",
+      "GG1556",
+      "GG1039",
+      "GG1330",
+      "GG1650",
+      "GG1378"
+    ]
   }
 ]

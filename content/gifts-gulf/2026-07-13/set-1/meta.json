@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-13",
+  "theme": "Premium drinkware",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "design": "A",
+  "campaign_code": "GG-20260713-1",
+  "campaign_name": "Recycled Steel Drinkware - 13 Jul 2026",
+  "subject": "Steel for the daily grind",
+  "skus": [
+    "GG1064",
+    "GG1346",
+    "GG1722",
+    "GG1530",
+    "GG1370",
+    "GG1369"
+  ],
+  "products": [
+    {
+      "name": "Fjard",
+      "sku": "GG1064",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2063-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1064"
+    },
+    {
+      "name": "Cocoa",
+      "sku": "GG1346",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2900-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1346"
+    },
+    {
+      "name": "Chan Bamboo",
+      "sku": "GG1722",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9991-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1722"
+    },
+    {
+      "name": "Namib Bottle",
+      "sku": "GG1530",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6931-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1530"
+    },
+    {
+      "name": "Howler Cup",
+      "sku": "GG1370",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2995-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1370"
+    },
+    {
+      "name": "Toien One",
+      "sku": "GG1369",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2989-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1369"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20premium%20drinkware%20options%20for%20our%20team."
+}

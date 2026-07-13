@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-13",
+  "theme": "Writing essentials",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "design": "C",
+  "campaign_code": "GG-20260713-9",
+  "campaign_name": "Pens And Writing Sets - 13 Jul 2026",
+  "subject": "Sign here, in style",
+  "skus": [
+    "GG1597",
+    "GG1556",
+    "GG1039",
+    "GG1330",
+    "GG1650",
+    "GG1378"
+  ],
+  "products": [
+    {
+      "name": "Squarie",
+      "sku": "GG1597",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8783-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1597"
+    },
+    {
+      "name": "Rio Duo",
+      "sku": "GG1556",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7440-08.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1556"
+    },
+    {
+      "name": "Manors",
+      "sku": "GG1039",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc6217-26.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1039"
+    },
+    {
+      "name": "Ampla",
+      "sku": "GG1330",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2830-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1330"
+    },
+    {
+      "name": "Blacklet",
+      "sku": "GG1650",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9537-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1650"
+    },
+    {
+      "name": "Blanquito Clean",
+      "sku": "GG1378",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6153-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1378"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20writing%20essentials%20options%20for%20our%20team."
+}

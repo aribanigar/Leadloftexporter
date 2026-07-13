@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-13",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Recycled steel that keeps drinks cold",
+      "out": "content/gifts-gulf/2026-07-13/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2063-03",
+          "sku": "GG1064",
+          "name": "Fjard",
+          "desc": "Recycled steel that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2900-03",
+          "sku": "GG1346",
+          "name": "Cocoa",
+          "desc": "Double-wall mug that holds the heat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Recycled shopping bag for the daily run",
+      "out": "content/gifts-gulf/2026-07-13/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2301-13",
+          "sku": "GG1137",
+          "name": "Viveka",
+          "desc": "Recycled shopping bag for the daily run",
+          "colours": 0
+        },
+        {
+          "code": "mo2753-03",
+          "sku": "GG1313",
+          "name": "Xpanda",
+          "desc": "Expandable backpack that fits a laptop",
+          "colours": 0
+        },
+        {
+          "code": "mo2373-03",
+          "sku": "GG1170",
+          "name": "Onbag",
+          "desc": "Carry-on bag sized for the cabin",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Cork-cover notebook with a matching pen",
+      "out": "content/gifts-gulf/2026-07-13/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9859-03",
+          "sku": "GG1697",
+          "name": "Sonora Pluscork",
+          "desc": "Cork-cover notebook with a matching pen",
+          "colours": 0
+        },
+        {
+          "code": "mo9966-03",
+          "sku": "GG1721",
+          "name": "Note Rpet",
+          "desc": "Hard-cover notebook that lies flat",
+          "colours": 0
+        },
+        {
+          "code": "mo9868-13",
+          "sku": "GG1702",
+          "name": "Mini Paper Book",
+          "desc": "Pocket notebook for quick notes",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "A desk gadget they will actually use",
+      "out": "content/gifts-gulf/2026-07-13/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6949-03",
+          "sku": "GG1538",
+          "name": "Tricpower",
+          "desc": "A desk gadget they will actually use",
+          "colours": 0
+        },
+        {
+          "code": "mo6250-06",
+          "sku": "GG1404",
+          "name": "Twing",
+          "desc": "Wireless charger for phone and buds",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Vacuum bottle that holds the cold",
+      "out": "content/gifts-gulf/2026-07-13/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6750-03",
+          "sku": "GG1495",
+          "name": "Athena",
+          "desc": "Vacuum bottle that holds the cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2775-03",
+          "sku": "GG1318",
+          "name": "Suma Grip",
+          "desc": "Insulated bottle with a solid grip",
+          "colours": 0
+        },
+        {
+          "code": "mo6760-03",
+          "sku": "GG1496",
+          "name": "Onto",
+          "desc": "Steel vacuum bottle for the commute",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Set of bamboo coasters in a cotton bag",
+      "out": "content/gifts-gulf/2026-07-13/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6601-40",
+          "sku": "GG1470",
+          "name": "Bayin Set",
+          "desc": "Set of bamboo coasters in a cotton bag",
+          "colours": 0
+        },
+        {
+          "code": "mo9891-13",
+          "sku": "GG1704",
+          "name": "Layaback",
+          "desc": "Wireless charger in wheat straw",
+          "colours": 0
+        },
+        {
+          "code": "mo6379-13",
+          "sku": "GG1432",
+          "name": "Respect",
+          "desc": "Recycled canvas bag for the beach run",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Organic cotton hoodie for the crew",
+      "out": "content/gifts-gulf/2026-07-13/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s03568-bl",
+          "sku": "GG1759",
+          "name": "Stellar",
+          "desc": "Organic cotton hoodie for the crew",
+          "colours": 0
+        },
+        {
+          "code": "s03574-bo",
+          "sku": "GG1760",
+          "name": "Comet",
+          "desc": "Round-neck sweatshirt in soft cotton",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Ceramic mug boxed on its own",
+      "out": "content/gifts-gulf/2026-07-13/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7063-06",
+          "sku": "GG1050",
+          "name": "Trent",
+          "desc": "Ceramic mug boxed on its own",
+          "colours": 0
+        },
+        {
+          "code": "mo2564-04",
+          "sku": "GG1245",
+          "name": "Peze",
+          "desc": "Gradient ceramic mug for the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo8831-06",
+          "sku": "GG1599",
+          "name": "Taza",
+          "desc": "Compact ceramic mug for a quick cup",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Square highlighter in four colours",
+      "out": "content/gifts-gulf/2026-07-13/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8783-06",
+          "sku": "GG1597",
+          "name": "Squarie",
+          "desc": "Square highlighter in four colours",
+          "colours": 0
+        },
+        {
+          "code": "mo7440-08",
+          "sku": "GG1556",
+          "name": "Rio Duo",
+          "desc": "Two-in-one pen and highlighter",
+          "colours": 0
+        },
+        {
+          "code": "kc6217-26",
+          "sku": "GG1039",
+          "name": "Manors",
+          "desc": "Push-button pen with a rubber grip",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

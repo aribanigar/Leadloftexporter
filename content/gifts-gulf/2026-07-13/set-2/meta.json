@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-13",
+  "theme": "Bags and travel",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "design": "B",
+  "campaign_code": "GG-20260713-2",
+  "campaign_name": "Recycled Bags And Carry - 13 Jul 2026",
+  "subject": "Pack light, pack smart",
+  "skus": [
+    "GG1137",
+    "GG1313",
+    "GG1170",
+    "GG1312",
+    "GG1374",
+    "GG1093"
+  ],
+  "products": [
+    {
+      "name": "Viveka",
+      "sku": "GG1137",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2301-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1137"
+    },
+    {
+      "name": "Xpanda",
+      "sku": "GG1313",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2753-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1313"
+    },
+    {
+      "name": "Onbag",
+      "sku": "GG1170",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2373-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1170"
+    },
+    {
+      "name": "Brenna Pouch",
+      "sku": "GG1312",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2754-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1312"
+    },
+    {
+      "name": "Fama",
+      "sku": "GG1374",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6134-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1374"
+    },
+    {
+      "name": "Coolpack",
+      "sku": "GG1093",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2125-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1093"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20bags%20and%20travel%20options%20for%20our%20team."
+}

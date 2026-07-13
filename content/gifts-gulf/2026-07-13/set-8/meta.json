@@ -1,0 +1,44 @@
+{
+  "date": "2026-07-13",
+  "theme": "Mugs and cups",
+  "season": "Peak summer, everyday carry, desk and team gifting",
+  "design": "B",
+  "campaign_code": "GG-20260713-8",
+  "campaign_name": "Ceramic And Steel Mugs - 13 Jul 2026",
+  "subject": "The mug they pick first",
+  "skus": [
+    "GG1050",
+    "GG1245",
+    "GG1599",
+    "GG1522"
+  ],
+  "products": [
+    {
+      "name": "Trent",
+      "sku": "GG1050",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc7063-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1050"
+    },
+    {
+      "name": "Peze",
+      "sku": "GG1245",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2564-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1245"
+    },
+    {
+      "name": "Taza",
+      "sku": "GG1599",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8831-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1599"
+    },
+    {
+      "name": "Trumba",
+      "sku": "GG1522",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6873-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1522"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-13/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20mugs%20and%20cups%20options%20for%20our%20team."
+}
