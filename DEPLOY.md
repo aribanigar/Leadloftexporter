@@ -1,85 +1,99 @@
-# Deploying LeadCaptura
+# LeadCaptura — Turnkey Deploy Checklist
 
-The stack splits into three independent deployables:
+Follow top to bottom. Nothing here needs code changes — it's all "create service,
+set env, deploy." Dependencies install automatically on each platform (Vercel
+runs `npm install`, Render builds the Docker image). Times assume accounts exist.
 
-| Component | Hosting | Cost on free/starter |
+> The ONE thing NOT in this archive: the **secret VALUES** (DB URL, API keys,
+> JWT secret). Those are never committed for security. Either the current owner
+> shares them privately, or you provision your own (a new Postgres + fresh keys).
+> Every required var is listed below and in `.env.api.example` / `.env.local.example`.
+
+---
+
+## 0) Accounts / prerequisites
+- **GitHub** (host the code so Vercel + Render can auto-deploy from it)
+- **Render** (backend, Docker) — https://render.com
+- **Vercel** (frontend) — https://vercel.com
+- **Postgres** — Supabase, Neon, or Render Postgres (any Postgres 14+)
+- Optional: **Redis** (only if you run Celery workers), a domain, Gmail/Google
+  OAuth creds, Anthropic key.
+
+## 1) Put the code on GitHub
+```bash
+unzip leadcaptura-source.zip && cd Leadloftexporter
+git init && git add -A && git commit -m "LeadCaptura"
+git branch -M main
+git remote add origin https://github.com/<you>/leadcaptura.git
+git push -u origin main
+```
+
+## 2) Provision Postgres → get DATABASE_URL
+Create a Postgres DB. Copy its connection string and convert the scheme to:
+```
+postgresql+psycopg://USER:PASSWORD@HOST:5432/DBNAME
+```
+(The `+psycopg` part is required — SQLAlchemy picks the driver from it.)
+No manual schema step: the backend runs `alembic upgrade head` on every boot.
+
+## 3) Deploy the BACKEND → Render (Docker)
+- New **Web Service** → connect the GitHub repo.
+- **Root Directory:** `api`  ·  **Runtime:** Docker (uses `api/Dockerfile`).
+- **Environment variables** (minimum):
+  ```
+  DATABASE_URL=postgresql+psycopg://...        (from step 2)
+  SECRET_KEY=<long random string>
+  FRONTEND_ORIGINS=https://<your-vercel-domain>   (fill after step 4; can update later)
+  PUBLIC_API_URL=https://<this-render-service>.onrender.com
+  ```
+  Optional (features degrade gracefully if unset): `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY`, `GMAIL_*`, `GOOGLE_*`, `GOOGLE_PLACES_API_KEY`, `CRON_SECRET`,
+  `CONTENT_INGEST_TOKEN`, `SMTP_RELAY_SECRET`, `WA_SIDECAR_URL`, `WA_SIDECAR_TOKEN`.
+- Deploy. When live, hit `https://<service>.onrender.com/health` → `{"ok":true}`.
+- (Full stack with workers + Redis: deploy via the included `render.yaml` blueprint
+  instead. Free tier can skip workers — the API still serves every sync endpoint.)
+
+## 4) Deploy the FRONTEND → Vercel
+- **Import Project** → the same GitHub repo. Framework auto-detects Next.js.
+  Leave root as the repo root (no override; `.vercelignore` already skips `api/`
+  and `extension/`).
+- **Environment variable:**
+  ```
+  NEXT_PUBLIC_API_URL=https://<your-render-backend>.onrender.com
+  ```
+- Deploy. Then go back to Render and set `FRONTEND_ORIGINS` to the Vercel URL
+  (comma-separate multiple), and redeploy the backend so CORS allows it.
+
+## 5) First login
+Open the Vercel URL → **Register**. That creates the first user + workspace and
+seeds the default pipeline. You're live.
+
+## 6) Optional add-ons
+- **Keep the free-tier backend warm:** the repo ships
+  `.github/workflows/keep-alive.yml` (pings every 10 min). In GitHub → repo
+  **Settings → Secrets and variables → Actions → Variables**, set `API_URL` to
+  your backend URL so it warms the right host. (Or upgrade Render off free tier.)
+- **Cron tasks without a paid worker:** set `CRON_SECRET` on the backend and hit
+  `/api/v1/cron/run` on a schedule (cron-job.org) to fire reminders/agendas/drains.
+- **WhatsApp sidecar:** deploy `whatsapp/` as a second Render Docker service; set
+  `WA_SIDECAR_URL` + `WA_SIDECAR_TOKEN` on both it and the backend.
+- **Content routine → Content Hub:** set the SAME `CONTENT_INGEST_TOKEN` on the
+  backend and in the routine env; the routine then publishes via
+  `POST /content-hub/ingest` (see HANDOFF.md §"Content Hub routine ingest").
+
+## 7) Chrome extension (not a hosted deploy)
+`extension/` is loaded unpacked: `chrome://extensions` → Developer mode → Load
+unpacked → select the `extension/` folder. Its default backend URL is baked into
+`extension/background/service-worker.js` and `extension/options/options.js` —
+update those to your backend before zipping/distributing.
+
+---
+
+### Required-vs-optional at a glance
+| Service | Must set | Everything else |
 |---|---|---|
-| Next.js frontend (repo root) | Vercel | $0 |
-| FastAPI API + Celery worker + beat (`/api`) | Render (or Railway/Fly) | $7/mo each on starter |
-| Postgres | Neon | $0 |
-| Redis | Render's managed Redis (or Upstash) | $0–$10 |
+| Backend (Render) | `DATABASE_URL`, `SECRET_KEY`, `FRONTEND_ORIGINS`, `PUBLIC_API_URL` | optional / feature-gated |
+| Frontend (Vercel) | `NEXT_PUBLIC_API_URL` | — |
 
-## 1. Provision Postgres (Neon)
-
-1. Create a free project at <https://neon.tech>.
-2. Copy the **connection string** with the `postgresql+psycopg://` driver — Neon shows it as `postgresql://`, just replace the scheme:
-   ```
-   postgresql+psycopg://user:pw@ep-xxx.neon.tech/neondb?sslmode=require
-   ```
-
-## 2. Deploy the backend on Render
-
-1. Push this repo to GitHub (already done on branch `claude/linkedin-lead-generation-saas-u7GDc`).
-2. Go to <https://dashboard.render.com> → **New +** → **Blueprint** → connect this repo.
-3. Render reads `render.yaml`, which provisions:
-   - `leadcaptura-api` (Docker web service on `/api`)
-   - `leadcaptura-worker` (Celery worker)
-   - `leadcaptura-beat` (Celery beat)
-   - `leadcaptura-redis` (managed Redis)
-4. Fill the `sync: false` env vars in the dashboard:
-   - `DATABASE_URL` — Neon connection string from step 1
-   - `FRONTEND_ORIGINS` — `https://your-app.vercel.app`
-   - `ANTHROPIC_API_KEY` — from <https://console.anthropic.com>
-   - `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REDIRECT_URI` — optional, only needed for Gmail send
-   - `SENTRY_DSN` — optional
-5. Deploy. Migrations run on boot via the Dockerfile `CMD`.
-6. Note your API URL: `https://leadcaptura-api.onrender.com`.
-
-### Alternative: Railway
-
-1. <https://railway.app> → **New** → **Deploy from GitHub** → pick this repo.
-2. Railway reads `railway.json` and uses `api/Dockerfile`.
-3. Add Postgres + Redis plugins from Railway's marketplace (or use Neon + Upstash).
-4. Set the env vars listed above.
-5. Add a second service for the Celery worker pointing to the same Dockerfile with start command `celery -A app.workers.celery_app worker --loglevel=info`. Add a third for `celery beat`.
-
-## 3. Deploy the frontend on Vercel
-
-1. <https://vercel.com/new> → import this repo.
-2. Set **Root Directory** to `web` (or leave at root — `vercel.json` handles both).
-3. Environment variables:
-   - `NEXT_PUBLIC_API_URL` = your backend URL (`https://leadcaptura-api.onrender.com`)
-   - `NEXT_PUBLIC_APP_NAME` = `LeadCaptura`
-4. Deploy. Vercel returns `https://your-app.vercel.app`.
-5. Go back to Render and update `FRONTEND_ORIGINS` to this URL, then redeploy the API.
-
-## 4. Wire the Chrome extension
-
-1. Open the LeadCaptura web app → sign up → **Settings → API Keys** → generate.
-2. Load the extension: `chrome://extensions` → Developer mode → **Load unpacked** → select the `extension/` folder in this repo.
-3. Open the extension Options → paste:
-   - Backend URL: `https://leadcaptura-api.onrender.com`
-   - API key: `lcx_…` from step 1
-4. Visit a LinkedIn profile → the floating panel appears → click **Save Lead**.
-
-## 5. Local dev with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-That starts Postgres, Redis, the API, worker, and beat. Frontend runs separately:
-
-```bash
-npm install && npm run dev
-```
-
-## Health check & smoke test
-
-```bash
-curl https://leadcaptura-api.onrender.com/health
-# {"ok": true, "service": "leadcaptura-api"}
-
-curl https://leadcaptura-api.onrender.com/api/v1/extension/health
-# {"ok": true, "ts": "..."}
-```
+That's it — with those four backend vars + one frontend var + a Postgres, the
+app deploys and runs.

@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     # Celery worker. The ping also keeps a free web service awake.
     cron_secret: str = ""
 
+    # Shared secret for the Content Hub ingest endpoint (POST /content-hub/ingest).
+    # The daily content routine can't reach the DB directly (Supabase REST is
+    # egress-restricted; direct Postgres is blocked in the routine sandbox), but
+    # it CAN reach this backend over HTTPS — and the backend's own pooled DB
+    # connection works. Set the SAME value here (backend env) and in the routine
+    # so it can POST generated assets and we write them via SQLAlchemy. Empty =
+    # the ingest endpoint is disabled (503).
+    content_ingest_token: str = ""
+
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
 

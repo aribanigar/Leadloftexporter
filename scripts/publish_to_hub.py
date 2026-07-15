@@ -27,11 +27,15 @@ Env:
   HUB_LOGO_URL        optional. Public logo URL.
   HUB_TONE            optional. AI-writer tone (default "vibrant").
 
-  Supabase backend (preferred when present):
+  CRM ingest backend (PREFERRED — works when the DB is only reachable by the
+  backend, e.g. Supabase egress-restricted / Postgres ports blocked):
+    CONTENT_INGEST_TOKEN  shared secret; MUST match the backend's CONTENT_INGEST_TOKEN.
+    CONTENT_INGEST_URL    backend base URL (default https://leadloftexporter.onrender.com).
+  Supabase backend (used if no ingest token):
     SUPABASE_URL          e.g. https://abcd.supabase.co
     SUPABASE_SERVICE_KEY  service_role key (bypasses RLS)
-  Neon backend (fallback):
-    DATABASE_URL          Neon URL (postgresql+psycopg://... accepted; +driver stripped).
+  Neon / direct-Postgres backend (last fallback):
+    DATABASE_URL          Neon/Postgres URL (postgresql+psycopg://... accepted; +driver stripped).
 
 Usage:
   python3 scripts/publish_to_hub.py --date 2026-06-13   # default: today UTC
@@ -177,6 +181,67 @@ class SupabaseREST:
         }, prefer="return=minimal")
 
 
+class CrmIngest:
+    """Publish through the CRM backend's POST /content-hub/ingest endpoint,
+    authenticated with a shared secret (CONTENT_INGEST_TOKEN).
+
+    This is the channel that works when the DB isn't directly reachable — e.g.
+    Supabase is egress-restricted (REST returns 402) and Postgres ports are
+    blocked in the routine sandbox — because the *backend* still has a working
+    pooled DB connection. We accumulate the business + all its assets and POST
+    them in ONE idempotent call on flush(); the server resolves-or-creates the
+    business and dedups assets by (business, title), so reruns are no-ops."""
+
+    def __init__(self, base: str, token: str, workspace_id: str):
+        self.url = base.rstrip("/") + "/api/v1/content-hub/ingest"
+        self.token = token
+        self.ws = workspace_id
+        self._biz = None
+        self._assets = []
+        self.result = None
+
+    # The routine drives the backend per-row; for the HTTP path we just collect.
+    def workspace_exists(self, ws):
+        return True                      # validated server-side on flush
+
+    def business_id(self, ws, slug):
+        return None                      # force create_business (server resolves-or-creates)
+
+    def create_business(self, f):
+        self._biz = {
+            "slug": f["slug"], "name": f["name"], "brand_color": f["brand_color"],
+            "accent_color": f["accent_color"], "tone": f["tone"], "logo_url": f["logo_url"],
+        }
+        return "__ingest__"              # placeholder id; real id comes back from the server
+
+    def asset_exists(self, biz, title):
+        return False                     # server dedups idempotently
+
+    def insert_asset(self, f):
+        self._assets.append({
+            "title": f["title"], "type": f["type"], "content": f["content"],
+            "amp_content": f.get("amp_content"), "subject": f.get("subject"),
+            "platform": f.get("platform"), "tags": f.get("tags") or [],
+            "image_url": f.get("image_url"),
+        })
+
+    def flush(self):
+        if self._biz is None:
+            return None
+        payload = {"workspace_id": self.ws, "business": self._biz, "assets": self._assets}
+        req = Request(self.url, data=json.dumps(payload).encode(), method="POST",
+                      headers={"Content-Type": "application/json", "X-Content-Token": self.token})
+        try:
+            with urlopen(req, timeout=120) as r:
+                raw = r.read().decode()
+                self.result = json.loads(raw) if raw else {}
+                return self.result
+        except HTTPError as e:
+            raise RuntimeError("ingest %s: %s" % (e.code, e.read().decode()[:300]))
+        except URLError as e:
+            raise RuntimeError("ingest unreachable: %s" % e)
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -246,6 +311,16 @@ def seed(backend, args, ws, slug, biz_name, brand, accent, logo, tone):
             except Exception as e:  # noqa: BLE001
                 rep["failures"].append([title, str(e)])
 
+    # HTTP-ingest backend batches everything and writes on flush — the server's
+    # counts are authoritative (it does the real resolve-or-create + dedup).
+    if hasattr(backend, "flush"):
+        srv = backend.flush()
+        if isinstance(srv, dict):
+            rep["business_id"] = srv.get("business_id", rep["business_id"])
+            rep["created_business"] = srv.get("created_business", rep["created_business"])
+            rep["inserted"] = srv.get("inserted", rep["inserted"])
+            rep["skipped"] = srv.get("skipped", rep["skipped"])
+
     print(json.dumps(rep, indent=2))
     return 1 if rep["failures"] else 0
 
@@ -266,6 +341,11 @@ def main() -> int:
     logo = os.environ.get("HUB_LOGO_URL", "")
     tone = os.environ.get("HUB_TONE", "vibrant")
 
+    # Preferred channel: the CRM backend's ingest endpoint (works even when the
+    # DB is only reachable by the backend, e.g. Supabase egress-restricted /
+    # Postgres ports blocked). Falls back to the direct DB channels.
+    ingest_token = os.environ.get("CONTENT_INGEST_TOKEN")
+    ingest_url = os.environ.get("CONTENT_INGEST_URL", "https://leadloftexporter.onrender.com")
     sb_url = os.environ.get("SUPABASE_URL")
     sb_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     db = os.environ.get("DATABASE_URL")
@@ -274,13 +354,15 @@ def main() -> int:
         print(json.dumps({"date": args.date, "hub_publish": "skipped (no HUB_WORKSPACE)"}))
         return 0
 
-    if sb_url and sb_key:
+    if ingest_token and ingest_url:
+        backend = CrmIngest(ingest_url, ingest_token, ws)
+    elif sb_url and sb_key:
         backend = SupabaseREST(sb_url, sb_key)
     elif db:
         backend = Neon(db)
     else:
         print(json.dumps({"date": args.date,
-                          "hub_publish": "skipped (no SUPABASE_URL/SUPABASE_SERVICE_KEY or DATABASE_URL)"}))
+                          "hub_publish": "skipped (set CONTENT_INGEST_TOKEN, or SUPABASE_URL/SUPABASE_SERVICE_KEY, or DATABASE_URL)"}))
         return 0
 
     try:

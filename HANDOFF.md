@@ -135,3 +135,47 @@ Receiver replaces all three with their own URLs and updates `NEXT_PUBLIC_API_URL
 ## Support / questions
 
 The full architecture, all gotchas, every load-bearing detail, and the reasoning behind every design choice is in `CLAUDE.md`. The original `README.md` and `DEPLOY.md` are also included for the high-level overview and deploy steps.
+
+---
+
+## Recent change included in this archive — Content Hub routine ingest
+
+Files: `api/app/api/v1/content_hub.py`, `api/app/core/config.py`, `scripts/publish_to_hub.py`.
+
+The daily content routine could generate content but not persist it — Supabase's
+REST API is egress-restricted (402) and the routine sandbox blocks Postgres
+ports. The backend, though, still has a working DB connection. So a new
+shared-secret endpoint lets the routine publish over HTTPS through the backend:
+
+- **`POST /content-hub/ingest`** — auth via header `X-Content-Token` vs
+  `CONTENT_INGEST_TOKEN` (not behind the user JWT; same trust model as the
+  WhatsApp webhook). Resolves-or-creates the business by `(workspace, slug)` and
+  inserts assets idempotently by `(business, title)`.
+- `scripts/publish_to_hub.py` gained a `CrmIngest` backend that batches the day's
+  business + assets and POSTs them there. Preferred when `CONTENT_INGEST_TOKEN`
+  is set; otherwise it falls back to the existing Supabase/Neon direct-DB paths.
+
+**Activate:** set `CONTENT_INGEST_TOKEN` to the same value on the backend (Render)
+**and** in the routine env, then redeploy the backend. No schema change.
+
+## Current state / known issues (as of handoff)
+
+1. **Supabase project is egress-restricted (402).** The DB engine still works for
+   the backend (direct pooler); only Supabase's REST layer is blocked. Restore
+   the project (upgrade plan / remove spend cap) for the clean fix, or use the
+   ingest endpoint above. Same root cause behind app slowness and any DB
+   migration questions.
+2. **Render free tier sleeps** after 15 min → 30–60s cold start (login/first load
+   feel slow). `.github/workflows/keep-alive.yml` pings it every 10 min — ensure
+   it targets the LIVE backend host. A paid Render plan removes it entirely.
+3. **Frontend perf tuning** already in place: non-render-blocking web fonts
+   (`src/components/deferred-fonts.tsx`), Material Symbols limited to the FILL
+   axis, backend origin preconnected in `src/app/layout.tsx`.
+4. **Extension is distributed unpacked** (no Web-Store auto-update). The toolbar
+   popup shows an "Update available" banner sourced from
+   `public/extension-version.json`; the download page lists releases.
+
+## Env templates
+- Backend: copy `.env.api.example` → `api/.env`
+- Frontend: copy `.env.local.example` → `.env.local`
+No secret values are committed anywhere in this repo.

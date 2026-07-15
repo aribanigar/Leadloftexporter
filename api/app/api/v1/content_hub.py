@@ -23,17 +23,19 @@ SMTP bridge (`/api/outreach/send`) — no send endpoint lives here.
 """
 from __future__ import annotations
 
+import hmac
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context
-from app.models import ContentAsset, ContentBusiness
+from app.models import ContentAsset, ContentBusiness, Workspace
 
 
 router = APIRouter(prefix="/content-hub", tags=["content-hub"])
@@ -462,3 +464,123 @@ def delete_asset(
     db.delete(a)
     db.commit()
     return None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Routine ingest — shared-secret, no user JWT
+# ──────────────────────────────────────────────────────────────────────────
+# The daily content routine can't reach the database directly: Supabase's REST
+# API is egress-restricted (402) and direct Postgres is blocked in the routine
+# sandbox. But the routine CAN reach this backend over HTTPS, and the backend's
+# own pooled DB connection works. So the routine POSTs its generated assets
+# here with a shared secret (CONTENT_INGEST_TOKEN) and we write them exactly
+# like the UI create path — resolve-or-create the business by (workspace, slug),
+# then insert assets idempotently by (business, title). Mirrors the logic in
+# scripts/publish_to_hub.py so either channel produces identical rows.
+
+
+class IngestBusiness(BaseModel):
+    slug: str
+    name: Optional[str] = None
+    brand_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    tone: Optional[str] = None
+    logo_url: Optional[str] = None
+
+
+class IngestAsset(BaseModel):
+    title: str
+    type: str = "html_email"
+    content: str = ""
+    amp_content: Optional[str] = None
+    subject: Optional[str] = None
+    platform: Optional[str] = None
+    tags: list = Field(default_factory=list)
+    notes: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class IngestPayload(BaseModel):
+    workspace_id: str
+    business: IngestBusiness
+    assets: list[IngestAsset] = Field(default_factory=list)
+
+
+@router.post("/ingest")
+def ingest_content(payload: IngestPayload, request: Request, db: Session = Depends(get_db)):
+    """Seed content into the hub from the routine (shared-secret auth)."""
+    token = get_settings().content_ingest_token
+    if not token:
+        # Not configured — refuse rather than accept unauthenticated writes.
+        raise HTTPException(status_code=503, detail="ingest_not_configured")
+    supplied = request.headers.get("X-Content-Token") or ""
+    if not hmac.compare_digest(supplied, token):
+        raise HTTPException(status_code=401, detail="bad_token")
+
+    ws_id = payload.workspace_id
+    if not db.query(Workspace.id).filter(Workspace.id == ws_id).first():
+        raise HTTPException(status_code=404, detail="workspace_not_found")
+
+    # Resolve-or-create the business by (workspace_id, slug).
+    biz = (
+        db.query(ContentBusiness)
+        .filter(
+            ContentBusiness.workspace_id == ws_id,
+            ContentBusiness.slug == payload.business.slug,
+        )
+        .first()
+    )
+    created_business = False
+    if biz is None:
+        biz = ContentBusiness(
+            workspace_id=ws_id,
+            name=payload.business.name or payload.business.slug,
+            slug=payload.business.slug,
+            brand_color=payload.business.brand_color or "#00361a",
+            accent_color=payload.business.accent_color,
+            tone=payload.business.tone,
+            logo_url=payload.business.logo_url,
+        )
+        db.add(biz)
+        db.flush()
+        created_business = True
+
+    inserted = 0
+    skipped = 0
+    for a in payload.assets:
+        atype = a.type if a.type in ASSET_TYPES else "other"
+        exists = (
+            db.query(ContentAsset.id)
+            .filter(ContentAsset.business_id == biz.id, ContentAsset.title == a.title)
+            .first()
+        )
+        if exists:
+            skipped += 1
+            continue
+        db.add(
+            ContentAsset(
+                workspace_id=ws_id,
+                business_id=biz.id,
+                title=a.title,
+                type=atype,
+                content=a.content or "",
+                amp_content=a.amp_content,
+                subject=a.subject,
+                platform=a.platform,
+                tags=_norm_tags(a.tags),
+                notes=a.notes,
+                image_url=a.image_url,
+            )
+        )
+        inserted += 1
+
+    db.commit()
+    return {
+        "ok": True,
+        "workspace_id": ws_id,
+        "business_id": biz.id,
+        "business_slug": biz.slug,
+        "created_business": created_business,
+        "inserted": inserted,
+        "skipped": skipped,
+    }
