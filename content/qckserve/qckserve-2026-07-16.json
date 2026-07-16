@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-16",
+  "business": "qckserve",
+  "topic": "Sell what you don't use — free, keep every rupee",
+  "items": [
+    {
+      "channel": "html_email",
+      "subject": "Sell what you don't use — ₹0 commission, keep every rupee",
+      "content": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<title>Sell what you don't use — free on QckServe</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#FCF9F8; -webkit-text-size-adjust:100%;\">\n<div style=\"display:none; max-height:0; overflow:hidden; opacity:0; font-size:1px; line-height:1px; color:#FCF9F8;\">That drawer of unused stuff is worth money. List it free, keep every rupee &#8212; &#8377;0 commission on QckServe.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#FCF9F8;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px; max-width:600px; background-color:#FFFFFF; border-radius:16px; overflow:hidden;\">\n\n<!-- logo zone: text wordmark only -->\n<tr><td style=\"padding:28px 40px 4px 40px; font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; letter-spacing:1px; color:#1A1A1A;\">qckserve.in</td></tr>\n\n<!-- KICKER + HEADLINE (editorial: italic serif kicker + oversized head) -->\n<tr><td style=\"padding:12px 40px 4px 40px;\">\n<div style=\"font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:17px; color:#ef6723;\">that drawer of unused stuff is worth money</div>\n<div style=\"font-family:'Arial Narrow',Arial,sans-serif; font-size:52px; line-height:0.98; font-weight:800; color:#1A1A1A; letter-spacing:-1px; padding-top:8px;\">SELL WHAT YOU<br />DON'T USE.</div>\n</td></tr>\n\n<!-- HERO POSTER BAND: live SVG, reads with images off via alt -->\n<tr><td style=\"padding:18px 40px 6px 40px;\">\n<img src=\"https://leadloftexporter.vercel.app/email/qckserve-2026-07-16.svg\" width=\"520\" alt=\"Coupon: &#8377;0 commission, forever. List it free on QckServe, buyers pay you direct, you keep every rupee.\" style=\"display:block; width:100%; max-width:520px; height:auto; border-radius:14px;\" />\n</td></tr>\n\n<!-- ONE-IDEA-PER-LINE clarity block (<=90 words before CTA) -->\n<tr><td style=\"padding:26px 40px 6px 40px; font-family:'Poppins',Arial,sans-serif; color:#1A1A1A;\">\n<div style=\"font-size:20px; line-height:1.45; font-weight:700;\">Old phone. Spare furniture. The bike you outgrew.</div>\n<div style=\"font-size:20px; line-height:1.45; font-weight:700; color:#ef6723;\">Someone nearby wants it today.</div>\n<div style=\"font-size:16px; line-height:1.6; color:#555555; padding-top:10px;\">Post it free. The buyer messages you and pays you direct. No listing fee. No commission. No cut of your sale.</div>\n</td></tr>\n\n<!-- FIRST CTA: bulletproof button (padded a on bgcolor td) -->\n<tr><td style=\"padding:18px 40px 8px 40px;\">\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n<tr><td align=\"center\" bgcolor=\"#ef6723\" style=\"border-radius:12px;\">\n<a href=\"https://qckserve.in\" target=\"_blank\" style=\"display:inline-block; padding:16px 34px; font-family:'Poppins',Arial,sans-serif; font-size:17px; font-weight:700; color:#FFFFFF; text-decoration:none; border-radius:12px;\">List your item &#8212; free &#8594;</a>\n</td></tr>\n</table>\n</td></tr>\n\n<!-- THE COUPON DEVICE: dashed-cut ticket, the one memorable star -->\n<tr><td style=\"padding:16px 40px 8px 40px;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#1A1A1A; border-radius:16px;\">\n<tr><td style=\"padding:26px 26px 10px 26px;\">\n<div style=\"font-family:Georgia,'Times New Roman',serif; font-style:italic; font-size:15px; color:#FF6B00;\">this coupon never expires</div>\n<div style=\"font-family:'Arial Narrow',Arial,sans-serif; font-size:60px; line-height:1; font-weight:800; color:#FFFFFF; letter-spacing:-1px; padding-top:6px;\">&#8377;0 <span style=\"color:#FF6B00;\">COMMISSION</span></div>\n</td></tr>\n<!-- perforation tear line -->\n<tr><td style=\"padding:0 18px;\">\n<div style=\"border-top:2px dashed #555555; line-height:0; font-size:0;\">&nbsp;</div>\n</td></tr>\n<tr><td style=\"padding:12px 26px 26px 26px; font-family:'Poppins',Arial,sans-serif;\">\n<div style=\"font-size:15px; line-height:1.7; color:#FCF9F8;\">&#10003;&#160; Free to list &#160;&#183;&#160; Free forever</div>\n<div style=\"font-size:15px; line-height:1.7; color:#FCF9F8;\">&#10003;&#160; Buyer pays you direct &#160;&#183;&#160; no middleman</div>\n<div style=\"font-size:15px; line-height:1.7; color:#FCF9F8;\">&#10003;&#160; Keep 100% of your sale price</div>\n</td></tr>\n</table>\n</td></tr>\n\n<!-- HOW IT WORKS: 3 quick steps -->\n<tr><td style=\"padding:20px 40px 4px 40px; font-family:'Poppins',Arial,sans-serif; color:#1A1A1A;\">\n<div style=\"font-size:13px; font-weight:700; letter-spacing:1px; color:#999999;\">HOW IT WORKS</div>\n</td></tr>\n<tr><td style=\"padding:8px 40px 6px 40px; font-family:'Poppins',Arial,sans-serif; color:#1A1A1A;\">\n<div style=\"font-size:16px; line-height:1.7; font-weight:600;\"><span style=\"color:#ef6723; font-weight:800;\">1.</span>&#160; Snap a photo, set your price.</div>\n<div style=\"font-size:16px; line-height:1.7; font-weight:600;\"><span style=\"color:#ef6723; font-weight:800;\">2.</span>&#160; Buyers nearby message you.</div>\n<div style=\"font-size:16px; line-height:1.7; font-weight:600;\"><span style=\"color:#ef6723; font-weight:800;\">3.</span>&#160; Meet, hand it over, get paid in full.</div>\n</td></tr>\n\n<!-- CLOSING CTA line -->\n<tr><td style=\"padding:22px 40px 26px 40px;\" align=\"center\">\n<a href=\"https://qckserve.in\" target=\"_blank\" style=\"font-family:'Poppins',Arial,sans-serif; font-size:16px; font-weight:700; color:#ef6723; text-decoration:none;\">Turn clutter into cash on qckserve.in &#8594;</a>\n</td></tr>\n\n<!-- footer band -->\n<tr><td style=\"background-color:#FCF9F8; padding:20px 40px; font-family:'Poppins',Arial,sans-serif; font-size:12px; line-height:1.6; color:#999999;\">\nQckServe &#8212; India's free local marketplace. Zero commission. Free listings. Owner-direct, no middlemen.<br />\nqckserve.in\n</td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-16.svg",
+      "tags": [
+        "classifieds",
+        "promo",
+        "recommerce"
+      ],
+      "notes": "Thu Classifieds — coupon/ticket archetype (dashed-cut perforation, ₹0 commission device). Monsoon-declutter angle; India-wide."
+    },
+    {
+      "channel": "whatsapp",
+      "content": "Ghar mein padi purani cheezein bech do — bike, phone, furniture, kuch bhi. Listing free, commission ₹0, paisa seedha aapke haath. 📦\nAaj list karo: qckserve.in",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-16.svg",
+      "tags": [
+        "classifieds",
+        "promo"
+      ]
+    },
+    {
+      "channel": "caption",
+      "platform": "instagram",
+      "content": "Woh drawer jo band pada hai? Usme paisa hai. 💰\n\nPurani cheezein bech do — listing free, commission ₹0, buyer aapko seedha pay karta hai. Middleman ka cut? Zero.\n\nList it free 👉 qckserve.in\n\n#QckServe #SellFree #ZeroCommission #LocalMarketplace #DeclutterIndia",
+      "image_url": "https://leadloftexporter.vercel.app/email/qckserve-2026-07-16.svg",
+      "tags": [
+        "classifieds",
+        "promo",
+        "instagram"
+      ]
+    },
+    {
+      "channel": "sms",
+      "content": "Sell what you don't use — free. ₹0 commission, buyers pay you direct, keep every rupee. List it now: qckserve.in",
+      "tags": [
+        "classifieds",
+        "promo"
+      ]
+    },
+    {
+      "channel": "other",
+      "content": "[2026-07-16] Sell what you don't use — zero commission classifieds (Image Prompt)\n\nSCENE: A warm, lived-in Indian home corner during monsoon light — a few well-loved second-hand items neatly arranged for resale (a bicycle, a table lamp, a stack of books, a smartphone), tidy and inviting, not cluttered.\nSUBJECT: A young Indian seller (25-34, gender-neutral framing) photographing one item with a phone, mid-action, relaxed and confident.\nPHONE-UI MOCKUP: On the phone screen, a clean QckServe listing card — item photo, a price field, and a bold '₹0 commission' badge; a single primary button 'List it free'. Flat UI, rounded 14px corners, no gradients.\nCOLOUR SYSTEM: flat colour blocking only, NO gradients — orange #FF6B00 / #ef6723 accent, charcoal #1A1A1A, warm off-white #FCF9F8, one accent used sparingly.\nLIGHTING: soft, diffused overcast monsoon daylight from a window; gentle, true-to-life, no HDR.\nTYPE HIERARCHY: one oversized condensed headline 'SELL WHAT YOU DON'T USE.' paired with a small italic-serif kicker 'this coupon never expires'; a coupon/ticket device showing '₹0 COMMISSION' with a dashed perforation cut.\nEYE FLOW: headline → phone screen → ₹0 coupon badge → wordmark.\nCAMERA: 35mm, eye-level, shallow depth of field, editorial product-lifestyle framing, portrait.\nPERFORMANCE LAYER: thumb-stopping, high contrast, reads instantly at small size; wordmark 'qckserve.in' bottom-left.\nReserve the TOP-LEFT logo zone (~140px square) empty — logo placed manually.\n--ar 4:5 --style raw --v 6.1",
+      "tags": [
+        "classifieds",
+        "image-prompt"
+      ],
+      "notes": "AI image generation prompt — QckServe production format, --ar 4:5 --style raw --v 6.1."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="Sell what you don't use on QckServe. Zero commission. You keep every rupee. India's free local marketplace.">
+  <defs>
+    <style>
+      .cond { font-family: 'Arial Narrow','Poppins',Arial,sans-serif; font-weight: 800; }
+      .sans { font-family: 'Poppins',Arial,sans-serif; }
+      .serif { font-family: 'Georgia','Times New Roman',serif; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- base -->
+  <rect width="1080" height="1350" fill="#1A1A1A"/>
+
+  <!-- reserved 140px top-left logo square (kept blank; Ariba places logo manually) -->
+  <rect x="0" y="0" width="140" height="140" fill="#1A1A1A"/>
+
+  <!-- kicker -->
+  <text x="180" y="118" class="serif" font-size="34" fill="#FF6B00">for sellers &amp; bargain-hunters</text>
+
+  <!-- headline -->
+  <text x="70" y="330" class="cond" font-size="150" fill="#FCF9F8" letter-spacing="-4">SELL WHAT</text>
+  <text x="70" y="475" class="cond" font-size="150" fill="#FCF9F8" letter-spacing="-4">YOU DON'T</text>
+  <text x="70" y="620" class="cond" font-size="150" fill="#FF6B00" letter-spacing="-4">USE.</text>
+
+  <!-- THE COUPON/TICKET DEVICE: dashed-cut card with perforation notches -->
+  <rect x="70" y="700" width="940" height="380" rx="24" fill="#FF6B00"/>
+  <!-- perforation: side notches + dashed tear line -->
+  <circle cx="70" cy="890" r="34" fill="#1A1A1A"/>
+  <circle cx="1010" cy="890" r="34" fill="#1A1A1A"/>
+  <line x1="120" y1="890" x2="960" y2="890" stroke="#1A1A1A" stroke-width="4" stroke-dasharray="14 12"/>
+
+  <!-- coupon top half: the value -->
+  <text x="110" y="810" class="serif" font-size="34" fill="#1A1A1A">this coupon never expires</text>
+  <text x="100" y="875" class="cond" font-size="150" fill="#1A1A1A" letter-spacing="-6">&#8377;0 COMMISSION</text>
+
+  <!-- coupon bottom half: what you keep -->
+  <text x="110" y="985" class="sans" font-size="40" font-weight="800" fill="#1A1A1A">List it free. Buyers pay you direct.</text>
+  <text x="110" y="1040" class="sans" font-size="40" font-weight="800" fill="#1A1A1A">You keep every single rupee.</text>
+
+  <!-- footer wordmark -->
+  <text x="70" y="1180" class="sans" font-size="52" font-weight="800" fill="#FCF9F8">Post it on qckserve.in</text>
+  <text x="70" y="1245" class="serif" font-size="30" fill="#8A8A8A">India's free local marketplace &#183; zero commission &#183; owner-direct</text>
+  <text x="70" y="1320" class="sans" font-size="34" font-weight="700" fill="#FF6B00">qckserve.in</text>
+</svg>
