@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-16",
+  "theme": "Cooler bags and lunch",
+  "season": "Peak summer, event season carry and the early year-end build",
+  "design": "C",
+  "campaign_code": "GG-20260716-9",
+  "campaign_name": "Cooler Bags And Lunch - 16 Jul 2026",
+  "subject": "Lunch that travels cold",
+  "skus": [
+    "GG1326",
+    "GG1331",
+    "GG1585",
+    "GG1475",
+    "GG1092",
+    "GG1379"
+  ],
+  "products": [
+    {
+      "name": "Gelid",
+      "sku": "GG1326",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2788-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1326"
+    },
+    {
+      "name": "Coldi",
+      "sku": "GG1331",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2832-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1331"
+    },
+    {
+      "name": "Cubacool",
+      "sku": "GG1585",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8438-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1585"
+    },
+    {
+      "name": "Chan Lunchbox Colour",
+      "sku": "GG1475",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6638-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1475"
+    },
+    {
+      "name": "Idolunch",
+      "sku": "GG1092",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2119-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1092"
+    },
+    {
+      "name": "Cuba",
+      "sku": "GG1379",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6150-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1379"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cooler%20bags%20and%20lunch%20options%20for%20our%20team."
+}

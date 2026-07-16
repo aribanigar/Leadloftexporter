@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-16",
+  "theme": "Apparel and merch",
+  "season": "Peak summer, event season carry and the early year-end build",
+  "design": "A",
+  "campaign_code": "GG-20260716-7",
+  "campaign_name": "Organic Cotton Tees - 16 Jul 2026",
+  "subject": "Tees the team lives in",
+  "skus": [
+    "GG1758",
+    "GG1761",
+    "GG1765",
+    "GG1767",
+    "GG1763",
+    "GG1783"
+  ],
+  "products": [
+    {
+      "name": "Planet Men",
+      "sku": "GG1758",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03566-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1758"
+    },
+    {
+      "name": "Planet Women",
+      "sku": "GG1761",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03575-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1761"
+    },
+    {
+      "name": "Crusader Kids",
+      "sku": "GG1765",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03580-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1765"
+    },
+    {
+      "name": "Crusader Men",
+      "sku": "GG1767",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03582-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1767"
+    },
+    {
+      "name": "Pioneer Kids",
+      "sku": "GG1763",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03578-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1763"
+    },
+    {
+      "name": "Pacific",
+      "sku": "GG1783",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s04439-aq.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1783"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20apparel%20and%20merch%20options%20for%20our%20team."
+}

@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-16",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Recycled steel bottle that keeps drinks cold",
+      "out": "content/gifts-gulf/2026-07-16/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2090-16",
+          "sku": "GG1071",
+          "name": "Ursa",
+          "desc": "Recycled steel bottle that keeps drinks cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2107-16",
+          "sku": "GG1085",
+          "name": "Florence",
+          "desc": "Vacuum steel bottle for the daily commute",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Roomy cotton bag for the daily carry",
+      "out": "content/gifts-gulf/2026-07-16/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9515-13",
+          "sku": "GG1644",
+          "name": "Illa",
+          "desc": "Roomy cotton bag for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2503-13",
+          "sku": "GG1216",
+          "name": "Lona",
+          "desc": "Jute shopping bag with sturdy handles",
+          "colours": 0
+        },
+        {
+          "code": "mo6443-04",
+          "sku": "GG1445",
+          "name": "Aura",
+          "desc": "Natural jute bag that folds away",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Recycled paper notebook for everyday notes",
+      "out": "content/gifts-gulf/2026-07-16/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2448-13",
+          "sku": "GG1197",
+          "name": "Peat",
+          "desc": "Recycled paper notebook for everyday notes",
+          "colours": 0
+        },
+        {
+          "code": "mo2718-03",
+          "sku": "GG1301",
+          "name": "Journu",
+          "desc": "Softcover notebook that lies flat",
+          "colours": 0
+        },
+        {
+          "code": "mo6580-03",
+          "sku": "GG1467",
+          "name": "Ours",
+          "desc": "Recycled notebook sized for the bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Bamboo charging stand for phone and buds",
+      "out": "content/gifts-gulf/2026-07-16/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2144-40",
+          "sku": "GG1100",
+          "name": "Hubstand",
+          "desc": "Bamboo charging stand for phone and buds",
+          "colours": 0
+        },
+        {
+          "code": "mo2981-06",
+          "sku": "GG1363",
+          "name": "Pro Light Usb Ac30 Pd",
+          "desc": "Compact travel adapter with a USB port",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Ceramic mug that suits any desk",
+      "out": "content/gifts-gulf/2026-07-16/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc7062-06",
+          "sku": "GG1049",
+          "name": "Dublin",
+          "desc": "Ceramic mug that suits any desk",
+          "colours": 0
+        },
+        {
+          "code": "mo2101-06",
+          "sku": "GG1082",
+          "name": "Karoo",
+          "desc": "Stoneware mug with a solid handle",
+          "colours": 0
+        },
+        {
+          "code": "mo2493-03",
+          "sku": "GG1212",
+          "name": "Cerack",
+          "desc": "Ceramic mug boxed on its own",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Bamboo mug with a natural, warm finish",
+      "out": "content/gifts-gulf/2026-07-16/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6981-03",
+          "sku": "GG1544",
+          "name": "Galao",
+          "desc": "Bamboo mug with a natural, warm finish",
+          "colours": 0
+        },
+        {
+          "code": "mo6559-40",
+          "sku": "GG1463",
+          "name": "Toolbam",
+          "desc": "Bamboo multi-tool for small desk jobs",
+          "colours": 0
+        },
+        {
+          "code": "mo6790-40",
+          "sku": "GG1500",
+          "name": "Bram",
+          "desc": "Bamboo-cover notebook with a matching pen",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Organic cotton tee in a clean cut",
+      "out": "content/gifts-gulf/2026-07-16/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s03566-bk",
+          "sku": "GG1758",
+          "name": "Planet Men",
+          "desc": "Organic cotton tee in a clean cut",
+          "colours": 0
+        },
+        {
+          "code": "s03575-bk",
+          "sku": "GG1761",
+          "name": "Planet Women",
+          "desc": "Organic cotton tee shaped for a soft fit",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Recycled cap with a curved brim",
+      "out": "content/gifts-gulf/2026-07-16/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2359-03",
+          "sku": "GG1166",
+          "name": "Capnit",
+          "desc": "Recycled cap with a curved brim",
+          "colours": 0
+        },
+        {
+          "code": "mo2345-03",
+          "sku": "GG1162",
+          "name": "Sunny",
+          "desc": "Cotton cap for bright days outside",
+          "colours": 0
+        },
+        {
+          "code": "mo8834-03",
+          "sku": "GG1600",
+          "name": "Basie Apollo",
+          "desc": "Classic cotton cap with a snap back",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled cooler bag that keeps food cold",
+      "out": "content/gifts-gulf/2026-07-16/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2788-03",
+          "sku": "GG1326",
+          "name": "Gelid",
+          "desc": "Recycled cooler bag that keeps food cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2832-15",
+          "sku": "GG1331",
+          "name": "Coldi",
+          "desc": "Insulated cooler bag for the lunch run",
+          "colours": 0
+        },
+        {
+          "code": "mo8438-06",
+          "sku": "GG1585",
+          "name": "Cubacool",
+          "desc": "Roomy cooler bag for trips and picnics",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

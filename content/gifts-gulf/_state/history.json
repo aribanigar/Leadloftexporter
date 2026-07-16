@@ -3315,5 +3315,158 @@
       "GG1650",
       "GG1378"
     ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260716-1",
+    "campaign_name": "Recycled Steel Bottles - 16 Jul 2026",
+    "subject": "Cold, held in steel",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1071",
+      "GG1085",
+      "GG1086",
+      "GG1122",
+      "GG1431",
+      "GG1525"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260716-2",
+    "campaign_name": "Cotton And Jute Bags - 16 Jul 2026",
+    "subject": "Carry it in cotton",
+    "theme": "Bags and totes",
+    "skus": [
+      "GG1644",
+      "GG1216",
+      "GG1445",
+      "GG1567",
+      "GG1714",
+      "GG1690"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260716-3",
+    "campaign_name": "Recycled Paper Notebooks - 16 Jul 2026",
+    "subject": "Notes on less waste",
+    "theme": "Notebooks and writing",
+    "skus": [
+      "GG1197",
+      "GG1301",
+      "GG1467",
+      "GG1482",
+      "GG1497",
+      "GG1703"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260716-4",
+    "campaign_name": "Desk Tech And Charging - 16 Jul 2026",
+    "subject": "Power up the whole desk",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1100",
+      "GG1363",
+      "GG1629",
+      "GG1365",
+      "GG1251",
+      "GG1221"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260716-5",
+    "campaign_name": "Ceramic Desk Mugs - 16 Jul 2026",
+    "subject": "The mug they reach for",
+    "theme": "Mugs and cups",
+    "skus": [
+      "GG1049",
+      "GG1082",
+      "GG1212",
+      "GG1225",
+      "GG1547",
+      "GG1566"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260716-6",
+    "campaign_name": "Bamboo And Cork Gifts - 16 Jul 2026",
+    "subject": "Real bamboo, warm to hold",
+    "theme": "Eco and sustainable",
+    "skus": [
+      "GG1544",
+      "GG1463",
+      "GG1500",
+      "GG1628",
+      "GG1419",
+      "GG1069"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260716-7",
+    "campaign_name": "Organic Cotton Tees - 16 Jul 2026",
+    "subject": "Tees the team lives in",
+    "theme": "Apparel and merch",
+    "skus": [
+      "GG1758",
+      "GG1761",
+      "GG1765",
+      "GG1767",
+      "GG1763",
+      "GG1783"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260716-8",
+    "campaign_name": "Caps And Sun Hats - 16 Jul 2026",
+    "subject": "Shade that wears your logo",
+    "theme": "Caps and headwear",
+    "skus": [
+      "GG1166",
+      "GG1162",
+      "GG1600",
+      "GG1660",
+      "GG1692",
+      "GG1523"
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260716-9",
+    "campaign_name": "Cooler Bags And Lunch - 16 Jul 2026",
+    "subject": "Lunch that travels cold",
+    "theme": "Cooler bags and lunch",
+    "skus": [
+      "GG1326",
+      "GG1331",
+      "GG1585",
+      "GG1475",
+      "GG1092",
+      "GG1379"
+    ]
   }
 ]

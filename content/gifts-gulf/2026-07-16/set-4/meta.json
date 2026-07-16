@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-16",
+  "theme": "Tech and desk",
+  "season": "Peak summer, event season carry and the early year-end build",
+  "design": "A",
+  "campaign_code": "GG-20260716-4",
+  "campaign_name": "Desk Tech And Charging - 16 Jul 2026",
+  "subject": "Power up the whole desk",
+  "skus": [
+    "GG1100",
+    "GG1363",
+    "GG1629",
+    "GG1365",
+    "GG1251",
+    "GG1221"
+  ],
+  "products": [
+    {
+      "name": "Hubstand",
+      "sku": "GG1100",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2144-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1100"
+    },
+    {
+      "name": "Pro Light Usb Ac30 Pd",
+      "sku": "GG1363",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2981-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1363"
+    },
+    {
+      "name": "Pro World & Usb",
+      "sku": "GG1629",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9321-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1629"
+    },
+    {
+      "name": "Karta Stand",
+      "sku": "GG1365",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2983-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1365"
+    },
+    {
+      "name": "Blendie",
+      "sku": "GG1251",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2574-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1251"
+    },
+    {
+      "name": "Netica",
+      "sku": "GG1221",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2521-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1221"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-16/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20tech%20and%20desk%20options%20for%20our%20team."
+}

@@ -1,0 +1,160 @@
+{
+  "date": "2026-07-16",
+  "season": "Peak summer, event season carry and the early year-end build",
+  "generated_utc": "2026-07-16T00:43:51.147009Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Premium drinkware",
+      "angle": "Recycled steel bottles",
+      "campaign_code": "GG-20260716-1",
+      "campaign_name": "Recycled Steel Bottles - 16 Jul 2026",
+      "subject": "Cold, held in steel",
+      "skus": [
+        "GG1071",
+        "GG1085",
+        "GG1086",
+        "GG1122",
+        "GG1431",
+        "GG1525"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Bags and totes",
+      "angle": "Cotton and jute bags",
+      "campaign_code": "GG-20260716-2",
+      "campaign_name": "Cotton And Jute Bags - 16 Jul 2026",
+      "subject": "Carry it in cotton",
+      "skus": [
+        "GG1644",
+        "GG1216",
+        "GG1445",
+        "GG1567",
+        "GG1714",
+        "GG1690"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Notebooks and writing",
+      "angle": "Recycled notebooks",
+      "campaign_code": "GG-20260716-3",
+      "campaign_name": "Recycled Paper Notebooks - 16 Jul 2026",
+      "subject": "Notes on less waste",
+      "skus": [
+        "GG1197",
+        "GG1301",
+        "GG1467",
+        "GG1482",
+        "GG1497",
+        "GG1703"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Tech and desk",
+      "angle": "Desk charging tech",
+      "campaign_code": "GG-20260716-4",
+      "campaign_name": "Desk Tech And Charging - 16 Jul 2026",
+      "subject": "Power up the whole desk",
+      "skus": [
+        "GG1100",
+        "GG1363",
+        "GG1629",
+        "GG1365",
+        "GG1251",
+        "GG1221"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Mugs and cups",
+      "angle": "Ceramic desk mugs",
+      "campaign_code": "GG-20260716-5",
+      "campaign_name": "Ceramic Desk Mugs - 16 Jul 2026",
+      "subject": "The mug they reach for",
+      "skus": [
+        "GG1049",
+        "GG1082",
+        "GG1212",
+        "GG1225",
+        "GG1547",
+        "GG1566"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Eco and sustainable",
+      "angle": "Bamboo and cork",
+      "campaign_code": "GG-20260716-6",
+      "campaign_name": "Bamboo And Cork Gifts - 16 Jul 2026",
+      "subject": "Real bamboo, warm to hold",
+      "skus": [
+        "GG1544",
+        "GG1463",
+        "GG1500",
+        "GG1628",
+        "GG1419",
+        "GG1069"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Apparel and merch",
+      "angle": "Organic cotton tees",
+      "campaign_code": "GG-20260716-7",
+      "campaign_name": "Organic Cotton Tees - 16 Jul 2026",
+      "subject": "Tees the team lives in",
+      "skus": [
+        "GG1758",
+        "GG1761",
+        "GG1765",
+        "GG1767",
+        "GG1763",
+        "GG1783"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Caps and headwear",
+      "angle": "Caps and sun hats",
+      "campaign_code": "GG-20260716-8",
+      "campaign_name": "Caps And Sun Hats - 16 Jul 2026",
+      "subject": "Shade that wears your logo",
+      "skus": [
+        "GG1166",
+        "GG1162",
+        "GG1600",
+        "GG1660",
+        "GG1692",
+        "GG1523"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Cooler bags and lunch",
+      "angle": "Cooler bags and lunch",
+      "campaign_code": "GG-20260716-9",
+      "campaign_name": "Cooler Bags And Lunch - 16 Jul 2026",
+      "subject": "Lunch that travels cold",
+      "skus": [
+        "GG1326",
+        "GG1331",
+        "GG1585",
+        "GG1475",
+        "GG1092",
+        "GG1379"
+      ]
+    }
+  ]
+}
