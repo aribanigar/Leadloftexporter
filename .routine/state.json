@@ -1,0 +1,30 @@
+{
+  "runs": [
+    {
+      "date": "2026-07-16",
+      "industries": ["Retail", "Construction and Real Estate"],
+      "emails": [
+        "Social Media",
+        "SEO AEO GEO SRX",
+        "Website Design",
+        "ERP Building",
+        "AI Work Studio",
+        "Performance Marketing",
+        "SchoolOS"
+      ],
+      "batch_items": 28,
+      "seeded": false,
+      "seed_error": "Supabase REST 402 exceed_egress_quota - project restricted, owner must upgrade or clear violation; batch.json is ready and publish_rest.py is idempotent so re-run once restored"
+    }
+  ],
+  "industries_used": ["Retail", "Construction and Real Estate"],
+  "industries_remaining": [
+    "Agribusiness", "Consumer Products", "Life Sciences and Healthcare", "Wholesale Distribution",
+    "Aerospace and Defense", "Automotive", "High Tech", "Industrial Manufacturing", "Mill Products",
+    "Chemicals", "Mining", "Oil Gas and Energy", "Utilities",
+    "Media Sports and Entertainment", "Professional Services", "Telecommunications", "Travel and Transportation",
+    "Defense and Security", "Education and Research", "Government",
+    "Financial Services"
+  ],
+  "last_run": "2026-07-16"
+}
