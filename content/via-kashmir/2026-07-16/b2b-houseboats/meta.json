@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-16",
+  "track": "b2b-houseboats",
+  "audience": "houseboat owners (India)",
+  "theme": "Loss-aversion - mid-summer Dal Lake demand is high; travellers only find the boats that are listed, so an unlisted boat loses this week's guest to the deck next door",
+  "season": "Mid-summer, peak Amarnath Yatra season (3 Jul - 28 Aug 2026). Traveller demand is at its highest - roads busy, hotels and boats booking weeks ahead, cut-off timings in force. Highest-visibility window of the year for operators.",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B-HOUSEBOATS-20260716",
+  "campaign_name": "Houseboats Mid-summer Dal demand missed guest [INR] - 16 Jul 2026",
+  "subject": "This week's Dal stay was booked, not on your boat",
+  "items": [
+    "VK-BOAT-DEMAND",
+    "VK-BOAT-SUNRISE",
+    "VK-BOAT-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-16/b2b-houseboats/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-16/b2b-houseboats/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

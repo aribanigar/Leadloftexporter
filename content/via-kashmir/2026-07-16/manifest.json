@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-16",
+  "engine": "via-kashmir",
+  "market": "India (INR)",
+  "sets": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "subject": "The plains are melting, the valley is cool and green",
+      "campaign_code": "VK-INR-B2C-20260716"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "A",
+      "subject": "The Yatra rush is booking cabs, just not yours",
+      "campaign_code": "VK-INR-B2B-CABS-20260716"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "subject": "This week's Dal stay was booked, not on your boat",
+      "campaign_code": "VK-INR-B2B-HOUSEBOATS-20260716"
+    }
+  ]
+}
