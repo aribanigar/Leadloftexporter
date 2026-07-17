@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-17",
+  "track": "b2b-hotels",
+  "audience": "hotel & stay owners (India)",
+  "theme": "Loss-aversion - peak mid-summer weeks; travellers book stays weeks ahead and only find listed hotels, so an unlisted stay watches the guest check in next door",
+  "season": "Mid-summer, peak Amarnath Yatra season (3 Jul - 28 Aug 2026). Traveller demand is at its highest - roads busy, hotels and boats booking weeks ahead, cut-off timings in force. Highest-visibility window of the year for operators.",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B-HOTELS-20260717",
+  "campaign_name": "Hotels Peak-season rooms filling fast [INR] - 17 Jul 2026",
+  "subject": "The busiest weeks are here and your rooms sit unlisted",
+  "items": [
+    "VK-HOTELS-PEAK",
+    "VK-HOTELS-SEARCH",
+    "VK-HOTELS-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-17/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-17/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

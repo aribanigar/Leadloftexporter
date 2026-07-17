@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-17",
+  "engine": "via-kashmir",
+  "market": "India (INR)",
+  "sets": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "subject": "Kashmir's gardens are at their fullest this week",
+      "campaign_code": "VK-INR-B2C-20260717"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "C",
+      "subject": "The busiest weeks are here and your rooms sit unlisted",
+      "campaign_code": "VK-INR-B2B-HOTELS-20260717"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "B",
+      "subject": "The Dal is at its busiest and your boat stays hidden",
+      "campaign_code": "VK-INR-B2B-HOUSEBOATS-20260717"
+    }
+  ]
+}
