@@ -1,0 +1,15 @@
+{
+  "brand": "hudace",
+  "folder": "hudace",
+  "last_run": "2026-07-17",
+  "industries_used": ["Retail", "Construction and Real Estate"],
+  "industry_rotation_history": [
+    { "date": "2026-07-17", "industries": ["Retail", "Construction and Real Estate"] }
+  ],
+  "services_covered": ["Social Media", "SEO / AEO / GEO / SRX", "Website Design", "ERP Building", "AI Work Studio", "SchoolOS (School ERP)"],
+  "batch_items": 24,
+  "notes": {
+    "db_seed": "FAILED 2026-07-17: Supabase project cmdnezltteldysoxyjzh returned HTTP 402 exceed_egress_quota (service restricted). REST seeding could not run. Owner must upgrade plan or remove spend caps, then re-run: python3 publish_rest.py --folder hudace batch.json",
+    "push_target": "Pushed to designated dev branch claude/happy-bell-1m0jze per harness branch policy (routine requested main). Merge to main to activate the Vercel-hosted image URLs at leadloftexporter.vercel.app/email/."
+  }
+}
