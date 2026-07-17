@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-17",
+  "theme": "Cotton apparel",
+  "season": "Deep summer, event carry and the early build toward the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260717-7",
+  "campaign_name": "Cotton Apparel - 17 Jul 2026",
+  "subject": "Wear it, keep it",
+  "skus": [
+    "GG1002",
+    "GG1003",
+    "GG1001",
+    "GG1611",
+    "GG1515",
+    "GG1392"
+  ],
+  "products": [
+    {
+      "name": "Classic Polo Shirt",
+      "sku": "GG1002",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/ar1470-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1002"
+    },
+    {
+      "name": "Classic Pullover Hoodie",
+      "sku": "GG1003",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it0971-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1003"
+    },
+    {
+      "name": "Premium Cotton T-Shirt",
+      "sku": "GG1001",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/ar1589-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1001"
+    },
+    {
+      "name": "Organic Hundred",
+      "sku": "GG1611",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8974-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1611"
+    },
+    {
+      "name": "Tura Colour",
+      "sku": "GG1515",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6851-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1515"
+    },
+    {
+      "name": "Zimde Colour",
+      "sku": "GG1392",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6189-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1392"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cotton%20apparel%20options%20for%20our%20team."
+}

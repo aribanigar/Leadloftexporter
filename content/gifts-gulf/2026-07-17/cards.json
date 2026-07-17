@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-17",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Glass bottle that keeps water fresh",
+      "out": "content/gifts-gulf/2026-07-17/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2089-03",
+          "sku": "GG1072",
+          "name": "Ebor",
+          "desc": "Glass bottle that keeps water fresh",
+          "colours": 0
+        },
+        {
+          "code": "mo2912-03",
+          "sku": "GG1349",
+          "name": "Boris",
+          "desc": "Clear glass tumbler for the desk",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Recycled bag roomy enough for the day",
+      "out": "content/gifts-gulf/2026-07-17/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2408-03",
+          "sku": "GG1185",
+          "name": "Feltote",
+          "desc": "Recycled bag roomy enough for the day",
+          "colours": 0
+        },
+        {
+          "code": "mo2527-03",
+          "sku": "GG1227",
+          "name": "Libag",
+          "desc": "Recycled bag built for the daily commute",
+          "colours": 0
+        },
+        {
+          "code": "mo2639-03",
+          "sku": "GG1280",
+          "name": "Bangkok Bag",
+          "desc": "Foldaway recycled bag for the shop run",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Recycled paper notebook for everyday notes",
+      "out": "content/gifts-gulf/2026-07-17/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo1800-03",
+          "sku": "GG1056",
+          "name": "Notelux",
+          "desc": "Recycled paper notebook for everyday notes",
+          "colours": 0
+        },
+        {
+          "code": "mo2195-03",
+          "sku": "GG1116",
+          "name": "Eleganote",
+          "desc": "Notebook with a clean, simple cover",
+          "colours": 0
+        },
+        {
+          "code": "mo2390-03",
+          "sku": "GG1177",
+          "name": "Notemix",
+          "desc": "Recycled notebook sized for the bag",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Recycled steel bottle that holds the cold",
+      "out": "content/gifts-gulf/2026-07-17/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2109-16",
+          "sku": "GG1087",
+          "name": "Mahua",
+          "desc": "Recycled steel bottle that holds the cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2234-03",
+          "sku": "GG1123",
+          "name": "Ives",
+          "desc": "Insulated steel piece for hot or cold",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Stoneware mug that suits any desk",
+      "out": "content/gifts-gulf/2026-07-17/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2102-06",
+          "sku": "GG1083",
+          "name": "Karoo Sublim",
+          "desc": "Stoneware mug that suits any desk",
+          "colours": 0
+        },
+        {
+          "code": "mo6208-03",
+          "sku": "GG1397",
+          "name": "Dublin Tone",
+          "desc": "Two-tone ceramic mug for the break room",
+          "colours": 0
+        },
+        {
+          "code": "mo2061-06",
+          "sku": "GG1065",
+          "name": "Menkaure",
+          "desc": "Ceramic mug with a solid handle",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Bamboo desk piece with a warm finish",
+      "out": "content/gifts-gulf/2026-07-17/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6345-40",
+          "sku": "GG1422",
+          "name": "Groovy",
+          "desc": "Bamboo desk piece with a warm finish",
+          "colours": 0
+        },
+        {
+          "code": "mo6493-40",
+          "sku": "GG1451",
+          "name": "Inkless Plus",
+          "desc": "Inkless bamboo pen that never runs dry",
+          "colours": 0
+        },
+        {
+          "code": "mo2633-09",
+          "sku": "GG1276",
+          "name": "Chippewa Set",
+          "desc": "Cork gift set for casual moments",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Cotton polo in a clean, classic cut",
+      "out": "content/gifts-gulf/2026-07-17/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "ar1470-01",
+          "sku": "GG1002",
+          "name": "Classic Polo Shirt",
+          "desc": "Cotton polo in a clean, classic cut",
+          "colours": 0
+        },
+        {
+          "code": "it0971-04",
+          "sku": "GG1003",
+          "name": "Classic Pullover Hoodie",
+          "desc": "Cotton hoodie soft enough for every day",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Cotton tote roomy for the daily carry",
+      "out": "content/gifts-gulf/2026-07-17/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9517-13",
+          "sku": "GG1646",
+          "name": "Illa Tote",
+          "desc": "Cotton tote roomy for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo9518-13",
+          "sku": "GG1647",
+          "name": "India Tote",
+          "desc": "Cotton shopper with sturdy handles",
+          "colours": 0
+        },
+        {
+          "code": "mo9816-03",
+          "sku": "GG1683",
+          "name": "Kleuren Bag",
+          "desc": "Cotton bag that folds away neat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled piece handy for every day",
+      "out": "content/gifts-gulf/2026-07-17/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2047-03",
+          "sku": "GG1059",
+          "name": "Hana",
+          "desc": "Recycled piece handy for every day",
+          "colours": 0
+        },
+        {
+          "code": "mo2048-03",
+          "sku": "GG1060",
+          "name": "Rocky",
+          "desc": "Recycled everyday item for the booth",
+          "colours": 0
+        },
+        {
+          "code": "mo2600-03",
+          "sku": "GG1267",
+          "name": "Brenna",
+          "desc": "Lightweight recycled giveaway for events",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

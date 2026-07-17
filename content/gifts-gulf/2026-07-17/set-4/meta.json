@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-17",
+  "theme": "Steel drinkware",
+  "season": "Deep summer, event carry and the early build toward the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260717-4",
+  "campaign_name": "Recycled Steel Drinkware - 17 Jul 2026",
+  "subject": "Steel that keeps it cold",
+  "skus": [
+    "GG1087",
+    "GG1123",
+    "GG1145",
+    "GG1215",
+    "GG1243",
+    "GG1535"
+  ],
+  "products": [
+    {
+      "name": "Mahua",
+      "sku": "GG1087",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2109-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1087"
+    },
+    {
+      "name": "Ives",
+      "sku": "GG1123",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2234-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1123"
+    },
+    {
+      "name": "Emerald Set",
+      "sku": "GG1145",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2314-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1145"
+    },
+    {
+      "name": "Spot",
+      "sku": "GG1215",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2500-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1215"
+    },
+    {
+      "name": "Florence Sing",
+      "sku": "GG1243",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2562-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1243"
+    },
+    {
+      "name": "Boali",
+      "sku": "GG1535",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6944-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1535"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20steel%20drinkware%20options%20for%20our%20team."
+}

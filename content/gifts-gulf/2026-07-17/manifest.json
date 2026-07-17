@@ -1,0 +1,160 @@
+{
+  "date": "2026-07-17",
+  "season": "Deep summer, event carry and the early build toward the year-end kits",
+  "generated_utc": "2026-07-17T00:43:39.505299Z",
+  "sets": [
+    {
+      "set": 1,
+      "design": "A",
+      "theme": "Glassware",
+      "angle": "Glass drinkware",
+      "campaign_code": "GG-20260717-1",
+      "campaign_name": "Glass Drinkware - 17 Jul 2026",
+      "subject": "Drink it from glass",
+      "skus": [
+        "GG1072",
+        "GG1349",
+        "GG1385",
+        "GG1505",
+        "GG1529",
+        "GG1678"
+      ]
+    },
+    {
+      "set": 2,
+      "design": "B",
+      "theme": "Recycled bags",
+      "angle": "Recycled bags",
+      "campaign_code": "GG-20260717-2",
+      "campaign_name": "Recycled Bags - 17 Jul 2026",
+      "subject": "Bags made from bottles",
+      "skus": [
+        "GG1185",
+        "GG1227",
+        "GG1280",
+        "GG1391",
+        "GG1684",
+        "GG1335"
+      ]
+    },
+    {
+      "set": 3,
+      "design": "C",
+      "theme": "Notebooks",
+      "angle": "Recycled notebooks",
+      "campaign_code": "GG-20260717-3",
+      "campaign_name": "Recycled Paper Notebooks - 17 Jul 2026",
+      "subject": "Write it, waste less",
+      "skus": [
+        "GG1056",
+        "GG1116",
+        "GG1177",
+        "GG1223",
+        "GG1239",
+        "GG1620"
+      ]
+    },
+    {
+      "set": 4,
+      "design": "A",
+      "theme": "Steel drinkware",
+      "angle": "Recycled steel",
+      "campaign_code": "GG-20260717-4",
+      "campaign_name": "Recycled Steel Drinkware - 17 Jul 2026",
+      "subject": "Steel that keeps it cold",
+      "skus": [
+        "GG1087",
+        "GG1123",
+        "GG1145",
+        "GG1215",
+        "GG1243",
+        "GG1535"
+      ]
+    },
+    {
+      "set": 5,
+      "design": "B",
+      "theme": "Desk mugs",
+      "angle": "Ceramic mugs",
+      "campaign_code": "GG-20260717-5",
+      "campaign_name": "Ceramic And Stoneware Mugs - 17 Jul 2026",
+      "subject": "The cup they keep",
+      "skus": [
+        "GG1083",
+        "GG1397",
+        "GG1065",
+        "GG1405",
+        "GG1531",
+        "GG1354"
+      ]
+    },
+    {
+      "set": 6,
+      "design": "C",
+      "theme": "Natural materials",
+      "angle": "Bamboo and cork",
+      "campaign_code": "GG-20260717-6",
+      "campaign_name": "Bamboo Cork And Aluminium - 17 Jul 2026",
+      "subject": "Grown, not made",
+      "skus": [
+        "GG1422",
+        "GG1451",
+        "GG1276",
+        "GG1492",
+        "GG1462",
+        "GG1226"
+      ]
+    },
+    {
+      "set": 7,
+      "design": "A",
+      "theme": "Cotton apparel",
+      "angle": "Cotton apparel",
+      "campaign_code": "GG-20260717-7",
+      "campaign_name": "Cotton Apparel - 17 Jul 2026",
+      "subject": "Wear it, keep it",
+      "skus": [
+        "GG1002",
+        "GG1003",
+        "GG1001",
+        "GG1611",
+        "GG1515",
+        "GG1392"
+      ]
+    },
+    {
+      "set": 8,
+      "design": "B",
+      "theme": "Cotton totes",
+      "angle": "Cotton totes",
+      "campaign_code": "GG-20260717-8",
+      "campaign_name": "Cotton Totes - 17 Jul 2026",
+      "subject": "Totes cut from cotton",
+      "skus": [
+        "GG1646",
+        "GG1647",
+        "GG1683",
+        "GG1685",
+        "GG1442",
+        "GG1460"
+      ]
+    },
+    {
+      "set": 9,
+      "design": "C",
+      "theme": "Event giveaways",
+      "angle": "Recycled giveaways",
+      "campaign_code": "GG-20260717-9",
+      "campaign_name": "Recycled Event Giveaways - 17 Jul 2026",
+      "subject": "Giveaways they actually use",
+      "skus": [
+        "GG1059",
+        "GG1060",
+        "GG1267",
+        "GG1298",
+        "GG1306",
+        "GG1307"
+      ]
+    }
+  ]
+}

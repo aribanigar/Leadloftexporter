@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-17",
+  "theme": "Natural materials",
+  "season": "Deep summer, event carry and the early build toward the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260717-6",
+  "campaign_name": "Bamboo Cork And Aluminium - 17 Jul 2026",
+  "subject": "Grown, not made",
+  "skus": [
+    "GG1422",
+    "GG1451",
+    "GG1276",
+    "GG1492",
+    "GG1462",
+    "GG1226"
+  ],
+  "products": [
+    {
+      "name": "Groovy",
+      "sku": "GG1422",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6345-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1422"
+    },
+    {
+      "name": "Inkless Plus",
+      "sku": "GG1451",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6493-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1451"
+    },
+    {
+      "name": "Chippewa Set",
+      "sku": "GG1276",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2633-09.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1276"
+    },
+    {
+      "name": "Sumless",
+      "sku": "GG1492",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6729-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1492"
+    },
+    {
+      "name": "Dana",
+      "sku": "GG1462",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6560-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1462"
+    },
+    {
+      "name": "Twen",
+      "sku": "GG1226",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2529-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1226"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20natural%20materials%20options%20for%20our%20team."
+}

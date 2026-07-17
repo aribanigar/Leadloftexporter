@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-17",
+  "theme": "Notebooks",
+  "season": "Deep summer, event carry and the early build toward the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260717-3",
+  "campaign_name": "Recycled Paper Notebooks - 17 Jul 2026",
+  "subject": "Write it, waste less",
+  "skus": [
+    "GG1056",
+    "GG1116",
+    "GG1177",
+    "GG1223",
+    "GG1239",
+    "GG1620"
+  ],
+  "products": [
+    {
+      "name": "Notelux",
+      "sku": "GG1056",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo1800-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1056"
+    },
+    {
+      "name": "Eleganote",
+      "sku": "GG1116",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2195-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1116"
+    },
+    {
+      "name": "Notemix",
+      "sku": "GG1177",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2390-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1177"
+    },
+    {
+      "name": "Recarnote",
+      "sku": "GG1223",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2523-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1223"
+    },
+    {
+      "name": "Sticknote",
+      "sku": "GG1239",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2554-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1239"
+    },
+    {
+      "name": "Reconote",
+      "sku": "GG1620",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9213-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1620"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-17/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20notebooks%20options%20for%20our%20team."
+}
