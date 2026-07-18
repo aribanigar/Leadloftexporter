@@ -124,5 +124,10 @@
     "b2c": "meadow",
     "b2b-hotels": "stay",
     "b2b-houseboats": "houseboat"
+  },
+  "2026-07-18": {
+    "b2c": "hero_dal",
+    "b2b-hotels": "valley",
+    "b2b-cabs-shikaras": "shikara"
   }
 }

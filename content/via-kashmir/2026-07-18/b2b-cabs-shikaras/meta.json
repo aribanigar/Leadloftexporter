@@ -1,0 +1,20 @@
+{
+  "date": "2026-07-18",
+  "track": "b2b-cabs-shikaras",
+  "audience": "cab & shikara operators (India)",
+  "theme": "Loss-aversion - airport runs, Pahalgam and Sonamarg drives and golden-hour shikaras are booking all week; idle cabs and boats miss the traveller who booked another driver",
+  "season": "Mid-summer (18 July 2026). The Amarnath Yatra is on (3 Jul - 28 Aug), so the Srinagar-Pahalgam and Srinagar-Sonamarg roads run in convoys and hotels fill fast - book 3-4 weeks ahead and travel within the valley in daylight. Srinagar wakes cool at dawn and warms by day while the plains sit above 40C; gardens are at peak bloom, the meadows are deep green, the Dal is glass at first light. Fast-changing weather with sunny mornings, cool evenings and brief afternoon showers, with flash-flood watches on the higher Yatra routes.",
+  "design": "C",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B-CABS-SHIKARAS-20260718",
+  "campaign_name": "Cabs and shikaras Yatra-week rides [INR] - 18 Jul 2026",
+  "subject": "Yatra-week rides are filling every cab but yours",
+  "items": [
+    "VK-B2B-CABS-RIDES",
+    "VK-B2B-CABS-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-18/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-18/b2b-cabs-shikaras/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}

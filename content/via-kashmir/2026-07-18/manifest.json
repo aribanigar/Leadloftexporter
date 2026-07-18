@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-18",
+  "engine": "via-kashmir",
+  "market": "India (INR)",
+  "sets": [
+    {
+      "track": "b2c",
+      "design": "B",
+      "subject": "Dawn on the Dal is cool while the plains swelter",
+      "campaign_code": "VK-INR-B2C-20260718"
+    },
+    {
+      "track": "b2b-hotels",
+      "design": "A",
+      "subject": "Peak Yatra weeks are here and your rooms stay hidden",
+      "campaign_code": "VK-INR-B2B-HOTELS-20260718"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "C",
+      "subject": "Yatra-week rides are filling every cab but yours",
+      "campaign_code": "VK-INR-B2B-CABS-SHIKARAS-20260718"
+    }
+  ]
+}

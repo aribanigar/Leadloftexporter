@@ -1,0 +1,20 @@
+{
+  "date": "2026-07-18",
+  "track": "b2b-hotels",
+  "audience": "hotels & stays (India)",
+  "theme": "Loss-aversion - Yatra-week travellers are searching Kashmir stays and booking days ahead; unlisted rooms lose the guest to the hotel down the road",
+  "season": "Mid-summer (18 July 2026). The Amarnath Yatra is on (3 Jul - 28 Aug), so the Srinagar-Pahalgam and Srinagar-Sonamarg roads run in convoys and hotels fill fast - book 3-4 weeks ahead and travel within the valley in daylight. Srinagar wakes cool at dawn and warms by day while the plains sit above 40C; gardens are at peak bloom, the meadows are deep green, the Dal is glass at first light. Fast-changing weather with sunny mornings, cool evenings and brief afternoon showers, with flash-flood watches on the higher Yatra routes.",
+  "design": "A",
+  "currency": "INR",
+  "campaign_code": "VK-INR-B2B-HOTELS-20260718",
+  "campaign_name": "Hotels Yatra-week rooms unlisted [INR] - 18 Jul 2026",
+  "subject": "Peak Yatra weeks are here and your rooms stay hidden",
+  "items": [
+    "VK-B2B-HOTELS-SEARCH",
+    "VK-B2B-HOTELS-LIST"
+  ],
+  "promo_image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-18/b2b-hotels/img/whatsapp.jpg",
+  "image": "https://cdn.jsdelivr.net/gh/aribanigar/Leadloftexporter@main/content/via-kashmir/2026-07-18/b2b-hotels/img/whatsapp.jpg",
+  "cta_url": "https://viakashmir.in/sign-up?role=vendor",
+  "whatsapp_cta": "https://wa.me/919186051499"
+}
