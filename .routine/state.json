@@ -1,0 +1,21 @@
+{
+  "last_run": "2026-07-18",
+  "industries_used": ["Retail", "Professional Services"],
+  "runs": [
+    {
+      "date": "2026-07-18",
+      "industries": ["Retail", "Professional Services"],
+      "emails": [
+        "Social Media",
+        "SEO / AEO / GEO / SRX",
+        "Website Design",
+        "ERP Building",
+        "AI Work Studio",
+        "Performance Marketing",
+        "SchoolOS"
+      ],
+      "batch_items": 28,
+      "seed_status": "blocked: supabase project restricted (exceed_egress_quota, HTTP 402)"
+    }
+  ]
+}
