@@ -3621,5 +3621,158 @@
       "GG1306",
       "GG1307"
     ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260718-1",
+    "campaign_name": "Executive Onboarding Kits - 18 Jul 2026",
+    "subject": "Sharp welcome kits",
+    "theme": "Executive onboarding",
+    "skus": [
+      "GG1583",
+      "GG1022",
+      "GG1592",
+      "GG1673",
+      "GG1004",
+      "GG1604"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260718-2",
+    "campaign_name": "Premium Drinkware - 18 Jul 2026",
+    "subject": "Bottles worth carrying",
+    "theme": "Premium drinkware",
+    "skus": [
+      "GG1680",
+      "GG1710",
+      "GG1634",
+      "GG1539",
+      "GG1287",
+      "GG1146"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260718-3",
+    "campaign_name": "Bags And Travel - 18 Jul 2026",
+    "subject": "Carry it further",
+    "theme": "Bags and travel",
+    "skus": [
+      "GG1605",
+      "GG1390",
+      "GG1485",
+      "GG1176",
+      "GG1606",
+      "GG1169"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260718-4",
+    "campaign_name": "Pens And Writing - 18 Jul 2026",
+    "subject": "Ink that stays",
+    "theme": "Pens and writing",
+    "skus": [
+      "GG1196",
+      "GG1507",
+      "GG1598",
+      "GG1204",
+      "GG1136",
+      "GG1533"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260718-5",
+    "campaign_name": "Tech And Desk - 18 Jul 2026",
+    "subject": "Power at the desk",
+    "theme": "Tech and desk",
+    "skus": [
+      "GG1159",
+      "GG1362",
+      "GG1283",
+      "GG1266",
+      "GG1626",
+      "GG1575"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260718-6",
+    "campaign_name": "Bamboo And Cork - 18 Jul 2026",
+    "subject": "Made from what grows",
+    "theme": "Bamboo and cork",
+    "skus": [
+      "GG1104",
+      "GG1077",
+      "GG1693",
+      "GG1191",
+      "GG1199",
+      "GG1675"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260718-7",
+    "campaign_name": "Totes And Shoppers - 18 Jul 2026",
+    "subject": "Totes on repeat",
+    "theme": "Totes and shoppers",
+    "skus": [
+      "GG1672",
+      "GG1114",
+      "GG1383",
+      "GG1120",
+      "GG1415",
+      "GG1211"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260718-8",
+    "campaign_name": "Team Apparel - 18 Jul 2026",
+    "subject": "Kit the whole crew",
+    "theme": "Team apparel",
+    "skus": [
+      "GG1725",
+      "GG1785",
+      "GG1771",
+      "GG1774",
+      "GG1787",
+      "GG1764"
+    ]
+  },
+  {
+    "date": "2026-07-18",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260718-9",
+    "campaign_name": "Recycled Everyday Giveaways - 18 Jul 2026",
+    "subject": "Handy and recycled",
+    "theme": "Recycled giveaways",
+    "skus": [
+      "GG1234",
+      "GG1550",
+      "GG1687",
+      "GG1254",
+      "GG1208",
+      "GG1548"
+    ]
   }
 ]

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-18",
+  "theme": "Recycled giveaways",
+  "season": "Deep summer, live event season and the first moves on the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260718-9",
+  "campaign_name": "Recycled Everyday Giveaways - 18 Jul 2026",
+  "subject": "Handy and recycled",
+  "skus": [
+    "GG1234",
+    "GG1550",
+    "GG1687",
+    "GG1254",
+    "GG1208",
+    "GG1548"
+  ],
+  "products": [
+    {
+      "name": "Recoba Colour",
+      "sku": "GG1234",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2551-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1234"
+    },
+    {
+      "name": "Recyclo",
+      "sku": "GG1550",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7173-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1550"
+    },
+    {
+      "name": "Cartoon Coloured",
+      "sku": "GG1687",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9830-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1687"
+    },
+    {
+      "name": "Route",
+      "sku": "GG1254",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2580-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1254"
+    },
+    {
+      "name": "Activate",
+      "sku": "GG1208",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2489-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1208"
+    },
+    {
+      "name": "Side",
+      "sku": "GG1548",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6991-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1548"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20recycled%20giveaways%20options%20for%20our%20team."
+}

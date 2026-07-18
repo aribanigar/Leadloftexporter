@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-18",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Card holder and keyring set for new starters",
+      "out": "content/gifts-gulf/2026-07-18/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8406-03",
+          "sku": "GG1583",
+          "name": "Kadeau",
+          "desc": "Card holder and keyring set for new starters",
+          "colours": 0
+        },
+        {
+          "code": "it3775-03",
+          "sku": "GG1022",
+          "name": "Sonora Plus",
+          "desc": "Recycled notebook for the first-week notes",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Steel bottle that holds the cold all day",
+      "out": "content/gifts-gulf/2026-07-18/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9812-16",
+          "sku": "GG1680",
+          "name": "Belo Bottle",
+          "desc": "Steel bottle that holds the cold all day",
+          "colours": 0
+        },
+        {
+          "code": "mo9927-03",
+          "sku": "GG1710",
+          "name": "Bielo Tumbler",
+          "desc": "Glass tumbler that suits the desk",
+          "colours": 0
+        },
+        {
+          "code": "mo9334-16",
+          "sku": "GG1634",
+          "name": "Pin Flask",
+          "desc": "Metal keyring opener for the keychain",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Recycled backpack roomy enough for the day",
+      "out": "content/gifts-gulf/2026-07-18/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo8958-07",
+          "sku": "GG1605",
+          "name": "Stockholm Bag",
+          "desc": "Recycled backpack roomy enough for the day",
+          "colours": 0
+        },
+        {
+          "code": "mo6185-07",
+          "sku": "GG1390",
+          "name": "Taslo",
+          "desc": "Recycled felt tote for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo6704-03",
+          "sku": "GG1485",
+          "name": "Zurich Roll",
+          "desc": "Roll-top bag that seals the load in",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "Wheat straw pen with a smooth write",
+      "out": "content/gifts-gulf/2026-07-18/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2449-03",
+          "sku": "GG1196",
+          "name": "Maipen",
+          "desc": "Wheat straw pen with a smooth write",
+          "colours": 0
+        },
+        {
+          "code": "mo6822-03",
+          "sku": "GG1507",
+          "name": "Mito Pen",
+          "desc": "Recycled pen that writes clean",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Slim power bank that tops up on the go",
+      "out": "content/gifts-gulf/2026-07-18/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2340-03",
+          "sku": "GG1159",
+          "name": "Powerflat8C",
+          "desc": "Slim power bank that tops up on the go",
+          "colours": 0
+        },
+        {
+          "code": "mo2980-06",
+          "sku": "GG1362",
+          "name": "Muv Usb Ac30 Pd",
+          "desc": "Travel adapter for the desk and the trip",
+          "colours": 0
+        },
+        {
+          "code": "mo2646-03",
+          "sku": "GG1283",
+          "name": "Fauleti Charge",
+          "desc": "Charging cable bracelet you wear on the wrist",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Bamboo barrel pen with a warm finish",
+      "out": "content/gifts-gulf/2026-07-18/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2159-03",
+          "sku": "GG1104",
+          "name": "Sparta",
+          "desc": "Bamboo barrel pen with a warm finish",
+          "colours": 0
+        },
+        {
+          "code": "mo2097-13",
+          "sku": "GG1077",
+          "name": "Origin",
+          "desc": "Cork gift set for casual moments",
+          "colours": 0
+        },
+        {
+          "code": "mo9836-40",
+          "sku": "GG1693",
+          "name": "Todo Set",
+          "desc": "Wood stationery set that dresses up the desk",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Cotton drawstring bag for the daily carry",
+      "out": "content/gifts-gulf/2026-07-18/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9733-03",
+          "sku": "GG1672",
+          "name": "Taske Large",
+          "desc": "Cotton drawstring bag for the daily carry",
+          "colours": 0
+        },
+        {
+          "code": "mo2190-03",
+          "sku": "GG1114",
+          "name": "Fukuro",
+          "desc": "Jute bag with a sturdy natural weave",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Cotton polo in a sharp, classic cut",
+      "out": "content/gifts-gulf/2026-07-18/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "s00571-bk",
+          "sku": "GG1725",
+          "name": "Prime Men",
+          "desc": "Cotton polo in a sharp, classic cut",
+          "colours": 0
+        },
+        {
+          "code": "s11420-aq",
+          "sku": "GG1785",
+          "name": "Monarch",
+          "desc": "Cotton long-sleeve tee with an easy fit",
+          "colours": 0
+        },
+        {
+          "code": "s03812-bk",
+          "sku": "GG1771",
+          "name": "Carter",
+          "desc": "Zip hoodie for cooler mornings",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Recycled cotton piece for the booth",
+      "out": "content/gifts-gulf/2026-07-18/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2551-03",
+          "sku": "GG1234",
+          "name": "Recoba Colour",
+          "desc": "Recycled cotton piece for the booth",
+          "colours": 0
+        },
+        {
+          "code": "mo7173-13",
+          "sku": "GG1550",
+          "name": "Recyclo",
+          "desc": "Recycled notepad for the welcome table",
+          "colours": 0
+        },
+        {
+          "code": "mo9830-03",
+          "sku": "GG1687",
+          "name": "Cartoon Coloured",
+          "desc": "Recycled item that earns a second look",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

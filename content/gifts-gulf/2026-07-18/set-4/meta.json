@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-18",
+  "theme": "Pens and writing",
+  "season": "Deep summer, live event season and the first moves on the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260718-4",
+  "campaign_name": "Pens And Writing - 18 Jul 2026",
+  "subject": "Ink that stays",
+  "skus": [
+    "GG1196",
+    "GG1507",
+    "GG1598",
+    "GG1204",
+    "GG1136",
+    "GG1533"
+  ],
+  "products": [
+    {
+      "name": "Maipen",
+      "sku": "GG1196",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2449-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1196"
+    },
+    {
+      "name": "Mito Pen",
+      "sku": "GG1507",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6822-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1507"
+    },
+    {
+      "name": "Multipen",
+      "sku": "GG1598",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8812-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1598"
+    },
+    {
+      "name": "Notie",
+      "sku": "GG1204",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2481-01.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1204"
+    },
+    {
+      "name": "Cinco",
+      "sku": "GG1136",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2285-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1136"
+    },
+    {
+      "name": "Cleanpen",
+      "sku": "GG1533",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6936-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1533"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20pens%20and%20writing%20options%20for%20our%20team."
+}

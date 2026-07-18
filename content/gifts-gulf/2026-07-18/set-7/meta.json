@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-18",
+  "theme": "Totes and shoppers",
+  "season": "Deep summer, live event season and the first moves on the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260718-7",
+  "campaign_name": "Totes And Shoppers - 18 Jul 2026",
+  "subject": "Totes on repeat",
+  "skus": [
+    "GG1672",
+    "GG1114",
+    "GG1383",
+    "GG1120",
+    "GG1415",
+    "GG1211"
+  ],
+  "products": [
+    {
+      "name": "Taske Large",
+      "sku": "GG1672",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9733-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1672"
+    },
+    {
+      "name": "Fukuro",
+      "sku": "GG1114",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2190-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1114"
+    },
+    {
+      "name": "Naima Tote",
+      "sku": "GG1383",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6162-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1383"
+    },
+    {
+      "name": "Zolang",
+      "sku": "GG1120",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2209-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1120"
+    },
+    {
+      "name": "Visi Tote",
+      "sku": "GG1415",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6302-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1415"
+    },
+    {
+      "name": "Wooler",
+      "sku": "GG1211",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2492-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1211"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-7/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-7/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20totes%20and%20shoppers%20options%20for%20our%20team."
+}

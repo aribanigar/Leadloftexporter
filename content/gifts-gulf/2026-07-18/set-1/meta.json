@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-18",
+  "theme": "Executive onboarding",
+  "season": "Deep summer, live event season and the first moves on the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260718-1",
+  "campaign_name": "Executive Onboarding Kits - 18 Jul 2026",
+  "subject": "Sharp welcome kits",
+  "skus": [
+    "GG1583",
+    "GG1022",
+    "GG1592",
+    "GG1673",
+    "GG1004",
+    "GG1604"
+  ],
+  "products": [
+    {
+      "name": "Kadeau",
+      "sku": "GG1583",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8406-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1583"
+    },
+    {
+      "name": "Sonora Plus",
+      "sku": "GG1022",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3775-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1022"
+    },
+    {
+      "name": "Toolpen",
+      "sku": "GG1592",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8679-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1592"
+    },
+    {
+      "name": "Taske Large",
+      "sku": "GG1673",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9732-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1673"
+    },
+    {
+      "name": "5-Panel Cotton Baseball Cap",
+      "sku": "GG1004",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it1332-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1004"
+    },
+    {
+      "name": "Ombra Pouch",
+      "sku": "GG1604",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo8941-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1604"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-1/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-1/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20executive%20onboarding%20options%20for%20our%20team."
+}

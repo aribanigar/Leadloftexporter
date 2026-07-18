@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-18",
+  "theme": "Team apparel",
+  "season": "Deep summer, live event season and the first moves on the year-end kits",
+  "design": "B",
+  "campaign_code": "GG-20260718-8",
+  "campaign_name": "Team Apparel - 18 Jul 2026",
+  "subject": "Kit the whole crew",
+  "skus": [
+    "GG1725",
+    "GG1785",
+    "GG1771",
+    "GG1774",
+    "GG1787",
+    "GG1764"
+  ],
+  "products": [
+    {
+      "name": "Prime Men",
+      "sku": "GG1725",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s00571-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1725"
+    },
+    {
+      "name": "Monarch",
+      "sku": "GG1785",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s11420-aq.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1785"
+    },
+    {
+      "name": "Carter",
+      "sku": "GG1771",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03812-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1771"
+    },
+    {
+      "name": "Factor Men",
+      "sku": "GG1774",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03823-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1774"
+    },
+    {
+      "name": "Imperial",
+      "sku": "GG1787",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s11500-ag.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1787"
+    },
+    {
+      "name": "Pioneer Women",
+      "sku": "GG1764",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03579-db.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1764"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-18/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20team%20apparel%20options%20for%20our%20team."
+}
