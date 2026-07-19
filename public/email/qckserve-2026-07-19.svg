@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-label="QckServe manifesto poster: Sell free, keep every rupee. Zero commission on qckserve.in">
+  <defs>
+    <style>
+      .kicker { font-family: Georgia, 'Times New Roman', serif; font-style: italic; }
+      .head   { font-family: 'Poppins', 'Arial Black', Arial, sans-serif; font-weight: 800; letter-spacing: -3px; }
+      .body   { font-family: 'Poppins', Arial, sans-serif; font-weight: 500; }
+      .mono   { font-family: 'Poppins', Arial, sans-serif; font-weight: 700; letter-spacing: 2px; }
+    </style>
+  </defs>
+
+  <!-- Full-bleed orange field (Manifesto) -->
+  <rect width="1080" height="1350" fill="#FF6B00"/>
+
+  <!-- Reserved top-left logo square (~140px), left intentionally blank -->
+  <rect x="64" y="64" width="140" height="140" fill="none"/>
+
+  <!-- Italic-serif kicker -->
+  <text x="540" y="300" text-anchor="middle" class="kicker" font-size="46" fill="#1A1A1A" opacity="0.85">A quiet promise to every seller in India</text>
+
+  <!-- Oversized centered manifesto headline -->
+  <text x="540" y="470" text-anchor="middle" class="head" font-size="118" fill="#1A1A1A">SELL FREE.</text>
+  <text x="540" y="590" text-anchor="middle" class="head" font-size="118" fill="#FFFFFF">KEEP IT ALL.</text>
+
+  <!-- The one memorable visual device: giant zero -->
+  <text x="540" y="900" text-anchor="middle" class="head" font-size="360" fill="#1A1A1A" letter-spacing="-8">&#8377;0</text>
+  <text x="540" y="965" text-anchor="middle" class="mono" font-size="34" fill="#1A1A1A">COMMISSION &#183; FOREVER</text>
+
+  <!-- Supporting line -->
+  <text x="540" y="1080" text-anchor="middle" class="body" font-size="40" fill="#1A1A1A">No fees. No cuts. No middlemen.</text>
+  <text x="540" y="1136" text-anchor="middle" class="body" font-size="40" fill="#1A1A1A">Just you and your buyer.</text>
+
+  <!-- Hairline separator -->
+  <rect x="240" y="1200" width="600" height="3" fill="#1A1A1A" opacity="0.6"/>
+
+  <!-- Wordmark bottom-left -->
+  <text x="64" y="1300" text-anchor="start" class="head" font-size="52" fill="#1A1A1A" letter-spacing="-1">qckserve.in</text>
+  <text x="1016" y="1300" text-anchor="end" class="body" font-size="30" fill="#1A1A1A" opacity="0.75">India&#8217;s free marketplace</text>
+</svg>
