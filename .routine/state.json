@@ -1,0 +1,33 @@
+{
+  "last_run": "2026-07-19",
+  "industries_used": {
+    "2026-07-19": ["Retail", "Professional Services"]
+  },
+  "industry_rotation_cursor": 2,
+  "industry_order": [
+    "Retail",
+    "Professional Services",
+    "Agribusiness",
+    "Consumer Products",
+    "Life Sciences and Healthcare",
+    "Wholesale Distribution",
+    "Aerospace and Defense",
+    "Automotive",
+    "High Tech",
+    "Industrial Manufacturing",
+    "Mill Products",
+    "Chemicals",
+    "Mining",
+    "Oil Gas and Energy",
+    "Utilities",
+    "Construction and Real Estate",
+    "Media Sports and Entertainment",
+    "Telecommunications",
+    "Travel and Transportation",
+    "Defense and Security",
+    "Education and Research",
+    "Government",
+    "Financial Services"
+  ],
+  "notes": "First run. Supabase REST returned HTTP 402 (exceed_egress_quota) - DB seeding blocked at account level; content + images generated and committed to repo instead."
+}
