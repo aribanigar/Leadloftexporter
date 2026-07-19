@@ -1,0 +1,245 @@
+{
+  "date": "2026-07-19",
+  "sets": [
+    {
+      "set": 1,
+      "variant": 1,
+      "promo": "Handy pieces they actually keep.",
+      "out": "content/gifts-gulf/2026-07-19/set-1/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc2364-07",
+          "sku": "GG1031",
+          "name": "Bapal",
+          "desc": "Handy piece that earns a second look",
+          "colours": 0
+        },
+        {
+          "code": "kc5078-03",
+          "sku": "GG1037",
+          "name": "Terra",
+          "desc": "Everyday item ready for the booth",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "variant": 2,
+      "promo": "Your logo on their daily cup.",
+      "out": "content/gifts-gulf/2026-07-19/set-2/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "kc2694-03",
+          "sku": "GG1034",
+          "name": "Isoset",
+          "desc": "Cup that suits the desk all day",
+          "colours": 0
+        },
+        {
+          "code": "mo2091-22",
+          "sku": "GG1073",
+          "name": "Celestial",
+          "desc": "Glass cup with a clean, simple look",
+          "colours": 0
+        },
+        {
+          "code": "mo2105-23",
+          "sku": "GG1084",
+          "name": "Abe",
+          "desc": "Double-wall cup that holds the heat",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "variant": 3,
+      "promo": "Branded packs for every commute.",
+      "out": "content/gifts-gulf/2026-07-19/set-3/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2644-03",
+          "sku": "GG1284",
+          "name": "Bangkok",
+          "desc": "Recycled backpack roomy for the day",
+          "colours": 0
+        },
+        {
+          "code": "mo2782-03",
+          "sku": "GG1322",
+          "name": "Drift",
+          "desc": "Daypack that carries the laptop safe",
+          "colours": 0
+        },
+        {
+          "code": "mo2840-04",
+          "sku": "GG1332",
+          "name": "Flysafe",
+          "desc": "Recycled pack with a clean, modern look",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "variant": 1,
+      "promo": "A sharper desk, your mark on it.",
+      "out": "content/gifts-gulf/2026-07-19/set-4/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "it3441-03",
+          "sku": "GG1019",
+          "name": "Madame",
+          "desc": "Metal pen with a smooth, weighty write",
+          "colours": 0
+        },
+        {
+          "code": "mo2476-03",
+          "sku": "GG1203",
+          "name": "Seattle",
+          "desc": "Everyday pen that writes clean",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "variant": 2,
+      "promo": "Branded sound they keep close.",
+      "out": "content/gifts-gulf/2026-07-19/set-5/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2548-03",
+          "sku": "GG1237",
+          "name": "Kolapsi",
+          "desc": "Compact speaker with a full, clean sound",
+          "colours": 0
+        },
+        {
+          "code": "mo2725-03",
+          "sku": "GG1303",
+          "name": "Usbnote",
+          "desc": "Charging piece that tops up on the go",
+          "colours": 0
+        },
+        {
+          "code": "mo2513-03",
+          "sku": "GG1218",
+          "name": "Wusic",
+          "desc": "Wireless piece for calls and music",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "variant": 3,
+      "promo": "Soft cotton, your logo on it.",
+      "out": "content/gifts-gulf/2026-07-19/set-6/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2098-03",
+          "sku": "GG1078",
+          "name": "Osole Colour",
+          "desc": "Organic cotton tee with an easy fit",
+          "colours": 0
+        },
+        {
+          "code": "mo2196-13",
+          "sku": "GG1117",
+          "name": "Bente",
+          "desc": "Organic cotton piece built to last",
+          "colours": 0
+        },
+        {
+          "code": "mo2197-03",
+          "sku": "GG1118",
+          "name": "Bente Colour",
+          "desc": "Cotton piece in a fresh colour",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "variant": 1,
+      "promo": "Where your brand meets their notes.",
+      "out": "content/gifts-gulf/2026-07-19/set-7/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo6325-03",
+          "sku": "GG1417",
+          "name": "Olympic",
+          "desc": "Recycled notebook sized for the bag",
+          "colours": 0
+        },
+        {
+          "code": "mo6328-03",
+          "sku": "GG1420",
+          "name": "Seoul",
+          "desc": "Journal with a clean, sturdy cover",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "variant": 2,
+      "promo": "Steel bottles they carry everywhere.",
+      "out": "content/gifts-gulf/2026-07-19/set-8/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo2598-04",
+          "sku": "GG1264",
+          "name": "Orot",
+          "desc": "Steel bottle that holds the cold all day",
+          "colours": 0
+        },
+        {
+          "code": "mo2634-03",
+          "sku": "GG1275",
+          "name": "Cadeau",
+          "desc": "Recycled steel bottle for hot or cold",
+          "colours": 0
+        },
+        {
+          "code": "mo2789-03",
+          "sku": "GG1325",
+          "name": "Dualuse",
+          "desc": "Large bottle for long days out",
+          "colours": 0
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "variant": 3,
+      "promo": "Natural finish, quiet branding.",
+      "out": "content/gifts-gulf/2026-07-19/set-9/img/whatsapp.jpg",
+      "products": [
+        {
+          "code": "mo9926-40",
+          "sku": "GG1711",
+          "name": "Dakai",
+          "desc": "Bamboo piece with a warm grain",
+          "colours": 0
+        },
+        {
+          "code": "mo2281-40",
+          "sku": "GG1134",
+          "name": "Pandu",
+          "desc": "Cork item for casual moments",
+          "colours": 0
+        },
+        {
+          "code": "mo2418-40",
+          "sku": "GG1190",
+          "name": "Renn",
+          "desc": "Wood piece that dresses up the desk",
+          "colours": 0
+        }
+      ]
+    }
+  ]
+}

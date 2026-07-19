@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Desk and carry",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "A",
+  "campaign_code": "GG-20260719-4",
+  "campaign_name": "Desk And Carry - 19 Jul 2026",
+  "subject": "Sharpen the desk",
+  "skus": [
+    "GG1019",
+    "GG1203",
+    "GG1554",
+    "GG1752",
+    "GG1753",
+    "GG1032"
+  ],
+  "products": [
+    {
+      "name": "Madame",
+      "sku": "GG1019",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it3441-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1019"
+    },
+    {
+      "name": "Seattle",
+      "sku": "GG1203",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2476-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1203"
+    },
+    {
+      "name": "Alucolor",
+      "sku": "GG1554",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo7323-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1554"
+    },
+    {
+      "name": "Spencer",
+      "sku": "GG1752",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s02991-cp.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1752"
+    },
+    {
+      "name": "Spencer Women",
+      "sku": "GG1753",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/s03103-bk.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1753"
+    },
+    {
+      "name": "Stanwell",
+      "sku": "GG1032",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2206-16.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1032"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-4/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-4/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20desk%20and%20carry%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Steel bottles",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "B",
+  "campaign_code": "GG-20260719-8",
+  "campaign_name": "Steel Bottles - 19 Jul 2026",
+  "subject": "Steel that lasts",
+  "skus": [
+    "GG1264",
+    "GG1275",
+    "GG1325",
+    "GG1368",
+    "GG1382",
+    "GG1396"
+  ],
+  "products": [
+    {
+      "name": "Orot",
+      "sku": "GG1264",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2598-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1264"
+    },
+    {
+      "name": "Cadeau",
+      "sku": "GG1275",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2634-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1275"
+    },
+    {
+      "name": "Dualuse",
+      "sku": "GG1325",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2789-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1325"
+    },
+    {
+      "name": "Toien Two",
+      "sku": "GG1368",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2988-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1368"
+    },
+    {
+      "name": "Bless",
+      "sku": "GG1382",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6158-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1382"
+    },
+    {
+      "name": "Venice",
+      "sku": "GG1396",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6210-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1396"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-8/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-8/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20steel%20bottles%20options%20for%20our%20team."
+}

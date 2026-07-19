@@ -3774,5 +3774,158 @@
       "GG1208",
       "GG1548"
     ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 1,
+    "design": "A",
+    "campaign_code": "GG-20260719-1",
+    "campaign_name": "Event Giveaways - 19 Jul 2026",
+    "subject": "Booth magnets",
+    "theme": "Event giveaways",
+    "skus": [
+      "GG1031",
+      "GG1037",
+      "GG1046",
+      "GG1096",
+      "GG1108",
+      "GG1179"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 2,
+    "design": "B",
+    "campaign_code": "GG-20260719-2",
+    "campaign_name": "Reusable Cups - 19 Jul 2026",
+    "subject": "Cups they refill",
+    "theme": "Reusable cups",
+    "skus": [
+      "GG1034",
+      "GG1073",
+      "GG1084",
+      "GG1135",
+      "GG1140",
+      "GG1147"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 3,
+    "design": "C",
+    "campaign_code": "GG-20260719-3",
+    "campaign_name": "Backpacks And Packs - 19 Jul 2026",
+    "subject": "Packs for the day",
+    "theme": "Backpacks and packs",
+    "skus": [
+      "GG1284",
+      "GG1322",
+      "GG1332",
+      "GG1333",
+      "GG1381",
+      "GG1406"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 4,
+    "design": "A",
+    "campaign_code": "GG-20260719-4",
+    "campaign_name": "Desk And Carry - 19 Jul 2026",
+    "subject": "Sharpen the desk",
+    "theme": "Desk and carry",
+    "skus": [
+      "GG1019",
+      "GG1203",
+      "GG1554",
+      "GG1752",
+      "GG1753",
+      "GG1032"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 5,
+    "design": "B",
+    "campaign_code": "GG-20260719-5",
+    "campaign_name": "Wireless And Audio - 19 Jul 2026",
+    "subject": "Sound they keep",
+    "theme": "Wireless and audio",
+    "skus": [
+      "GG1237",
+      "GG1303",
+      "GG1218",
+      "GG1345",
+      "GG1352",
+      "GG1012"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 6,
+    "design": "C",
+    "campaign_code": "GG-20260719-6",
+    "campaign_name": "Organic Cotton - 19 Jul 2026",
+    "subject": "Soft and organic",
+    "theme": "Organic cotton",
+    "skus": [
+      "GG1078",
+      "GG1117",
+      "GG1118",
+      "GG1178",
+      "GG1324",
+      "GG1393"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 7,
+    "design": "A",
+    "campaign_code": "GG-20260719-7",
+    "campaign_name": "Notebooks And Journals - 19 Jul 2026",
+    "subject": "Pages worth filling",
+    "theme": "Notebooks and journals",
+    "skus": [
+      "GG1417",
+      "GG1420",
+      "GG1421",
+      "GG1589",
+      "GG1000",
+      "GG1051"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 8,
+    "design": "B",
+    "campaign_code": "GG-20260719-8",
+    "campaign_name": "Steel Bottles - 19 Jul 2026",
+    "subject": "Steel that lasts",
+    "theme": "Steel bottles",
+    "skus": [
+      "GG1264",
+      "GG1275",
+      "GG1325",
+      "GG1368",
+      "GG1382",
+      "GG1396"
+    ]
+  },
+  {
+    "date": "2026-07-19",
+    "set": 9,
+    "design": "C",
+    "campaign_code": "GG-20260719-9",
+    "campaign_name": "Cork And Bamboo - 19 Jul 2026",
+    "subject": "Warm natural finish",
+    "theme": "Cork and bamboo",
+    "skus": [
+      "GG1711",
+      "GG1134",
+      "GG1190",
+      "GG1640",
+      "GG1641",
+      "GG1709"
+    ]
   }
 ]

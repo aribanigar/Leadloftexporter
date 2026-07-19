@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Cork and bamboo",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260719-9",
+  "campaign_name": "Cork And Bamboo - 19 Jul 2026",
+  "subject": "Warm natural finish",
+  "skus": [
+    "GG1711",
+    "GG1134",
+    "GG1190",
+    "GG1640",
+    "GG1641",
+    "GG1709"
+  ],
+  "products": [
+    {
+      "name": "Dakai",
+      "sku": "GG1711",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9926-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1711"
+    },
+    {
+      "name": "Pandu",
+      "sku": "GG1134",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2281-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1134"
+    },
+    {
+      "name": "Renn",
+      "sku": "GG1190",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2418-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1190"
+    },
+    {
+      "name": "Montado",
+      "sku": "GG1640",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9480-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1640"
+    },
+    {
+      "name": "Toyama",
+      "sku": "GG1641",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9481-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1641"
+    },
+    {
+      "name": "Baicoi",
+      "sku": "GG1709",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo9914-40.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1709"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-9/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-9/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20cork%20and%20bamboo%20options%20for%20our%20team."
+}

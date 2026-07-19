@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Wireless and audio",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "B",
+  "campaign_code": "GG-20260719-5",
+  "campaign_name": "Wireless And Audio - 19 Jul 2026",
+  "subject": "Sound they keep",
+  "skus": [
+    "GG1237",
+    "GG1303",
+    "GG1218",
+    "GG1345",
+    "GG1352",
+    "GG1012"
+  ],
+  "products": [
+    {
+      "name": "Kolapsi",
+      "sku": "GG1237",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2548-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1237"
+    },
+    {
+      "name": "Usbnote",
+      "sku": "GG1303",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2725-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1303"
+    },
+    {
+      "name": "Wusic",
+      "sku": "GG1218",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2513-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1218"
+    },
+    {
+      "name": "Rois",
+      "sku": "GG1345",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2891-06.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1345"
+    },
+    {
+      "name": "Cabstra",
+      "sku": "GG1352",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2921-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1352"
+    },
+    {
+      "name": "Lades",
+      "sku": "GG1012",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/it2386-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1012"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-5/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-5/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20wireless%20and%20audio%20options%20for%20our%20team."
+}

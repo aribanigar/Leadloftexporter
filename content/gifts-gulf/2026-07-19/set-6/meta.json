@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Organic cotton",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260719-6",
+  "campaign_name": "Organic Cotton - 19 Jul 2026",
+  "subject": "Soft and organic",
+  "skus": [
+    "GG1078",
+    "GG1117",
+    "GG1118",
+    "GG1178",
+    "GG1324",
+    "GG1393"
+  ],
+  "products": [
+    {
+      "name": "Osole Colour",
+      "sku": "GG1078",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2098-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1078"
+    },
+    {
+      "name": "Bente",
+      "sku": "GG1117",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2196-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1117"
+    },
+    {
+      "name": "Bente Colour",
+      "sku": "GG1118",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2197-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1118"
+    },
+    {
+      "name": "Leirur",
+      "sku": "GG1178",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2391-15.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1178"
+    },
+    {
+      "name": "Puri",
+      "sku": "GG1324",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2790-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1324"
+    },
+    {
+      "name": "Zimde",
+      "sku": "GG1393",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6190-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1393"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-6/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-6/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20organic%20cotton%20options%20for%20our%20team."
+}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Backpacks and packs",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "C",
+  "campaign_code": "GG-20260719-3",
+  "campaign_name": "Backpacks And Packs - 19 Jul 2026",
+  "subject": "Packs for the day",
+  "skus": [
+    "GG1284",
+    "GG1322",
+    "GG1332",
+    "GG1333",
+    "GG1381",
+    "GG1406"
+  ],
+  "products": [
+    {
+      "name": "Bangkok",
+      "sku": "GG1284",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2644-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1284"
+    },
+    {
+      "name": "Drift",
+      "sku": "GG1322",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2782-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1322"
+    },
+    {
+      "name": "Flysafe",
+      "sku": "GG1332",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2840-04.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1332"
+    },
+    {
+      "name": "Baga",
+      "sku": "GG1333",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2858-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1333"
+    },
+    {
+      "name": "Campo De Geli",
+      "sku": "GG1381",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6160-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1381"
+    },
+    {
+      "name": "Campo Di Vino",
+      "sku": "GG1406",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo6258-13.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1406"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-3/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-3/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20backpacks%20and%20packs%20options%20for%20our%20team."
+}

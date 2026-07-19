@@ -1,0 +1,58 @@
+{
+  "date": "2026-07-19",
+  "theme": "Reusable cups",
+  "season": "Deep summer, live event season and the first quiet moves on the year-end kits",
+  "design": "B",
+  "campaign_code": "GG-20260719-2",
+  "campaign_name": "Reusable Cups - 19 Jul 2026",
+  "subject": "Cups they refill",
+  "skus": [
+    "GG1034",
+    "GG1073",
+    "GG1084",
+    "GG1135",
+    "GG1140",
+    "GG1147"
+  ],
+  "products": [
+    {
+      "name": "Isoset",
+      "sku": "GG1034",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/kc2694-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1034"
+    },
+    {
+      "name": "Celestial",
+      "sku": "GG1073",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2091-22.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1073"
+    },
+    {
+      "name": "Abe",
+      "sku": "GG1084",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2105-23.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1084"
+    },
+    {
+      "name": "Riflow",
+      "sku": "GG1135",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2283-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1135"
+    },
+    {
+      "name": "Phottle",
+      "sku": "GG1140",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2308-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1140"
+    },
+    {
+      "name": "Topaz",
+      "sku": "GG1147",
+      "image": "https://wsrv.nl/?url=ssl:cdn1.midocean.com/image/original/mo2317-03.jpg&w=640&output=jpg&q=80",
+      "product_url": "https://www.giftsgulf.com/product/GG1147"
+    }
+  ],
+  "promo_image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-2/img/whatsapp.jpg",
+  "image": "https://raw.githubusercontent.com/aribanigar/Leadloftexporter/main/content/gifts-gulf/2026-07-19/set-2/img/whatsapp.jpg",
+  "cta_url": "https://wa.me/916005001499?text=Hi%20Gifts%20Gulf%2C%20please%20share%20branded%20reusable%20cups%20options%20for%20our%20team."
+}
