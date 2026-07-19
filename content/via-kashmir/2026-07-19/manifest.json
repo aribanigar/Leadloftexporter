@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-19",
+  "engine": "via-kashmir",
+  "market": "India (INR)",
+  "sets": [
+    {
+      "track": "b2c",
+      "design": "A",
+      "subject": "Gulmarg is green underfoot and the air stays cool",
+      "campaign_code": "VK-INR-B2C-20260719"
+    },
+    {
+      "track": "b2b-cabs-shikaras",
+      "design": "B",
+      "subject": "A full-day Kashmir drive just went to a listed cab",
+      "campaign_code": "VK-INR-B2B-CABS-SHIKARAS-20260719"
+    },
+    {
+      "track": "b2b-houseboats",
+      "design": "C",
+      "subject": "A summer night on the Dal just booked past your boat",
+      "campaign_code": "VK-INR-B2B-HOUSEBOATS-20260719"
+    }
+  ]
+}
