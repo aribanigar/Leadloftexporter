@@ -1,5 +1,5 @@
 {
-  "version": "1.0.364",
-  "zip": "/extensions/leadcaptura-extension-v1.0.364.zip",
-  "notes": "Checkboxes now sync live with Mass Apply — a job's tick turns off the moment it's applied; already-applied jobs show unticked. Added a dedicated Stop button and an auto-restart watchdog so the run survives a tab reload and only ends when you press Stop."
+  "version": "1.0.365",
+  "zip": "/extensions/leadcaptura-extension-v1.0.365.zip",
+  "notes": "Fixed a harmless Chrome console warning ('The AudioContext was not allowed to start') that appeared when Mass Apply auto-restarted itself. The buzz/beep alert now unlocks only from your click, so the run stays silent and clean when it resumes on its own — no change to how jobs are applied."
 }

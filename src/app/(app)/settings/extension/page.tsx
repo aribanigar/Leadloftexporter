@@ -19,11 +19,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.365",
+    date: "Jul 22, 2026",
+    size: "294 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.365.zip",
+    latest: true,
+    changes: [
+      "Fixed a harmless Chrome console warning ('The AudioContext was not allowed to start') that appeared when Mass Apply auto-restarted itself. The buzz/beep alert now unlocks only from your click, so the run stays silent and clean when it resumes on its own — no behaviour change to applying.",
+    ],
+  },
+  {
     version: "1.0.364",
     date: "Jul 11, 2026",
     size: "294 KB",
     file: "/extensions/leadcaptura-extension-v1.0.364.zip",
-    latest: true,
     changes: [
       "Job checkboxes now sync live with Mass Apply: every un-applied job shows a tick, and the tick turns OFF the instant that job is applied — so you can watch progress drain top-to-bottom. Jobs already applied earlier show unticked and are skipped automatically.",
       "Mass Apply applies every job on a page in order, then moves to the next page, and keeps going across all pages.",
@@ -48,61 +57,6 @@ const RELEASES: Release[] = [
     changes: [
       "Fixed Chrome's 'LeadCaptura started debugging this browser' banner during Mass Apply / Apply All — background running now uses a silent, inaudible keep-awake instead of the debugger, so no more notice on your tab.",
       "New: the toolbar popup now shows an 'Update available' banner when a newer version is out, with a one-click download. Unzip it over your existing folder and reload — your API key, settings and saved answers are all kept.",
-    ],
-  },
-  {
-    version: "1.0.361",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.361.zip",
-    changes: [
-      "Mass Apply Jobs now runs non-stop until you press Stop: when it finishes the last page it automatically restarts the whole sweep from page 1 (already-applied jobs are skipped) — it never ends on its own.",
-      "A question no longer halts the run. It buzzes and gives you time to answer in the LinkedIn form; if you don't, it skips that one job and keeps going instead of getting stuck.",
-      "Jobs are now applied strictly top-to-bottom on each page, and it only moves to the next page once the whole page is done.",
-      "Next / Review / Submit application clicking hardened so applications submit reliably whenever the buttons are visible.",
-    ],
-  },
-  {
-    version: "1.0.360",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.360.zip",
-    changes: [
-      "Mass Apply Jobs now runs until you stop it: it applies every job on the current page, then reliably moves to the next page (many more pagination fallbacks) and keeps going across all pages — it no longer stops early after one page.",
-      "Needs an answer? If a job asks a question the auto-fill can't answer, Mass Apply now buzzes/beeps and pauses instead of skipping — type your answer into the LinkedIn form and it continues automatically. (Only 'Stop' ends the run.)",
-      "The button shows live progress: how many jobs were applied and skipped, in real time.",
-      "Next / Review / Submit application are spotlighted and clicked with a 4-way fallback so they land reliably whenever visible.",
-    ],
-  },
-  {
-    version: "1.0.359",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.359.zip",
-    changes: [
-      "Bottom-toolbar 'Apply All' (LinkedIn Jobs) now matches the Mass Apply Jobs experience: it keeps applying even when you switch to another tab, and only stops when you press Stop — it no longer stalls in the background.",
-      "Spotlights added to Apply All: each 'Next', 'Review', and 'Submit application' button is highlighted just before it's clicked, so you can follow exactly what the auto-apply is doing.",
-      "The separate green Mass Apply Jobs button is unchanged.",
-    ],
-  },
-  {
-    version: "1.0.358",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.358.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): you can now hand-pick which jobs to apply to. Each job card has a checkbox, plus a 'Select jobs' button (top-right, above Mass Apply) that selects everything loaded on the page — then click Mass Apply and it applies to just your selection.",
-      "With nothing selected, Mass Apply behaves exactly as before (applies to every job, page by page). A selection run never changes pages — it applies only the jobs you ticked.",
-    ],
-  },
-  {
-    version: "1.0.357",
-    date: "Jul 11, 2026",
-    size: "286 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.357.zip",
-    changes: [
-      "Mass Apply (LinkedIn Jobs): fixed the bug where it jumped to the next page after only the first job — it now scrolls down and applies every job on the current page before paginating.",
-      "Background applying: the run now keeps going even when you switch to another tab, so you don't have to stay on the LinkedIn page. (Chrome shows a 'DevTools is debugging this browser' banner on the LinkedIn tab while a run is active — that's expected and it's only the extension keeping the tab awake.)",
     ],
   },
 ];

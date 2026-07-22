@@ -91,11 +91,18 @@
   }
 
   // ── Audio alert (buzz/beep) for "a question needs your answer" ──
-  // Web Audio needs a user gesture to start; the run always begins from the
-  // user's click on the Mass Apply button, so we create/resume the context then
-  // (see _ensureAudio() calls at run()/runSingle() start). Best-effort — if the
-  // browser blocks audio, the on-screen banner still alerts the user.
+  // Web Audio's autoplay policy REQUIRES a real user gesture to create OR resume
+  // an AudioContext. Chrome logs "The AudioContext was not allowed to start…"
+  // and blocks it otherwise. So context creation/resume happens ONLY inside the
+  // genuine click handlers (Mass Apply / per-card chip / Stop) via _ensureAudio().
+  // keepAwake()/beep() NEVER create or resume — they only use an already-running
+  // context (_audioReady()). This matters because the auto-restart watchdog calls
+  // run() WITHOUT a user gesture; creating/resuming audio there is what threw the
+  // warning. Best-effort throughout — if audio is blocked, the on-screen banner
+  // still alerts the user.
   let _audioCtx = null;
+  // Create/resume the context. MUST only be called from a real user-gesture
+  // handler, or Chrome's autoplay policy blocks it (and logs a warning).
   function _ensureAudio() {
     try {
       if (!_audioCtx) {
@@ -106,9 +113,15 @@
     } catch (_) {}
     return _audioCtx;
   }
+  // True only when we already hold a running context (unlocked by an earlier
+  // gesture). Non-gesture code paths gate on this and never create/resume.
+  function _audioReady() {
+    return !!(_audioCtx && _audioCtx.state === "running");
+  }
   function beep(freq, ms) {
     try {
-      const ctx = _ensureAudio();
+      if (!_audioReady()) return;   // never create/resume outside a gesture
+      const ctx = _audioCtx;
       if (!ctx) return;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -1544,20 +1557,48 @@
   // focused. Gain is ~-60 dB (silent in practice). Best-effort — if the browser
   // blocks audio, the run still proceeds (fastest while the tab is visible).
   // Turned off in each run's finally. No chrome.* calls, no permissions.
-  let _keepAliveOsc = null, _keepAliveGain = null;
+  let _keepAliveOsc = null, _keepAliveGain = null, _keepAliveWanted = false;
+  function _startKeepAliveOsc() {
+    // Build + start the inaudible oscillator on an ALREADY-running context.
+    // Never creates/resumes the context (that needs a gesture) — the caller
+    // gates on _audioReady() or a statechange→running transition.
+    try {
+      const ctx = _audioCtx;
+      if (!ctx || ctx.state !== "running" || _keepAliveOsc) return;
+      _keepAliveOsc = ctx.createOscillator();
+      _keepAliveGain = ctx.createGain();
+      _keepAliveGain.gain.value = 0.001;      // inaudible, but registers as audio
+      _keepAliveOsc.frequency.value = 440;
+      _keepAliveOsc.connect(_keepAliveGain);
+      _keepAliveGain.connect(ctx.destination);
+      _keepAliveOsc.start();
+    } catch (_) {}
+  }
   function keepAwake(on) {
     try {
       if (on) {
-        const ctx = _ensureAudio();
-        if (!ctx || _keepAliveOsc) return;
-        _keepAliveOsc = ctx.createOscillator();
-        _keepAliveGain = ctx.createGain();
-        _keepAliveGain.gain.value = 0.001;      // inaudible, but registers as audio
-        _keepAliveOsc.frequency.value = 440;
-        _keepAliveOsc.connect(_keepAliveGain);
-        _keepAliveGain.connect(ctx.destination);
-        _keepAliveOsc.start();
+        _keepAliveWanted = true;
+        if (_audioReady()) {
+          _startKeepAliveOsc();
+        } else if (_audioCtx) {
+          // Context exists but is suspended (no gesture yet, or the run was
+          // auto-restarted by the watchdog). Do NOT resume() — that would trip
+          // the autoplay-policy warning. Instead arm the oscillator to start the
+          // instant the context is unlocked by a later gesture (statechange fires
+          // when the user clicks Mass Apply / a chip and _ensureAudio resumes).
+          try {
+            _audioCtx.addEventListener("statechange", function _onStateChange() {
+              if (_audioCtx && _audioCtx.state === "running") {
+                try { _audioCtx.removeEventListener("statechange", _onStateChange); } catch (_) {}
+                if (_keepAliveWanted) _startKeepAliveOsc();
+              }
+            });
+          } catch (_) {}
+        }
+        // No context at all → skip silently; keep-awake is best-effort and the
+        // run proceeds fine (fastest while the tab is visible anyway).
       } else {
+        _keepAliveWanted = false;
         if (_keepAliveOsc) { try { _keepAliveOsc.stop(); } catch (_) {} try { _keepAliveOsc.disconnect(); } catch (_) {} _keepAliveOsc = null; }
         if (_keepAliveGain) { try { _keepAliveGain.disconnect(); } catch (_) {} _keepAliveGain = null; }
       }
@@ -1582,7 +1623,9 @@
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
     keepAwake(true);   // keep applying even when the tab is in the background
-    _ensureAudio();    // unlock audio now (this run began from the user's click)
+    // NOTE: audio is unlocked in the click handler (gesture), NOT here — run()
+    // can be entered by the auto-restart watchdog with no user gesture, and
+    // creating/resuming an AudioContext there trips Chrome's autoplay policy.
 
     // Process ONE freshly-rendered card per iteration, then scroll the
     // virtualised list to reveal more. This survives cards unmounting as the
@@ -1790,7 +1833,7 @@
     try { injectRunStyles(); } catch (_) {}
     try { startStrayWatcher(); } catch (_) {}
     keepAwake(true);
-    _ensureAudio();    // unlock audio now (this run began from the user's click)
+    // Audio is unlocked in the chip's click handler (gesture), not here.
     setLabel("Applying 1 job…");
     try {
       // Re-resolve the card fresh so we never act on a stale node.
@@ -1852,6 +1895,7 @@
       ].join(";");
       chip.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
+        _ensureAudio();    // unlock audio inside the gesture (autoplay policy)
         runSingle(card.key, chip);
       }, true);
       // Swallow the press so the card's own open-job handler never fires.
@@ -1931,6 +1975,7 @@
       '<span class="lc-ma-text">Mass Apply Jobs</span>';
     btnEl.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
+      _ensureAudio();    // unlock audio inside the gesture (autoplay policy)
       if (state.running) stopRun();
       else run();
     });
@@ -1972,6 +2017,7 @@
       '<span>Stop</span>';
     stopEl.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
+      _ensureAudio();    // unlock audio inside the gesture (autoplay policy)
       stopRun();
     });
     document.body.appendChild(stopEl);
