@@ -175,6 +175,10 @@ class Lead(Base, TimestampMixin):
         Index("ix_leads_workspace_stage", "workspace_id", "stage_id"),
         Index("ix_leads_workspace_owner", "workspace_id", "owner_id"),
         Index("ix_leads_workspace_email", "workspace_id", "email"),
+        # Supports the default list ORDER BY created_at DESC within a workspace
+        # (Pipeline / Prospecting main list) so it's an index scan, not a sort of
+        # the whole workspace's leads.
+        Index("ix_leads_workspace_created", "workspace_id", "created_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -264,6 +268,20 @@ class EmailThread(Base, TimestampMixin):
 
 class EmailMessage(Base, TimestampMixin):
     __tablename__ = "email_messages"
+    # email_messages is the fastest-growing table (every send / campaign recipient /
+    # manual email writes a row). These indexes back the hot read paths: the lead
+    # timeline (workspace_id, lead_id), the dashboard stats + bulk-send dedup
+    # (workspace_id, direction, created_at), inbox thread grouping (thread_id), and
+    # the status counts (workspace_id, status). The functional lower(from_address)
+    # index backs the inbox mailbox thread-count group-by — it can't be expressed
+    # here (the column isn't in scope yet) so it lives only in migration 0026 as
+    # ix_email_from_lower.
+    __table_args__ = (
+        Index("ix_email_ws_lead", "workspace_id", "lead_id"),
+        Index("ix_email_ws_dir_created", "workspace_id", "direction", "created_at"),
+        Index("ix_email_ws_status", "workspace_id", "status"),
+        Index("ix_email_thread", "thread_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
@@ -336,7 +354,9 @@ class CallLog(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
-    lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"))
+    # Indexed: the lead timeline filters call logs by lead_id; without this it was a
+    # full scan of the workspace's call history on every Lead Detail open.
+    lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     outcome: Mapped[str] = mapped_column(String(40), default="connected")
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)

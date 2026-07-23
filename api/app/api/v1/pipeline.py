@@ -36,13 +36,24 @@ def list_stages(ctx: AuthContext = Depends(get_workspace_context), db: Session =
         )
     # Self-heal: any lead with no stage_id (saved before a default stage
     # existed) gets parked on the first stage so it shows in the Pipeline.
+    # Guard the write behind a cheap indexed existence check (ix_leads_workspace_stage)
+    # so we don't issue an UPDATE + commit on EVERY pipeline load — that write
+    # amplification (one commit per read of a hot endpoint) was a real cost as the
+    # leads table grew. In steady state there are no null-stage leads, so this is a
+    # single LIMIT 1 index probe and no write happens.
     if stages:
-        first_stage_id = stages[0].id
-        db.query(Lead).filter(
-            Lead.workspace_id == ctx.workspace_id,
-            Lead.stage_id.is_(None),
-        ).update({Lead.stage_id: first_stage_id}, synchronize_session=False)
-        db.commit()
+        has_orphan = (
+            db.query(Lead.id)
+            .filter(Lead.workspace_id == ctx.workspace_id, Lead.stage_id.is_(None))
+            .first()
+        )
+        if has_orphan:
+            first_stage_id = stages[0].id
+            db.query(Lead).filter(
+                Lead.workspace_id == ctx.workspace_id,
+                Lead.stage_id.is_(None),
+            ).update({Lead.stage_id: first_stage_id}, synchronize_session=False)
+            db.commit()
     counts = dict(
         db.query(Lead.stage_id, func.count(Lead.id))
         .filter(Lead.workspace_id == ctx.workspace_id)

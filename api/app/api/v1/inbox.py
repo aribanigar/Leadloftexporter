@@ -88,7 +88,10 @@ def list_mailboxes(
             {"id": cid, "name": cname, "recipients": n}
         )
 
-    # Live thread count per mailbox (threads with a message from/to that address).
+    # Live thread count per mailbox (threads with a message from that address).
+    # ONE grouped query for every address instead of a COUNT(DISTINCT) per mailbox
+    # in a Python loop (an N+1 over the number of connected inboxes). Backed by the
+    # functional lower(from_address) index so it's a single index-grouped scan.
     out = []
     total_threads = (
         db.query(func.count(EmailThread.id))
@@ -96,20 +99,24 @@ def list_mailboxes(
         .scalar()
         or 0
     )
+    thread_counts: dict[str, int] = {}
+    for addr_lower, n in (
+        db.query(
+            func.lower(EmailMessage.from_address),
+            func.count(func.distinct(EmailMessage.thread_id)),
+        )
+        .filter(
+            EmailMessage.workspace_id == ctx.workspace_id,
+            EmailMessage.thread_id.isnot(None),
+        )
+        .group_by(func.lower(EmailMessage.from_address))
+        .all()
+    ):
+        if addr_lower is not None:
+            thread_counts[addr_lower] = n or 0
     for a in accts:
         addr = (a.external_id or "").lower()
-        thread_count = 0
-        if addr:
-            thread_count = (
-                db.query(func.count(func.distinct(EmailMessage.thread_id)))
-                .filter(
-                    EmailMessage.workspace_id == ctx.workspace_id,
-                    EmailMessage.thread_id.isnot(None),
-                    func.lower(EmailMessage.from_address) == addr,
-                )
-                .scalar()
-                or 0
-            )
+        thread_count = thread_counts.get(addr, 0) if addr else 0
         out.append(
             {
                 "id": a.id,

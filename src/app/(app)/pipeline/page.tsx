@@ -150,10 +150,17 @@ export default function PipelinePage() {
   );
 
   const firstStageId = stages?.[0]?.id;
+  // O(1) stage lookups. Previously every lead did stages.some(...) / stages.find(...)
+  // — an O(stages) scan per row, run for thousands of rows on every render and in
+  // each memo. With a Map + Set it's a constant-time lookup, which is the dominant
+  // per-render cost on a large pipeline.
+  const stageById = useMemo(() => {
+    const m = new Map<string, PipelineStage>();
+    stages?.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [stages]);
   const stageOf = (l: Lead): string | undefined =>
-    l.stage_id && stages?.some((s) => s.id === l.stage_id)
-      ? l.stage_id
-      : firstStageId;
+    l.stage_id && stageById.has(l.stage_id) ? l.stage_id : firstStageId;
 
   const countsByStage = useMemo(() => {
     const m = new Map<string, number>();
@@ -196,7 +203,7 @@ export default function PipelinePage() {
     return m;
   }, [leads]);
 
-  const allFilteredIds = filteredLeads.map((l) => l.id);
+  const allFilteredIds = useMemo(() => filteredLeads.map((l) => l.id), [filteredLeads]);
   const allSelected =
     allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.has(id));
 
@@ -437,7 +444,7 @@ export default function PipelinePage() {
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {filteredLeads.map((lead) => {
-                  const stage = stages?.find((s) => s.id === lead.stage_id);
+                  const stage = lead.stage_id ? stageById.get(lead.stage_id) : undefined;
                   const selected = selectedIds.has(lead.id);
                   return (
                     <tr

@@ -101,7 +101,10 @@ def list_leads(
     elif owner_id:
         base = base.filter(Lead.owner_id == owner_id)
     if segment:
-        base = base.filter(Lead.custom["segment"].astext == segment)
+        # Use JSONB containment (@>) rather than ->>'segment' = ... so the query
+        # can use the GIN index on Lead.custom instead of sequential-scanning
+        # every lead in the workspace. Equivalent for string segment values.
+        base = base.filter(Lead.custom.contains({"segment": segment}))
     if no_activity_days is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(days=no_activity_days)
         base = base.filter(
@@ -1133,18 +1136,33 @@ def lead_timeline(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Unified activity timeline: emails + notes + calls + system activities, newest first."""
+    """Unified activity timeline: emails + notes + calls + system activities, newest first.
+
+    Each source is capped at the newest ``TIMELINE_CAP`` rows *in SQL* (ordered by
+    the same timestamp used for the merged sort), so a lead with a long history no
+    longer drags its entire email/activity/whatsapp history into memory on every
+    Lead Detail open. For any lead with fewer than the cap of each kind — the
+    overwhelming majority — the output is byte-identical to before; a lead past the
+    cap simply gets its most-recent slice, which is all the UI shows anyway. The
+    per-kind cap relies on the new (workspace_id, lead_id) / lead-scoped indexes so
+    each query is an index range-scan, not a full-table scan.
+    """
     _ensure_lead(db, lead_id, ctx.workspace_id)
+    TIMELINE_CAP = 200
     items: list[dict] = []
     for a in (
         db.query(Activity)
         .filter(Activity.workspace_id == ctx.workspace_id, Activity.lead_id == lead_id)
+        .order_by(Activity.created_at.desc())
+        .limit(TIMELINE_CAP)
         .all()
     ):
         items.append({"kind": "activity", "id": a.id, "type": a.type, "payload": a.payload, "at": a.created_at})
     for m in (
         db.query(EmailMessage)
         .filter(EmailMessage.workspace_id == ctx.workspace_id, EmailMessage.lead_id == lead_id)
+        .order_by(func.coalesce(EmailMessage.sent_at, EmailMessage.created_at).desc())
+        .limit(TIMELINE_CAP)
         .all()
     ):
         items.append({
@@ -1162,12 +1180,16 @@ def lead_timeline(
     for n in (
         db.query(Note)
         .filter(Note.workspace_id == ctx.workspace_id, Note.lead_id == lead_id)
+        .order_by(Note.created_at.desc())
+        .limit(TIMELINE_CAP)
         .all()
     ):
         items.append({"kind": "note", "id": n.id, "body": n.body, "at": n.created_at})
     for c in (
         db.query(CallLog)
         .filter(CallLog.workspace_id == ctx.workspace_id, CallLog.lead_id == lead_id)
+        .order_by(CallLog.created_at.desc())
+        .limit(TIMELINE_CAP)
         .all()
     ):
         items.append({
@@ -1181,6 +1203,8 @@ def lead_timeline(
     for w in (
         db.query(WhatsAppMessage)
         .filter(WhatsAppMessage.workspace_id == ctx.workspace_id, WhatsAppMessage.lead_id == lead_id)
+        .order_by(func.coalesce(WhatsAppMessage.provider_ts, WhatsAppMessage.created_at).desc())
+        .limit(TIMELINE_CAP)
         .all()
     ):
         items.append({
