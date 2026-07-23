@@ -1028,34 +1028,67 @@
       const type = (el.type || "").toLowerCase();
       if (["hidden", "file", "checkbox", "radio", "submit", "button"].includes(type)) return;
       if (el.value && el.value.trim()) return;             // already filled / prefilled
-      const required = el.required || el.getAttribute("aria-required") === "true";
-      if (!required) return;
-      // Pull the field's label text to decide on a sensible value.
-      let label = "";
-      const id = el.id;
-      if (id) {
-        const l = scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
-        if (l) label = textOf(l);
-      }
-      label = label || el.getAttribute("aria-label") || el.name || "";
-      // 1) Try the Apply Profile — answers questions like notice period,
-      //    expected salary, LinkedIn URL, etc. from the user's saved data.
-      const fromProfile = answerForLabel(label);
-      if (fromProfile != null && fromProfile !== "") {
-        setNativeValue(el, fromProfile);
+      const label = _labelForField(scope, el);
+      // 1) A KNOWN answer — learned from a past application first, then the Apply
+      //    Profile — fills the field whether or not it's required. This is what
+      //    makes a repeat question auto-answer smoothly instead of pausing again:
+      //    once you've answered "Notice period"/"Years of experience"/etc. once,
+      //    every future job with the same question fills itself.
+      const known = answerForLabel(label);
+      if (known != null && known !== "") {
+        setNativeValue(el, known);
         return;
       }
-      // 2) Number / experience-shaped questions → the profile's years value
-      //    (only if the user set one — never a hard-coded guess).
+      // Past this point we only ACT on REQUIRED fields — never inject a guess
+      // into an optional question we have no stored answer for.
+      const required = el.required || el.getAttribute("aria-required") === "true";
+      if (!required) return;
+      // 2) Number / experience-shaped required questions → the profile's years
+      //    value (only if the user set one — never a hard-coded guess).
       if ((type === "number" || looksLikeExperience(label)) && APPLY_PROFILE.years_of_experience) {
         setNativeValue(el, APPLY_PROFILE.years_of_experience);
         return;
       }
-      // 3) Otherwise leave it blank. Better to skip this job (it won't advance)
-      //    than to submit a random guess into a real question. Once the user
-      //    answers this question once (here or in a manual LinkedIn apply),
-      //    learnFromScope remembers it and future jobs auto-fill it.
+      // 3) Otherwise leave it blank. Better to pause for the user than to submit
+      //    a random guess into a real question. Once the user answers it once
+      //    (here or in a manual LinkedIn apply), learnFromScope remembers it and
+      //    future jobs auto-fill it.
     });
+  }
+
+  // Resolve the QUESTION label for a radio/checkbox group. The per-option
+  // <label for=id> only holds the option text ("Yes"/"No"); the real question
+  // lives in the enclosing <fieldset>'s <legend>, an aria-labelledby target, or a
+  // group container's aria-label. Try those in order so learned answers key on
+  // the question, not on "Yes".
+  function _groupLabel(scope, el) {
+    try {
+      const fs = el.closest && el.closest("fieldset");
+      if (fs) {
+        const lg = fs.querySelector("legend");
+        if (lg) { const t = textOf(lg); if (t) return t; }
+      }
+      const grp = el.closest && el.closest('[role="radiogroup"],[role="group"]');
+      if (grp) {
+        const al = grp.getAttribute("aria-label");
+        if (al) return al;
+        const lb = grp.getAttribute("aria-labelledby");
+        if (lb) {
+          const parts = lb.split(/\s+/).map(id => {
+            const n = document.getElementById(id);
+            return n ? textOf(n) : "";
+          }).filter(Boolean);
+          if (parts.length) return parts.join(" ");
+        }
+      }
+    } catch (_) {}
+    return el.name || "";
+  }
+
+  // The visible option text for a single radio (its <label for=id>, else aria/value).
+  function _radioOptionText(scope, r) {
+    const l = r.id && scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(r.id) : r.id) + '"]');
+    return (l ? textOf(l) : (r.getAttribute("aria-label") || r.value || "")).trim();
   }
 
   function fillRadios(scope) {
@@ -1065,14 +1098,26 @@
     });
     Object.values(groups).forEach(group => {
       if (group.some(r => r.checked)) return;              // already answered
-      // Prefer the "Yes" option, else the first.
-      let pick = group.find(r => {
-        const l = r.id && scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(r.id) : r.id) + '"]');
-        return l && /^\s*yes\s*$/i.test(textOf(l));
-      }) || group[0];
+      // 1) A KNOWN answer for THIS question — learned from a past application
+      //    first, then the Apply Profile (e.g. "Authorized to work" → Yes,
+      //    "Require sponsorship" → No) — selects the matching option.
+      const want = (answerForLabel(_groupLabel(scope, group[0])) || "").toString().trim().toLowerCase();
+      let pick = null;
+      if (want) {
+        pick = group.find(r => _radioOptionText(scope, r).toLowerCase() === want)
+            || group.find(r => { const t = _radioOptionText(scope, r).toLowerCase(); return t && t.includes(want); })
+            || group.find(r => { const t = _radioOptionText(scope, r).toLowerCase(); return t && want.includes(t); });
+      }
+      // 2) Fallback: prefer the "Yes" option, else the first.
+      if (!pick) {
+        pick = group.find(r => /^\s*yes\s*$/i.test(_radioOptionText(scope, r))) || group[0];
+      }
       if (pick) {
         const l = pick.id && scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(pick.id) : pick.id) + '"]');
         humanClick(l || pick);
+        // Mark our own pick so learnFromScope never records the engine's guess as
+        // if it were the user's answer.
+        try { pick.setAttribute("data-lc-autofilled", "1"); } catch (_) {}
       }
     });
   }
@@ -1120,6 +1165,18 @@
         const txt = opt ? (opt.textContent || "").trim() : "";
         if (!txt || /^select an option$/i.test(txt)) return;
         rememberAnswer(_labelForField(scope, sel), txt);
+      });
+      // Radio groups: remember the user's chosen option (Yes/No and multi-choice
+      // questions) keyed by the group's QUESTION label, so the same question
+      // auto-answers on future jobs. Skip the engine's own picks (marked
+      // data-lc-autofilled) so it never learns a guess as if it were the user's.
+      const seenGroups = {};
+      scope.querySelectorAll('input[type="radio"]:checked').forEach(r => {
+        if (r.getAttribute("data-lc-autofilled") === "1") return;
+        if (!r.name || seenGroups[r.name]) return;
+        seenGroups[r.name] = 1;
+        const optText = _radioOptionText(scope, r);
+        if (optText) rememberAnswer(_groupLabel(scope, r), optText);
       });
     } catch (_) {}
   }

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.365",
-  "zip": "/extensions/leadcaptura-extension-v1.0.365.zip",
-  "notes": "Fixed a harmless Chrome console warning ('The AudioContext was not allowed to start') that appeared when Mass Apply auto-restarted itself. The buzz/beep alert now unlocks only from your click, so the run stays silent and clean when it resumes on its own — no change to how jobs are applied."
+  "version": "1.0.366",
+  "zip": "/extensions/leadcaptura-extension-v1.0.366.zip",
+  "notes": "Smarter answer memory: Mass Apply now remembers the answers you give to job-application questions — including Yes/No and multiple-choice — and auto-fills the same question on every future job so the run keeps flowing. Remembered answers now fill optional fields too, and the engine never learns its own guesses, only your real answers."
 }
