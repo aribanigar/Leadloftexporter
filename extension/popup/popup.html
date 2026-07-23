@@ -20,11 +20,15 @@
           <span class="update-title">Update available</span>
           <span class="update-ver" id="update-ver">—</span>
         </div>
-        <button class="btn primary update-btn" id="update-download">Update extension</button>
+        <p class="update-notes" id="update-notes" hidden></p>
+        <div class="update-actions">
+          <button class="btn primary update-btn" id="update-download">1 · Download update</button>
+          <button class="btn update-btn" id="update-restart">2 · Restart now</button>
+        </div>
         <p class="update-steps" id="update-steps">
-          Downloads the new version. Unzip it <b>over your existing LeadCaptura folder</b>
-          (same location), then open <span class="mono">chrome://extensions</span> and click the
-          refresh ↻ on LeadCaptura. Your API key, settings and saved answers are kept.
+          <b>Download</b> the new version and unzip it <b>over your existing LeadCaptura folder</b>
+          (same location, replace when asked), then click <b>Restart now</b>. Your API key,
+          settings and saved answers are all kept.
         </p>
       </div>
     </section>

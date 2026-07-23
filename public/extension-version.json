@@ -1,5 +1,5 @@
 {
-  "version": "1.0.366",
-  "zip": "/extensions/leadcaptura-extension-v1.0.366.zip",
-  "notes": "Smarter answer memory: Mass Apply now remembers the answers you give to job-application questions — including Yes/No and multiple-choice — and auto-fills the same question on every future job so the run keeps flowing. Remembered answers now fill optional fields too, and the engine never learns its own guesses, only your real answers."
+  "version": "1.0.367",
+  "zip": "/extensions/leadcaptura-extension-v1.0.367.zip",
+  "notes": "Built-in updates like your phone: the extension now checks for new versions on its own and shows a red dot on the LeadCaptura toolbar icon the moment one is ready. Click the icon → Download update → unzip over your folder → Restart now, and it reloads straight into the new version. Your API key, settings and learned answers are all kept."
 }

@@ -1523,6 +1523,11 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
       console.log("[LeadCaptura SW] wiped lc_contacted_urls (v292 one-time migration)");
     }
   } catch {}
+
+  // Reconcile update state on install/update: after an update lands, the
+  // running version now equals (or exceeds) the manifest's latest, so this
+  // clears the "update available" flag + toolbar badge automatically.
+  try { lcCheckForUpdate(); } catch (_) {}
 });
 
 // GC the per-tab enrichment-result map whenever a tab closes for ANY
@@ -1538,3 +1543,110 @@ chrome.alarms?.create("lc-heartbeat", { periodInMinutes: 1 });
 chrome.alarms?.onAlarm.addListener(() => {
   // No-op: just ensures Chrome rouses the worker periodically.
 });
+
+// ───────────────────────── In-extension auto-update ─────────────────────────
+// Chrome cannot silently replace an UNPACKED extension's files (only the Chrome
+// Web Store can), so "auto-update" here means: detect a newer build in the
+// BACKGROUND (even with the popup closed), badge the toolbar icon like a phone
+// app-update dot, fire one desktop notification per version, and let the popup
+// turn that into a one-click Download + one-click Restart. The restart uses
+// chrome.runtime.reload(), which reloads the freshly-unzipped files WITHOUT a
+// trip to chrome://extensions. Purely additive: no existing message, handler,
+// setting, or integration is touched, and NO new permission is requested
+// (alarms/notifications/storage/action are already granted).
+const LC_VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
+
+// Numeric dotted-version compare: 1 if a>b, -1 if a<b, 0 if equal.
+function _lcCmpVersion(a, b) {
+  const pa = String(a).split("."), pb = String(b).split(".");
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = parseInt(pa[i] || "0", 10), nb = parseInt(pb[i] || "0", 10);
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+async function _lcSetUpdateBadge(latest) {
+  try {
+    await chrome.action.setBadgeBackgroundColor({ color: "#e11d48" });
+    await chrome.action.setBadgeText({ text: "1" });
+    await chrome.action.setTitle({ title: `LeadCaptura — update available (v${latest})` });
+  } catch (_) {}
+}
+async function _lcClearUpdateBadge() {
+  try {
+    await chrome.action.setBadgeText({ text: "" });
+    await chrome.action.setTitle({ title: "LeadCaptura" });
+  } catch (_) {}
+}
+
+// Check the hosted version manifest and reconcile local update state. Best-effort:
+// any failure (offline, blocked) leaves everything exactly as-is.
+async function lcCheckForUpdate() {
+  try {
+    const cur = chrome.runtime.getManifest().version;
+    const res = await fetch(LC_VERSION_MANIFEST_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const info = await res.json();
+    const latest = info && info.version;
+    if (!latest) return;
+    if (_lcCmpVersion(latest, cur) <= 0) {
+      // Already up to date (e.g. the user just restarted onto the new build) —
+      // clear any stale flag/badge so the dot disappears the moment they update.
+      await chrome.storage.local.remove("lc_update_available");
+      await _lcClearUpdateBadge();
+      return;
+    }
+    // A newer build exists. Persist it so the popup can render instantly (even
+    // offline) and badge the toolbar icon like a phone app-update dot.
+    const payload = {
+      version: latest,
+      notes: info.notes || "",
+      zip: info.zip || "/leadcaptura-extension.zip",
+      from: cur,
+      seenAt: Date.now(),
+    };
+    await chrome.storage.local.set({ lc_update_available: payload });
+    await _lcSetUpdateBadge(latest);
+    // One desktop notification per version — never on every check.
+    try {
+      const { lc_update_notified } = await chrome.storage.local.get("lc_update_notified");
+      if (lc_update_notified !== latest && chrome.notifications) {
+        chrome.notifications.create("lc-update-" + latest, {
+          type: "basic",
+          iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+          title: "LeadCaptura update available",
+          message: `Version ${latest} is ready. Click the LeadCaptura toolbar icon to update.`,
+          priority: 1,
+        }, () => { void chrome.runtime.lastError; });
+        await chrome.storage.local.set({ lc_update_notified: latest });
+      }
+    } catch (_) {}
+  } catch (_) { /* offline / blocked — silent, retried on the next tick */ }
+}
+
+// Clicking the update notification opens the popup-equivalent flow: focus/open
+// the toolbar popup isn't scriptable, so open the CRM download page as a
+// dependable fallback and drop the OS notification.
+chrome.notifications?.onClicked.addListener((id) => {
+  if (!id || !String(id).startsWith("lc-update-")) return;
+  chrome.storage.local.get("lc_update_available", ({ lc_update_available }) => {
+    const zip = lc_update_available?.zip || "/leadcaptura-extension.zip";
+    const url = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+    chrome.tabs.create({ url });
+    try { chrome.notifications.clear(id); } catch (_) {}
+  });
+});
+
+// Run the check on the events that matter: browser startup, install/update, and
+// a periodic 6-hour alarm. (onInstalled after an update finds latest<=current
+// and self-clears the badge.)
+chrome.runtime.onStartup?.addListener(() => { lcCheckForUpdate(); });
+chrome.alarms?.create("lc-update-check", { periodInMinutes: 360 });
+chrome.alarms?.onAlarm.addListener((alarm) => {
+  if (alarm && alarm.name === "lc-update-check") lcCheckForUpdate();
+});
+// Also check shortly after the worker first spins up so a freshly-opened
+// browser doesn't wait up to 6h for the first alarm.
+lcCheckForUpdate();

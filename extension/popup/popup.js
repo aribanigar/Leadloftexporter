@@ -38,22 +38,51 @@ function cmpVersion(a, b) {
 // keeps the extension ID (so chrome.storage.local: API key, settings, learned
 // answers, application profile all persist).
 const VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
+
+// Render the "Update available" card from a resolved {version, notes, zip}.
+// Wires the Download button (opens the versioned zip) and the Restart button
+// (chrome.runtime.reload() — reloads the freshly-unzipped files with NO trip to
+// chrome://extensions). Idempotent: safe to call from both the instant
+// storage prefill and the live network check.
+let _updateRendered = false;
+function renderUpdateCard(cur, info) {
+  const latest = info && info.version;
+  if (!latest || cmpVersion(latest, cur) <= 0) return;   // already up to date
+  if (_updateRendered) return;
+  _updateRendered = true;
+  const zip = info.zip || "/leadcaptura-extension.zip";
+  const zipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+  const verEl = $("#update-ver");
+  if (verEl) verEl.textContent = "v" + cur + " → v" + latest;
+  const notesEl = $("#update-notes");
+  if (notesEl && info.notes) { notesEl.textContent = info.notes; notesEl.hidden = false; }
+  const sec = $("#update-section");
+  if (sec) sec.hidden = false;
+  const dl = $("#update-download");
+  if (dl) dl.addEventListener("click", () => { chrome.tabs.create({ url: zipUrl }); });
+  const restart = $("#update-restart");
+  if (restart) restart.addEventListener("click", () => {
+    // Reload the extension so Chrome re-reads the files the user just unzipped
+    // over the folder. Data in chrome.storage.local (API key, settings, learned
+    // answers) survives because the extension ID is unchanged.
+    try { chrome.runtime.reload(); } catch (_) {}
+  });
+}
+
 async function checkForUpdate() {
+  const cur = chrome.runtime.getManifest().version;
+  // 1) Instant prefill from what the background check already found — the card
+  //    shows immediately, even offline, matching the toolbar badge.
   try {
-    const cur = chrome.runtime.getManifest().version;
+    const { lc_update_available } = await chrome.storage.local.get("lc_update_available");
+    if (lc_update_available) renderUpdateCard(cur, lc_update_available);
+  } catch (_) {}
+  // 2) Live check so an update published while the popup is open still appears.
+  try {
     const res = await fetch(VERSION_MANIFEST_URL + "?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) return;
     const info = await res.json();
-    const latest = info && info.version;
-    if (!latest || cmpVersion(latest, cur) <= 0) return;   // already up to date
-    const zip = info.zip || "/leadcaptura-extension.zip";
-    const zipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
-    const verEl = $("#update-ver");
-    if (verEl) verEl.textContent = "v" + cur + " → v" + latest;
-    const sec = $("#update-section");
-    if (sec) sec.hidden = false;
-    const btn = $("#update-download");
-    if (btn) btn.addEventListener("click", () => { chrome.tabs.create({ url: zipUrl }); });
+    renderUpdateCard(cur, info);
   } catch (_) { /* offline / blocked — silently skip */ }
 }
 

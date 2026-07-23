@@ -90,6 +90,15 @@ html, body {
 }
 .update-btn { background: #059669 !important; }
 .update-btn:hover { background: #047857 !important; }
+.update-notes {
+  color: #065f46; font-size: 11.5px; line-height: 1.45; margin: 8px 0 0;
+  background: #d1fae5; border-radius: 8px; padding: 7px 9px;
+}
+.update-actions { display: flex; gap: 8px; margin-top: 10px; }
+.update-actions .btn { flex: 1; margin: 0; }
+/* Secondary "Restart now" button — id beats the .update-btn class on specificity. */
+#update-restart { background: #ffffff !important; color: #047857 !important; border: 1px solid #6ee7b7 !important; }
+#update-restart:hover { background: #f0fdf4 !important; }
 .update-steps { color: #475569; font-size: 11.5px; line-height: 1.5; margin: 8px 0 0; }
 .update-steps .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: #f1f5f9; padding: 0 4px; border-radius: 4px; }
 

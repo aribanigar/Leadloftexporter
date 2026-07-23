@@ -19,11 +19,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.367",
+    date: "Jul 23, 2026",
+    size: "296 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.367.zip",
+    latest: true,
+    changes: [
+      "Built-in updates, like your phone: the extension now checks for new versions on its own in the background and shows a red dot on the LeadCaptura toolbar icon (plus a one-time desktop notification) the moment an update is ready — you no longer have to check the CRM.",
+      "One-click update flow: click the toolbar icon to see what's new, hit 'Download update', unzip it over your LeadCaptura folder, then click 'Restart now' — it reloads straight into the new version with no trip to chrome://extensions. Your API key, settings and learned answers are all kept.",
+    ],
+  },
+  {
     version: "1.0.366",
     date: "Jul 23, 2026",
     size: "295 KB",
     file: "/extensions/leadcaptura-extension-v1.0.366.zip",
-    latest: true,
     changes: [
       "Smarter answer memory: Mass Apply now remembers the answers you type into job-application questions — including Yes/No and multiple-choice questions, which it didn't before — and auto-fills the very same question on every future job, so the run keeps flowing without pausing.",
       "A remembered answer now fills a field even when it's optional (previously only required fields were auto-filled), so more of each form completes itself.",
@@ -48,16 +58,6 @@ const RELEASES: Release[] = [
       "Job checkboxes now sync live with Mass Apply: every un-applied job shows a tick, and the tick turns OFF the instant that job is applied — so you can watch progress drain top-to-bottom. Jobs already applied earlier show unticked and are skipped automatically.",
       "Mass Apply applies every job on a page in order, then moves to the next page, and keeps going across all pages.",
       "Added a dedicated red Stop button, and an auto-restart safeguard: if the run is ever interrupted (e.g. the tab reloads) it resumes by itself — it only truly stops when you press Stop.",
-    ],
-  },
-  {
-    version: "1.0.363",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.363.zip",
-    changes: [
-      "Mass Apply Jobs: fixed the bug where it jumped to the next page after only the first few (visible) jobs. It now reliably scrolls the list and applies EVERY job on a page, top-to-bottom, before moving to the next page.",
-      "Made the run crash-proof: a transient page error can no longer stop it — once started it keeps going until you press Stop (already-applied jobs are detected and skipped).",
     ],
   },
 ];
