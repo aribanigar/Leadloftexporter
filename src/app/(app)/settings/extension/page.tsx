@@ -4,9 +4,15 @@ import { Download, Chrome, Puzzle, RefreshCw, CheckCircle2, Sparkles, History } 
 
 /**
  * Extension release catalogue — newest first. To publish a new build:
- *   1. zip the extension into  public/extensions/leadcaptura-extension-v<ver>.zip
- *   2. prepend a new entry here (set `latest: true`, clear it on the old one)
- *   3. also refresh  public/leadcaptura-extension.zip  (the stable "latest" alias)
+ *   1. run  npm run build:extension  (produces the PROTECTED extension-dist/)
+ *   2. zip extension-dist as  public/extensions/leadcaptura-extension-v<ver>.zip
+ *      (top folder "extension") and refresh  public/leadcaptura-extension.zip
+ *   3. prepend a new entry here (set `latest: true`, clear it on the old one)
+ *
+ * The published zip is ALWAYS the protected build (minified + comment-stripped +
+ * local-name-mangled) so the extension can be handed out at scale without
+ * shipping copyable source. The readable source lives only in `extension/` in
+ * the repo — the admin's open copy, never published.
  */
 type Release = {
   version: string;
@@ -19,45 +25,14 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.367",
+    version: "1.0.368",
     date: "Jul 23, 2026",
-    size: "296 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.367.zip",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.368.zip",
     latest: true,
     changes: [
-      "Built-in updates, like your phone: the extension now checks for new versions on its own in the background and shows a red dot on the LeadCaptura toolbar icon (plus a one-time desktop notification) the moment an update is ready — you no longer have to check the CRM.",
-      "One-click update flow: click the toolbar icon to see what's new, hit 'Download update', unzip it over your LeadCaptura folder, then click 'Restart now' — it reloads straight into the new version with no trip to chrome://extensions. Your API key, settings and learned answers are all kept.",
-    ],
-  },
-  {
-    version: "1.0.366",
-    date: "Jul 23, 2026",
-    size: "295 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.366.zip",
-    changes: [
-      "Smarter answer memory: Mass Apply now remembers the answers you type into job-application questions — including Yes/No and multiple-choice questions, which it didn't before — and auto-fills the very same question on every future job, so the run keeps flowing without pausing.",
-      "A remembered answer now fills a field even when it's optional (previously only required fields were auto-filled), so more of each form completes itself.",
-      "The engine never learns its own guesses — only the answers you (or LinkedIn's prefill of your past applications) actually gave — so its memory stays accurate and gets stronger the more you apply.",
-    ],
-  },
-  {
-    version: "1.0.365",
-    date: "Jul 22, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.365.zip",
-    changes: [
-      "Fixed a harmless Chrome console warning ('The AudioContext was not allowed to start') that appeared when Mass Apply auto-restarted itself. The buzz/beep alert now unlocks only from your click, so the run stays silent and clean when it resumes on its own — no behaviour change to applying.",
-    ],
-  },
-  {
-    version: "1.0.364",
-    date: "Jul 11, 2026",
-    size: "294 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.364.zip",
-    changes: [
-      "Job checkboxes now sync live with Mass Apply: every un-applied job shows a tick, and the tick turns OFF the instant that job is applied — so you can watch progress drain top-to-bottom. Jobs already applied earlier show unticked and are skipped automatically.",
-      "Mass Apply applies every job on a page in order, then moves to the next page, and keeps going across all pages.",
-      "Added a dedicated red Stop button, and an auto-restart safeguard: if the run is ever interrupted (e.g. the tab reloads) it resumes by itself — it only truly stops when you press Stop.",
+      "This build is a protected package — the code is minified and hardened so the extension can be shared at scale without exposing how it works. It is functionally identical to before: every feature and behaviour is unchanged, it just can't be casually copied.",
+      "Includes everything from recent updates: smarter answer memory in Mass Apply (remembers Yes/No and multiple-choice answers and auto-fills repeat questions), built-in phone-style updates (a red dot on the toolbar icon + one-click download & restart), and the CRM speed improvements.",
     ],
   },
 ];

@@ -66,11 +66,42 @@ npm run lint
 for f in $(find extension -name '*.js'); do node --check "$f" || break; done
 python3 -c "import json; json.load(open('extension/manifest.json'))"
 
-# Package
-zip -r leadcaptura-extension.zip extension
+# Package the PROTECTED distribution (what the public downloads)
+npm run build:extension            # → extension-dist/ (verified, comment-stripped, minified, locals mangled)
+rm -rf /tmp/lcpack && mkdir -p /tmp/lcpack/extension && cp -r extension-dist/. /tmp/lcpack/extension/
+(cd /tmp/lcpack && zip -rq "$OLDPWD/public/extensions/leadcaptura-extension-v<ver>.zip" extension)
+cp public/extensions/leadcaptura-extension-v<ver>.zip public/leadcaptura-extension.zip
 ```
 
 After editing content scripts, reload the extension (`chrome://extensions` → 🔄) **and** hard-reload the LinkedIn tab (Ctrl+R) — Chrome only injects content scripts on tab load, so an open tab keeps the old code. Confirm the new build is live by checking the `LeadCaptura v<version>` badge in the bottom toolbar.
+
+### Code protection — published builds are always obfuscated (`scripts/build-extension.mjs`)
+
+To let the extension be shared at scale without handing out copyable source, **every
+published zip is a protected build**, never the raw source:
+
+- **`extension/` (raw source) = the admin's OPEN copy. It is NEVER published.** It stays
+  in the repo (and is excluded from Vercel by `.vercelignore`), so the readable code
+  never leaves the repo. That is the "admin download is open, everyone else is protected"
+  guarantee — the open build is repo-only.
+- **`npm run build:extension`** runs `scripts/build-extension.mjs` → `extension-dist/`
+  (gitignored). It strips all comments, minifies, and mangles **function-local** names via
+  terser. The transform is deliberately the provably behaviour-preserving subset:
+  `compress:false`, `mangle.toplevel:false`, `mangle.properties:false`. So it's alpha-renaming
+  + whitespace/comment removal only — **it cannot change runtime behaviour**. The 8-file
+  content bundle shares state through `globalThis.__lc*` **property** names (never mangled),
+  and each file is IIFE-wrapped (empty program-top-level surface), so nothing that crosses a
+  file boundary is touched.
+- The build **self-verifies and aborts on any doubt**: every output passes `node --check`
+  and an acorn parse asserting its top-level binding names are identical to the source's.
+  A broken protected build can never ship.
+- **Honest limit:** client-side code always runs on the user's machine, so this is strong
+  *deterrence* (removes the how-it-works comments, makes it hostile to read or hand to an AI),
+  **not** an uncrackable vault. True one-tap-uncopyable is only possible off-device.
+- Only the single current protected zip is kept in `public/extensions/`; old **readable**
+  zips were removed so they're no longer publicly fetchable.
+- To hand the admin an open build on purpose, just zip the source dir directly
+  (`zip -r open.zip extension`) — do **not** publish that artifact.
 
 ## Backend architecture (`/api`)
 
@@ -522,6 +553,6 @@ LinkedIn rewrites markup often. Prefer multiple selectors via `first(root, [...]
 - **`/api` and `/extension` are excluded from Vercel builds** by `.vercelignore`. If you add another top-level directory that should also be skipped, add it there too.
 - **Don't add `web_accessible_resources` to the manifest you don't reference** — Chrome logs a warning.
 - **Don't grant `<all_urls>` in the manifest.** Host permissions are restricted to linkedin.com plus runtime-granted backend host.
-- **No build step for the extension.** Keep raw JS; do not introduce npm or bundlers.
+- **No build step for the extension RUNTIME.** Author raw JS in `extension/`; do not introduce npm/bundlers into the extension's own source or load flow. The ONE exception is packaging for distribution: `npm run build:extension` produces the protected `extension-dist/` that gets zipped and published (see "Code protection" above). Never publish the raw `extension/` source; never load `extension-dist/` as your dev copy (develop against `extension/`).
 - **Models in one file.** Resist the urge to split `app/models/base.py` — the import graph relies on it.
 - **bcrypt is pinned.** See the auth section above before bumping `requirements.txt`.

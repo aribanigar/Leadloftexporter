@@ -1,5 +1,5 @@
 {
-  "version": "1.0.367",
-  "zip": "/extensions/leadcaptura-extension-v1.0.367.zip",
-  "notes": "Built-in updates like your phone: the extension now checks for new versions on its own and shows a red dot on the LeadCaptura toolbar icon the moment one is ready. Click the icon → Download update → unzip over your folder → Restart now, and it reloads straight into the new version. Your API key, settings and learned answers are all kept."
+  "version": "1.0.368",
+  "zip": "/extensions/leadcaptura-extension-v1.0.368.zip",
+  "notes": "This build ships as a protected (minified, comment-stripped, name-mangled) package so the extension can be shared at scale without exposing the source. It is functionally identical to before — same features, same behaviour — just hardened against casual copying. Includes the recent smarter answer memory, built-in phone-style updates and CRM speed work."
 }

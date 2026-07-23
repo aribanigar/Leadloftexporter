@@ -12,3 +12,4 @@
 docker-compose.yml
 render.yaml
 railway.json
+/extension-dist/
