@@ -405,7 +405,7 @@ export default function PipelinePage() {
             <table className="min-w-full border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="w-10 px-3 py-3 text-left">
+                  <th className="w-10 px-3 py-1.5 text-left">
                     <input
                       type="checkbox"
                       className="rounded border-slate-300"
@@ -413,31 +413,31 @@ export default function PipelinePage() {
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Name
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Title
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Company
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Email
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Phone
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Stage
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Location
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Added
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Actions
                   </th>
                 </tr>
@@ -453,7 +453,7 @@ export default function PipelinePage() {
                         selected ? "bg-brand-50" : "hover:bg-slate-50"
                       }`}
                     >
-                      <td className="w-10 px-3 py-3">
+                      <td className="w-10 px-3 py-1.5">
                         <input
                           type="checkbox"
                           className="rounded border-slate-300"
@@ -461,12 +461,12 @@ export default function PipelinePage() {
                           onChange={() => toggleRow(lead.id)}
                         />
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-1.5">
                         <Link
                           href={`/leads/${lead.id}`}
-                          className="flex items-center gap-2.5 hover:text-brand-700"
+                          className="flex items-center gap-2 hover:text-brand-700"
                         >
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-[11px] font-bold uppercase text-slate-600">
+                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-200 text-[10px] font-bold uppercase text-slate-600">
                             {initials(lead.full_name)}
                           </div>
                           <div>
@@ -481,13 +481,13 @@ export default function PipelinePage() {
                           </div>
                         </Link>
                       </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
+                      <td className="px-3 py-1.5 text-sm text-slate-600">
                         {lead.title || <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
+                      <td className="px-3 py-1.5 text-sm text-slate-600">
                         {lead.company?.name || <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-sm">
+                      <td className="px-3 py-1.5 text-sm">
                         {lead.email ? (
                           <a
                             href={`mailto:${lead.email}`}
@@ -499,10 +499,10 @@ export default function PipelinePage() {
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
+                      <td className="px-3 py-1.5 text-sm text-slate-600">
                         {lead.phone || <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-1.5">
                         {stage ? (
                           <span
                             className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
@@ -518,13 +518,13 @@ export default function PipelinePage() {
                           <span className="text-xs text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-sm text-slate-500">
+                      <td className="px-3 py-1.5 text-sm text-slate-500">
                         {lead.location || <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-400">
+                      <td className="px-3 py-1.5 text-xs text-slate-400">
                         {fmtDate(lead.created_at)}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-1.5">
                         <RowActions lead={lead} />
                       </td>
                     </tr>

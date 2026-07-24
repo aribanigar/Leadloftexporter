@@ -364,7 +364,7 @@ export default function ProspectingPage() {
         <table className="min-w-full">
           <thead className="sticky top-0 z-10 bg-slate-50/95 text-xs uppercase tracking-wide text-slate-500 backdrop-blur">
             <tr>
-              <th className="w-10 px-3 py-2">
+              <th className="w-10 px-3 py-1.5">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -373,7 +373,7 @@ export default function ProspectingPage() {
                 />
               </th>
               {visibleColumns.map((c) => (
-                <th key={c} className="whitespace-nowrap px-3 py-2 text-left font-semibold">
+                <th key={c} className="whitespace-nowrap px-3 py-1.5 text-left font-semibold">
                   {fields?.find((f) => f.key === c)?.label || c}
                 </th>
               ))}
@@ -437,7 +437,7 @@ export default function ProspectingPage() {
                   key={lead.id}
                   className={`border-b border-slate-100 hover:bg-slate-50 ${selected.has(lead.id) ? "bg-brand-50/60" : ""}`}
                 >
-                  <td className="w-10 px-3 py-2">
+                  <td className="w-10 px-3 py-1.5">
                     <input
                       type="checkbox"
                       checked={selected.has(lead.id)}
@@ -446,7 +446,7 @@ export default function ProspectingPage() {
                     />
                   </td>
                   {visibleColumns.map((c) => (
-                    <td key={c} className="whitespace-nowrap px-3 py-2 text-sm">
+                    <td key={c} className="whitespace-nowrap px-3 py-1.5 text-sm">
                       {renderCell(c, lead, stageById)}
                     </td>
                   ))}
