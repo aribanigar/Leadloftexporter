@@ -26,7 +26,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import Link from "next/link";
-import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
+import { api, apiBase, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadList, PipelineStage } from "@/lib/types";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
 import { EnrollPlaybookModal } from "@/components/enroll-playbook-modal";
@@ -236,7 +236,7 @@ export default function PipelinePage() {
   function exportCsv() {
     const token = getToken();
     const ws = getWorkspaceId();
-    const url = `${API_BASE}/api/v1/leads/export.csv?columns=${encodeURIComponent(LEAD_FIELDS.join(","))}`;
+    const url = `${apiBase()}/api/v1/leads/export.csv?columns=${encodeURIComponent(LEAD_FIELDS.join(","))}`;
     fetch(url, {
       method: "POST",
       headers: {

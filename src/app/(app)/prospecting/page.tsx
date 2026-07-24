@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, MoreHorizontal, Plus, Filter, Columns3, Search, Sparkles, Zap, Wrench, Bot } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
+import { api, apiBase, getToken, getWorkspaceId } from "@/lib/api";
 import type { Lead, LeadField, LeadList, PipelineStage, SavedView } from "@/lib/types";
 import Link from "next/link";
 import { fmtDate, fmtMoney, initials } from "@/lib/utils";
@@ -165,7 +165,7 @@ export default function ProspectingPage() {
     const token = getToken();
     const ws = getWorkspaceId();
     const cols = visibleColumns.join(",");
-    const url = `${API_BASE}/api/v1/leads/export.csv?columns=${encodeURIComponent(cols)}`;
+    const url = `${apiBase()}/api/v1/leads/export.csv?columns=${encodeURIComponent(cols)}`;
     fetch(url, {
       method: "POST",
       headers: {

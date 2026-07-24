@@ -11,7 +11,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
+import { api, apiBase, getToken, getWorkspaceId } from "@/lib/api";
 import type { PipelineStage } from "@/lib/types";
 
 type WipeResult = { deleted: Record<string, number> };
@@ -97,7 +97,7 @@ export default function ImportPage() {
     form.append("file", f);
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/leads/import-csv/preview`, {
+      const res = await fetch(`${apiBase()}/api/v1/leads/import-csv/preview`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -153,7 +153,7 @@ export default function ImportPage() {
     form.append("mapping", JSON.stringify(reverseMap));
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/leads/import-csv`, {
+      const res = await fetch(`${apiBase()}/api/v1/leads/import-csv`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

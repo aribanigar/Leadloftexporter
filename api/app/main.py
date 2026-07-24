@@ -39,10 +39,17 @@ app = FastAPI(
     default_response_class=__import__("fastapi.responses", fromlist=["ORJSONResponse"]).ORJSONResponse,
 )
 
+# Always allow the extension (chrome-extension://*) AND any Vercel deployment of
+# the web app (production + preview URLs), regardless of what FRONTEND_ORIGINS is
+# set to on a given backend service. This makes the frontend's automatic
+# backend-failover robust: whichever Render service the browser lands on will
+# accept the Vercel origin even if that service's env wasn't configured with it.
+# Regex-matched origins are echoed back (not "*"), so this stays compatible with
+# allow_credentials=True.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins or ["*"],
-    allow_origin_regex=r"chrome-extension://.*",
+    allow_origin_regex=r"(chrome-extension://.*|https://([a-z0-9-]+\.)*vercel\.app)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mic, Upload, Trash2, FileText, CheckCircle2, ListChecks, Loader2 } from "lucide-react";
-import { api, API_BASE, getToken, getWorkspaceId } from "@/lib/api";
+import { api, apiBase, getToken, getWorkspaceId } from "@/lib/api";
 import { fmtRelative } from "@/lib/utils";
 import { PageHeader, Pill } from "@/components/scheduling-ui";
 
@@ -114,7 +114,7 @@ export default function NotetakerPage() {
       const w = getWorkspaceId();
       if (t) headers["Authorization"] = `Bearer ${t}`;
       if (w) headers["X-Workspace-Id"] = w;
-      const res = await fetch(`${API_BASE}/api/v1/notetaker/transcribe`, { method: "POST", headers, body: fd });
+      const res = await fetch(`${apiBase()}/api/v1/notetaker/transcribe`, { method: "POST", headers, body: fd });
       const text = await res.text();
       const json = text ? JSON.parse(text) : null;
       if (!res.ok) throw new Error(json?.detail || `Error ${res.status}`);
