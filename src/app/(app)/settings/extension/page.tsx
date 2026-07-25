@@ -25,10 +25,10 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.369",
+    version: "1.0.370",
     date: "Jul 25, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.369.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.370.zip",
     latest: true,
     changes: [
       "Smoother self-update: after the extension updates itself, any open LinkedIn tab now detects the change instantly and auto-refreshes to the new version — you no longer see the 'Extension was just reloaded — refresh this tab' error in the console or the browser's extensions panel. It's a self-heal + logging fix only; capture and Mass Apply behave exactly as before.",
