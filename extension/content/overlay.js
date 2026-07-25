@@ -4982,7 +4982,14 @@
         const msg = err?.message || String(err);
         textSpan.textContent = "Failed";
         btn.title = msg;
-        console.error("[LeadCaptura] per-card save failed", err);
+        // A post-update orphaned context is expected + self-healing (the tab
+        // auto-refreshes), so log it at warn — only genuine failures should
+        // surface as errors in the browser's extension Errors panel.
+        if (/reloaded|context invalidated/i.test(msg)) {
+          console.warn("[LeadCaptura] per-card save skipped — extension was updated; tab will refresh");
+        } else {
+          console.error("[LeadCaptura] per-card save failed", err);
+        }
       }
     });
 

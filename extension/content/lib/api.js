@@ -95,7 +95,14 @@
         }
         if (/Extension context invalidated/i.test(raw)) {
           const err = new Error(_decorate(raw, action));
-          console.error(`[LeadCaptura] api.call no-runtime action=${action} err="${err.message}"`);
+          // Expected + self-healing: the extension was reloaded/updated, so this
+          // tab's content scripts are orphaned (chrome.runtime.id is gone). Kick
+          // main.js's stale-tab self-heal (strip UI + banner + auto-reload) NOW
+          // instead of waiting for its poll, and log at warn — this is a normal
+          // post-update condition, not an error, so it must not surface in the
+          // browser's extension Errors panel.
+          try { globalThis.__lcCheckRuntime && globalThis.__lcCheckRuntime(); } catch (_) {}
+          console.warn(`[LeadCaptura] api.call action=${action} skipped — extension was just updated; refreshing this tab to the new version`);
           throw err;
         }
         const err = new Error(_decorate(raw, action));

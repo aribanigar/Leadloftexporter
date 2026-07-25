@@ -25,14 +25,14 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.368",
-    date: "Jul 23, 2026",
+    version: "1.0.369",
+    date: "Jul 25, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.368.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.369.zip",
     latest: true,
     changes: [
-      "This build is a protected package — the code is minified and hardened so the extension can be shared at scale without exposing how it works. It is functionally identical to before: every feature and behaviour is unchanged, it just can't be casually copied.",
-      "Includes everything from recent updates: smarter answer memory in Mass Apply (remembers Yes/No and multiple-choice answers and auto-fills repeat questions), built-in phone-style updates (a red dot on the toolbar icon + one-click download & restart), and the CRM speed improvements.",
+      "Smoother self-update: after the extension updates itself, any open LinkedIn tab now detects the change instantly and auto-refreshes to the new version — you no longer see the 'Extension was just reloaded — refresh this tab' error in the console or the browser's extensions panel. It's a self-heal + logging fix only; capture and Mass Apply behave exactly as before.",
+      "Protected package (minified/hardened so it can't be casually copied) with all recent features: smarter Mass Apply answer memory (Yes/No + multiple-choice), built-in phone-style updates (toolbar dot + one-click download & restart), and the CRM speed improvements.",
     ],
   },
 ];

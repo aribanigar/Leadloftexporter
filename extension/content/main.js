@@ -103,9 +103,16 @@
       }, 2000);
     }
   }
-  setInterval(_checkRuntime, 3000);
+  // Expose the self-heal so other content scripts (api.js) can trigger it the
+  // INSTANT they detect an orphaned context, instead of waiting for the poll.
+  // Property name (not mangled by the protected build), same pattern as __lcApi.
+  try { globalThis.__lcCheckRuntime = _checkRuntime; } catch {}
+  // Poll faster (was 3000ms) so after an extension reload/update the tab strips
+  // its stale UI and auto-refreshes within ~1s — shrinking the window in which
+  // orphaned API calls can fire and log noise.
+  setInterval(_checkRuntime, 1000);
   // Also check right away in case the runtime was already dead at mount
-  setTimeout(_checkRuntime, 500);
+  setTimeout(_checkRuntime, 250);
 
   const Overlay = globalThis.__lcOverlay;
   const Automate = globalThis.__lcAutomate;
