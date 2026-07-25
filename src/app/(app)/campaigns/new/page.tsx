@@ -362,6 +362,13 @@ interface CsvRecipient {
   [key: string]: string;
 }
 
+interface CampaignAttachment {
+  filename: string;
+  content_type: string;
+  data: string;   // base64 (no data: prefix)
+  size: number;   // decoded bytes (for display)
+}
+
 interface FormState {
   name: string;
   goal: string;
@@ -387,6 +394,7 @@ interface FormState {
   senderIds: string[];     // sender_account_ids
   mergeColumns: string[];
   csvRecipients: CsvRecipient[];
+  attachments: CampaignAttachment[];
 }
 
 // Pipeline stage from GET /pipeline/stages
@@ -894,6 +902,7 @@ function NewCampaignPageInner() {
     senderIds: [],
     mergeColumns: [],
     csvRecipients: [],
+    attachments: [],
   });
 
   const [campaignId, setCampaignId] = useState<string | null>(editId || null);
@@ -1100,7 +1109,21 @@ function NewCampaignPageInner() {
             email: r.email,
             ...(r.merge || {}),
           })),
+          attachments: [],
         });
+        // Fetch full attachment payloads (with base64) so edits round-trip losslessly.
+        api<{ attachments: { filename: string; content_type: string; data: string }[] }>(`/campaigns/${editId}/attachments`)
+          .then(res => {
+            if (cancelled) return;
+            const atts = (res?.attachments || []).filter(a => a?.data).map(a => ({
+              filename: a.filename || 'attachment',
+              content_type: a.content_type || 'application/octet-stream',
+              data: a.data,
+              size: Math.floor((a.data.length * 3) / 4),
+            }));
+            if (atts.length) setForm(f => ({ ...f, attachments: atts }));
+          })
+          .catch(() => {});
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingEdit(false); });
@@ -1367,6 +1390,9 @@ function NewCampaignPageInner() {
         delay_hours: fu.scheduleType === 'delay' ? unitToHours(fu.delayValue, fu.delayUnit) : 24,
         status: 'draft',
       })),
+      attachments: form.attachments.map(a => ({
+        filename: a.filename, content_type: a.content_type, data: a.data,
+      })),
     };
   };
 
@@ -1403,8 +1429,53 @@ function NewCampaignPageInner() {
         delay_hours: fu.scheduleType === 'delay' ? unitToHours(fu.delayValue, fu.delayUnit) : 24,
         status: 'draft',
       })),
+      attachments: form.attachments.map(a => ({
+        filename: a.filename, content_type: a.content_type, data: a.data,
+      })),
     };
   };
+
+  // ── Email attachments (photo / PDF / any file) ──
+  const MAX_ATTACH_BYTES = 10 * 1024 * 1024; // 10 MB total per campaign
+  const fmtBytes = (n: number) =>
+    n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+
+  const onPickAttachments = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const readAsBase64 = (file: File) =>
+      new Promise<CampaignAttachment>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = String(reader.result || '');
+          const data = res.includes(',') ? res.slice(res.indexOf(',') + 1) : res;
+          resolve({
+            filename: file.name || 'attachment',
+            content_type: file.type || 'application/octet-stream',
+            data,
+            size: file.size,
+          });
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    try {
+      const added = await Promise.all(Array.from(files).map(readAsBase64));
+      setForm(f => {
+        const next = [...f.attachments, ...added];
+        const total = next.reduce((s, a) => s + a.size, 0);
+        if (total > MAX_ATTACH_BYTES) {
+          setToast({ msg: `Attachments exceed 10 MB (total ${fmtBytes(total)}). Remove some.`, type: 'error' });
+          return f;
+        }
+        return { ...f, attachments: next };
+      });
+    } catch {
+      setToast({ msg: "Couldn't read that file.", type: 'error' });
+    }
+  };
+
+  const removeAttachment = (idx: number) =>
+    setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }));
 
   // ── Save draft (create or PATCH)
   const saveDraft = async () => {
@@ -2990,6 +3061,42 @@ function NewCampaignPageInner() {
                     }}
                   />
                 )}
+
+                {/* Attachments — photo / PDF / any file, sent with every email */}
+                <div style={{ padding: '14px 20px', borderBottom: `1px solid ${T.surfaceContainer}`, backgroundColor: T.surfaceContainerLowest }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: T.onSurfaceVariant, fontFamily: 'Inter, sans-serif' }}>
+                      📎 Attachments{form.attachments.length > 0 ? ` (${form.attachments.length})` : ''}
+                    </div>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: T.primary, padding: '6px 12px', border: `1px solid ${T.primary}`, borderRadius: 8 }}>
+                      + Add file (photo / PDF)
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+                        onChange={e => { onPickAttachments(e.target.files); e.currentTarget.value = ''; }}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                  {form.attachments.length > 0 && (
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {form.attachments.map((a, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 10px', background: T.surfaceContainerLow, borderRadius: 8 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, fontSize: 12.5, color: T.onSurface, fontFamily: 'Inter, sans-serif' }}>
+                            <span style={{ fontSize: 14 }}>{a.content_type.startsWith('image/') ? '🖼️' : a.content_type === 'application/pdf' ? '📄' : '📎'}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.filename}</span>
+                            <span style={{ color: T.onSurfaceVariant, flexShrink: 0 }}>· {fmtBytes(a.size)}</span>
+                          </span>
+                          <button type="button" onClick={() => removeAttachment(i)} style={{ border: 'none', background: 'transparent', color: '#b3261e', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Remove</button>
+                        </div>
+                      ))}
+                      <div style={{ fontSize: 11, color: T.onSurfaceVariant, marginTop: 2 }}>
+                        Sent with every email in this campaign. Max 10 MB total.
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* HTML Code mode */}
                 {form.contentMode === 'html' && (

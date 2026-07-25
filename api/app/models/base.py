@@ -763,6 +763,9 @@ class Campaign(Base, TimestampMixin):
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     # Drip follow-ups — list of {subject, body_html, delay_hours, status}.
     follow_ups: Mapped[list] = mapped_column(JSONB, default=list)
+    # Email attachments carried on every send: [{filename, content_type, data}]
+    # where `data` is base64. Stored once on the campaign (not per recipient).
+    attachments: Mapped[list] = mapped_column(JSONB, default=list)
     # Merge / personalisation. merge_columns is the list of available tokens
     # (e.g. ["name","city"]); recipient_data holds the raw pasted/CSV rows
     # ([{email, merge:{col:val}}]) before they're materialised into rows.

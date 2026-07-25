@@ -203,7 +203,7 @@ def _gmail_send(account: ConnectedAccount, msg: PyEmail) -> SendResult:
         return SendResult(False, error=str(exc))
 
 
-def _resend_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str]) -> SendResult:
+def _resend_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str], attachments: Optional[list] = None) -> SendResult:
     """POST to Resend's /emails endpoint. Pure HTTPS — never blocked.
     https://resend.com/docs/api-reference/emails/send-email
     """
@@ -215,6 +215,9 @@ def _resend_send(account: ConnectedAccount, to: str, subject: str, body_text: st
             payload["html"] = body_html
         if body_text:
             payload["text"] = body_text
+        atts = [{"filename": a["filename"], "content": a["content"]} for a in _api_attachments(attachments)]
+        if atts:
+            payload["attachments"] = atts
         with httpx.Client(timeout=20) as client:
             r = client.post(
                 "https://api.resend.com/emails",
@@ -232,7 +235,7 @@ def _resend_send(account: ConnectedAccount, to: str, subject: str, body_text: st
         return SendResult(False, error=f"resend_request_failed: {exc}")
 
 
-def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str]) -> SendResult:
+def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: str, body_html: Optional[str], attachments: Optional[list] = None) -> SendResult:
     """POST to SendGrid's /v3/mail/send. Pure HTTPS — never blocked.
     https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
     """
@@ -254,6 +257,12 @@ def _sendgrid_send(account: ConnectedAccount, to: str, subject: str, body_text: 
             "subject": subject,
             "content": content,
         }
+        atts = [
+            {"content": a["content"], "filename": a["filename"], "type": a["type"], "disposition": "attachment"}
+            for a in _api_attachments(attachments)
+        ]
+        if atts:
+            payload["attachments"] = atts
         with httpx.Client(timeout=20) as client:
             r = client.post(
                 "https://api.sendgrid.com/v3/mail/send",
@@ -304,12 +313,48 @@ def send_via_account(
     return asyncio.run(_smtp_send(account, py))
 
 
+def _api_attachments(attachments: Optional[list]) -> list:
+    """Normalise campaign attachments to the base64-content shape the HTTPS
+    providers (Resend / SendGrid) want: [{filename, content, type}]."""
+    out = []
+    for a in attachments or []:
+        data = (a or {}).get("data")
+        if not data:
+            continue
+        out.append({
+            "filename": a.get("filename") or "attachment",
+            "content": data,  # already base64
+            "type": a.get("content_type") or "application/octet-stream",
+        })
+    return out
+
+
+def _attach_to_pyemail(py: "PyEmail", attachments: Optional[list]) -> None:
+    """Attach base64 files to a python EmailMessage (Gmail / SMTP paths)."""
+    for a in attachments or []:
+        try:
+            raw = base64.b64decode((a or {}).get("data") or "")
+        except Exception:
+            continue
+        if not raw:
+            continue
+        ct = (a.get("content_type") or "application/octet-stream")
+        maintype, _, subtype = ct.partition("/")
+        py.add_attachment(
+            raw,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=a.get("filename") or "attachment",
+        )
+
+
 def send_email_message(
     db: Session,
     message: EmailMessage,
     workspace: Workspace,
     user_id: Optional[str] = None,
     account: "Optional[ConnectedAccount]" = None,
+    attachments: Optional[list] = None,
 ) -> SendResult:
     if message.status not in {"queued", "failed"}:
         return SendResult(False, error="not_sendable")
@@ -344,6 +389,7 @@ def send_email_message(
             message.subject or "(no subject)",
             message.body_text or "",
             message.body_html,
+            attachments,
         )
     elif account.provider == "sendgrid":
         result = _sendgrid_send(
@@ -351,6 +397,7 @@ def send_email_message(
             message.subject or "(no subject)",
             message.body_text or "",
             message.body_html,
+            attachments,
         )
     elif account.provider == "gmail":
         # Build py-email and send via Gmail HTTPS API
@@ -361,6 +408,7 @@ def send_email_message(
         py.set_content(message.body_text or "")
         if message.body_html:
             py.add_alternative(message.body_html, subtype="html")
+        _attach_to_pyemail(py, attachments)
         result = _gmail_send(account, py)
     else:
         # SMTP fallback — won't work on Render free, surfaces clear error
@@ -371,6 +419,7 @@ def send_email_message(
         py.set_content(message.body_text or "")
         if message.body_html:
             py.add_alternative(message.body_html, subtype="html")
+        _attach_to_pyemail(py, attachments)
         result = asyncio.run(_smtp_send(account, py))
 
     message.from_address = account.external_id or ""

@@ -23,6 +23,12 @@ export interface SendConfig {
   sendgrid_api_key?: string;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content_type: string;
+  data: string; // base64
+}
+
 export interface EmailJob {
   recipient_id: string;
   message_id: string;
@@ -34,6 +40,7 @@ export interface EmailJob {
   text: string;
   amp_html?: string;
   preview_text?: string;
+  attachments?: EmailAttachment[];
   send_config: SendConfig;
 }
 
@@ -80,6 +87,7 @@ export async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: str
   const fromHeader = job.from_name
     ? `${job.from_name} <${job.from_email}>`
     : job.from_email;
+  const atts = (job.attachments || []).filter((a) => a && a.data);
 
   if (send_config.provider === "smtp" && send_config.smtp) {
     const { host, port, username, password } = send_config.smtp;
@@ -110,6 +118,13 @@ export async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: str
         text: job.text || undefined,
         alternatives: alternatives.length ? alternatives : undefined,
         headers: Object.keys(headers).length ? headers : undefined,
+        attachments: atts.length
+          ? atts.map((a) => ({
+              filename: a.filename,
+              content: Buffer.from(a.data, "base64"),
+              contentType: a.content_type,
+            }))
+          : undefined,
       };
       await t.sendMail(mailOptions);
       try {
@@ -146,6 +161,9 @@ export async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: str
           subject: job.subject,
           html: job.html || undefined,
           text: job.text || undefined,
+          attachments: atts.length
+            ? atts.map((a) => ({ filename: a.filename, content: a.data }))
+            : undefined,
         }),
       });
       if (res.ok) return { ok: true };
@@ -172,6 +190,14 @@ export async function sendJob(job: EmailJob): Promise<{ ok: boolean; error?: str
             ...(job.html ? [{ type: "text/html", value: job.html }] : []),
             ...(job.text ? [{ type: "text/plain", value: job.text }] : []),
           ],
+          attachments: atts.length
+            ? atts.map((a) => ({
+                content: a.data,
+                filename: a.filename,
+                type: a.content_type,
+                disposition: "attachment",
+              }))
+            : undefined,
         }),
       });
       if (res.status === 202) return { ok: true };

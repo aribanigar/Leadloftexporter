@@ -424,6 +424,35 @@ class FollowUpIn(BaseModel):
     status: str = "draft"
 
 
+class AttachmentIn(BaseModel):
+    filename: str = Field(default="attachment", max_length=260)
+    content_type: str = Field(default="application/octet-stream", max_length=160)
+    data: str = ""  # base64-encoded file bytes
+
+
+# Total decoded attachment budget per campaign — keeps the DB (and every email)
+# from ballooning. base64 stored, so on-disk is ~1.33× this.
+_MAX_ATTACH_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _sanitize_attachments(items) -> list[dict]:
+    """Validate + cap campaign attachments; drop empties, enforce total size."""
+    out: list[dict] = []
+    total = 0
+    for a in items or []:
+        data = getattr(a, "data", None) if not isinstance(a, dict) else a.get("data")
+        if not data:
+            continue
+        fn = (getattr(a, "filename", None) if not isinstance(a, dict) else a.get("filename")) or "attachment"
+        ct = (getattr(a, "content_type", None) if not isinstance(a, dict) else a.get("content_type")) or "application/octet-stream"
+        # base64 length → approx decoded bytes
+        total += (len(data) * 3) // 4
+        if total > _MAX_ATTACH_BYTES:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "attachments_too_large_max_10mb")
+        out.append({"filename": str(fn)[:260], "content_type": str(ct)[:160], "data": data})
+    return out
+
+
 class RecipientRowIn(BaseModel):
     email: str
     name: Optional[str] = None
@@ -447,6 +476,7 @@ class CampaignCreateIn(BaseModel):
     goal: Optional[str] = None
     tags: list[str] = []
     follow_ups: list[FollowUpIn] = []
+    attachments: list[AttachmentIn] = []
     # Personalisation.
     merge_columns: list[str] = []
     # Arbitrary pasted / CSV recipients (NOT tied to CRM leads).
@@ -479,6 +509,7 @@ class CampaignUpdateIn(BaseModel):
     goal: Optional[str] = None
     tags: Optional[list[str]] = None
     follow_ups: Optional[list[FollowUpIn]] = None
+    attachments: Optional[list[AttachmentIn]] = None
     sender_account_ids: Optional[list[str]] = None
     batch_size: Optional[int] = None
     seconds_between_sends: Optional[int] = None
@@ -684,6 +715,7 @@ def create_campaign(
         goal=body.goal,
         tags=body.tags or [],
         follow_ups=[f.model_dump() for f in body.follow_ups],
+        attachments=_sanitize_attachments(body.attachments),
         merge_columns=body.merge_columns or [],
         recipient_data=[r.model_dump() for r in body.recipients],
         recipient_sources={
@@ -882,6 +914,19 @@ def get_campaign(
     return _campaign_dict(c, db)
 
 
+@router.get("/{campaign_id}/attachments")
+def get_campaign_attachments(
+    campaign_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Full attachment payloads (with base64 data) — fetched only when EDITING a
+    campaign so the builder can round-trip existing files losslessly. Kept off
+    the main detail response so list/detail stay small."""
+    c = _own_campaign(db, ctx, campaign_id)
+    return {"attachments": c.attachments or []}
+
+
 def _campaign_dict(c: Campaign, db: Session | None = None) -> dict:
     d: dict = {
         "id": c.id,
@@ -899,6 +944,15 @@ def _campaign_dict(c: Campaign, db: Session | None = None) -> dict:
         "goal": c.goal,
         "tags": c.tags or [],
         "follow_ups": c.follow_ups or [],
+        # Attachment metadata only (never ship the base64 back on list/detail).
+        "attachments": [
+            {
+                "filename": a.get("filename", "attachment"),
+                "content_type": a.get("content_type", ""),
+                "size": (len(a.get("data", "")) * 3) // 4,
+            }
+            for a in (c.attachments or [])
+        ],
         "merge_columns": c.merge_columns or [],
         "recipient_data": c.recipient_data or [],
         "recipient_sources": c.recipient_sources or {},
@@ -954,6 +1008,9 @@ def update_campaign(
         data["follow_ups"] = [
             f if isinstance(f, dict) else f.model_dump() for f in body.follow_ups
         ]
+    # Attachments: replace the whole list when provided (validated + size-capped).
+    if body.attachments is not None:
+        c.attachments = _sanitize_attachments(body.attachments)
     for field in (
         "name", "subject", "preheader", "body_html", "body_text",
         "body_amp", "preview_text", "brand_color",
@@ -1918,6 +1975,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
                 ws,
                 user_id=ctx_user_id or campaign.user_id,
                 account=sender,
+                attachments=campaign.attachments or [],
             )
             if result.ok:
                 r.status = "sent"
@@ -2162,6 +2220,12 @@ def _prepare_tick_batch(
             "text": body_text or "",
             "amp_html": body_amp or "",
             "preview_text": campaign.preview_text or "",
+            "attachments": [
+                {"filename": a.get("filename", "attachment"),
+                 "content_type": a.get("content_type", "application/octet-stream"),
+                 "data": a.get("data", "")}
+                for a in (campaign.attachments or []) if a.get("data")
+            ],
             "send_config": send_config,
         })
 
