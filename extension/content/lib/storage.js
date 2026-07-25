@@ -15,7 +15,7 @@
   const KEY_PREFIX = "leadcaptura:";
 
   const DEFAULTS = {
-    apiUrl: "http://localhost:8000",
+    apiUrl: "https://leadloftexporter-1.onrender.com",
     apiKey: "",
     enabled: true,
     // Autopilot defaults ON so bulk-message jobs the user just queued in the

@@ -6,7 +6,7 @@ const $ = (s) => document.querySelector(s);
 const DEFAULT_CV = "";
 
 const DEFAULTS = {
-  apiUrl: "https://leadloftexporter.onrender.com",
+  apiUrl: "https://leadloftexporter-1.onrender.com",
   apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
   enabled: true,
   autopilot: false,
