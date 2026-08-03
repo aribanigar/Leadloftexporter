@@ -54,6 +54,8 @@ export default function PipelinePage() {
   const [view, setView] = useState<"board" | "list">("list");
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"any" | "me">("any");
+  const [titleQuery, setTitleQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   const [sortIdx, setSortIdx] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -187,6 +189,10 @@ export default function PipelinePage() {
     let list = leads?.items ?? [];
     if (stageFilter) list = list.filter((l) => stageOf(l) === stageFilter);
     if (ownerFilter === "me") list = list.filter((l) => l.owner_id);
+    const tq = titleQuery.trim().toLowerCase();
+    if (tq) list = list.filter((l) => (l.title || "").toLowerCase().includes(tq));
+    const lq = locationQuery.trim().toLowerCase();
+    if (lq) list = list.filter((l) => (l.location || "").toLowerCase().includes(lq));
     list = [...list].sort((a, b) => {
       const av = (a[sort.key] as string | null | undefined) ?? "";
       const bv = (b[sort.key] as string | null | undefined) ?? "";
@@ -195,7 +201,7 @@ export default function PipelinePage() {
       return sort.dir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [leads, stages, stageFilter, ownerFilter, sortIdx]);
+  }, [leads, stages, stageFilter, ownerFilter, sortIdx, titleQuery, locationQuery]);
 
   const leadsById = useMemo(() => {
     const m = new Map<string, Lead>();
@@ -373,6 +379,30 @@ export default function PipelinePage() {
             </DDItem>
           ))}
         </Dropdown>
+
+        <span className="h-4 w-px bg-slate-200" />
+
+        {/* Title + Location search — e.g. "marketing manager" in "Riyadh" */}
+        <input
+          value={titleQuery}
+          onChange={(e) => setTitleQuery(e.target.value)}
+          placeholder="Title (e.g. marketing manager)"
+          className="w-52 max-w-[40vw] rounded-md border border-slate-200 px-2.5 py-1 text-sm placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+        />
+        <input
+          value={locationQuery}
+          onChange={(e) => setLocationQuery(e.target.value)}
+          placeholder="Location (e.g. Riyadh)"
+          className="w-44 max-w-[40vw] rounded-md border border-slate-200 px-2.5 py-1 text-sm placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+        />
+        {(titleQuery || locationQuery) && (
+          <button
+            onClick={() => { setTitleQuery(""); setLocationQuery(""); }}
+            className="text-xs font-medium text-rose-600 hover:underline"
+          >
+            Clear
+          </button>
+        )}
 
         <span className="ml-auto flex items-center gap-2 text-xs text-slate-500">
           {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

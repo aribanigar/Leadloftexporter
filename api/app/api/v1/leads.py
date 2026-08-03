@@ -54,6 +54,8 @@ def list_leads(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
     q: Optional[str] = None,
+    title: Optional[str] = None,
+    location: Optional[str] = None,
     stage_id: Optional[str] = None,
     stage_slug: Optional[List[str]] = Query(None),
     owner_id: Optional[str] = None,
@@ -77,9 +79,16 @@ def list_leads(
                 Lead.full_name.ilike(like),
                 Lead.email.ilike(like),
                 Lead.title.ilike(like),
+                Lead.location.ilike(like),
                 Lead.linkedin_url.ilike(like),
             )
         )
+    # Dedicated job-title filter (e.g. "marketing manager").
+    if title:
+        base = base.filter(Lead.title.ilike(f"%{title.strip()}%"))
+    # Dedicated location filter (e.g. "Riyadh", "Saudi Arabia").
+    if location:
+        base = base.filter(Lead.location.ilike(f"%{location.strip()}%"))
     if stage_id:
         base = base.filter(Lead.stage_id == stage_id)
     if stage_slug:
