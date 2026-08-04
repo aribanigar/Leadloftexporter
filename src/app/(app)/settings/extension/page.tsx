@@ -25,14 +25,14 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.370",
-    date: "Jul 25, 2026",
+    version: "1.0.371",
+    date: "Jul 26, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.370.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.371.zip",
     latest: true,
     changes: [
-      "Smoother self-update: after the extension updates itself, any open LinkedIn tab now detects the change instantly and auto-refreshes to the new version — you no longer see the 'Extension was just reloaded — refresh this tab' error in the console or the browser's extensions panel. It's a self-heal + logging fix only; capture and Mass Apply behave exactly as before.",
-      "Protected package (minified/hardened so it can't be casually copied) with all recent features: smarter Mass Apply answer memory (Yes/No + multiple-choice), built-in phone-style updates (toolbar dot + one-click download & restart), and the CRM speed improvements.",
+      "Connect All is much faster: the wait between profiles is now capped at 35 seconds (it used to run up to ~3 minutes). It stays randomized to look human — roughly 8–35s, mostly around 15–20s — just with no more long stalls between people.",
+      "Also includes the smoother self-update (open LinkedIn tabs auto-refresh after an update, no 'Extension was just reloaded' error) and all recent features: smarter Mass Apply answer memory, phone-style in-extension updates, and CRM speed improvements. Protected package (minified/hardened so it can't be casually copied).",
     ],
   },
 ];

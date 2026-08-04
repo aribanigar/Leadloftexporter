@@ -27,7 +27,8 @@
 //
 // Anti-bot rules honoured (see CLAUDE.md > Bot-detection avoidance):
 //   - Read-only DOM. Never calls LinkedIn internal APIs.
-//   - 45-180s gap between consequential actions, with ~18% long-tail.
+//   - 8-35s randomized gap between consequential actions (~20% long-tail),
+//     hard-capped at 35s so a run never stalls on a huge wait.
 //   - Human-paced click sequence (pointerover/down/up/click) with realistic
 //     coordinates.
 //   - Aborts on captcha/checkpoint pages.
@@ -45,13 +46,18 @@
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   function rand(min, max) { return min + Math.random() * (max - min); }
 
-  // Human-paced delay between consequential actions:
-  //   55% → 45–75s, 27% → 70–130s, 18% → 60–180s long tail
+  // Human-paced delay between consequential actions — HARD-CAPPED at 35s.
+  // Still a randomized 3-tier spread so the gap looks human (never a fixed
+  // value), just compressed into the 8–35s band the user asked for:
+  //   50% → 8–18s, 30% → 16–28s, 20% → 25–35s long tail.
+  // The Math.min is a belt-and-suspenders ceiling so no path can ever exceed 35s.
   function nextActionDelayMs() {
     const r = Math.random();
-    if (r < 0.18) return 60000 + rand(0, 120000);
-    if (r < 0.45) return 70000 + rand(0, 60000);
-    return 45000 + rand(0, 30000);
+    let ms;
+    if (r < 0.20) ms = 25000 + rand(0, 10000);        // long tail 25–35s
+    else if (r < 0.50) ms = 16000 + rand(0, 12000);   // 16–28s
+    else ms = 8000 + rand(0, 10000);                  // 8–18s
+    return Math.min(35000, ms);
   }
 
   function onSearchPeoplePage() {

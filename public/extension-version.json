@@ -1,5 +1,5 @@
 {
-  "version": "1.0.370",
-  "zip": "/extensions/leadcaptura-extension-v1.0.370.zip",
-  "notes": "Smoother self-update: after the extension updates itself, any open LinkedIn tab now detects the change instantly and auto-refreshes to the new version — no more 'Extension was just reloaded' error in the console or the extensions panel. Also points fresh installs at the current backend. Purely self-heal + config; capture and Mass Apply behave exactly as before."
+  "version": "1.0.371",
+  "zip": "/extensions/leadcaptura-extension-v1.0.371.zip",
+  "notes": "Connect All is faster: the wait between profiles is now capped at 35 seconds (was up to ~3 minutes). It's still randomized to stay human-like (roughly 8–35s, mostly ~15–20s), just no more long stalls."
 }
