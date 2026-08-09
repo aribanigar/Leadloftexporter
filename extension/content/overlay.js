@@ -3868,9 +3868,15 @@
     if (/\bcity\b|current location|where are you (based|located)|^location$/i.test(l)) return p.city || null;
     if (/\bcountry\b/i.test(l)) return p.country || null;
     if (/nationality|citizen(ship)?/i.test(l)) return p.nationality || null;
-    if (/highest.*degree|level.*education|qualification/i.test(l) && options) return p.education || null;
+    if (/highest.*(degree|education|qualification)|level.*education|education.*level|\bqualification\b|\bdegree\b/i.test(l) && options) return p.education || null;
     if (/gender|pronouns/i.test(l) && options) return p.gender || null;
     if (/race|ethnicity|veteran|disability/i.test(l) && options) return p.diversity || null;
+    // Additional profile fields (were missing — these questions used to stay
+    // blank / fall to AI even though the user had saved the answer).
+    if (/current[^a-z]{0,4}(job )?title|present title|current role|most recent[^a-z]{0,4}(job )?title|\bjob title\b|current position|position you (currently )?hold/i.test(l)) return p.jobTitle || null;
+    if (/language/i.test(l)) return p.languages || null;
+    if (/visa status|residenc|iqama|residence permit|current visa|work.?permit.*status/i.test(l)) return p.visaStatus || null;
+    if (/driving licen|driver'?s? licen|driving license/i.test(l)) return p.drivingLicense || null;
 
     // ---- Safe universal defaults for required compliance questions ----
     if (/relocat/i.test(l)) return _yesNoOption(p.relocate || "Yes", options);

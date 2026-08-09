@@ -1,5 +1,5 @@
 {
-  "version": "1.0.373",
-  "zip": "/extensions/leadcaptura-extension-v1.0.373.zip",
-  "notes": "Application profile now fills forms more perfectly: the details you save in Options (name, email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender, links) auto-fill the matching LinkedIn Easy Apply questions. First-name and Last-name boxes are now filled correctly from your full name, and 'When can you start / availability' questions use your notice period. Saving the profile updates the running auto-apply instantly."
+  "version": "1.0.374",
+  "zip": "/extensions/leadcaptura-extension-v1.0.374.zip",
+  "notes": "Both auto-apply engines now fill LinkedIn Easy Apply forms from your saved Application profile. Fixed the 'Apply All' toolbar engine so it also uses your job title, languages, residency/visa status and driving licence (previously it skipped those), plus broader education matching. Save your profile in the extension Options and it fills every matching question — with the learned-answer memory covering anything else."
 }

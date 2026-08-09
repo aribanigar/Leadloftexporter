@@ -25,15 +25,15 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.373",
-    date: "Jul 28, 2026",
+    version: "1.0.374",
+    date: "Jul 29, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.373.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.374.zip",
     latest: true,
     changes: [
-      "Application profile fills forms perfectly: the details you save in the extension Options — name, email, phone, nationality, city, country, job title, years of experience, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender and links — now auto-fill the matching LinkedIn Easy Apply questions. First-name and Last-name boxes are filled correctly from your full name, and “When can you start / availability” questions use your notice period. Saving the profile updates the running auto-apply instantly.",
-      "Answer memory (from the previous update) keeps learning every new question you answer — text, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers it next time. “Reset learned answers” button + a live count live in Options. Your API key and settings are always kept.",
-      "Also includes: Connect All wait capped at 35s (still randomized/human) and the smoother self-update. Protected package.",
+      "Both auto-apply engines now fill LinkedIn Easy Apply forms from your saved Application profile. The “Apply All” toolbar engine was missing a few fields — it now also uses your job title, languages, residency/visa status and driving licence (previously it left those blank or guessed), plus broader education matching. The “Mass Apply Jobs” engine already used the full profile.",
+      "Everything you save in the extension Options — name (incl. first/last), email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender and links — auto-fills the matching questions. Saving the profile updates the running auto-apply instantly.",
+      "The learned-answer memory still covers anything the profile can't: it remembers every new question you answer (text, dropdowns, Yes/No, multiple-choice, checkboxes) and reuses it next time. “Reset learned answers” + a live count live in Options. Protected package.",
     ],
   },
 ];
