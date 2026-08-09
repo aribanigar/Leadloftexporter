@@ -404,6 +404,35 @@ async function saveApplicationProfileOnly() {
   }
 }
 
+// Show how many questions the engine has memorised (in the profile card).
+async function refreshMemoryCount() {
+  const el = $("#ap_mem_count");
+  if (!el) return;
+  try {
+    const { lc_learned_answers } = await chrome.storage.local.get("lc_learned_answers");
+    const n = lc_learned_answers && typeof lc_learned_answers === "object"
+      ? Object.keys(lc_learned_answers).length : 0;
+    el.textContent = n
+      ? `It currently remembers ${n} answer${n === 1 ? "" : "s"}.`
+      : "It hasn't learned any answers yet.";
+  } catch (_) { el.textContent = ""; }
+}
+
+// Clear the learned-answers memory on demand. Keeps the API key, settings, and
+// the application profile above — only the auto-learned Q&A is wiped, and the
+// engine picks it up live via the chrome.storage.onChanged listener, then
+// re-learns from scratch as new questions are answered.
+async function resetLearnedAnswers() {
+  const el = $("#ap_status");
+  try {
+    await chrome.storage.local.remove("lc_learned_answers");
+    await refreshMemoryCount();
+    if (el) { el.textContent = "Learned answers cleared ✓ — the engine will re-learn as you apply."; el.className = "status ok"; }
+  } catch (e) {
+    if (el) { el.textContent = "Couldn't reset: " + (e.message || e); el.className = "status err"; }
+  }
+}
+
 async function onSave() {
   await save({
     apiUrl: $("#apiUrl").value.trim().replace(/\/+$/, ""),
@@ -513,6 +542,8 @@ async function init() {
 
   $("#save").addEventListener("click", onSave);
   $("#ap_save").addEventListener("click", saveApplicationProfileOnly);
+  $("#ap_reset_memory").addEventListener("click", resetLearnedAnswers);
+  refreshMemoryCount();
   $("#test").addEventListener("click", testConnection);
   $("#test-gemini").addEventListener("click", testGemini);
   $("#toggle-show").addEventListener("click", () => {

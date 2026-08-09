@@ -1126,9 +1126,18 @@
     scope.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       if (cb.id === "follow-company-checkbox") return;     // handled separately
       const required = cb.required || cb.getAttribute("aria-required") === "true";
-      if (required && !cb.checked) {
+      // Recall the user's past choice for THIS box. A box they ticked before
+      // (learned "yes") auto-ticks even when optional; required boxes always tick
+      // (submission needs them). We NEVER untick — unchecking a consent box could
+      // break submission — so a learned "no" just means "leave this optional box
+      // alone."
+      const learned = (LEARNED[_normLabel("checkbox: " + _labelForField(scope, cb))] || "").toLowerCase();
+      const shouldCheck = learned === "yes" || required;
+      if (shouldCheck && !cb.checked) {
         const l = cb.id && scope.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(cb.id) : cb.id) + '"]');
         humanClick(l || cb);
+        // Mark our own tick so learnFromScope never records the engine's guess.
+        try { cb.setAttribute("data-lc-autofilled", "1"); } catch (_) {}
       }
     });
   }
@@ -1177,6 +1186,17 @@
         seenGroups[r.name] = 1;
         const optText = _radioOptionText(scope, r);
         if (optText) rememberAnswer(_groupLabel(scope, r), optText);
+      });
+      // Checkboxes: remember whether the user ticked each labeled box (yes/no),
+      // keyed under a "checkbox:" namespace so it never collides with a text or
+      // radio question of the same wording. Skip the engine's own ticks
+      // (data-lc-autofilled) and the Follow-company box (handled separately).
+      scope.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        if (cb.id === "follow-company-checkbox") return;
+        if (cb.getAttribute("data-lc-autofilled") === "1") return;
+        const label = _labelForField(scope, cb);
+        if (!label) return;
+        rememberAnswer("checkbox: " + label, cb.checked ? "yes" : "no");
       });
     } catch (_) {}
   }

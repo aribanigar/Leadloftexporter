@@ -1524,6 +1524,22 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     }
   } catch {}
 
+  // One-time FRESH-START reset of the auto-apply answer memory. The user asked
+  // to wipe everything the extension had learned/stored so far and let it build
+  // a clean memory from scratch. We clear the learned-answers map AND the saved
+  // application profile (it reverts to the code's neutral defaults), guarded by
+  // a sentinel so it happens exactly once. The API key + core settings are NOT
+  // touched, so the extension keeps working — only the answer memory resets, and
+  // it re-learns every question as the user answers it going forward.
+  try {
+    const { lcMemoryResetV372 } = await chrome.storage.local.get("lcMemoryResetV372");
+    if (!lcMemoryResetV372) {
+      await chrome.storage.local.remove(["lc_learned_answers", "lc_apply_profile"]);
+      await chrome.storage.local.set({ lcMemoryResetV372: true });
+      console.log("[LeadCaptura SW] fresh-start: wiped learned answers + apply profile (one-time v372 reset)");
+    }
+  } catch {}
+
   // Reconcile update state on install/update: after an update lands, the
   // running version now equals (or exceeds) the manifest's latest, so this
   // clears the "update available" flag + toolbar badge automatically.

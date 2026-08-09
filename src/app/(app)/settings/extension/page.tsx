@@ -25,14 +25,15 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.371",
-    date: "Jul 26, 2026",
+    version: "1.0.372",
+    date: "Jul 27, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.371.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.372.zip",
     latest: true,
     changes: [
-      "Connect All is much faster: the wait between profiles is now capped at 35 seconds (it used to run up to ~3 minutes). It stays randomized to look human — roughly 8–35s, mostly around 15–20s — just with no more long stalls between people.",
-      "Also includes the smoother self-update (open LinkedIn tabs auto-refresh after an update, no 'Extension was just reloaded' error) and all recent features: smarter Mass Apply answer memory, phone-style in-extension updates, and CRM speed improvements. Protected package (minified/hardened so it can't be casually copied).",
+      "Fresh start for answer memory: this update wipes everything the extension had learned or stored so far and begins a clean memory. From now on it remembers your answer to every job-application question — text boxes, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers the same question next time, getting smarter the more you apply.",
+      "New “Reset learned answers” button in the extension Options if you ever want to start over, plus a live count of how many answers it has memorised. Your API key and settings are always kept.",
+      "Also includes: Connect All wait capped at 35s (was up to ~3 min, still randomized/human), smoother self-update (open tabs auto-refresh, no 'Extension was just reloaded' error), and the CRM speed improvements. Protected package.",
     ],
   },
 ];

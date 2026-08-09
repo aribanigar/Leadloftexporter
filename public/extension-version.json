@@ -1,5 +1,5 @@
 {
-  "version": "1.0.371",
-  "zip": "/extensions/leadcaptura-extension-v1.0.371.zip",
-  "notes": "Connect All is faster: the wait between profiles is now capped at 35 seconds (was up to ~3 minutes). It's still randomized to stay human-like (roughly 8–35s, mostly ~15–20s), just no more long stalls."
+  "version": "1.0.372",
+  "zip": "/extensions/leadcaptura-extension-v1.0.372.zip",
+  "notes": "Fresh start for answer memory: on this update the extension wipes everything it had learned/stored so far and begins building a clean memory. From now on it remembers your answer to every job-application question — text, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers the same question next time, getting smarter the more you apply. New 'Reset learned answers' button in Options if you ever want to start over. Your API key and settings are kept."
 }
