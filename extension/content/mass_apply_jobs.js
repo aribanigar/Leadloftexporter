@@ -954,14 +954,51 @@
     } catch (_) {}
   }
 
+  // Recall a previously-learned answer for THIS question. An exact (normalized)
+  // match wins outright; otherwise we fuzzily find the closest question already
+  // answered and reuse it — this is what makes a RE-WORDED but equivalent
+  // question ("What's your notice period?" vs "Notice period") auto-answer
+  // without asking again. Deliberately conservative so unrelated questions never
+  // borrow each other's answers:
+  //   - require ≥2 meaningful tokens before fuzzy-matching at all;
+  //   - accept only heavy token overlap (Jaccard ≥ 0.72) OR one question fully
+  //     containing the other — so "years experience in marketing" does NOT take
+  //     the answer to "years experience in sales" (overlap only 0.5).
+  // Purely additive: returns null when nothing is confidently similar, so every
+  // existing caller behaves exactly as before.
+  function _learnedAnswer(rawLabel) {
+    const key = _normLabel(rawLabel);
+    if (!key) return null;
+    if (LEARNED[key] != null && LEARNED[key] !== "") return LEARNED[key]; // exact
+    const kt = key.split(" ").filter((t) => t.length > 2);
+    if (kt.length < 2) return null; // too short to fuzzy-match safely
+    const kset = new Set(kt);
+    let best = null, bestScore = 0;
+    for (const lk in LEARNED) {
+      const val = LEARNED[lk];
+      if (val == null || val === "") continue;
+      const lt = lk.split(" ").filter((t) => t.length > 2);
+      if (lt.length < 2) continue;
+      const lset = new Set(lt);
+      let inter = 0;
+      kset.forEach((t) => { if (lset.has(t)) inter++; });
+      const union = new Set([...kset, ...lset]).size;
+      const jac = union ? inter / union : 0;
+      const contained = key.length > lk.length ? key.includes(lk) : lk.includes(key);
+      const score = contained ? Math.max(jac, 0.85) : jac;
+      if (score > bestScore) { bestScore = score; best = val; }
+    }
+    return bestScore >= 0.72 ? best : null;
+  }
+
   // Map a question label → a sensible answer from the Apply Profile. Order
   // matters: specific patterns first. Returns null if no rule matches.
   function answerForLabel(rawLabel) {
     const l = (rawLabel || "").toLowerCase().replace(/\s+/g, " ").trim();
     if (!l) return null;
     // 0) Learned answers win — anything the user has answered before for this
-    //    exact question is reused automatically.
-    const learned = LEARNED[_normLabel(rawLabel)];
+    //    question (exact OR fuzzily-similar) is reused automatically.
+    const learned = _learnedAnswer(rawLabel);
     if (learned != null && learned !== "") return learned;
     // Identity fields from the saved profile.
     // Split-name questions FIRST — LinkedIn sometimes asks First/Last separately,
@@ -1228,6 +1265,16 @@
     try { checkRequiredBoxes(scope); } catch (_) {}
     try { untickFollowCompany(scope); } catch (_) {}
   }
+
+  // Share this engine's answerer with the OTHER apply engine (overlay.js
+  // "Apply All"), which runs in the SAME isolated world. Exposing it via a
+  // globalThis PROPERTY (never mangled by the protected build, same pattern as
+  // __lcOverlay etc.) lets Apply All answer from the SAME saved profile +
+  // learned memory + fuzzy recall this engine uses, so both buttons behave
+  // identically. Read-only for the consumer — it never writes back, so it can't
+  // corrupt the memory; Apply All degrades to its own logic when this isn't
+  // present (guarded ?. on that side). Purely additive.
+  try { globalThis.__lcAnswerForLabel = answerForLabel; } catch (_) {}
 
   // Is THIS dialog node the Easy Apply modal? Detected STRUCTURALLY so we
   // never accidentally close it on a step whose visible text doesn't happen

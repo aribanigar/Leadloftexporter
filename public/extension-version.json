@@ -1,5 +1,5 @@
 {
-  "version": "1.0.374",
-  "zip": "/extensions/leadcaptura-extension-v1.0.374.zip",
-  "notes": "Both auto-apply engines now fill LinkedIn Easy Apply forms from your saved Application profile. Fixed the 'Apply All' toolbar engine so it also uses your job title, languages, residency/visa status and driving licence (previously it skipped those), plus broader education matching. Save your profile in the extension Options and it fills every matching question — with the learned-answer memory covering anything else."
+  "version": "1.0.375",
+  "zip": "/extensions/leadcaptura-extension-v1.0.375.zip",
+  "notes": "Smarter, shared answer memory across BOTH apply buttons. The 'Mass Apply Jobs' engine already auto-fills from your saved profile and learns answers; it now also answers RE-WORDED but equivalent questions from memory (e.g. 'Notice period' vs 'What's your notice period?') without asking again — while carefully never borrowing an answer from a genuinely different question. The 'Apply All' toolbar now reads the same shared profile + learned memory + fuzzy recall, so both buttons behave the same. Save your Application profile in Options; anything not there is learned the first time you answer it."
 }

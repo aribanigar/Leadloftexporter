@@ -3902,6 +3902,23 @@
     return null;
   }
 
+  // Answer from the SHARED profile + learned-memory answerer that the Mass Apply
+  // engine exposes on globalThis (__lcAnswerForLabel) — both content scripts run
+  // in the same isolated world. This gives "Apply All" the same saved-profile
+  // mapping, learned answers and fuzzy "similar question" recall the green
+  // "Mass Apply Jobs" button already has. Guarded + read-only: if that engine
+  // isn't on the page it returns null and the caller falls back to its own
+  // _matchProfileAnswer + AI exactly as before. Purely additive.
+  function _sharedAnswer(label) {
+    try {
+      if (globalThis.__lcAnswerForLabel && label) {
+        const a = globalThis.__lcAnswerForLabel(label);
+        if (a != null && String(a).trim() !== "") return a;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function _pickOption(options, desired) {
     if (!desired) return null;
     const d = String(desired).toLowerCase().trim();
@@ -3968,7 +3985,8 @@
       const label = _fieldLabelFor(inp);
       if (!label) continue;
       const isNumber = inp.type === "number" || /\b(year|years|salary|number|how many|amount|ctc|experience)\b/i.test(label);
-      let ans = _matchProfileAnswer(label, profile, isNumber ? "number" : "text", null);
+      let ans = _sharedAnswer(label);
+      if (ans == null) ans = _matchProfileAnswer(label, profile, isNumber ? "number" : "text", null);
       if (ans == null) ans = await askGemini(label, isNumber ? "number" : "text", null);
       if (ans != null && String(ans).trim()) {
         let val = String(ans).trim();
@@ -3988,7 +4006,8 @@
       const options = Array.from(sel.options).map((o) => o.text.trim())
         .filter((t) => t && !/^(select|choose|please|--)/i.test(t));
       if (!options.length) continue;
-      let ans = _matchProfileAnswer(label, profile, "select", options);
+      let ans = _sharedAnswer(label);
+      if (ans == null) ans = _matchProfileAnswer(label, profile, "select", options);
       if (ans == null) ans = await askGemini(label, "select", options);
       const pick = ans ? _pickOption(options, ans) : null;
       if (pick) {
@@ -4001,7 +4020,8 @@
     for (const group of _groupRadios(modal)) {
       if (group.radios.some((r) => r.checked)) continue;
       const options = group.radios.map((r) => _radioLabel(r));
-      let ans = _matchProfileAnswer(group.question, profile, "radio", options);
+      let ans = _sharedAnswer(group.question);
+      if (ans == null) ans = _matchProfileAnswer(group.question, profile, "radio", options);
       if (ans == null) ans = await askGemini(group.question, "radio", options);
       const pick = ans ? _pickOption(options, ans) : null;
       if (pick) {
@@ -4059,7 +4079,8 @@
         opts = getOptions();
       }
       if (!opts.length) continue;
-      let ans = _matchProfileAnswer(label, profile, "select", opts);
+      let ans = _sharedAnswer(label);
+      if (ans == null) ans = _matchProfileAnswer(label, profile, "select", opts);
       if (ans == null) ans = await askGemini(label, "select", opts);
       const pick = ans ? _pickOption(opts, ans) : null;
       if (pick) {

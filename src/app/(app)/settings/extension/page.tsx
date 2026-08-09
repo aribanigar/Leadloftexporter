@@ -25,15 +25,15 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.374",
-    date: "Jul 29, 2026",
+    version: "1.0.375",
+    date: "Jul 30, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.374.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.375.zip",
     latest: true,
     changes: [
-      "Both auto-apply engines now fill LinkedIn Easy Apply forms from your saved Application profile. The “Apply All” toolbar engine was missing a few fields — it now also uses your job title, languages, residency/visa status and driving licence (previously it left those blank or guessed), plus broader education matching. The “Mass Apply Jobs” engine already used the full profile.",
-      "Everything you save in the extension Options — name (incl. first/last), email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender and links — auto-fills the matching questions. Saving the profile updates the running auto-apply instantly.",
-      "The learned-answer memory still covers anything the profile can't: it remembers every new question you answer (text, dropdowns, Yes/No, multiple-choice, checkboxes) and reuses it next time. “Reset learned answers” + a live count live in Options. Protected package.",
+      "Smarter memory, shared across BOTH apply buttons. “Mass Apply Jobs” now also answers RE-WORDED but equivalent questions from memory — e.g. it recalls your answer to “Notice period” when a job asks “What’s your notice period?” — without asking again, while carefully never borrowing an answer from a genuinely different question (so “years of experience in sales” won’t reuse your “…in marketing” answer).",
+      "“Apply All” now reads the same shared saved-profile mapping + learned memory + fuzzy recall that “Mass Apply Jobs” uses, so both buttons fill and answer identically. Everything you save in Options — name (first/last), email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender, links — auto-fills the matching questions.",
+      "Anything the profile can’t answer is learned the first time you answer it and reused next time. “Reset learned answers” + a live count live in Options. Protected package.",
     ],
   },
 ];
