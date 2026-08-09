@@ -1,5 +1,5 @@
 {
-  "version": "1.0.372",
-  "zip": "/extensions/leadcaptura-extension-v1.0.372.zip",
-  "notes": "Fresh start for answer memory: on this update the extension wipes everything it had learned/stored so far and begins building a clean memory. From now on it remembers your answer to every job-application question — text, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers the same question next time, getting smarter the more you apply. New 'Reset learned answers' button in Options if you ever want to start over. Your API key and settings are kept."
+  "version": "1.0.373",
+  "zip": "/extensions/leadcaptura-extension-v1.0.373.zip",
+  "notes": "Application profile now fills forms more perfectly: the details you save in Options (name, email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender, links) auto-fill the matching LinkedIn Easy Apply questions. First-name and Last-name boxes are now filled correctly from your full name, and 'When can you start / availability' questions use your notice period. Saving the profile updates the running auto-apply instantly."
 }

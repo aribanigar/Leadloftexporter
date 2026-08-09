@@ -25,15 +25,15 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: "1.0.372",
-    date: "Jul 27, 2026",
+    version: "1.0.373",
+    date: "Jul 28, 2026",
     size: "145 KB",
-    file: "/extensions/leadcaptura-extension-v1.0.372.zip",
+    file: "/extensions/leadcaptura-extension-v1.0.373.zip",
     latest: true,
     changes: [
-      "Fresh start for answer memory: this update wipes everything the extension had learned or stored so far and begins a clean memory. From now on it remembers your answer to every job-application question — text boxes, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers the same question next time, getting smarter the more you apply.",
-      "New “Reset learned answers” button in the extension Options if you ever want to start over, plus a live count of how many answers it has memorised. Your API key and settings are always kept.",
-      "Also includes: Connect All wait capped at 35s (was up to ~3 min, still randomized/human), smoother self-update (open tabs auto-refresh, no 'Extension was just reloaded' error), and the CRM speed improvements. Protected package.",
+      "Application profile fills forms perfectly: the details you save in the extension Options — name, email, phone, nationality, city, country, job title, years of experience, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender and links — now auto-fill the matching LinkedIn Easy Apply questions. First-name and Last-name boxes are filled correctly from your full name, and “When can you start / availability” questions use your notice period. Saving the profile updates the running auto-apply instantly.",
+      "Answer memory (from the previous update) keeps learning every new question you answer — text, dropdowns, Yes/No, multiple-choice and checkboxes — and auto-answers it next time. “Reset learned answers” button + a live count live in Options. Your API key and settings are always kept.",
+      "Also includes: Connect All wait capped at 35s (still randomized/human) and the smoother self-update. Protected package.",
     ],
   },
 ];

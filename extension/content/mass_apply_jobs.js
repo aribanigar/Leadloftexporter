@@ -964,6 +964,17 @@
     const learned = LEARNED[_normLabel(rawLabel)];
     if (learned != null && learned !== "") return learned;
     // Identity fields from the saved profile.
+    // Split-name questions FIRST — LinkedIn sometimes asks First/Last separately,
+    // and the full-name rule below would otherwise drop the WHOLE name into a
+    // First-name box. Derive both halves from the saved full name.
+    const _full = (APPLY_PROFILE.full_name || "").trim();
+    if (_full && /\b(first name|given name|forename)\b/.test(l) && !/company|last name/.test(l)) {
+      return _full.split(/\s+/)[0];
+    }
+    if (_full && /\b(last name|surname|family name)\b/.test(l)) {
+      const parts = _full.split(/\s+/);
+      return parts.length > 1 ? parts.slice(1).join(" ") : _full;
+    }
     if (/\b(full name|your name|first and last name|name)\b/.test(l) && !/company|manager|reference|user ?name|file/.test(l)) return APPLY_PROFILE.full_name;
     if (/e-?mail/.test(l)) return APPLY_PROFILE.email;
     if (/phone|mobile|contact number/.test(l)) return APPLY_PROFILE.phone;
@@ -977,7 +988,7 @@
     if (/visa status|residenc|iqama|work permit|residence permit/.test(l)) return APPLY_PROFILE.visa_status;
     if (/on-?site|hybrid|remote|work (mode|arrangement|setting)/.test(l)) return APPLY_PROFILE.work_mode;
     if (/years.*experience|how many years|total experience|relevant experience/.test(l)) return APPLY_PROFILE.years_of_experience;
-    if (/notice period/.test(l)) return APPLY_PROFILE.notice_period_days;
+    if (/notice period|availability|when can you (start|join|begin)|available to start|earliest.*start|start date|how soon can you (start|join)/.test(l)) return APPLY_PROFILE.notice_period_days;
     if (/expected .*currency|currency.*expected/.test(l)) return APPLY_PROFILE.expected_salary_currency;
     if (/current .*currency|currency.*current|salary currency/.test(l)) return APPLY_PROFILE.current_salary_currency;
     if (/expected (salary|ctc|compensation)|salary expectation/.test(l)) return APPLY_PROFILE.expected_salary;
