@@ -27,6 +27,8 @@ interface Campaign {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  user_id?: string | null;
+  created_by_name?: string | null;
 }
 
 // Provider → brand colour for the mailbox header chip

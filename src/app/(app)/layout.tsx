@@ -12,12 +12,25 @@ import { CampaignAutoSender } from "@/components/campaign-auto-sender";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, workspace, loading } = useAuth();
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
+
+  // Restricted team-member role (Settings → Manage Team → "Campaigns only"):
+  // hard-redirect away from every CRM section except Campaigns. Settings is
+  // still allowed so the member can change their password / sign out — see
+  // settings/layout.tsx for the matching nav filter. This mirrors the
+  // sidebar's own nav filtering so a restricted member can't just type a URL
+  // to reach a hidden section.
+  useEffect(() => {
+    if (loading || !user) return;
+    const restricted = workspace?.role === "campaigns_only";
+    const allowed = pathname?.startsWith("/campaigns") || pathname?.startsWith("/settings");
+    if (restricted && !allowed) router.replace("/campaigns");
+  }, [workspace, pathname, loading, user, router]);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {

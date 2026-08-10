@@ -59,6 +59,7 @@ from app.models import (
     Lead,
     SenderWarmup,
     Suppression,
+    User,
     Workspace,
 )
 
@@ -585,6 +586,18 @@ def list_campaigns(
     )
     acct_by_id = {a.id: a for a in acct_rows}
 
+    # Creator name per campaign (Campaign.user_id is set on create — see
+    # create_campaign below). Surfaced so a workspace with team members
+    # (Settings → Manage Team) can see who made each campaign in the shared
+    # list, same as the admin's per-member count on that page.
+    creator_ids = {c.user_id for c in rows if c.user_id}
+    creator_by_id: dict[str, str] = {}
+    if creator_ids:
+        for u in db.query(User).filter(User.id.in_(creator_ids)).all():
+            creator_by_id[u.id] = (
+                f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+            )
+
     used_by_campaign: dict[str, set[str]] = {}
     if ids:
         # 1) Recipients that explicitly recorded which account sent them.
@@ -666,6 +679,8 @@ def list_campaigns(
                 "name": c.name,
                 "subject": c.subject,
                 "status": c.status,
+                "user_id": c.user_id,
+                "created_by_name": creator_by_id.get(c.user_id),
                 "total_recipients": c.total_recipients,
                 "sent_count": sent,
                 "failed_count": c.failed_count,

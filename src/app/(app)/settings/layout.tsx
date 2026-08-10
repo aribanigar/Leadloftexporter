@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const SECTIONS = [
   { title: "My Account", items: [
@@ -31,10 +32,21 @@ const SECTIONS = [
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { workspace } = useAuth();
+  // Restricted team-member role: only "My Account" is relevant (change
+  // password, sign out) — every other section manages workspace-wide CRM
+  // data/config outside their intended Campaigns-only scope. This is UI-level
+  // decluttering (same class of gate the rest of Settings already uses —
+  // e.g. workspaces.py:update_current_workspace only 403s owner/admin
+  // server-side); it hides the nav entry but doesn't itself lock the route.
+  const sections =
+    workspace?.role === "campaigns_only"
+      ? SECTIONS.filter((s) => s.title === "My Account")
+      : SECTIONS;
   return (
     <div className="grid h-full grid-cols-[260px_1fr] gap-6 p-6">
       <aside className="space-y-5">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <div key={s.title} className="card p-2">
             <div className="px-2 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               {s.title}

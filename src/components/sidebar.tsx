@@ -55,15 +55,23 @@ const HIDDEN_VIEWS = new Set(["new", "school connect"]);
 export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void } = {}) {
   const pathname = usePathname();
   const { user, workspace } = useAuth();
+  // "campaigns_only" is the restricted team-member role added for
+  // Settings → Manage Team: that member should see ONLY the Campaigns
+  // section (create/send/analyse) — every other CRM nav item, and the
+  // Quick Views section (Finder Lead + saved views, which are Prospecting/
+  // Pipeline features), are hidden for them. Settings stays reachable so
+  // they can still change their password / sign out.
+  const campaignsOnly = workspace?.role === "campaigns_only";
+  const nav = campaignsOnly ? NAV.filter((n) => n.href === "/campaigns") : NAV;
   const { data: views } = useQuery<SavedView[]>({
     queryKey: ["saved-views"],
     queryFn: () => api("/workspaces/current/views"),
-    enabled: !!user,
+    enabled: !!user && !campaignsOnly,
   });
   const { data: stages } = useQuery<PipelineStage[]>({
     queryKey: ["stages"],
     queryFn: () => api("/pipeline/stages"),
-    enabled: !!user,
+    enabled: !!user && !campaignsOnly,
   });
   const [creatingLead, setCreatingLead] = useState(false);
 
@@ -92,7 +100,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       </div>
 
       <nav className="space-y-0.5 px-2 pt-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
             <Link
@@ -134,38 +142,40 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         />
       )}
 
-      <div className="mt-4 px-2">
-        <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          Quick Views
+      {!campaignsOnly && (
+        <div className="mt-4 px-2">
+          <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Quick Views
+          </div>
+          <div className="space-y-0.5">
+            {/* Finder Lead — Google-Maps-scraped businesses, kept separate from the
+                pipeline/prospecting until explicitly added. */}
+            <Link
+              href="/company-finder"
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                pathname?.startsWith("/company-finder")
+                  ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 ring-1 ring-dteal-100"
+                  : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
+              )}
+            >
+              <Building2 className={cn("h-4 w-4", pathname?.startsWith("/company-finder") ? "text-dteal-600" : "text-slate-400")} />
+              Finder Lead
+            </Link>
+            {(views || [])
+              .filter((v) => !HIDDEN_VIEWS.has((v.name || "").trim().toLowerCase()))
+              .map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/prospecting?view=${v.id}`}
+                  className="block truncate rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700"
+                >
+                  {v.name}
+                </Link>
+              ))}
+          </div>
         </div>
-        <div className="space-y-0.5">
-          {/* Finder Lead — Google-Maps-scraped businesses, kept separate from the
-              pipeline/prospecting until explicitly added. */}
-          <Link
-            href="/company-finder"
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-              pathname?.startsWith("/company-finder")
-                ? "bg-gradient-to-r from-dteal-50 to-emerald-50 text-dteal-700 ring-1 ring-dteal-100"
-                : "text-slate-600 hover:bg-dteal-50/60 hover:text-dteal-700"
-            )}
-          >
-            <Building2 className={cn("h-4 w-4", pathname?.startsWith("/company-finder") ? "text-dteal-600" : "text-slate-400")} />
-            Finder Lead
-          </Link>
-          {(views || [])
-            .filter((v) => !HIDDEN_VIEWS.has((v.name || "").trim().toLowerCase()))
-            .map((v) => (
-              <Link
-                key={v.id}
-                href={`/prospecting?view=${v.id}`}
-                className="block truncate rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-emerald-50/60 hover:text-emerald-700"
-              >
-                {v.name}
-              </Link>
-            ))}
-        </div>
-      </div>
+      )}
 
       <div className="mt-auto space-y-0.5 border-t border-slate-100 px-2 py-3">
         <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg bg-gradient-to-r from-mcyellow-400 to-mcyellow-500 px-3 py-2 text-sm font-semibold text-dteal-800 shadow-sm ring-1 ring-mcyellow-600/30 transition-colors hover:from-mcyellow-500 hover:to-mcyellow-600">
