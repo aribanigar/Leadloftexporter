@@ -220,7 +220,7 @@ function AIGeneratorPanel({
               boxSizing: 'border-box',
             }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <select
               value={tone}
               onChange={e => setTone(e.target.value as 'professional' | 'friendly' | 'witty' | 'urgent')}
@@ -1745,7 +1745,7 @@ function NewCampaignPageInner() {
       flexDirection: 'column',
     }}>
       {/* ═══ HEADER BAR ═══════════════════════════════════════════════════════ */}
-      <div style={{
+      <div className="cb-header" style={{
         backgroundColor: T.surfaceContainerLowest,
         borderBottom: `1px solid ${T.surfaceContainer}`,
         padding: '0 28px',
@@ -1831,6 +1831,7 @@ function NewCampaignPageInner() {
               cursor: 'pointer', fontFamily: 'Inter, sans-serif',
               maxWidth: '380px', overflow: 'hidden',
             }}
+            className="cb-from-chip"
           >
             <Icon name="send" size={14} color={form.senderIds.length === 0 ? '#dc2626' : T.primary} />
             <span style={{
@@ -1869,7 +1870,7 @@ function NewCampaignPageInner() {
           }}
         >
           <Icon name={showSplitPreview ? 'visibility' : 'splitscreen'} size={15} />
-          {showSplitPreview ? 'Hide Preview' : 'Live Preview'}
+          <span className="cb-btn-label">{showSplitPreview ? 'Hide Preview' : 'Live Preview'}</span>
         </button>
 
         {/* Save Draft */}
@@ -1897,7 +1898,7 @@ function NewCampaignPageInner() {
           ) : (
             <Icon name={'save'} size={15} />
           )}
-          Save Draft
+          <span className="cb-btn-label">Save Draft</span>
         </button>
 
         {/* Launch Campaign */}
@@ -1926,17 +1927,17 @@ function NewCampaignPageInner() {
           ) : (
             <Icon name={'send'} size={15} />
           )}
-          {sending ? 'Launching…' : 'Launch Campaign'}
+          <span className="cb-btn-label">{sending ? 'Launching…' : 'Launch Campaign'}</span>
         </button>
       </div>
 
       {/* ═══ BODY: split layout ═══════════════════════════════════════════════ */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div className="cb-body-split" style={{ display: 'flex', flex: 1, minHeight: 0 }}>
 
         {/* ─── LEFT PANEL (~340px) ─────────────────────────────────────────── */}
         {/* Soft tinted backdrop so the white PanelSection cards float on top
             instead of being slabs glued to the rail — far less scattered. */}
-        <div style={{
+        <div className="cb-left-rail" style={{
           width: '340px',
           flexShrink: 0,
           background: 'linear-gradient(180deg, #f7f9f7 0%, #f3f5f4 100%)',
@@ -2008,7 +2009,7 @@ function NewCampaignPageInner() {
               </div>
 
               {/* From Name + Email */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="cb-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <span style={alpineLabel()}>From Name</span>
                   <input
@@ -2449,7 +2450,7 @@ function NewCampaignPageInner() {
             <PanelSectionTitle icon="tune">Sending Options</PanelSectionTitle>
 
             {/* Row 1: Batch + Delay */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="cb-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {/* Batch size */}
               <div>
                 <span style={alpineLabel()}>Batch size / tick</span>
@@ -2637,7 +2638,7 @@ function NewCampaignPageInner() {
         {/* ─── END LEFT PANEL ──────────────────────────────────────────────── */}
 
         {/* ─── RIGHT PANEL (main editor area) ─────────────────────────────── */}
-        <div style={{
+        <div className="cb-right-panel" style={{
           flex: 1,
           minWidth: 0,
           display: 'flex',
@@ -2765,7 +2766,7 @@ function NewCampaignPageInner() {
               </div>
 
               {/* Connected tabs */}
-              <div style={{
+              <div className="cb-editor-tabs" style={{
                 display: 'inline-flex',
                 backgroundColor: T.surfaceContainerLow,
                 borderRadius: T.radiusLg,
@@ -2879,7 +2880,7 @@ function NewCampaignPageInner() {
 
             {/* Collapsible health details */}
             {healthOpen && (
-              <div style={{
+              <div className="cb-grid-2" style={{
                 padding: '20px 24px',
                 backgroundColor: T.surfaceContainer,
                 borderBottom: `1px solid ${T.surfaceContainerLow}`,
@@ -3006,7 +3007,7 @@ function NewCampaignPageInner() {
             )}
 
             {/* ── Editor + Quick Preview split ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', minHeight: '460px' }}>
+            <div className="cb-quick-preview-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', minHeight: '460px' }}>
 
               {/* Left: editor area */}
               <div style={{ borderRight: `1px solid ${T.surfaceContainer}`, display: 'flex', flexDirection: 'column' }}>
@@ -3808,7 +3809,7 @@ function NewCampaignPageInner() {
             narrow viewports and so it doesn't have to fight the flex row for
             horizontal space. Anchored top-right under the 60px header. */}
         {showSplitPreview && (
-          <div style={{
+          <div className="cb-preview-panel" style={{
             position: 'fixed',
             top: '60px',
             right: 0,
@@ -3956,6 +3957,45 @@ function NewCampaignPageInner() {
           content: attr(data-placeholder);
           color: #9ca3af;
           pointer-events: none;
+        }
+
+        /* ── Mobile (≤900px) ──────────────────────────────────────────────
+           Every rule needs !important — inline style={{}} always wins the
+           cascade over an external rule at equal specificity otherwise (same
+           pattern as campaigns/page.tsx and campaigns/[id]/page.tsx). The
+           left-rail/right-panel body split is the structural change: it goes
+           from side-by-side to stacked, so the left rail's own sticky/height
+           are turned off too — they only made sense next to a scrolling
+           sibling column, and would otherwise pin an entire panel's worth of
+           height at the top of a phone screen. */
+        @media (max-width: 900px) {
+          /* position:static (not just a shorter/wrapped sticky bar): once
+             hiding button labels still isn't enough to fit Back+title+From
+             chip+3 actions in one row, the header wraps to 2 rows — a
+             sticky 2-row header would permanently eat a big slice of a
+             phone's height while scrolling the form below, AND its fixed
+             zIndex:100 would fight the full-screen preview panel below for
+             which one visually sits on top at a given scroll position.
+             Letting it scroll away normally sidesteps both problems. */
+          .cb-header { flex-wrap: wrap !important; height: auto !important; padding: 10px 14px !important; row-gap: 8px !important; position: static !important; }
+          .cb-btn-label { display: none !important; }
+          .cb-from-chip { max-width: 140px !important; }
+          .cb-body-split { flex-direction: column !important; }
+          .cb-left-rail {
+            width: 100% !important; position: static !important; height: auto !important;
+            max-height: none !important; overflow-y: visible !important; border-right: none !important;
+            border-bottom: 1px solid ${T.surfaceContainer} !important;
+          }
+          .cb-right-panel { height: auto !important; }
+          .cb-grid-2 { grid-template-columns: 1fr !important; }
+          .cb-editor-tabs { max-width: 100% !important; overflow-x: auto !important; flex-wrap: nowrap !important; }
+          .cb-quick-preview-grid { grid-template-columns: 1fr !important; }
+          /* Live Preview: the desktop panel is a fixed-width overlay clamped
+             to calc(100vw - 320px) so it never covers the 340px rail — on a
+             phone that clamp collapses it to an unusably thin sliver instead
+             of overlapping anything (there's no side-by-side rail left to
+             protect once .cb-body-split is a column). Go full-screen instead. */
+          .cb-preview-panel { top: 0 !important; width: 100vw !important; max-width: 100vw !important; }
         }
       `}</style>
     </div>

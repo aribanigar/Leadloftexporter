@@ -315,6 +315,24 @@ export default function EmailCampaignsPage() {
         .ec-tab-btn:hover { background: #edeeef !important; }
         .ec-row:hover { background: #fafbfb !important; }
         .ec-create-btn:hover { opacity: 0.9; }
+
+        /* ── Mobile: swap the desktop table for a stacked card list ──────
+           A wide 5-column table forces horizontal scrolling on a phone,
+           which is a poor way to browse a campaign list. Below 680px we
+           hide the table and show ec-mobile-cards instead — both render
+           (cheap for a <=200-row list), CSS just picks one. */
+        .ec-table-wrap { display: block; }
+        .ec-mobile-cards { display: none; }
+        .ec-mcard-action:active { opacity: 0.6; }
+        @media (max-width: 680px) {
+          .ec-page-pad { padding: 16px 12px !important; }
+          .ec-page-title { font-size: 21px !important; }
+          .ec-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .ec-table-wrap { display: none !important; }
+          .ec-mobile-cards { display: block !important; }
+          .ec-toolbar { width: 100%; justify-content: space-between !important; }
+          .ec-create-btn-label { display: none; }
+        }
       `}</style>
 
       <div style={{
@@ -322,7 +340,7 @@ export default function EmailCampaignsPage() {
         background: T.surface,
         fontFamily: 'Inter, system-ui, sans-serif',
         padding: '28px 24px',
-      }}>
+      }} className="ec-page-pad">
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
           {/* ── Page Header ─────────────────────────────────────────────── */}
@@ -335,7 +353,7 @@ export default function EmailCampaignsPage() {
             marginBottom: 28,
           }}>
             <div>
-              <h1 style={{
+              <h1 className="ec-page-title" style={{
                 margin: 0,
                 fontSize: 26,
                 fontWeight: 700,
@@ -352,7 +370,7 @@ export default function EmailCampaignsPage() {
           </div>
 
           {/* ── KPI Cards Row ────────────────────────────────────────────── */}
-          <div style={{
+          <div className="ec-kpi-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: 16,
@@ -407,7 +425,7 @@ export default function EmailCampaignsPage() {
                 Campaign Performance
               </h2>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div className="ec-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {/* Filter tabs: All Status / Completed */}
                 <div style={{
                   display: 'flex',
@@ -465,13 +483,13 @@ export default function EmailCampaignsPage() {
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M7 1v12M1 7h12" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
-                  Create Campaign
+                  <span className="ec-create-btn-label">Create Campaign</span>
                 </Link>
               </div>
             </div>
 
-            {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
+            {/* Table (desktop) */}
+            <div className="ec-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
@@ -783,6 +801,186 @@ export default function EmailCampaignsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Cards (mobile) — same data as the table above, laid out as
+                stacked cards instead of columns so nothing needs horizontal
+                scrolling to read on a phone. Toggled purely by CSS
+                (.ec-mobile-cards), see the media query at the top. */}
+            <div className="ec-mobile-cards">
+              {loading ? (
+                [1, 2, 3].map(i => (
+                  <div key={i} style={{ padding: '14px 16px', borderTop: i > 1 ? `1px solid rgba(65,73,66,0.06)` : undefined }}>
+                    <div style={{
+                      height: 14, width: '60%', borderRadius: 6, marginBottom: 8,
+                      background: 'linear-gradient(90deg, #edeeef 25%, #f8f9fa 50%, #edeeef 75%)',
+                      backgroundSize: '400% 100%', animation: 'shimmer 1.4s infinite',
+                    }} />
+                    <div style={{
+                      height: 11, width: '40%', borderRadius: 6,
+                      background: 'linear-gradient(90deg, #edeeef 25%, #f8f9fa 50%, #edeeef 75%)',
+                      backgroundSize: '400% 100%', animation: 'shimmer 1.4s infinite',
+                    }} />
+                  </div>
+                ))
+              ) : visible.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ display: 'block', margin: '0 auto 12px' }}>
+                    <rect x="2" y="4" width="20" height="16" rx="3" stroke="#b8bfb9" strokeWidth="1.5"/>
+                    <path d="M2 8l10 7 10-7" stroke="#b8bfb9" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: T.onSurfaceVar, margin: '0 0 4px', fontFamily: 'Manrope, Inter, sans-serif' }}>
+                    No campaigns yet
+                  </p>
+                  <p style={{ fontSize: 12, color: T.onSurfaceVar, margin: 0, opacity: 0.7 }}>
+                    Create your first campaign to get started.
+                  </p>
+                </div>
+              ) : (
+                groups.map((g) => (
+                  <div key={g.key}>
+                    {/* Mailbox header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '12px 14px 8px', background: T.surfaceLow,
+                      borderTop: `1px solid rgba(65,73,66,0.08)`,
+                    }}>
+                      <span style={{
+                        display: 'inline-grid', placeItems: 'center', width: 20, height: 20,
+                        borderRadius: T.rFull, background: PROVIDER_COLOR[g.provider] || T.secondary,
+                        color: '#ffffff', fontSize: 10, fontWeight: 700, flexShrink: 0,
+                      }}>
+                        {(g.address || '?').charAt(0).toUpperCase()}
+                      </span>
+                      <span style={{
+                        fontSize: 12.5, fontWeight: 700, color: T.onSurface,
+                        fontFamily: 'Manrope, Inter, sans-serif', overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+                      }}>
+                        {g.address}
+                      </span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: T.onSurfaceVar, flexShrink: 0 }}>
+                        {g.campaigns.length}
+                      </span>
+                    </div>
+
+                    {g.campaigns.map((c, idx) => {
+                      const badge = STATUS_BADGE[c.status] || STATUS_BADGE.draft;
+                      const openRateNum = c.sent_count ? (c.opened_count / c.sent_count) * 100 : 0;
+                      const openRateStr = fmtRateDisplay(c.opened_count, c.sent_count);
+                      const rowAvatarColor = avatarColor(c.id || c.name || String(idx));
+                      return (
+                        <div
+                          key={`${g.key}-${c.id}-m`}
+                          style={{
+                            padding: '12px 14px',
+                            borderBottom: `1px solid rgba(65,73,66,0.06)`,
+                            background: T.surfaceLowest,
+                          }}
+                        >
+                          <Link href={`/campaigns/${c.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                              <div style={{
+                                width: 34, height: 34, borderRadius: T.rFull, background: rowAvatarColor,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                color: '#ffffff', fontSize: 13, fontWeight: 700, fontFamily: 'Manrope, Inter, sans-serif',
+                              }}>
+                                {getInitial(c.name)}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                                  <div style={{
+                                    fontSize: 14, fontWeight: 600, color: T.onSurface,
+                                    fontFamily: 'Inter, system-ui, sans-serif', overflow: 'hidden',
+                                    textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+                                  }}>
+                                    {c.name}
+                                  </div>
+                                  <span style={{
+                                    display: 'inline-block', flexShrink: 0, background: badge.bg, color: badge.color,
+                                    borderRadius: T.rFull, padding: '3px 9px', fontSize: 10, fontWeight: 600,
+                                    letterSpacing: '0.03em', textTransform: 'uppercase',
+                                  }}>
+                                    {badge.label}
+                                  </span>
+                                </div>
+                                <div style={{
+                                  fontSize: 12, color: T.onSurfaceVar, opacity: 0.7, marginTop: 2,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                  {c.subject}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                                  <span style={{ fontSize: 12, color: T.onSurfaceVar }}>
+                                    <b style={{ color: T.onSurface }}>{c.total_recipients.toLocaleString()}</b> recipients
+                                  </span>
+                                  <span style={{ fontSize: 12, color: T.onSurfaceVar }}>
+                                    Open <b style={{ color: T.onSurface }}>{openRateStr}</b>
+                                  </span>
+                                </div>
+                                {openRateNum > 0 && (
+                                  <div style={{ height: 3, background: T.surfaceContainer, borderRadius: T.rFull, overflow: 'hidden', width: '100%', marginTop: 6 }}>
+                                    <div style={{ height: '100%', width: `${Math.min(openRateNum, 100)}%`, background: T.gradientCTA, borderRadius: T.rFull }} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+
+                          {/* Actions — bigger tap targets than the desktop row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingLeft: 44 }}>
+                            <Link
+                              href={`/campaigns/new?id=${c.id}`}
+                              className="ec-mcard-action"
+                              title="Edit"
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 36, height: 36, borderRadius: T.rLg, background: T.surfaceLow,
+                                textDecoration: 'none', color: T.onSurfaceVar,
+                              }}
+                            >
+                              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                                <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </Link>
+                            <button
+                              className="ec-mcard-action"
+                              title="Duplicate"
+                              onClick={() => handleDuplicate(c.id)}
+                              disabled={dupLoading === c.id}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 36, height: 36, borderRadius: T.rLg, background: T.surfaceLow, border: 'none',
+                                cursor: dupLoading === c.id ? 'wait' : 'pointer', color: T.onSurfaceVar,
+                                opacity: dupLoading === c.id ? 0.45 : undefined,
+                              }}
+                            >
+                              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                                <rect x="4" y="4" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                                <path d="M2 10V2.5A1.5 1.5 0 0 1 3.5 1H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                            <button
+                              className="ec-mcard-action"
+                              title="Delete"
+                              onClick={() => setDeleteId(c.id)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 36, height: 36, borderRadius: T.rLg, background: '#ffd5d5', border: 'none',
+                                cursor: 'pointer', color: '#b91c1c', marginLeft: 'auto',
+                              }}
+                            >
+                              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                                <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M11 3.5l-.7 7.2a1 1 0 0 1-1 .8H4.7a1 1 0 0 1-1-.8L3 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

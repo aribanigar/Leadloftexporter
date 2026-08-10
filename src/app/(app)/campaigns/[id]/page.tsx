@@ -231,7 +231,11 @@ function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error';
       fontSize: '13px', fontWeight: 600, zIndex: 9999,
       boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
       display: 'flex', alignItems: 'center', gap: '10px',
-      whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif',
+      // A long message used to force whiteSpace:'nowrap' into one unbroken
+      // line, overflowing both edges of a phone screen (it's centered with
+      // no width clamp). Cap the width and let it wrap instead.
+      maxWidth: 'calc(100vw - 32px)', width: 'max-content',
+      whiteSpace: 'normal', fontFamily: 'Inter, sans-serif',
     }}>
       <span className="material-symbols-outlined" style={{ fontSize: '17px', fontVariationSettings: "'FILL' 1" }}>
         {type === 'success' ? 'check_circle' : 'error'}
@@ -468,6 +472,11 @@ function HeroStatCard({
       boxShadow: T.shadow,
       display: 'flex', flexDirection: 'column', gap: '12px',
       overflow: 'hidden', flex: 1,
+      // Without a minWidth, flex:1 children just keep shrinking instead of
+      // ever triggering the parent row's flexWrap — this is what let two
+      // cards with 48px value text get squeezed together on a phone instead
+      // of stacking.
+      minWidth: '220px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -905,10 +914,25 @@ export default function CampaignDetailPage() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
         @keyframes liveDot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
         * { box-sizing: border-box; }
+
+        /* ── Mobile (≤680px) ──────────────────────────────────────────────
+           Inline style={{}} always wins the cascade over an external rule of
+           equal specificity, so every override below needs !important — same
+           pattern already used in campaigns/page.tsx. */
+        @media (max-width: 680px) {
+          .cd-header { padding: 14px 16px !important; }
+          .cd-title { font-size: 21px !important; }
+          .cd-content { padding: 16px 12px !important; }
+          .cd-hero-card { min-width: 0 !important; }
+          .cd-grid-2 { grid-template-columns: 1fr !important; }
+          .cd-grid-3, .cd-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+          .cd-search-input { width: 100% !important; }
+          .cd-pagination-btn { padding: 10px 16px !important; }
+        }
       `}</style>
 
       {/* ─── Header ──────────────────────────────────────────────────────────── */}
-      <div style={{
+      <div className="cd-header" style={{
         backgroundColor: T.surfaceContainerLowest,
         borderBottom: `1px solid ${T.ghost}`,
         padding: '20px 32px',
@@ -927,7 +951,7 @@ export default function CampaignDetailPage() {
 
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{
+            <h1 className="cd-title" style={{
               fontSize: '28px', fontWeight: 900, color: T.onSurface,
               margin: '0 0 4px', fontFamily: 'Manrope, sans-serif', lineHeight: 1.15,
               letterSpacing: '-0.02em',
@@ -966,7 +990,7 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '28px 20px' }}>
+      <div className="cd-content" style={{ maxWidth: '1160px', margin: '0 auto', padding: '28px 20px' }}>
 
         {/* ═══ Send-blocked banner ════════════════════════════════════
             The campaign says 'Sending' but nothing is going out. Tell the
@@ -1079,7 +1103,7 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* ═══ Real-time Delivery + Link Analytics ══════════════════════════════ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+        <div className="cd-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
 
           {/* Real-time Delivery */}
           <div style={{
@@ -1393,7 +1417,7 @@ export default function CampaignDetailPage() {
           </div>
 
           {/* ── live count tiles ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '12px' }}>
+          <div className="cd-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '12px' }}>
             {tiles.map(t => (
               <div key={t.key} style={{ backgroundColor: t.bg, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
@@ -1467,7 +1491,7 @@ export default function CampaignDetailPage() {
             </div>
 
             {stats.goalAchieved !== undefined && stats.benchmarks && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+              <div className="cd-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
                 <div style={{
                   textAlign: 'center', padding: '16px 12px', borderRadius: '10px',
                   backgroundColor: stats.goalAchieved >= 75 ? 'rgba(0,54,26,0.05)' : stats.goalAchieved >= 50 ? 'rgba(255,220,196,0.3)' : 'rgba(220,38,38,0.05)',
@@ -1549,6 +1573,7 @@ export default function CampaignDetailPage() {
                 fontSize: '15px', color: T.onSurfaceVariant, pointerEvents: 'none',
               }}>search</span>
               <input
+                className="cd-search-input"
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
                 placeholder="Search emails…"
@@ -1658,6 +1683,7 @@ export default function CampaignDetailPage() {
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
+                      className="cd-pagination-btn"
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
                       style={{
@@ -1682,6 +1708,7 @@ export default function CampaignDetailPage() {
                       {page} / {totalPages}
                     </span>
                     <button
+                      className="cd-pagination-btn"
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
                       style={{
