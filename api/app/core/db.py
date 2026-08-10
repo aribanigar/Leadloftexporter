@@ -48,13 +48,28 @@ def _normalize_db_url(url: str) -> str:
 #     it out and transparently reconnects if the pooler dropped it.
 #   - pool_recycle   → proactively retire any connection older than 30 min so
 #     we never even reach for one the pooler has already culled.
-# pool_size is kept modest because the Supabase free tier caps total server
-# connections; 10 + 20 overflow = 30 max from one Render instance is safe.
+#
+# pool_size/max_overflow — HARD-LEARNED, do not raise without re-checking the
+# pooler's actual ceiling first. The previous 10+20=30-per-instance config was
+# sized off a guess ("Supabase free tier caps total connections") rather than
+# the pooler's real limit, and it silently broke every deploy: this project's
+# Supavisor session-mode pooler caps the WHOLE project at 15 concurrent
+# clients total (confirmed from a live crash log —
+# "FATAL: max clients reached in session mode - max clients are limited to
+# pool_size: 15"). With TWO live Render web services each able to open up to
+# 30 connections, a rolling deploy (old+new instance briefly overlapping)
+# could easily demand 60 — so new containers were crashing on boot trying to
+# grab a connection, Render kept serving the last GOOD build, and every code
+# change silently never went live even though the deploy "succeeded" by
+# every visible signal (push → auto-deploy triggered → build finished).
+# 3 + 2 overflow = 5 max per instance leaves real headroom across however many
+# services/workers share this one pooler.
 engine = create_engine(
     _normalize_db_url(_settings.database_url),
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=3,
+    max_overflow=2,
+    pool_timeout=10,
     pool_recycle=1800,
     future=True,
 )
