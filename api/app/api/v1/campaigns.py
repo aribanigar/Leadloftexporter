@@ -72,11 +72,18 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
 def _own_campaign(db: Session, ctx: AuthContext, campaign_id: str) -> Campaign:
-    c = (
-        db.query(Campaign)
-        .filter(Campaign.id == campaign_id, Campaign.workspace_id == ctx.workspace_id)
-        .first()
-    )
+    q = db.query(Campaign).filter(Campaign.id == campaign_id, Campaign.workspace_id == ctx.workspace_id)
+    # "campaigns_only" team members (Settings → Manage Team) only ever see
+    # their OWN campaigns — everyone else (owner/admin/member) sees every
+    # campaign in the workspace, unchanged. This is the single choke point
+    # every campaign read/write endpoint routes through (view, edit, start,
+    # pause, resume, cancel, duplicate's source lookup, stats, tick, delete,
+    # recipients, attachments), so scoping it here enforces the rule
+    # everywhere at once — not just in the list, so typing another member's
+    # campaign URL directly 404s exactly like it doesn't exist.
+    if ctx.membership.role == "campaigns_only":
+        q = q.filter(Campaign.user_id == ctx.user_id)
+    c = q.first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "campaign_not_found")
     return c
@@ -545,13 +552,14 @@ def list_campaigns(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(Campaign)
-        .filter(Campaign.workspace_id == ctx.workspace_id)
-        .order_by(Campaign.created_at.desc())
-        .limit(200)
-        .all()
-    )
+    q = db.query(Campaign).filter(Campaign.workspace_id == ctx.workspace_id)
+    # "campaigns_only" team members only see campaigns THEY created; every
+    # other role (owner/admin/member) still sees the whole workspace's
+    # campaigns, exactly as before. Same rule _own_campaign enforces for a
+    # single campaign, applied here for the list.
+    if ctx.membership.role == "campaigns_only":
+        q = q.filter(Campaign.user_id == ctx.user_id)
+    rows = q.order_by(Campaign.created_at.desc()).limit(200).all()
     # Live engagement per campaign in ONE grouped query (same source the
     # detail-page stats endpoint uses) so the list's open/click rates match
     # the report exactly — and never come back NaN from a missing field.
@@ -835,14 +843,17 @@ def active_sending(
     workspace. Powers the app-shell background sender, which keeps every active
     campaign draining no matter which page the user is on. Declared BEFORE
     /{campaign_id} so the literal path wins the FastAPI match."""
-    rows = (
-        db.query(Campaign.id)
-        .filter(
-            Campaign.workspace_id == ctx.workspace_id,
-            Campaign.status == "sending",
-        )
-        .all()
+    q = db.query(Campaign.id).filter(
+        Campaign.workspace_id == ctx.workspace_id,
+        Campaign.status == "sending",
     )
+    # Match the same "campaigns_only sees only their own" scoping as
+    # list_campaigns/_own_campaign — otherwise this poller would hand a
+    # campaigns_only member's browser other members' campaign ids, which
+    # would just 404 against the now-scoped /tick endpoint anyway.
+    if ctx.membership.role == "campaigns_only":
+        q = q.filter(Campaign.user_id == ctx.user_id)
+    rows = q.all()
     return {"ids": [r[0] for r in rows]}
 
 
