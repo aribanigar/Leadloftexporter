@@ -25,11 +25,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.376",
+    date: "Jul 31, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.376.zip",
+    latest: true,
+    changes: [
+      "Fixed Mass Apply Jobs sometimes skipping the real submit on the final step and moving straight to the next job. The last-step Submit click was judged the same way as Next/Review clicks (“did the text on screen change?”) — but a validation error on that final step also changes the text, so a failed submission could be mistaken for a successful one. It now only counts a job as applied once the Easy Apply form is genuinely gone; if something on the last step still needs you, it buzzes and waits, like it already does mid-form, instead of quietly moving on.",
+      "This makes the whole run more trustworthy end-to-end: what the extension reports as “applied” now matches what actually went out on LinkedIn.",
+    ],
+  },
+  {
     version: "1.0.375",
     date: "Jul 30, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.375.zip",
-    latest: true,
     changes: [
       "Smarter memory, shared across BOTH apply buttons. “Mass Apply Jobs” now also answers RE-WORDED but equivalent questions from memory — e.g. it recalls your answer to “Notice period” when a job asks “What’s your notice period?” — without asking again, while carefully never borrowing an answer from a genuinely different question (so “years of experience in sales” won’t reuse your “…in marketing” answer).",
       "“Apply All” now reads the same shared saved-profile mapping + learned memory + fuzzy recall that “Mass Apply Jobs” uses, so both buttons fill and answer identically. Everything you save in Options — name (first/last), email, phone, nationality, city, country, job title, years, education, notice/availability, languages, salary, work authorization, sponsorship, relocation, visa status, driving licence, work mode, gender, links — auto-fills the matching questions.",

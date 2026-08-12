@@ -1416,12 +1416,40 @@
 
   // Wait up to timeoutMs for the modal's innerText to differ from `before`.
   // Returns true if it changed (= step advanced) or the modal closed (= done).
+  // Used for NEXT/REVIEW clicks only — see waitSubmitted() below for why the
+  // final Submit click needs a stricter check.
   async function waitAdvanced(before, timeoutMs) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       await sleep(220);
       if (!applyFormPresent()) return true;     // modal closed = advanced/submitted
       if (modalText() !== before) return true;  // text changed = stepped forward
+    }
+    return false;
+  }
+
+  // Wait up to timeoutMs for the Easy Apply form to be fully GONE — the only
+  // proof the Submit click actually submitted. Unlike waitAdvanced (used for
+  // Next/Review), this deliberately does NOT accept "text changed" as
+  // success: clicking Submit on a step with an unsatisfied required field
+  // makes LinkedIn show an inline validation error IN THE SAME MODAL, which
+  // also changes modalText() — so the old shared waitAdvanced() call here was
+  // a false-positive generator. It would report done:true on a validation
+  // error, skip the "needs the user" branch entirely, call closePostSubmit()
+  // on a form that never actually submitted, and report the job "applied"
+  // when nothing was sent to LinkedIn. This mirrors the exact rule
+  // overlay.js's connect-invite flow already uses for the analogous problem:
+  // "report ok:true only after the modal actually closes — never on a
+  // same-modal state change." applyFormPresent() is already scoped to the
+  // Easy Apply form specifically (Next/Submit/Review buttons, progress
+  // region, or the "Apply to <Company>" header) — a genuine post-submit
+  // screen (confirmation toast, next-best-action upsell) has none of those,
+  // so it correctly reads as "gone" the moment the real submission lands.
+  async function waitSubmitted(timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await sleep(220);
+      if (!applyFormPresent()) return true;
     }
     return false;
   }
@@ -1508,8 +1536,8 @@
         spotlight(submit, 2000);
         await sleep(rand(220, 380));
         humanClick(submit);
-        let done = await waitAdvanced(beforeSubmit, 5000);
-        if (!done) { escalateClick(submitButton() || submit); done = await waitAdvanced(beforeSubmit, 4000); }
+        let done = await waitSubmitted(5000);
+        if (!done) { escalateClick(submitButton() || submit); done = await waitSubmitted(4000); }
         // Submit didn't go through and the form is still open → a required
         // field on the final step needs the user. Buzz + wait, then resume.
         if (!done && applyFormPresent()) {
