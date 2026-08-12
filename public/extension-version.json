@@ -1,5 +1,5 @@
 {
-  "version": "1.0.376",
-  "zip": "/extensions/leadcaptura-extension-v1.0.376.zip",
-  "notes": "Fixed Mass Apply Jobs sometimes moving to the next job without actually submitting on LinkedIn. The final Submit click was verified the same way as Next/Review clicks (\"did the on-screen text change\") — but a validation error on the last step ALSO changes the text, so the engine could mistake a failed submit for a successful one and skip straight to the next job. It now only counts a submission as done once the Easy Apply form is genuinely gone; if a required field still needs you, it buzzes and waits like it always does mid-form, instead of silently moving on."
+  "version": "1.0.377",
+  "zip": "/extensions/leadcaptura-extension-v1.0.377.zip",
+  "notes": "Fixed the remaining cause of Mass Apply Jobs skipping the Submit application click on some jobs — specifically the newer single-page 'review' style apply forms (Resume + Additional Questions already answered, one Submit button at the bottom, no separate Next/Review steps). When that button sat below the fold in the form's own scroll area, the click coordinates were computed before the page actually scrolled it into view, so the click could land in the wrong place. The engine now scrolls the button into view first — for Next, Review and Submit alike — so every click lands exactly where it should and the run moves from job to job smoothly."
 }

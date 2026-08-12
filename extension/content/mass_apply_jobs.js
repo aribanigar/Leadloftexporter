@@ -144,6 +144,19 @@
   function humanClick(el) {
     if (!el) return false;
     try {
+      // Scroll the target into view FIRST — the click coordinates below are
+      // computed from getBoundingClientRect(), which is only correct once the
+      // element is actually positioned in the visible viewport. Without this,
+      // a button below the fold in a long, scrollable single-page apply form
+      // (e.g. a "review" modal with Resume + Additional Questions + Submit
+      // application, no separate Next/Review steps) yields an off-screen or
+      // stale rect, so the synthetic pointer sequence fires at the wrong
+      // screen position and the click can silently miss — the exact bug
+      // behind "Mass Apply skips clicking Submit application". instant (not
+      // smooth) so the scroll finishes synchronously before the rect below is
+      // read — same pattern already used elsewhere in this file (e.g. the
+      // Easy Apply entry button) for the identical reason.
+      try { el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch (_) {}
       try { el.focus({ preventScroll: true }); } catch (_) {}
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2 + (Math.random() * 6 - 3);
@@ -1533,6 +1546,13 @@
       const submit = submitButton();
       if (submit) {
         const beforeSubmit = modalText();
+        // Scroll BEFORE spotlighting too, not just inside humanClick — a long
+        // single-page review-style apply form (Resume + Additional Questions
+        // + Submit, no separate Next/Review steps) can have Submit below the
+        // fold, and the pulsing highlight should land where the button
+        // actually is on screen, not flash off-screen before humanClick's own
+        // scroll catches up a moment later.
+        try { submit.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch (_) {}
         spotlight(submit, 2000);
         await sleep(rand(220, 380));
         humanClick(submit);
@@ -1565,6 +1585,7 @@
 
       // STAGE 1 — spotlight + human pointer click. Pulsing outline tells the
       // user exactly which button Mass Apply is targeting.
+      try { advance.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch (_) {}
       spotlight(advance, 2000);
       await sleep(rand(220, 380));
       humanClick(advance);
@@ -1577,6 +1598,7 @@
         try { closeStrayModals(); } catch (_) {}
         const fresh = reviewButton() || nextButton() || submitButton();
         if (fresh) {
+          try { fresh.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch (_) {}
           spotlight(fresh, 1800);
           escalateClick(fresh);
           advanced = await waitAdvanced(before, 4000);

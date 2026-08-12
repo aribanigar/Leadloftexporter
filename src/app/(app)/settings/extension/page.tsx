@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.377",
+    date: "Aug 12, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.377.zip",
+    latest: true,
+    changes: [
+      "Fixed the remaining cause of Mass Apply Jobs skipping the Submit application click — the newer single-page “review” style apply forms (Resume + Additional Questions already answered, one Submit button at the bottom, no separate Next/Review steps). When Submit sat below the fold, the click was computed before the button actually scrolled into view, so it could land in the wrong place. The engine now scrolls Next, Review and Submit into view before every click, so it lands exactly where it should and the run moves from job to job smoothly, like a proper SaaS tool should.",
+    ],
+  },
+  {
     version: "1.0.376",
     date: "Jul 31, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.376.zip",
-    latest: true,
     changes: [
       "Fixed Mass Apply Jobs sometimes skipping the real submit on the final step and moving straight to the next job. The last-step Submit click was judged the same way as Next/Review clicks (“did the text on screen change?”) — but a validation error on that final step also changes the text, so a failed submission could be mistaken for a successful one. It now only counts a job as applied once the Easy Apply form is genuinely gone; if something on the last step still needs you, it buzzes and waits, like it already does mid-form, instead of quietly moving on.",
       "This makes the whole run more trustworthy end-to-end: what the extension reports as “applied” now matches what actually went out on LinkedIn.",
