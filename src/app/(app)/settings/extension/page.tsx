@@ -25,11 +25,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.378",
+    date: "Aug 12, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.378.zip",
+    latest: true,
+    changes: [
+      "Fixed the in-popup “Download update” button sometimes opening a broken link. The popup checks for updates twice — an instant offline check from a cached result, then a live check against the server — and a stale cached result from before the newest release was published could permanently lock the Download button to an older zip that's no longer published, so clicking it 404'd. The button now always reflects the freshest check.",
+      "Older versions in the list below are no longer individually downloadable — only the single most recent build is kept published, so grab the latest one above when updating.",
+    ],
+  },
+  {
     version: "1.0.377",
     date: "Aug 12, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.377.zip",
-    latest: true,
     changes: [
       "Fixed the remaining cause of Mass Apply Jobs skipping the Submit application click — the newer single-page “review” style apply forms (Resume + Additional Questions already answered, one Submit button at the bottom, no separate Next/Review steps). When Submit sat below the fold, the click was computed before the button actually scrolled into view, so it could land in the wrong place. The engine now scrolls Next, Review and Submit into view before every click, so it lands exactly where it should and the run moves from job to job smoothly, like a proper SaaS tool should.",
     ],
@@ -156,18 +166,23 @@ export default function ExtensionPage() {
                     ))}
                   </ul>
                 </div>
-                <a
-                  href={r.file}
-                  download
-                  className={
-                    r.latest
-                      ? "btn-primary shrink-0 self-start px-4 py-2 text-sm"
-                      : "btn-secondary shrink-0 self-start px-4 py-2 text-sm"
-                  }
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
+                {r.latest ? (
+                  <a
+                    href={r.file}
+                    download
+                    className="btn-primary shrink-0 self-start px-4 py-2 text-sm"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </a>
+                ) : (
+                  <span
+                    className="shrink-0 self-start px-1 text-xs text-slate-400"
+                    title="Older builds aren't kept published — grab the latest version above instead."
+                  >
+                    Superseded
+                  </span>
+                )}
               </div>
             </li>
           ))}

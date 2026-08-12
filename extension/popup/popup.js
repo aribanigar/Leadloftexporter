@@ -40,33 +40,27 @@ function cmpVersion(a, b) {
 const VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
 
 // Render the "Update available" card from a resolved {version, notes, zip}.
-// Wires the Download button (opens the versioned zip) and the Restart button
-// (chrome.runtime.reload() — reloads the freshly-unzipped files with NO trip to
-// chrome://extensions). Idempotent: safe to call from both the instant
-// storage prefill and the live network check.
-let _updateRendered = false;
+// Called from both the instant storage prefill (may be stale — cached from a
+// previous version-check, whose zip can since have been deleted from disk,
+// since only the single latest release's zip is kept published) and the live
+// network check (always current). Both calls must be able to update the
+// Download button's target — a "render once" guard here previously locked in
+// whichever call ran first, so a stale prefilled zip URL could permanently
+// win over the live fetch's correct one and the button opened a 404. Instead,
+// the click target lives in a plain variable that every call refreshes; the
+// click listener itself is wired once (see init()) and just reads it live.
+let _latestZipUrl = null;
 function renderUpdateCard(cur, info) {
   const latest = info && info.version;
   if (!latest || cmpVersion(latest, cur) <= 0) return;   // already up to date
-  if (_updateRendered) return;
-  _updateRendered = true;
   const zip = info.zip || "/leadcaptura-extension.zip";
-  const zipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+  _latestZipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
   const verEl = $("#update-ver");
   if (verEl) verEl.textContent = "v" + cur + " → v" + latest;
   const notesEl = $("#update-notes");
   if (notesEl && info.notes) { notesEl.textContent = info.notes; notesEl.hidden = false; }
   const sec = $("#update-section");
   if (sec) sec.hidden = false;
-  const dl = $("#update-download");
-  if (dl) dl.addEventListener("click", () => { chrome.tabs.create({ url: zipUrl }); });
-  const restart = $("#update-restart");
-  if (restart) restart.addEventListener("click", () => {
-    // Reload the extension so Chrome re-reads the files the user just unzipped
-    // over the folder. Data in chrome.storage.local (API key, settings, learned
-    // answers) survives because the extension ID is unchanged.
-    try { chrome.runtime.reload(); } catch (_) {}
-  });
 }
 
 async function checkForUpdate() {
@@ -77,13 +71,30 @@ async function checkForUpdate() {
     const { lc_update_available } = await chrome.storage.local.get("lc_update_available");
     if (lc_update_available) renderUpdateCard(cur, lc_update_available);
   } catch (_) {}
-  // 2) Live check so an update published while the popup is open still appears.
+  // 2) Live check so an update published while the popup is open still appears,
+  //    and so a stale/deleted zip from the prefill above gets corrected.
   try {
     const res = await fetch(VERSION_MANIFEST_URL + "?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) return;
     const info = await res.json();
     renderUpdateCard(cur, info);
   } catch (_) { /* offline / blocked — silently skip */ }
+}
+
+// Wired once — always opens whatever renderUpdateCard most recently resolved,
+// never a stale target captured at listener-registration time.
+function wireUpdateButtons() {
+  const dl = $("#update-download");
+  if (dl) dl.addEventListener("click", () => {
+    if (_latestZipUrl) chrome.tabs.create({ url: _latestZipUrl });
+  });
+  const restart = $("#update-restart");
+  if (restart) restart.addEventListener("click", () => {
+    // Reload the extension so Chrome re-reads the files the user just unzipped
+    // over the folder. Data in chrome.storage.local (API key, settings, learned
+    // answers) survives because the extension ID is unchanged.
+    try { chrome.runtime.reload(); } catch (_) {}
+  });
 }
 
 function callApi(action, payload) {
@@ -97,6 +108,7 @@ function callApi(action, payload) {
 }
 
 async function init() {
+  wireUpdateButtons();
   checkForUpdate();   // fire-and-forget; shows the update banner if one exists
 
   const settings = await getSettings();

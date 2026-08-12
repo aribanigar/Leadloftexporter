@@ -1,5 +1,5 @@
 {
-  "version": "1.0.377",
-  "zip": "/extensions/leadcaptura-extension-v1.0.377.zip",
-  "notes": "Fixed the remaining cause of Mass Apply Jobs skipping the Submit application click on some jobs — specifically the newer single-page 'review' style apply forms (Resume + Additional Questions already answered, one Submit button at the bottom, no separate Next/Review steps). When that button sat below the fold in the form's own scroll area, the click coordinates were computed before the page actually scrolled it into view, so the click could land in the wrong place. The engine now scrolls the button into view first — for Next, Review and Submit alike — so every click lands exactly where it should and the run moves from job to job smoothly."
+  "version": "1.0.378",
+  "zip": "/extensions/leadcaptura-extension-v1.0.378.zip",
+  "notes": "Fixed the in-popup 'Download update' button opening a broken link (404). A cached update-check from before the newest release could permanently lock the button to an older, no-longer-published zip file; the popup now always keeps the button pointed at the current release."
 }
