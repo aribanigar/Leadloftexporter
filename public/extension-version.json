@@ -1,5 +1,5 @@
 {
-  "version": "1.0.378",
-  "zip": "/extensions/leadcaptura-extension-v1.0.378.zip",
-  "notes": "Fixed the in-popup 'Download update' button opening a broken link (404). A cached update-check from before the newest release could permanently lock the button to an older, no-longer-published zip file; the popup now always keeps the button pointed at the current release."
+  "version": "1.0.379",
+  "zip": "/extensions/leadcaptura-extension-v1.0.379.zip",
+  "notes": "Fixed background-enrichment tabs silently losing their anti-throttle shim on LinkedIn. LinkedIn tightened its Content-Security-Policy to block inline <script> execution, which is exactly how bg_visibility.js used to patch the page (a Content Security Policy console error, visible in chrome://extensions). The shim now runs natively in the page's own JS context via Chrome's MAIN-world content script support, so it isn't affected by the page's script-src policy at all — Contact Info enrichment in background tabs is reliable again."
 }

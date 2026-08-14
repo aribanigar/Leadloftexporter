@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.379",
+    date: "Aug 12, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.379.zip",
+    latest: true,
+    changes: [
+      "Fixed background-enrichment tabs silently losing their anti-throttle shim on LinkedIn — LinkedIn tightened its Content-Security-Policy to block the inline script this used, so it stopped running (visible as a CSP error in chrome://extensions) and Contact Info fields could come back blank. It now runs natively in the page's own JS context via Chrome's MAIN-world content script support, which the page's script policy can't block, so background enrichment works reliably again.",
+    ],
+  },
+  {
     version: "1.0.378",
     date: "Aug 12, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.378.zip",
-    latest: true,
     changes: [
       "Fixed the in-popup “Download update” button sometimes opening a broken link. The popup checks for updates twice — an instant offline check from a cached result, then a live check against the server — and a stale cached result from before the newest release was published could permanently lock the Download button to an older zip that's no longer published, so clicking it 404'd. The button now always reflects the freshest check.",
       "Older versions in the list below are no longer individually downloadable — only the single most recent build is kept published, so grab the latest one above when updating.",
