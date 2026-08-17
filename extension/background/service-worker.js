@@ -254,6 +254,22 @@ async function listGeminiModels(key, prefer) {
   return ordered;
 }
 
+// A 5xx with an HTML body is almost always the HOSTING PROVIDER talking
+// (Render/Fly/nginx error page), not the FastAPI app — e.g. Render's
+// "This service has been suspended by its owner" page. Dumping that raw
+// markup into the UI ("HTTP 503 — <!DOCTYPE html>...") is unreadable, so
+// detect it and surface the page's own <title> (if any) in a clean sentence
+// instead. Returns "" when the body isn't HTML, so callers fall back to the
+// normal JSON-detail path.
+function describeHostErrorPage(status, bodyText) {
+  const trimmed = String(bodyText || "").trim();
+  if (!/^<!doctype html|^<html/i.test(trimmed)) return "";
+  const title = (trimmed.match(/<title>([^<]*)<\/title>/i) || [])[1]?.trim();
+  return title
+    ? `Backend host says "${title}" (HTTP ${status}) — that's a message from the hosting provider, not the LeadCaptura app. Check the hosting dashboard (e.g. Render).`
+    : `Backend returned an HTML error page (HTTP ${status}) instead of a response — likely a hosting-provider outage, not the app itself.`;
+}
+
 async function fetchJson(path, opts = {}) {
   const { apiUrl, apiKey } = await getSettings();
   if (!apiUrl) throw new Error("API URL not configured.");
@@ -283,6 +299,11 @@ async function fetchJson(path, opts = {}) {
     data = text;
   }
   if (!res.ok) {
+    const hostErrorMessage = typeof data === "string" ? describeHostErrorPage(res.status, data) : "";
+    if (hostErrorMessage) {
+      console.log(`[LeadCaptura SW] fetch !ok ${url} status=${res.status} non-JSON host error page (suppressed raw HTML)`);
+      throw new Error(hostErrorMessage);
+    }
     // Surface HTTP status alongside the server's message so the content
     // script's error decorator can map 401/403 etc. to actionable hints.
     const rawDetail =
@@ -302,13 +323,73 @@ async function fetchJson(path, opts = {}) {
   return data;
 }
 
+// ── Offline queue: syncProfile retries ──────────────────────────────────────
+// If the backend is unreachable (network error, or 5xx — e.g. the hosting
+// provider suspended the service), a profile the user just captured must not
+// just vanish. We stash it in chrome.storage.local and a periodic alarm
+// retries it until the backend comes back, so "Save" during an outage becomes
+// "saved offline, synced later" instead of "saved and lost." Dedup by
+// linkedin_url (same key the backend itself dedupes on) so repeated Save
+// clicks on the same profile update the queued entry instead of piling up.
+const PENDING_SAVES_KEY = "lc_pending_saves";
+const PENDING_SAVES_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // give up after 7 days
+
+function _pendingSaveKey(profile) {
+  return String(profile?.linkedin_url || "").toLowerCase().replace(/\?.*$/, "");
+}
+
+async function queuePendingSave(profile) {
+  const key = _pendingSaveKey(profile);
+  if (!key) return; // nothing to dedup/retry on — drop silently
+  const { [PENDING_SAVES_KEY]: existing = [] } = await chrome.storage.local.get(PENDING_SAVES_KEY);
+  const list = existing.filter((e) => e.key !== key);
+  list.push({ key, profile, queuedAt: Date.now(), attempts: 0 });
+  await chrome.storage.local.set({ [PENDING_SAVES_KEY]: list });
+  console.log(`[LeadCaptura SW] queued offline save for ${key} (${list.length} pending)`);
+}
+
+async function retryPendingSaves() {
+  const { [PENDING_SAVES_KEY]: list = [] } = await chrome.storage.local.get(PENDING_SAVES_KEY);
+  if (!list.length) return;
+  const now = Date.now();
+  const remaining = [];
+  for (const entry of list) {
+    if (now - (entry.queuedAt || 0) > PENDING_SAVES_MAX_AGE_MS) {
+      console.log(`[LeadCaptura SW] dropping stale pending save ${entry.key} (queued ${Math.round((now - entry.queuedAt) / 86400000)}d ago)`);
+      continue;
+    }
+    try {
+      await fetchJson("/extension/sync/profile", { method: "POST", body: entry.profile });
+      console.log(`[LeadCaptura SW] pending save synced ✓ ${entry.key}`);
+    } catch (e) {
+      remaining.push({ ...entry, attempts: (entry.attempts || 0) + 1 });
+      console.log(`[LeadCaptura SW] pending save retry failed (attempt ${(entry.attempts || 0) + 1}) ${entry.key}: ${e?.message || e}`);
+    }
+  }
+  await chrome.storage.local.set({ [PENDING_SAVES_KEY]: remaining });
+}
+
 const handlers = {
   me: () => fetchJson("/extension/me"),
   options: () => fetchJson("/extension/options"),
   createSegment: ({ name }) =>
     fetchJson("/extension/segments", { method: "POST", body: { name } }),
-  syncProfile: ({ profile }) =>
-    fetchJson("/extension/sync/profile", { method: "POST", body: profile }),
+  syncProfile: async ({ profile }) => {
+    try {
+      return await fetchJson("/extension/sync/profile", { method: "POST", body: profile });
+    } catch (e) {
+      const msg = e?.message || String(e);
+      // Only queue for retry when the backend itself is unreachable (network
+      // failure, or the host/app is down with a 5xx) — never on a 4xx, which
+      // means the request itself is wrong (bad API key, validation) and
+      // retrying it unchanged would just fail again.
+      if (/^Failed to fetch|HTTP 5\d\d/i.test(msg)) {
+        await queuePendingSave(profile).catch(() => {});
+        e.message = `${msg} — saved offline, will retry automatically once the backend is reachable`;
+      }
+      throw e;
+    }
+  },
   syncSearch: (body) => fetchJson("/extension/sync/search", { method: "POST", body }),
   enrollBatch: ({ playbook_id, lead_ids }) =>
     fetchJson("/extension/enroll", { method: "POST", body: { playbook_id, lead_ids } }),
@@ -1559,6 +1640,16 @@ chrome.alarms?.create("lc-heartbeat", { periodInMinutes: 1 });
 chrome.alarms?.onAlarm.addListener(() => {
   // No-op: just ensures Chrome rouses the worker periodically.
 });
+
+// Drain the offline-save queue every few minutes so profiles captured during
+// a backend outage land in the CRM automatically once it's back — no user
+// action needed. Also run once shortly after the worker spins up (covers the
+// "backend came back while the browser was closed" case).
+chrome.alarms?.create("lc-pending-saves-retry", { periodInMinutes: 3 });
+chrome.alarms?.onAlarm.addListener((alarm) => {
+  if (alarm && alarm.name === "lc-pending-saves-retry") retryPendingSaves();
+});
+retryPendingSaves();
 
 // ───────────────────────── In-extension auto-update ─────────────────────────
 // Chrome cannot silently replace an UNPACKED extension's files (only the Chrome

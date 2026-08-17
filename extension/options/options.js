@@ -83,6 +83,21 @@ function setStatus(msg, level = "") {
   el.className = "status " + level;
 }
 
+// A 5xx with an HTML body is almost always the HOSTING PROVIDER talking
+// (Render/Fly/nginx error page), not the LeadCaptura backend — e.g. Render's
+// "This service has been suspended by its owner" page. Dumping that raw
+// markup into the status pill is unreadable, so pull out the page's own
+// <title> (if any) and show a clean sentence instead. Returns "" when the
+// body isn't HTML, so the caller falls back to its normal error text.
+function describeHostErrorPage(status, bodyText) {
+  const trimmed = String(bodyText || "").trim();
+  if (!/^<!doctype html|^<html/i.test(trimmed)) return "";
+  const title = (trimmed.match(/<title>([^<]*)<\/title>/i) || [])[1]?.trim();
+  return title
+    ? `Backend host says "${title}" (HTTP ${status}) — that's a message from the hosting provider, not the LeadCaptura app. Check the hosting dashboard (e.g. Render).`
+    : `Backend returned an HTML error page (HTTP ${status}) instead of a response — likely a hosting-provider outage, not the app itself.`;
+}
+
 async function ensureHostPermission(apiUrl) {
   let origin;
   try {
@@ -114,7 +129,8 @@ async function testConnection() {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      setStatus(`Backend rejected (${res.status}). ${body.slice(0, 140)}`, "err");
+      const hostErrorMessage = describeHostErrorPage(res.status, body);
+      setStatus(hostErrorMessage || `Backend rejected (${res.status}). ${body.slice(0, 140)}`, "err");
       return;
     }
     const data = await res.json();
