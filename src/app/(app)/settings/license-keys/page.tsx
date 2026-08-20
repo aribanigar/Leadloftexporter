@@ -417,7 +417,7 @@ export default function LicenseKeysPage() {
         <h2 className="mb-1 text-base font-semibold">Grant access to an existing account</h2>
         <p className="mb-4 text-sm text-slate-500">
           For someone who already has an account and their <b>own</b> workspace — e.g. they registered before
-          invite codes existed, or you're re-issuing after a revoke. Find them by the email they registered
+          invite codes existed, or you&apos;re re-issuing after a revoke. Find them by the email they registered
           with, then issue an API key and license key straight into their workspace. You never join it and
           can&apos;t see their leads, campaigns, or anything else in it — this only ever touches the two
           credentials below.
