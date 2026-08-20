@@ -25,11 +25,30 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.383",
+    date: "Aug 20, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.383.zip",
+    latest: true,
+    changes: [
+      "Removed the baked-in default API key. Every fresh install used to fall back to one specific account's key until you pasted your own, which meant it silently captured into THAT account's workspace instead of yours — with no visible sign anything was wrong. There's no shared default anymore: installs still on the old key are automatically reset to \"not connected\" on this update, and everyone now gets their own API key + license key from their admin (Settings → License Keys → \"Invite a new user\" or \"Grant access\").",
+    ],
+  },
+  {
+    version: "1.0.382",
+    date: "Aug 20, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.382.zip",
+    changes: [
+      "Fixed a phone-number bug: profiles located in Russia, Ukraine, Austria, Australia, or Mauritius could get the wrong country dial code silently prepended (e.g. a Moscow number tagged +1 instead of +7), because the short \"us\"/\"uk\" abbreviations matched as substrings of those country names before the real country entry got a chance to.",
+      "Fixed conversations opened later in an already-open LinkedIn Messaging tab not syncing to the CRM — only conversations open at page load were being captured before.",
+    ],
+  },
+  {
     version: "1.0.381",
     date: "Aug 20, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.381.zip",
-    latest: true,
     changes: [
       "Moved the default backend off leadloftexporter-1.onrender.com (suspended by its owner on Render, which is why sends/captures could silently stop working) to leadloftexporter.onrender.com. Existing installs migrate automatically on update — nothing to do unless you'd manually set a custom Backend URL in Options.",
     ],
