@@ -7,7 +7,11 @@ const DEFAULT_CV = "";
 
 const DEFAULTS = {
   apiUrl: "https://leadloftexporter.onrender.com",
-  apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
+  // No baked-in API key: it used to default to one specific account's key, so
+  // every fresh install silently captured into THAT account's workspace
+  // instead of whichever workspace the person actually signed up for. Each
+  // workspace generates its own from Settings -> API Keys.
+  apiKey: "",
   licenseKey: "",
   enabled: true,
   autopilot: false,

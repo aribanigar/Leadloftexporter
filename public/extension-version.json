@@ -1,5 +1,5 @@
 {
-  "version": "1.0.382",
-  "zip": "/extensions/leadcaptura-extension-v1.0.382.zip",
-  "notes": "Fixed a phone-number bug: profiles located in Russia, Ukraine, Austria, Australia, or Mauritius could get the wrong country dial code silently prepended (e.g. a Moscow number tagged +1 instead of +7), because the short \"us\"/\"uk\" abbreviations matched as substrings of those country names before the real country entry got a chance to. Also fixed conversations opened later in an already-open LinkedIn Messaging tab not syncing to the CRM — only conversations open at page load were being captured."
+  "version": "1.0.383",
+  "zip": "/extensions/leadcaptura-extension-v1.0.383.zip",
+  "notes": "Fixed every fresh install silently capturing into one specific account's workspace instead of your own: the extension used to ship with that account's API key baked in as a fallback default, so anyone who installed it without pasting their own key was actually using someone else's workspace without knowing it. There is no shared default anymore — existing installs still on the old baked-in key are automatically reset to \"not connected\" on this update. Ask your admin for your own API key and license key (Settings → API Keys / License Keys) and paste them into Options to reconnect to your own workspace."
 }

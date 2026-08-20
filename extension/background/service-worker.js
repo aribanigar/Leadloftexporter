@@ -8,7 +8,13 @@
 
 const DEFAULT_SETTINGS = {
   apiUrl: "https://leadloftexporter.onrender.com",
-  apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
+  // No baked-in API key: it used to default to one specific account's key, so
+  // every fresh install silently captured into THAT account's workspace
+  // instead of whichever workspace the person actually signed up for. Each
+  // workspace generates its own from Settings -> API Keys. See the one-time
+  // migration below that also un-sticks installs already pinned to the old
+  // baked-in value.
+  apiKey: "",
   // No baked-in default — a license key is admin-issued per person (Settings
   // → License Keys) and must be entered in Options before the extension can
   // reach the backend at all. See fetchJson() below + deps.py:get_extension_context.
@@ -1571,22 +1577,26 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     }
   } catch {}
 
-  // One-time migration: rotate the OLD pre-set default workspace API key over
-  // to the new one. Pre-existing installs cached the old default in
-  // chrome.storage.local on first save, which then wins the merge over
-  // DEFAULTS forever — so just bumping DEFAULTS.apiKey only helps fresh
-  // installs. This flips any storage that's still on the old default value;
-  // a user who pasted their OWN generated key is left untouched (their key
-  // doesn't match the old default, so it stays).
+  // One-time migration: CLEAR any install still pinned to one of the old
+  // pre-baked default API keys. LeadCaptura used to ship with one specific
+  // account's key baked in as a "just works" convenience — every install
+  // kept using it silently forever (stored settings win over DEFAULTS once
+  // saved), which meant EVERY fresh install captured into that one account's
+  // workspace instead of whichever workspace the person actually signed up
+  // for. There is no safe shared replacement value anymore (each workspace
+  // must generate its own from Settings -> API Keys), so this un-sticks
+  // affected installs back to "not connected" instead of rotating them onto
+  // another shared value. A user who pasted their OWN generated key is left
+  // untouched (their key doesn't match any of these, so it stays).
   try {
-    const KNOWN_OLD_DEFAULTS = new Set([
+    const KNOWN_SHARED_DEFAULT_KEYS = new Set([
       "lcx_lqpLWLIgFoMLKCTs7-Xj38dKp9QCe2BG60BQ5N59Uo8",
+      "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
     ]);
-    const NEW_DEFAULT = "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E";
     const { settings } = await chrome.storage.local.get("settings");
-    if (settings && KNOWN_OLD_DEFAULTS.has(settings.apiKey)) {
+    if (settings && KNOWN_SHARED_DEFAULT_KEYS.has(settings.apiKey)) {
       await chrome.storage.local.set({
-        settings: { ...settings, apiKey: NEW_DEFAULT },
+        settings: { ...settings, apiKey: "" },
       });
     }
   } catch {}
