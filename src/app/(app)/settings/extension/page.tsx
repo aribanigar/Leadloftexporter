@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.381",
+    date: "Aug 20, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.381.zip",
+    latest: true,
+    changes: [
+      "Moved the default backend off leadloftexporter-1.onrender.com (suspended by its owner on Render, which is why sends/captures could silently stop working) to leadloftexporter.onrender.com. Existing installs migrate automatically on update — nothing to do unless you'd manually set a custom Backend URL in Options.",
+    ],
+  },
+  {
     version: "1.0.380",
     date: "Aug 14, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.380.zip",
-    latest: true,
     changes: [
       "Added license-key activation. The extension now needs a license key — issued by your admin in Settings → License Keys — in addition to your personal API key before it will connect. Open the extension's Options and paste both in; the Download/Options screen tells you exactly which one is missing or invalid if either is wrong, revoked, or expired.",
       "Admins: generate, label, assign, expire, revoke, reset, or delete license keys per person from the new Settings → License Keys page — a person's captured leads still save to their own account via their own API key exactly as before; the license key is just the on/off switch you control.",

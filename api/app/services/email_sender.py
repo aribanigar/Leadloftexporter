@@ -41,17 +41,29 @@ def _pick_account(db: Session, workspace_id: str, user_id: str) -> Optional[Conn
         (ConnectedAccount.provider == "smtp", 3),
         else_=9,
     )
-    return (
-        db.query(ConnectedAccount)
-        .filter(
+
+    def _query(scope_to_user: bool):
+        q = db.query(ConnectedAccount).filter(
             ConnectedAccount.workspace_id == workspace_id,
-            ConnectedAccount.user_id == user_id,
             ConnectedAccount.provider.in_(("gmail", "smtp", "resend", "sendgrid")),
             ConnectedAccount.status == "active",
         )
-        .order_by(provider_rank.asc(), ConnectedAccount.updated_at.desc())
-        .first()
-    )
+        if scope_to_user:
+            q = q.filter(ConnectedAccount.user_id == user_id)
+        return q.order_by(provider_rank.asc(), ConnectedAccount.updated_at.desc()).first()
+
+    # Prefer the requesting user's own connected mailbox (their captured
+    # leads/replies send "from" them) — but Settings -> Email Senders
+    # (GET /integrations/accounts) lists connected accounts workspace-wide
+    # with no per-user view, so a team member who never personally ran the
+    # Gmail/SMTP connect flow has no way to know they're missing one. Without
+    # this fallback their sends (Lead Detail composer, outreach playbook
+    # steps) failed outright with "no_email_account_connected" even though
+    # the workspace clearly has a working sender — exactly the asymmetry
+    # campaigns.py:_eligible_senders avoids by treating every active inbox as
+    # workspace-wide eligible. Falling back here brings single-lead sends in
+    # line with that same "any active inbox works" model.
+    return _query(scope_to_user=True) or _query(scope_to_user=False)
 
 
 def _looks_like_render_smtp_block(error: str) -> bool:

@@ -45,15 +45,14 @@ jobs:
       - name: Ping Render API to keep it warm
         run: |
           set -eu
-          # Warm EVERY backend the app might be pointed at, so whichever URL the
-          # CRM frontend / extension actually use stays awake. The previous
-          # default (leadloftexporter-1.onrender.com) did NOT match the real
-          # production backend the extension + app use (leadloftexporter.onrender.com),
-          # so the container that actually serves login was spinning down and
-          # cold-starting (30-60s) — that is the "CRM is slow to load" symptom.
+          # Warm the backend the app is actually pointed at. leadloftexporter-1
+          # was the previous production host; it's been SUSPENDED (by its
+          # owner, on Render) so pinging it is pointless — everything now
+          # points at leadloftexporter.onrender.com instead (see src/lib/api.ts,
+          # extension/background/service-worker.js DEFAULT_SETTINGS.apiUrl).
           #
-          # Order: manual-run input → repo variable API_URL → the known hosts.
-          URLS="${{ github.event.inputs.url }} ${{ vars.API_URL }} https://leadloftexporter.onrender.com https://leadloftexporter-1.onrender.com"
+          # Order: manual-run input → repo variable API_URL → the known host.
+          URLS="${{ github.event.inputs.url }} ${{ vars.API_URL }} https://leadloftexporter.onrender.com"
 
           # One poke per URL is enough to WAKE the container (the request reaching
           # Render triggers the spin-up); we don't need to wait for the full cold

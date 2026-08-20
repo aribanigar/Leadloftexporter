@@ -7,7 +7,7 @@
  */
 
 const DEFAULT_SETTINGS = {
-  apiUrl: "https://leadloftexporter-1.onrender.com",
+  apiUrl: "https://leadloftexporter.onrender.com",
   apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
   // No baked-in default — a license key is admin-issued per person (Settings
   // → License Keys) and must be entered in Options before the extension can
@@ -1587,6 +1587,25 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     if (settings && KNOWN_OLD_DEFAULTS.has(settings.apiKey)) {
       await chrome.storage.local.set({
         settings: { ...settings, apiKey: NEW_DEFAULT },
+      });
+    }
+  } catch {}
+
+  // One-time migration: move any install still pointed at the OLD default
+  // backend host (leadloftexporter-1.onrender.com, since suspended by its
+  // owner on Render) over to the current one. Same reasoning as the apiKey
+  // migration above — stored settings win over DEFAULTS forever once saved,
+  // so bumping DEFAULTS.apiUrl alone only helps fresh installs; every
+  // existing install kept silently talking to a dead host. Only rewrites the
+  // OLD DEFAULT value exactly, so a user who deliberately pointed their
+  // apiUrl elsewhere (self-hosted backend, etc.) is left untouched.
+  try {
+    const OLD_DEFAULT_API_URL = "https://leadloftexporter-1.onrender.com";
+    const NEW_DEFAULT_API_URL = "https://leadloftexporter.onrender.com";
+    const { settings } = await chrome.storage.local.get("settings");
+    if (settings && settings.apiUrl === OLD_DEFAULT_API_URL) {
+      await chrome.storage.local.set({
+        settings: { ...settings, apiUrl: NEW_DEFAULT_API_URL },
       });
     }
   } catch {}

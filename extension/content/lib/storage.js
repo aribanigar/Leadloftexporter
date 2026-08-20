@@ -15,7 +15,7 @@
   const KEY_PREFIX = "leadcaptura:";
 
   const DEFAULTS = {
-    apiUrl: "https://leadloftexporter-1.onrender.com",
+    apiUrl: "https://leadloftexporter.onrender.com",
     apiKey: "",
     licenseKey: "",
     enabled: true,

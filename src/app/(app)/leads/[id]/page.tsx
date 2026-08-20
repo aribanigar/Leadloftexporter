@@ -570,10 +570,11 @@ function Composer({
   const [noteBody, setNoteBody] = useState("");
   const [callOutcome, setCallOutcome] = useState("connected");
   const [callNotes, setCallNotes] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const sendEmail = useMutation({
     mutationFn: () =>
-      api("/inbox/send", {
+      api<{ ok: boolean; error: string | null }>("/inbox/send", {
         method: "POST",
         body: {
           lead_id: leadId,
@@ -582,10 +583,28 @@ function Composer({
           body_html: body,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // /inbox/send always returns HTTP 200 — a failed send (e.g. no
+      // connected mailbox to send from) comes back as {ok:false, error:...},
+      // not a thrown error, so it must be checked here explicitly. Without
+      // this the compose box just cleared as if the email had gone out,
+      // with no indication anything failed.
+      if (data?.ok === false) {
+        setSendError(
+          data.error === "no_email_account_connected"
+            ? "Couldn't send — no email sender is connected for this workspace yet. Connect one in Settings → Email Senders."
+            : data.error || "Send failed."
+        );
+        qc.invalidateQueries({ queryKey: ["lead", leadId, "timeline"] });
+        return;
+      }
+      setSendError(null);
       setSubject("");
       setBody("");
       qc.invalidateQueries({ queryKey: ["lead", leadId, "timeline"] });
+    },
+    onError: (e) => {
+      setSendError(e instanceof Error ? e.message : "Send failed.");
     },
   });
 
@@ -662,8 +681,11 @@ function Composer({
               className="input min-h-[160px] w-full"
               placeholder="Write your message…"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => { setBody(e.target.value); setSendError(null); }}
             />
+            {sendError && (
+              <div className="text-sm text-rose-600">{sendError}</div>
+            )}
             <div className="flex items-center justify-end gap-2">
               <button
                 className="btn-primary"

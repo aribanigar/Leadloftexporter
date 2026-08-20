@@ -4,7 +4,7 @@ const $ = (sel) => document.querySelector(sel);
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   return Object.assign(
-    { apiUrl: "https://leadloftexporter-1.onrender.com", apiKey: "", licenseKey: "", enabled: true, autopilot: true, showOverlay: true },
+    { apiUrl: "https://leadloftexporter.onrender.com", apiKey: "", licenseKey: "", enabled: true, autopilot: true, showOverlay: true },
     settings || {}
   );
 }

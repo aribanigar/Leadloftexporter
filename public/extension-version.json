@@ -1,5 +1,5 @@
 {
-  "version": "1.0.380",
-  "zip": "/extensions/leadcaptura-extension-v1.0.380.zip",
-  "notes": "Added license-key activation. The extension now needs a license key (Settings → License Keys, admin-issued) in addition to your personal API key before it will connect — open the extension's Options and paste both in. Admins can generate, label, assign, expire, revoke, reset, or delete license keys from the new Settings → License Keys page; a person's captured leads still save to their own account via their own API key exactly as before."
+  "version": "1.0.381",
+  "zip": "/extensions/leadcaptura-extension-v1.0.381.zip",
+  "notes": "Moved the default backend off leadloftexporter-1.onrender.com (suspended by its owner on Render) to leadloftexporter.onrender.com. Existing installs are migrated automatically on this update — no need to touch Options unless you'd set a custom Backend URL yourself."
 }
