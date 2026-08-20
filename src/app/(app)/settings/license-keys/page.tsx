@@ -169,6 +169,61 @@ export default function LicenseKeysPage() {
     return (e as Error)?.message || "Something went wrong.";
   }
 
+  function grantErrorMessage(e: unknown): string {
+    const msg = extractDetail(e);
+    if (msg === "user_not_found") return "No account with that email.";
+    if (msg === "no_owned_workspace") return "That email hasn't signed up and created a workspace yet.";
+    return msg;
+  }
+
+  // ── Grant access to a NEW user's OWN workspace ──────────────────────────
+  // Every self-registered user gets their own separate workspace where
+  // they're "owner" — see auth.py:register. The endpoints below (unlike
+  // create above, which only ever touches the CALLER's own current
+  // workspace) look that workspace up by email and issue a key into it
+  // directly, without joining it — see api/app/api/v1/admin_access.py.
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantFound, setGrantFound] = useState<{ email: string; name: string; workspaceName: string } | null>(null);
+  const [grantError, setGrantError] = useState<string | null>(null);
+  const [grantedKeys, setGrantedKeys] = useState<{ apiKey: string; licenseKey: string; email: string } | null>(null);
+  const [grantCopied, setGrantCopied] = useState<"api" | "license" | "both" | null>(null);
+
+  const lookupUser = useMutation({
+    mutationFn: (email: string) =>
+      api<{ email: string; first_name: string | null; last_name: string | null; workspace_name: string }>(
+        `/admin/access/lookup?email=${encodeURIComponent(email)}`
+      ),
+    onSuccess: (res) => {
+      setGrantFound({
+        email: res.email,
+        name: `${res.first_name || ""} ${res.last_name || ""}`.trim() || res.email,
+        workspaceName: res.workspace_name,
+      });
+      setGrantError(null);
+      setGrantedKeys(null);
+    },
+    onError: (e) => {
+      setGrantFound(null);
+      setGrantError(grantErrorMessage(e));
+    },
+  });
+
+  const grantAccess = useMutation({
+    mutationFn: async (email: string) => {
+      const apiKeyRes = await api<{ key: string }>("/admin/access/api-keys", { method: "POST", body: { email } });
+      const licenseKeyRes = await api<{ key: string }>("/admin/access/license-keys", {
+        method: "POST",
+        body: { email, label: "Chrome Extension" },
+      });
+      return { apiKey: apiKeyRes.key, licenseKey: licenseKeyRes.key };
+    },
+    onSuccess: (res) => {
+      setGrantedKeys({ apiKey: res.apiKey, licenseKey: res.licenseKey, email: grantEmail.trim() });
+      setGrantError(null);
+    },
+    onError: (e) => setGrantError(grantErrorMessage(e)),
+  });
+
   const previewExpiry = computeExpiry(form.expiryMode, form.customAmount, form.customUnit);
 
   const create = useMutation({
@@ -268,6 +323,116 @@ export default function LicenseKeysPage() {
   }
 
   return (
+    <>
+    {canIssueKeys && (
+      <div className="card mb-4 max-w-4xl p-6">
+        <h2 className="mb-1 text-base font-semibold">Grant a new user access</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          For someone who signed up and created their <b>own</b> workspace — not a teammate you invited into
+          this one. Find them by the email they registered with, then issue an API key and license key
+          straight into their workspace. You never join it and can&apos;t see their leads, campaigns, or
+          anything else in it — this only ever touches the two credentials below.
+        </p>
+
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const email = grantEmail.trim();
+            if (email) lookupUser.mutate(email);
+          }}
+        >
+          <label className="text-sm">
+            <span className="mb-1 block text-slate-600">Their account email</span>
+            <input
+              type="email"
+              className="input w-72"
+              placeholder="newuser@example.com"
+              value={grantEmail}
+              onChange={(e) => { setGrantEmail(e.target.value); setGrantFound(null); setGrantedKeys(null); setGrantError(null); }}
+            />
+          </label>
+          <button type="submit" className="btn-secondary" disabled={!grantEmail.trim() || lookupUser.isPending}>
+            {lookupUser.isPending ? "Looking up…" : "Find workspace"}
+          </button>
+        </form>
+
+        {grantError && <p className="mt-3 text-sm text-rose-600">{grantError}</p>}
+
+        {grantFound && !grantedKeys && (
+          <div className="mt-4 rounded-md border border-slate-200 p-4">
+            <p className="text-sm text-slate-700">
+              Found <b>{grantFound.name}</b> ({grantFound.email}) — owns workspace{" "}
+              <span className="font-medium">“{grantFound.workspaceName}”</span>.
+            </p>
+            <button
+              className="btn-primary mt-3"
+              disabled={grantAccess.isPending}
+              onClick={() => grantAccess.mutate(grantFound.email)}
+            >
+              <KeyRound className="h-4 w-4" />
+              {grantAccess.isPending ? "Issuing…" : "Issue API key + license key"}
+            </button>
+          </div>
+        )}
+
+        {grantedKeys && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="mb-2 font-medium">
+              Issued for {grantedKeys.email} — copy both now, neither is shown again. Send them to that
+              person; they paste them into the extension&apos;s Options page.
+            </div>
+            <div className="space-y-2">
+              <div>
+                <div className="mb-1 text-xs text-amber-700">API key</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 break-all rounded bg-white px-2 py-1 font-mono text-xs">{grantedKeys.apiKey}</code>
+                  <button
+                    className="btn-secondary"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(grantedKeys.apiKey);
+                      if (ok) { setGrantCopied("api"); setTimeout(() => setGrantCopied(null), 1500); }
+                    }}
+                  >
+                    {grantCopied === "api" ? (<><Check className="h-4 w-4 text-emerald-600" /> Copied</>) : (<><Copy className="h-4 w-4" /> Copy</>)}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-amber-700">License key</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 break-all rounded bg-white px-2 py-1 font-mono text-xs">{grantedKeys.licenseKey}</code>
+                  <button
+                    className="btn-secondary"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(grantedKeys.licenseKey);
+                      if (ok) { setGrantCopied("license"); setTimeout(() => setGrantCopied(null), 1500); }
+                    }}
+                  >
+                    {grantCopied === "license" ? (<><Check className="h-4 w-4 text-emerald-600" /> Copied</>) : (<><Copy className="h-4 w-4" /> Copy</>)}
+                  </button>
+                </div>
+              </div>
+              <button
+                className="btn-secondary"
+                onClick={async () => {
+                  const ok = await copyToClipboard(`API key: ${grantedKeys.apiKey}\nLicense key: ${grantedKeys.licenseKey}`);
+                  if (ok) { setGrantCopied("both"); setTimeout(() => setGrantCopied(null), 1500); }
+                }}
+              >
+                {grantCopied === "both" ? (<><Check className="h-4 w-4 text-emerald-600" /> Copied both</>) : (<><Copy className="h-4 w-4" /> Copy both</>)}
+              </button>
+            </div>
+            <button
+              className="mt-3 text-amber-700 underline"
+              onClick={() => { setGrantedKeys(null); setGrantFound(null); setGrantEmail(""); }}
+            >
+              Done — grant another
+            </button>
+          </div>
+        )}
+      </div>
+    )}
     <div className="card max-w-4xl p-6">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -549,5 +714,6 @@ export default function LicenseKeysPage() {
         </table>
       </div>
     </div>
+    </>
   );
 }
