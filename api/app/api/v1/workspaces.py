@@ -12,11 +12,13 @@ from app.schemas import WorkspaceOut
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-# API keys double as the product's license/activation key — the Chrome
-# extension is fully functional for anyone holding one. Key *creation* is
+# API keys determine which account a captured lead is attributed to
+# (ApiKey.user_id -> Lead.owner_id) and, alongside a license key
+# (see licenses.py), let the Chrome extension activate. Key *creation* is
 # restricted to this single account so signing up alone can't self-issue a
-# working key; existing keys already issued to other users keep working
-# (list/use/revoke below are untouched) and nothing else about auth changes.
+# working credential; existing keys already issued to other users keep
+# working (list/use/revoke below are untouched) and nothing else about auth
+# changes.
 LICENSED_API_KEY_ADMIN_EMAIL = "acemedia.qa@gmail.com"
 
 

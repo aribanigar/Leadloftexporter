@@ -17,12 +17,28 @@ from app.models import LicenseKey, Membership, User
 
 router = APIRouter(prefix="/workspaces/current/license-keys", tags=["license-keys"])
 
+# License keys are meant to be an ADMIN-issued credential nobody can grant
+# themselves. But every signup is auto-made "owner" of their own fresh trial
+# workspace (see auth.py:register), so the owner/admin check below passes
+# trivially for anyone who just made an account — it only ever stops a
+# non-owner/admin TEAMMATE inside someone else's workspace. Creation
+# specifically is additionally restricted to this one account so signing up
+# alone can never self-issue a working license key; managing keys you
+# already have (list/reassign/revoke/reset) stays owner/admin-gated as
+# before, unaffected.
+LICENSE_KEY_ISSUER_EMAIL = "acemedia.qa@gmail.com"
+
 
 def _require_manager(ctx: AuthContext) -> None:
     """Only an owner or admin may generate/revoke/reset/delete license keys —
     same gate + idiom as team.py:_require_manager."""
     if ctx.membership.role not in {"owner", "admin"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+
+
+def _require_key_issuer(ctx: AuthContext) -> None:
+    if (ctx.user.email or "").strip().lower() != LICENSE_KEY_ISSUER_EMAIL:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "license_key_creation_restricted")
 
 
 def _hash(raw: str) -> str:
@@ -103,6 +119,7 @@ def create_license_key(
     db: Session = Depends(get_db),
 ):
     _require_manager(ctx)
+    _require_key_issuer(ctx)
     _validate_assignee(db, ctx, body.assigned_user_id)
     raw, prefix, hashed = _generate_raw()
     record = LicenseKey(

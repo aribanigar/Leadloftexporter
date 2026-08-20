@@ -7,6 +7,13 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/utils";
 
+// Mirrors the backend restriction in api/app/api/v1/licenses.py::create_license_key.
+// Every signup is auto-made "owner" of their own trial workspace, so the
+// owner/admin role check alone doesn't stop self-issued license keys — this
+// keeps the UI in sync with that server-side gate (a UX nicety, not the gate
+// itself).
+const LICENSE_KEY_ISSUER_EMAIL = "acemedia.qa@gmail.com";
+
 interface TeamMember {
   membership_id: string;
   user_id: string;
@@ -49,7 +56,8 @@ function fmt(dt: string | null) {
 
 export default function LicenseKeysPage() {
   const qc = useQueryClient();
-  const { workspace } = useAuth();
+  const { workspace, user } = useAuth();
+  const canIssueKeys = (user?.email || "").trim().toLowerCase() === LICENSE_KEY_ISSUER_EMAIL;
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ label: "", assigned_user_id: "", expires_at: "" });
   const [revealed, setRevealed] = useState<RevealedKey | null>(null);
@@ -96,7 +104,13 @@ export default function LicenseKeysPage() {
     },
     onError: (e) => {
       const msg = extractDetail(e);
-      setError(msg === "assignee_not_in_workspace" ? "That teammate isn't in this workspace." : msg);
+      setError(
+        msg === "assignee_not_in_workspace"
+          ? "That teammate isn't in this workspace."
+          : msg === "license_key_creation_restricted"
+          ? "Only the account holder can generate license keys."
+          : msg
+      );
     },
   });
 
@@ -146,10 +160,17 @@ export default function LicenseKeysPage() {
     <div className="card max-w-4xl p-6">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-base font-semibold">License Keys</h2>
-        <button className="btn-primary" onClick={() => { setShowAdd((v) => !v); setError(null); }}>
-          <KeyRound className="h-4 w-4" /> Generate license key
-        </button>
+        {canIssueKeys && (
+          <button className="btn-primary" onClick={() => { setShowAdd((v) => !v); setError(null); }}>
+            <KeyRound className="h-4 w-4" /> Generate license key
+          </button>
+        )}
       </div>
+      {!canIssueKeys && (
+        <p className="mb-4 text-sm text-slate-500">
+          Only the account holder can generate license keys. Existing keys below can still be managed.
+        </p>
+      )}
       <p className="mb-6 text-sm text-slate-500">
         The Chrome extension only activates once it has BOTH a personal API key (each person
         generates their own from their own account in <b>Settings → API Keys</b> — that&apos;s what
@@ -182,7 +203,7 @@ export default function LicenseKeysPage() {
         </div>
       )}
 
-      {showAdd && (
+      {canIssueKeys && showAdd && (
         <form
           className="mb-6 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-4"
           onSubmit={(e) => {
