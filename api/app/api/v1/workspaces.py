@@ -12,6 +12,13 @@ from app.schemas import WorkspaceOut
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
+# API keys double as the product's license/activation key — the Chrome
+# extension is fully functional for anyone holding one. Key *creation* is
+# restricted to this single account so signing up alone can't self-issue a
+# working key; existing keys already issued to other users keep working
+# (list/use/revoke below are untouched) and nothing else about auth changes.
+LICENSED_API_KEY_ADMIN_EMAIL = "acemedia.qa@gmail.com"
+
 
 @router.get("/current", response_model=WorkspaceOut)
 def get_current_workspace(ctx: AuthContext = Depends(get_workspace_context)) -> WorkspaceOut:
@@ -113,6 +120,8 @@ def create_api_key(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    if (ctx.user.email or "").strip().lower() != LICENSED_API_KEY_ADMIN_EMAIL:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "api_key_creation_restricted")
     raw = "lcx_" + secrets.token_urlsafe(32)
     prefix = raw[:12]
     import hashlib

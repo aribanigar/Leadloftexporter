@@ -4,7 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/utils";
+
+// API keys double as the product's license/activation key — mirrors the
+// backend restriction in api/app/api/v1/workspaces.py::create_api_key.
+// Keeping this in sync is a UX nicety (hides a button that would 403), not
+// the actual gate — the backend enforces it regardless of this check.
+const LICENSED_API_KEY_ADMIN_EMAIL = "acemedia.qa@gmail.com";
 
 interface ApiKeyRow {
   id: string;
@@ -17,6 +24,8 @@ interface ApiKeyRow {
 
 export default function ApiKeysPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canCreateKeys = (user?.email || "").trim().toLowerCase() === LICENSED_API_KEY_ADMIN_EMAIL;
   const { data: keys } = useQuery<ApiKeyRow[]>({
     queryKey: ["api-keys"],
     queryFn: () => api("/workspaces/current/api-keys"),
@@ -24,6 +33,7 @@ export default function ApiKeysPage() {
 
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: (name: string) =>
@@ -31,7 +41,9 @@ export default function ApiKeysPage() {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["api-keys"] });
       setCreated(res.key);
+      setCreateError(null);
     },
+    onError: () => setCreateError("Only the account holder can generate new API keys."),
   });
 
   const revoke = useMutation({
@@ -84,14 +96,26 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          className="btn-primary"
-          onClick={() => create.mutate("Chrome Extension")}
-          disabled={create.isPending}
-        >
-          <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
-        </button>
+      {createError && (
+        <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          {createError}
+        </div>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {canCreateKeys ? (
+          <button
+            className="btn-primary"
+            onClick={() => create.mutate("Chrome Extension")}
+            disabled={create.isPending}
+          >
+            <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
+          </button>
+        ) : (
+          <p className="text-sm text-slate-500">
+            Only the account holder can generate new API keys. Contact your admin for a key.
+          </p>
+        )}
         {keys && keys.length > 0 && (
           <button
             className="btn-danger"
