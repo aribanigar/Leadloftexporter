@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
+import { MessageCircle, CheckCircle2, Loader2, ExternalLink, Users } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 interface WaConfig {
   connected: boolean;
@@ -13,6 +14,8 @@ interface WaConfig {
 
 export default function WhatsAppSettingsPage() {
   const qc = useQueryClient();
+  const { workspace } = useAuth();
+  const isManager = workspace?.role === "owner" || workspace?.role === "admin";
   const [token, setToken] = useState("");
   const [phoneId, setPhoneId] = useState("");
 
@@ -46,8 +49,9 @@ export default function WhatsAppSettingsPage() {
         <h1 className="text-lg font-semibold">WhatsApp Business API</h1>
       </div>
       <p className="mb-5 text-sm text-slate-500">
-        Connect your Meta WhatsApp Business account to send messages automatically
-        (no clicking) from the Messaging tab.
+        One connection covers the whole workspace — once an admin connects it here,
+        everyone can send WhatsApp messages from the Messaging tab with no setup of
+        their own.
       </p>
 
       {isLoading ? (
@@ -66,15 +70,28 @@ export default function WhatsAppSettingsPage() {
           <p className="mt-2 text-xs text-slate-500">
             Phone number ID: <span className="font-mono">{config.phone_number_id}</span>
           </p>
-          <button
-            className="btn-danger mt-4"
-            disabled={disconnect.isPending}
-            onClick={() => {
-              if (window.confirm("Disconnect WhatsApp Business API?")) disconnect.mutate();
-            }}
-          >
-            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-          </button>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+            <Users className="h-3.5 w-3.5" /> Shared with everyone in this workspace — no one else needs to connect their own.
+          </p>
+          {isManager ? (
+            <button
+              className="btn-danger mt-4"
+              disabled={disconnect.isPending}
+              onClick={() => {
+                if (window.confirm("Disconnect WhatsApp Business API? This stops sending for the whole workspace.")) disconnect.mutate();
+              }}
+            >
+              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+            </button>
+          ) : (
+            <p className="mt-4 text-xs text-slate-400">Only the workspace owner or an admin can disconnect this.</p>
+          )}
+        </div>
+      ) : !isManager ? (
+        <div className="card p-5 text-sm text-slate-500">
+          WhatsApp isn&apos;t connected yet. Ask your workspace owner or an admin to connect it here —
+          once they do, you&apos;ll be able to send from the Messaging tab right away, with nothing to set up
+          on your end.
         </div>
       ) : (
         <div className="card p-5">

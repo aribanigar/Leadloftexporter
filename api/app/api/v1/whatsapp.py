@@ -29,6 +29,17 @@ GRAPH = "https://graph.facebook.com/v21.0"
 MAX_PER_SEND = 100
 
 
+def _require_manager(ctx: AuthContext) -> None:
+    """Only an owner or admin may connect/disconnect the workspace's shared
+    WhatsApp Business API credentials — same gate + idiom as
+    team.py/licenses.py:_require_manager. Reading the config and sending
+    messages (below) stay open to every workspace member: the whole point of
+    a workspace-wide connection is that once an admin sets it up, everyone
+    can use it without entering their own token."""
+    if ctx.membership.role not in {"owner", "admin"}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+
+
 def _account(db: Session, ctx: AuthContext) -> Optional[ConnectedAccount]:
     return (
         db.query(ConnectedAccount)
@@ -86,6 +97,7 @@ def save_config(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    _require_manager(ctx)
     token = body.access_token.strip()
     pnid = body.phone_number_id.strip()
     if not token or not pnid:
@@ -140,6 +152,7 @@ def delete_config(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
+    _require_manager(ctx)
     acct = _account(db, ctx)
     if acct:
         db.delete(acct)
