@@ -894,6 +894,13 @@
     lastPath = location.pathname;
     const type = Scraper.pageType();
 
+    // Drain any conversation participants the interceptor buffered while the
+    // user was browsing /messaging/ on this SPA nav (the boot-time drains at
+    // 1.5s/6s above only catch conversations loaded before main.js started).
+    if (location.pathname.startsWith("/messaging")) {
+      setTimeout(() => { try { _drainMsgQueue(); } catch {} }, 1500);
+    }
+
     // Always tear down everything before deciding what to render.
     Overlay.unmountProfilePanel();
     Overlay.unmountToolbar();
@@ -1597,8 +1604,8 @@
   // main.js initialises) then again after 5s to catch async-loaded batches.
   setTimeout(_drainMsgQueue, 1500);
   setTimeout(_drainMsgQueue, 6000);
-  // Also drain whenever the user navigates to /messaging/ SPA route.
-  const _origOnPathChange = onPathChange;
+  // Also drains whenever the user navigates to /messaging/ SPA route — see
+  // the hook inside onPathChange() above.
 
   // Bridge trigger: when a tab opens with ?lc_bridge=<job_id> we scrape the
   // visible profile + contact info and POST a structured snapshot to the

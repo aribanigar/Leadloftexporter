@@ -1231,9 +1231,14 @@
     ["riyadh", "+966"], ["jeddah", "+966"], ["mecca", "+966"], ["medina", "+966"],
     ["dammam", "+966"], ["doha", "+974"], ["muscat", "+968"],
     ["kuwait city", "+965"], ["manama", "+973"], ["amman", "+962"],
-    // Abbreviations & common city/country names
-    ["uae", "+971"], ["emirates", "+971"], ["usa", "+1"], ["us", "+1"],
-    ["uk", "+44"], ["qatar", "+974"], ["bahrain", "+973"], ["kuwait", "+965"],
+    // Abbreviations & common city/country names. NOTE: "us" and "uk" are
+    // deliberately NOT listed here — they're substrings of other country
+    // names below (Russia, Belarus, Ukraine, Mauritius, …) and a naive
+    // `loc.includes(name)` scan would match those countries' entries dead
+    // on arrival. They're appended at the very end of this array instead,
+    // so every longer/more-specific name gets first chance to match.
+    ["uae", "+971"], ["emirates", "+971"], ["usa", "+1"],
+    ["qatar", "+974"], ["bahrain", "+973"], ["kuwait", "+965"],
     ["oman", "+968"], ["jordan", "+962"], ["egypt", "+20"],
     ["cairo", "+20"], ["alexandria", "+20"],
     ["india", "+91"], ["bangalore", "+91"], ["mumbai", "+91"],
@@ -1269,6 +1274,8 @@
     ["algeria", "+213"], ["morocco", "+212"], ["tunisia", "+216"],
     ["libya", "+218"], ["sudan", "+249"], ["senegal", "+221"],
     ["cameroon", "+237"], ["maldives", "+960"], ["mauritius", "+230"],
+    // Short abbreviations LAST — see the note above the "uae"/"emirates" row.
+    ["us", "+1"], ["uk", "+44"],
   ];
 
   function _inferDialCode(locationStr) {

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.381",
-  "zip": "/extensions/leadcaptura-extension-v1.0.381.zip",
-  "notes": "Moved the default backend off leadloftexporter-1.onrender.com (suspended by its owner on Render) to leadloftexporter.onrender.com. Existing installs are migrated automatically on this update — no need to touch Options unless you'd set a custom Backend URL yourself."
+  "version": "1.0.382",
+  "zip": "/extensions/leadcaptura-extension-v1.0.382.zip",
+  "notes": "Fixed a phone-number bug: profiles located in Russia, Ukraine, Austria, Australia, or Mauritius could get the wrong country dial code silently prepended (e.g. a Moscow number tagged +1 instead of +7), because the short \"us\"/\"uk\" abbreviations matched as substrings of those country names before the real country entry got a chance to. Also fixed conversations opened later in an already-open LinkedIn Messaging tab not syncing to the CRM — only conversations open at page load were being captured."
 }
