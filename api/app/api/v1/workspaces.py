@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import AuthContext, get_workspace_context, get_current_user
 from app.core.security import hash_password
-from app.models import ApiKey, Membership, SavedView, Workspace
+from app.models import ApiKey, Membership, SavedView, User, Workspace
 from app.schemas import WorkspaceOut
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -96,13 +96,25 @@ def create_view(
 # ---- API keys (for the Chrome extension) ----
 
 
+def _is_key_admin(ctx: AuthContext) -> bool:
+    return (ctx.user.email or "").strip().lower() == LICENSED_API_KEY_ADMIN_EMAIL
+
+
 @router.get("/current/api-keys")
 def list_api_keys(ctx: AuthContext = Depends(get_workspace_context), db: Session = Depends(get_db)):
-    rows = (
-        db.query(ApiKey)
-        .filter(ApiKey.workspace_id == ctx.workspace_id, ApiKey.user_id == ctx.user_id)
-        .all()
-    )
+    # The admin issues keys on behalf of teammates (create_api_key below
+    # accepts a target user_id) so they need to see every key in the
+    # workspace, with whose it is, to manage what they've handed out.
+    # Everyone else only ever sees their own — unchanged from before.
+    admin_view = _is_key_admin(ctx)
+    q = db.query(ApiKey).filter(ApiKey.workspace_id == ctx.workspace_id)
+    if not admin_view:
+        q = q.filter(ApiKey.user_id == ctx.user_id)
+    rows = q.order_by(ApiKey.created_at.desc()).all()
+    users = {}
+    if admin_view and rows:
+        user_ids = {k.user_id for k in rows}
+        users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()}
     return [
         {
             "id": k.id,
@@ -111,6 +123,7 @@ def list_api_keys(ctx: AuthContext = Depends(get_workspace_context), db: Session
             "last_used_at": k.last_used_at,
             "revoked_at": k.revoked_at,
             "created_at": k.created_at,
+            **({"user_email": users[k.user_id].email} if admin_view and k.user_id in users else {}),
         }
         for k in rows
     ]
@@ -122,15 +135,30 @@ def create_api_key(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    if (ctx.user.email or "").strip().lower() != LICENSED_API_KEY_ADMIN_EMAIL:
+    if not _is_key_admin(ctx):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "api_key_creation_restricted")
+    # The admin can issue a key for themselves (default) or for any teammate
+    # already in this workspace via body.user_id — the key is still created
+    # under THAT person's user_id (that's what makes their captured leads
+    # save to their own account, ApiKey.user_id -> Lead.owner_id), the admin
+    # just hands it to them directly instead of them self-serving it.
+    target_user_id = body.get("user_id") or ctx.user_id
+    if target_user_id != ctx.user_id:
+        target_membership = (
+            db.query(Membership)
+            .filter(Membership.user_id == target_user_id, Membership.workspace_id == ctx.workspace_id)
+            .first()
+        )
+        if not target_membership:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "target_not_in_workspace")
+
     raw = "lcx_" + secrets.token_urlsafe(32)
     prefix = raw[:12]
     import hashlib
 
     record = ApiKey(
         workspace_id=ctx.workspace_id,
-        user_id=ctx.user_id,
+        user_id=target_user_id,
         name=body.get("name", "Chrome Extension"),
         key_prefix=prefix,
         key_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
@@ -139,7 +167,7 @@ def create_api_key(
     db.commit()
     db.refresh(record)
     # Returned once. Frontend must store/copy it.
-    return {"id": record.id, "name": record.name, "key": raw, "key_prefix": prefix}
+    return {"id": record.id, "name": record.name, "key": raw, "key_prefix": prefix, "user_id": target_user_id}
 
 
 @router.delete("/current/api-keys/{key_id}")

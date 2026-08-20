@@ -20,6 +20,15 @@ interface ApiKeyRow {
   last_used_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  user_email?: string;
+}
+
+interface TeamMember {
+  membership_id: string;
+  user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 export default function ApiKeysPage() {
@@ -30,14 +39,39 @@ export default function ApiKeysPage() {
     queryKey: ["api-keys"],
     queryFn: () => api("/workspaces/current/api-keys"),
   });
+  // Lets the admin issue a key ON BEHALF OF a teammate — the key still
+  // belongs to that teammate's own account (ApiKey.user_id -> Lead.owner_id
+  // is what makes their captured leads save to them), the admin just hands
+  // it to them directly instead of them self-serving it. Only fetched for
+  // the admin: /workspaces/current/members is itself owner/admin-gated, and
+  // a non-admin has no use for the picker anyway.
+  const { data: members } = useQuery<TeamMember[]>({
+    queryKey: ["team-members"],
+    queryFn: () => api("/workspaces/current/members"),
+    enabled: canCreateKeys,
+  });
 
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [forUserId, setForUserId] = useState("");
+
+  // For a non-admin, every row in `keys` is already their own (self-scoped
+  // by the backend). For the admin, rows now include teammates' keys too
+  // (each tagged with user_email) — "Wipe my keys" only ever deletes the
+  // caller's own (wipe_api_keys is unchanged), so this count must match
+  // that, not the full list length, or the confirm dialog would overstate
+  // what's about to happen.
+  const ownKeyCount = canCreateKeys
+    ? (keys?.filter((k) => !k.user_email || k.user_email.toLowerCase() === (user?.email || "").toLowerCase()).length ?? 0)
+    : (keys?.length ?? 0);
 
   const create = useMutation({
     mutationFn: (name: string) =>
-      api<{ key: string }>("/workspaces/current/api-keys", { method: "POST", body: { name } }),
+      api<{ key: string }>("/workspaces/current/api-keys", {
+        method: "POST",
+        body: forUserId ? { name, user_id: forUserId } : { name },
+      }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["api-keys"] });
       setCreated(res.key);
@@ -104,25 +138,41 @@ export default function ApiKeysPage() {
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {canCreateKeys ? (
-          <button
-            className="btn-primary"
-            onClick={() => create.mutate("Chrome Extension")}
-            disabled={create.isPending}
-          >
-            <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
-          </button>
+          <>
+            <select
+              className="input py-1.5 text-sm"
+              value={forUserId}
+              onChange={(e) => setForUserId(e.target.value)}
+            >
+              <option value="">For myself</option>
+              {members
+                ?.filter((m) => m.email.toLowerCase() !== (user?.email || "").toLowerCase())
+                .map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    For {(`${m.first_name || ""} ${m.last_name || ""}`.trim() || m.email)} ({m.email})
+                  </option>
+                ))}
+            </select>
+            <button
+              className="btn-primary"
+              onClick={() => create.mutate("Chrome Extension")}
+              disabled={create.isPending}
+            >
+              <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
+            </button>
+          </>
         ) : (
           <p className="text-sm text-slate-500">
             Only the account holder can generate new API keys. Contact your admin for a key.
           </p>
         )}
-        {keys && keys.length > 0 && (
+        {ownKeyCount > 0 && (
           <button
             className="btn-danger"
             onClick={() => {
               if (
                 confirm(
-                  `Delete all ${keys.length} API key${keys.length === 1 ? "" : "s"}? Any extension or integration using these will stop working. This cannot be undone.`
+                  `Delete all ${ownKeyCount} of your own API key${ownKeyCount === 1 ? "" : "s"}? Any extension or integration using ${ownKeyCount === 1 ? "it" : "them"} will stop working. This cannot be undone.${canCreateKeys ? " (Keys issued to teammates are untouched.)" : ""}`
                 )
               ) {
                 wipeAll.mutate();
@@ -131,7 +181,7 @@ export default function ApiKeysPage() {
             disabled={wipeAll.isPending}
           >
             <Trash2 className="h-4 w-4" />{" "}
-            {wipeAll.isPending ? "Wiping…" : "Wipe all keys"}
+            {wipeAll.isPending ? "Wiping…" : "Wipe my keys"}
           </button>
         )}
       </div>
@@ -140,6 +190,7 @@ export default function ApiKeysPage() {
         <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th className="py-2">Name</th>
+            {canCreateKeys && <th className="py-2">For</th>}
             <th className="py-2">Prefix</th>
             <th className="py-2">Last used</th>
             <th className="py-2">Status</th>
@@ -150,6 +201,7 @@ export default function ApiKeysPage() {
           {keys?.map((k) => (
             <tr key={k.id} className="border-b border-slate-100">
               <td className="py-2">{k.name}</td>
+              {canCreateKeys && <td className="py-2 text-slate-500">{k.user_email || "—"}</td>}
               <td className="py-2 font-mono text-xs">{k.key_prefix}…</td>
               <td className="py-2 text-slate-500">{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "Never"}</td>
               <td className="py-2">
@@ -173,7 +225,7 @@ export default function ApiKeysPage() {
           ))}
           {keys?.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-6 text-center text-slate-500">
+              <td colSpan={canCreateKeys ? 6 : 5} className="py-6 text-center text-slate-500">
                 No API keys yet.
               </td>
             </tr>
