@@ -8,6 +8,7 @@ const DEFAULT_CV = "";
 const DEFAULTS = {
   apiUrl: "https://leadloftexporter-1.onrender.com",
   apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
+  licenseKey: "",
   enabled: true,
   autopilot: false,
   showOverlay: true,
@@ -115,6 +116,20 @@ async function ensureHostPermission(apiUrl) {
   }
 }
 
+// Maps the backend's license-key error codes (deps.py:get_extension_context)
+// to a sentence that tells the user what to actually do — same spirit as
+// describeHostErrorPage() above and content/lib/api.js's _decorate().
+const LICENSE_KEY_ERRORS = {
+  missing_license_key: "Add a license key — ask your admin for one (Settings → License Keys).",
+  invalid_license_key: "That license key isn't recognized — check for typos, or ask your admin for a fresh one.",
+  license_key_revoked: "This license key has been revoked. Ask your admin to reactivate or reissue it.",
+  license_key_expired: "This license key has expired. Ask your admin to extend it or issue a new one.",
+  license_key_wrong_workspace: "This license key belongs to a different workspace than your API key.",
+  license_key_wrong_account: "This license key is assigned to a different account than your API key.",
+  missing_api_key: "Add an API key first.",
+  invalid_api_key: "That API key isn't recognized — generate a fresh one in Settings → API Keys.",
+};
+
 async function testConnection() {
   setStatus("Checking…");
   const settings = await load();
@@ -122,15 +137,25 @@ async function testConnection() {
     setStatus("Add an API key first.", "err");
     return;
   }
+  if (!settings.licenseKey) {
+    setStatus(LICENSE_KEY_ERRORS.missing_license_key, "err");
+    return;
+  }
   try {
     await ensureHostPermission(settings.apiUrl);
     const res = await fetch(`${settings.apiUrl}/api/v1/extension/me`, {
-      headers: { "X-API-Key": settings.apiKey, Accept: "application/json" },
+      headers: { "X-API-Key": settings.apiKey, "X-License-Key": settings.licenseKey, Accept: "application/json" },
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       const hostErrorMessage = describeHostErrorPage(res.status, body);
-      setStatus(hostErrorMessage || `Backend rejected (${res.status}). ${body.slice(0, 140)}`, "err");
+      if (hostErrorMessage) {
+        setStatus(hostErrorMessage, "err");
+        return;
+      }
+      let detail = "";
+      try { detail = JSON.parse(body)?.detail || ""; } catch (_) {}
+      setStatus(LICENSE_KEY_ERRORS[detail] || `Backend rejected (${res.status}). ${body.slice(0, 140)}`, "err");
       return;
     }
     const data = await res.json();
@@ -453,6 +478,7 @@ async function onSave() {
   await save({
     apiUrl: $("#apiUrl").value.trim().replace(/\/+$/, ""),
     apiKey: $("#apiKey").value.trim(),
+    licenseKey: $("#licenseKey").value.trim(),
     enabled: $("#enabled").checked,
     autopilot: $("#autopilot").checked,
     showOverlay: $("#showOverlay").checked,
@@ -504,6 +530,7 @@ async function init() {
   const settings = await load();
   $("#apiUrl").value = settings.apiUrl;
   $("#apiKey").value = settings.apiKey;
+  $("#licenseKey").value = settings.licenseKey || "";
   $("#enabled").checked = settings.enabled;
   $("#autopilot").checked = settings.autopilot;
   $("#showOverlay").checked = settings.showOverlay;
@@ -566,6 +593,11 @@ async function init() {
     const inp = $("#apiKey");
     inp.type = inp.type === "password" ? "text" : "password";
     $("#toggle-show").textContent = inp.type === "password" ? "Show" : "Hide";
+  });
+  $("#toggle-show-license").addEventListener("click", () => {
+    const inp = $("#licenseKey");
+    inp.type = inp.type === "password" ? "text" : "password";
+    $("#toggle-show-license").textContent = inp.type === "password" ? "Show" : "Hide";
   });
   $("#toggle-gemini").addEventListener("click", () => {
     const inp = $("#geminiApiKey");

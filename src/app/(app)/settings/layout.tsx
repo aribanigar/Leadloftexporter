@@ -19,6 +19,7 @@ const SECTIONS = [
   ]},
   { title: "Workspace Settings", items: [
     { href: "/settings/team", label: "Manage Team" },
+    { href: "/settings/license-keys", label: "License Keys" },
     { href: "/settings/fields", label: "Custom Fields" },
     { href: "/settings/import", label: "Import Data" },
     { href: "/settings/pipeline", label: "Pipeline & Segments" },

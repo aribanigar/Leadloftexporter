@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Chrome, Puzzle, RefreshCw, CheckCircle2, Sparkles, History } from "lucide-react";
+import { Download, Chrome, Puzzle, RefreshCw, CheckCircle2, Sparkles, History, KeyRound } from "lucide-react";
 
 /**
  * Extension release catalogue — newest first. To publish a new build:
@@ -25,11 +25,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.380",
+    date: "Aug 14, 2026",
+    size: "145 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.380.zip",
+    latest: true,
+    changes: [
+      "Added license-key activation. The extension now needs a license key — issued by your admin in Settings → License Keys — in addition to your personal API key before it will connect. Open the extension's Options and paste both in; the Download/Options screen tells you exactly which one is missing or invalid if either is wrong, revoked, or expired.",
+      "Admins: generate, label, assign, expire, revoke, reset, or delete license keys per person from the new Settings → License Keys page — a person's captured leads still save to their own account via their own API key exactly as before; the license key is just the on/off switch you control.",
+    ],
+  },
+  {
     version: "1.0.379",
     date: "Aug 12, 2026",
     size: "145 KB",
     file: "/extensions/leadcaptura-extension-v1.0.379.zip",
-    latest: true,
     changes: [
       "Fixed background-enrichment tabs silently losing their anti-throttle shim on LinkedIn — LinkedIn tightened its Content-Security-Policy to block the inline script this used, so it stopped running (visible as a CSP error in chrome://extensions) and Contact Info fields could come back blank. It now runs natively in the page's own JS context via Chrome's MAIN-world content script support, which the page's script policy can't block, so background enrichment works reliably again.",
     ],
@@ -93,6 +103,11 @@ const STEPS = [
     icon: Puzzle,
     title: "Load unpacked",
     body: "Click “Load unpacked” and select the unzipped extension folder. LeadCaptura appears in your toolbar.",
+  },
+  {
+    icon: KeyRound,
+    title: "Activate",
+    body: "Click the LeadCaptura icon → Options, then paste your personal API key (Settings → API Keys, below) and the license key your admin gave you (Settings → License Keys — admins only). The extension won't connect until both are in.",
   },
   {
     icon: RefreshCw,

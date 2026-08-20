@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     workspaces,
     team,
+    licenses,
     leads,
     pipeline,
     tasks,
@@ -35,6 +36,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(workspaces.router)
 api_router.include_router(team.router)
+api_router.include_router(licenses.router)
 api_router.include_router(leads.router)
 api_router.include_router(pipeline.router)
 api_router.include_router(tasks.router)

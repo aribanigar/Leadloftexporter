@@ -4,7 +4,7 @@ const $ = (sel) => document.querySelector(sel);
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   return Object.assign(
-    { apiUrl: "https://leadloftexporter-1.onrender.com", apiKey: "", enabled: true, autopilot: true, showOverlay: true },
+    { apiUrl: "https://leadloftexporter-1.onrender.com", apiKey: "", licenseKey: "", enabled: true, autopilot: true, showOverlay: true },
     settings || {}
   );
 }
@@ -95,6 +95,20 @@ function wireUpdateButtons() {
     // answers) survives because the extension ID is unchanged.
     try { chrome.runtime.reload(); } catch (_) {}
   });
+}
+
+// Maps a raw "me" call failure (server error codes from
+// deps.py:get_extension_context, surfaced via the "HTTP 401 — <code>" shape
+// service-worker.js throws) to a sentence telling the user what to do —
+// same mapping content/lib/api.js's _decorate() uses for in-page toasts.
+function friendlyPopupError(msg) {
+  const m = String(msg || "");
+  if (/invalid_license_key/i.test(m)) return "Invalid license key — check Options, or ask your admin for a fresh one.";
+  if (/license_key_revoked/i.test(m)) return "This license key has been revoked — ask your admin to reactivate or reissue it.";
+  if (/license_key_expired/i.test(m)) return "This license key has expired — ask your admin to extend or reissue it.";
+  if (/license_key_wrong_(account|workspace)/i.test(m)) return "This license key is assigned to a different account.";
+  if (/invalid_api_key/i.test(m)) return "Invalid API key — generate a fresh one in Settings → API Keys.";
+  return m;
 }
 
 function callApi(action, payload) {
@@ -232,6 +246,12 @@ async function init() {
     setStatus("Add your API key in Options to start.");
     return;
   }
+  if (!settings.licenseKey) {
+    $("#status-badge").textContent = "Disconnected";
+    $("#status-badge").classList.add("disconnected");
+    setStatus("Add your license key in Options to activate.");
+    return;
+  }
   try {
     const me = await callApi("me");
     $("#status-badge").textContent = "Connected";
@@ -242,7 +262,7 @@ async function init() {
   } catch (err) {
     $("#status-badge").textContent = "Error";
     $("#status-badge").classList.add("disconnected");
-    setStatus(err.message, "err");
+    setStatus(friendlyPopupError(err.message), "err");
   }
 }
 

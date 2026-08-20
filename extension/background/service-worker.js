@@ -9,6 +9,10 @@
 const DEFAULT_SETTINGS = {
   apiUrl: "https://leadloftexporter-1.onrender.com",
   apiKey: "lcx_o9Ku7iUTYTnq3jC23cbpZsA_sloQTkog9LuUeTRBX4E",
+  // No baked-in default — a license key is admin-issued per person (Settings
+  // → License Keys) and must be entered in Options before the extension can
+  // reach the backend at all. See fetchJson() below + deps.py:get_extension_context.
+  licenseKey: "",
   enabled: true,
   // Autopilot defaults ON so bulk-message / connect jobs queued from the CRM
   // start sending immediately when the user opens any LinkedIn tab. The popup
@@ -271,9 +275,10 @@ function describeHostErrorPage(status, bodyText) {
 }
 
 async function fetchJson(path, opts = {}) {
-  const { apiUrl, apiKey } = await getSettings();
+  const { apiUrl, apiKey, licenseKey } = await getSettings();
   if (!apiUrl) throw new Error("API URL not configured.");
   if (!apiKey) throw new Error("API key not configured. Open the extension options.");
+  if (!licenseKey) throw new Error("License key not configured. Open the extension options.");
   const url = `${apiUrl}/api/v1${path}`;
   let res;
   try {
@@ -282,6 +287,7 @@ async function fetchJson(path, opts = {}) {
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": apiKey,
+        "X-License-Key": licenseKey,
         Accept: "application/json",
       },
       body: opts.body ? JSON.stringify(opts.body) : undefined,

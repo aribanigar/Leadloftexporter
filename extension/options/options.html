@@ -27,7 +27,8 @@
         <p class="card-desc">
           Generate an API key in your workspace at
           <a id="docs-link" href="http://localhost:3000/settings/api-keys" target="_blank">Settings → API Keys</a>
-          and paste it below.
+          and paste it below. You'll also need a <b>license key</b> from your admin
+          (Settings → License Keys) — the extension only activates once both are set.
         </p>
 
         <div class="field">
@@ -40,6 +41,14 @@
           <div class="inp-row">
             <input id="apiKey" class="inp" type="password" placeholder="lcx_…" autocomplete="off" />
             <button class="btn icon" id="toggle-show" type="button">Show</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="lbl" for="licenseKey">License key</label>
+          <div class="inp-row">
+            <input id="licenseKey" class="inp" type="password" placeholder="lclk_…" autocomplete="off" />
+            <button class="btn icon" id="toggle-show-license" type="button">Show</button>
           </div>
         </div>
 

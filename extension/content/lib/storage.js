@@ -17,6 +17,7 @@
   const DEFAULTS = {
     apiUrl: "https://leadloftexporter-1.onrender.com",
     apiKey: "",
+    licenseKey: "",
     enabled: true,
     // Autopilot defaults ON so bulk-message jobs the user just queued in the
     // CRM actually fire from their browser without an extra hidden toggle.

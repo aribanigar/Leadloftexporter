@@ -28,6 +28,24 @@
     } else {
       m = String(rawError || "");
     }
+    // License-key checks first — more specific than the generic 401/invalid
+    // branch below, and "invalid_license_key" would otherwise never be
+    // reached (it also contains "invalid").
+    if (/missing_license_key|license.key.*not.*configured/i.test(m)) {
+      return "License key not set — open the LeadCaptura extension Options and paste the license key your admin gave you";
+    }
+    if (/invalid_license_key/i.test(m)) {
+      return "Invalid license key — check for typos in Options, or ask your admin for a fresh one";
+    }
+    if (/license_key_revoked/i.test(m)) {
+      return "This license key has been revoked — ask your admin to reactivate or reissue it";
+    }
+    if (/license_key_expired/i.test(m)) {
+      return "This license key has expired — ask your admin to extend it or issue a new one";
+    }
+    if (/license_key_wrong_(account|workspace)/i.test(m)) {
+      return "This license key is assigned to a different account — check with your admin which key belongs to you";
+    }
     if (/401|invalid.*api.*key|unauthorized/i.test(m)) {
       return "Invalid API key — open the LeadCaptura extension Options and paste a fresh key from Settings → API Keys";
     }

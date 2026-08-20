@@ -31,6 +31,8 @@ def _bump_api_key(db: Session, ctx: AuthContext) -> None:
     db.query(ApiKey).filter(
         ApiKey.workspace_id == ctx.workspace_id, ApiKey.user_id == ctx.user_id
     ).update({ApiKey.last_used_at: datetime.now(timezone.utc)})
+    if ctx.license_key is not None:
+        ctx.license_key.last_used_at = datetime.now(timezone.utc)
 
 
 def _mark_linkedin_connected(db: Session, ctx: AuthContext) -> None:

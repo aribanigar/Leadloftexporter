@@ -96,6 +96,35 @@ class ApiKey(Base, TimestampMixin):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class LicenseKey(Base, TimestampMixin):
+    """Admin-issued activation credential the Chrome extension must present
+    ALONGSIDE a personal ApiKey before get_extension_context (deps.py) lets
+    any extension call through. An ApiKey already determines whose account
+    captured data belongs to (ApiKey.user_id -> Lead.owner_id etc.) — this
+    table doesn't change that. It's a separate, admin-controlled gate: an
+    owner/admin generates one of these per person (Settings -> License Keys),
+    can set an expiry, revoke it, rotate ("reset") its secret, or delete it
+    outright, all without touching that person's login or API key. Hashed at
+    rest, same pattern as ApiKey.
+    """
+    __tablename__ = "license_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Optional: pins this key to one specific team member. When set, the
+    # ApiKey presented alongside it must belong to that same user — a second
+    # integrity check on top of the ApiKey's own per-user attribution.
+    assigned_user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    label: Mapped[Optional[str]] = mapped_column(String(120))
+    key_prefix: Mapped[str] = mapped_column(String(16), index=True)
+    key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active | revoked
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class Company(Base, TimestampMixin):
     __tablename__ = "companies"
 
