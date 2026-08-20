@@ -134,6 +134,47 @@ def issue_api_key(
     }
 
 
+class InviteIn(BaseModel):
+    email: EmailStr
+    expires_at: Optional[datetime] = None
+
+
+@router.post("/invite")
+def invite_new_user(
+    body: InviteIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Issue a license key for someone who DOESN'T have an account yet.
+    Unlike issue_license_key above (which needs an existing owned workspace
+    to bind to), this creates an unclaimed LicenseKey — workspace_id and
+    assigned_user_id start NULL, pinned only to this email via invite_email.
+    auth.py:register validates and claims it — filling in workspace_id +
+    assigned_user_id — the moment that email actually registers, so the
+    exact same key value works for signup, login, and the extension."""
+    _require_platform_admin(user)
+    clean_email = body.email.strip().lower()
+    if db.query(User).filter(User.email == clean_email).first():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "email_already_has_account")
+    raw = "lclk_" + secrets.token_urlsafe(32)
+    prefix = raw[:12]
+    record = LicenseKey(
+        workspace_id=None,
+        created_by_user_id=user.id,
+        assigned_user_id=None,
+        invite_email=clean_email,
+        label=f"Invite for {clean_email}",
+        key_prefix=prefix,
+        key_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        status="active",
+        expires_at=body.expires_at,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {"id": record.id, "key": raw, "key_prefix": prefix, "invite_email": clean_email}
+
+
 class IssueLicenseKeyIn(BaseModel):
     email: EmailStr
     label: Optional[str] = None

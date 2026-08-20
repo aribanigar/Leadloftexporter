@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models import EmailMessage, Membership, User, Workspace
+from app.models import ApiKey, EmailMessage, LicenseKey, Membership, User, Workspace
 from app.schemas import LoginRequest, RegisterRequest, TokenResponse, UserOut
 from app.schemas.auth import WorkspaceContext
 from app.services.bootstrap import seed_workspace_defaults
@@ -21,6 +21,57 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 PASSWORD_RESET_TTL_MINUTES = 30
+
+# Same account as workspaces.py:LICENSED_API_KEY_ADMIN_EMAIL,
+# licenses.py:LICENSE_KEY_ISSUER_EMAIL, admin_access.py:PLATFORM_ADMIN_EMAIL —
+# kept as its own literal (not imported) so this file has no import-order
+# dependency on any of them, same reasoning as admin_access.py.
+PLATFORM_ADMIN_EMAIL = "acemedia.qa@gmail.com"
+
+
+def _user_is_campaigns_only(db: Session, user_id: str) -> bool:
+    """True only if EVERY membership this user has is the lightweight,
+    web-only "campaigns_only" role (team.py:create_member) — i.e. they were
+    invited purely to use Campaigns and never self-registered their own
+    workspace or were given fuller access. Those accounts never touch the
+    extension, so they're exempt from the license-key-to-log-in gate below;
+    everyone else (an "owner" of their own workspace, or an invited
+    admin/member) needs one, same as the extension does."""
+    roles = {m.role for m in db.query(Membership).filter(Membership.user_id == user_id).all()}
+    return bool(roles) and roles == {"campaigns_only"}
+
+
+def _user_has_valid_license(db: Session, user_id: str) -> bool:
+    """Mirrors get_extension_context's license-key pairing logic
+    (core/deps.py) exactly, so logging in and activating the extension are
+    gated by the literal same credential: an active, non-expired license key
+    in any workspace this user belongs to, that's either unassigned (usable
+    by anyone in that workspace) or pinned specifically to them."""
+    now = datetime.now(timezone.utc)
+    workspace_ids = [m.workspace_id for m in db.query(Membership).filter(Membership.user_id == user_id).all()]
+    if not workspace_ids:
+        return False
+    candidates = (
+        db.query(LicenseKey)
+        .filter(LicenseKey.workspace_id.in_(workspace_ids), LicenseKey.status == "active")
+        .all()
+    )
+    for lk in candidates:
+        if lk.expires_at and lk.expires_at <= now:
+            continue
+        if lk.assigned_user_id and lk.assigned_user_id != user_id:
+            continue
+        return True
+    return False
+
+
+def _require_license_to_sign_in(db: Session, user: User) -> None:
+    if (user.email or "").strip().lower() == PLATFORM_ADMIN_EMAIL:
+        return
+    if _user_is_campaigns_only(db, user.id):
+        return
+    if not _user_has_valid_license(db, user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "license_required")
 
 
 def _build_token(db: Session, user: User) -> TokenResponse:
@@ -51,12 +102,50 @@ def _unique_slug(db: Session, base: str) -> str:
     return candidate
 
 
+def _find_unclaimed_license(db: Session, raw_key: str, email: str) -> LicenseKey:
+    """Validate an invite code (admin_access.py:invite_new_user) BEFORE any
+    account/workspace row is created. Raises 400 with a specific detail code
+    on every failure so the frontend can show something more useful than a
+    generic error; only ever returns a still-unclaimed (workspace_id IS
+    NULL), active, unexpired key whose invite_email (if set) matches."""
+    raw = (raw_key or "").strip()
+    if not raw:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "license_key_required")
+    prefix = raw[:12]
+    hashed = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    candidates = (
+        db.query(LicenseKey)
+        .filter(LicenseKey.key_prefix == prefix, LicenseKey.workspace_id.is_(None))
+        .all()
+    )
+    lk = next((k for k in candidates if k.key_hash == hashed), None)
+    if not lk:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_license_key")
+    if lk.status == "revoked":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "license_key_revoked")
+    if lk.expires_at and lk.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "license_key_expired")
+    if lk.invite_email and lk.invite_email != email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "license_key_wrong_email")
+    return lk
+
+
 @router.post("/register", response_model=TokenResponse)
 def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    if db.query(User).filter(User.email == body.email.lower()).first():
+    clean_email = body.email.lower()
+    if db.query(User).filter(User.email == clean_email).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "email_in_use")
+
+    # Validate the invite code BEFORE creating anything — an invalid/missing
+    # code means no user, no workspace, no membership row gets created at
+    # all. The platform admin is the one issuing these, so they're exempt
+    # (there's no one above them to issue one to them).
+    invite: LicenseKey | None = None
+    if clean_email != PLATFORM_ADMIN_EMAIL:
+        invite = _find_unclaimed_license(db, body.license_key or "", clean_email)
+
     user = User(
-        email=body.email.lower(),
+        email=clean_email,
         password_hash=hash_password(body.password),
         first_name=body.first_name,
         last_name=body.last_name,
@@ -80,9 +169,39 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
         seed_workspace_defaults(db, workspace.id)
     except Exception:
         pass  # seed failures are non-fatal; defaults can be missing but user still registers
+
+    issued_api_key: str | None = None
+    if invite is not None:
+        # Claim the SAME key the admin handed out — it now works for login
+        # (below) and the extension immediately, no separate step needed.
+        invite.workspace_id = workspace.id
+        invite.assigned_user_id = user.id
+        invite.invite_email = None
+        # Also hand them their own API key right away so the invite code
+        # alone is enough to get the extension fully working — without
+        # this they'd be licensed but still have no way to self-issue one
+        # (API key creation is admin-only, same as license keys).
+        raw_api_key = "lcx_" + secrets.token_urlsafe(32)
+        db.add(
+            ApiKey(
+                workspace_id=workspace.id,
+                user_id=user.id,
+                name="Chrome Extension",
+                key_prefix=raw_api_key[:12],
+                key_hash=hashlib.sha256(raw_api_key.encode("utf-8")).hexdigest(),
+            )
+        )
+        issued_api_key = raw_api_key
+
     db.commit()
     db.refresh(user)
-    return _build_token(db, user)
+    # Belt-and-suspenders: re-check after commit using the exact same rule
+    # login() uses, in case of any edge case above (e.g. race with another
+    # signup claiming the same code between validation and commit).
+    _require_license_to_sign_in(db, user)
+    res = _build_token(db, user)
+    res.issued_api_key = issued_api_key
+    return res
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -92,6 +211,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "inactive_user")
+    _require_license_to_sign_in(db, user)
     return _build_token(db, user)
 
 

@@ -40,10 +40,11 @@ export default function LoginPage() {
   const RETRY_MAX = 6;          // ~ 1 + 2 + 4 + 6 + 8 + 10 = 31s of total backoff
   const RETRY_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10000];
 
-  function classifyError(message: string): "network" | "credentials" | "disabled" | "other" {
+  function classifyError(message: string): "network" | "credentials" | "disabled" | "license" | "other" {
     if (/Failed to fetch|NetworkError|TypeError|Request timed out|fetch failed|networkerror/i.test(message)) return "network";
     if (/invalid_credentials|wrong email|wrong password/i.test(message)) return "credentials";
     if (/inactive_user|disabled/i.test(message)) return "disabled";
+    if (/license_required/i.test(message)) return "license";
     return "other";
   }
 
@@ -74,6 +75,7 @@ export default function LoginPage() {
           let friendly = message;
           if (kind === "credentials") friendly = "Wrong email or password.";
           else if (kind === "disabled") friendly = "This account is disabled. Contact support.";
+          else if (kind === "license") friendly = "Your license key isn't active. Contact your admin.";
           setErr(friendly);
           setStatusMsg(null);
           setPending(false);

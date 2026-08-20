@@ -99,23 +99,38 @@ class ApiKey(Base, TimestampMixin):
 class LicenseKey(Base, TimestampMixin):
     """Admin-issued activation credential the Chrome extension must present
     ALONGSIDE a personal ApiKey before get_extension_context (deps.py) lets
-    any extension call through. An ApiKey already determines whose account
-    captured data belongs to (ApiKey.user_id -> Lead.owner_id etc.) — this
-    table doesn't change that. It's a separate, admin-controlled gate: an
-    owner/admin generates one of these per person (Settings -> License Keys),
-    can set an expiry, revoke it, rotate ("reset") its secret, or delete it
-    outright, all without touching that person's login or API key. Hashed at
-    rest, same pattern as ApiKey.
+    any extension call through, and (see auth.py:register/login) that a
+    person must hold to create or sign into an account at all. An ApiKey
+    already determines whose account captured data belongs to
+    (ApiKey.user_id -> Lead.owner_id etc.) — this table doesn't change that.
+    It's a separate, admin-controlled gate. Hashed at rest, same pattern as
+    ApiKey.
+
+    Two lifecycles share this one table:
+      1. Issued to an EXISTING account (admin_access.py / licenses.py):
+         workspace_id + assigned_user_id are set immediately.
+      2. Issued as an INVITE, before the person has an account at all
+         (admin_access.py's /invite endpoint): workspace_id and
+         assigned_user_id start NULL, invite_email optionally pins which
+         email may redeem it. auth.py:register validates + "claims" it —
+         filling in workspace_id/assigned_user_id — atomically with account
+         creation, so the exact same key the admin handed out also works for
+         the extension once registration succeeds. workspace_id is nullable
+         specifically to allow this unclaimed state.
     """
     __tablename__ = "license_keys"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[Optional[str]] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     created_by_user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # Optional: pins this key to one specific team member. When set, the
     # ApiKey presented alongside it must belong to that same user — a second
     # integrity check on top of the ApiKey's own per-user attribution.
     assigned_user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    # Only meaningful while unclaimed (workspace_id IS NULL): the email
+    # allowed to redeem this invite at registration. NULL = any email may
+    # claim it (first to submit it wins). Cleared once claimed.
+    invite_email: Mapped[Optional[str]] = mapped_column(String(255), index=True)
     label: Mapped[Optional[str]] = mapped_column(String(120))
     key_prefix: Mapped[str] = mapped_column(String(16), index=True)
     key_hash: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -19,6 +19,10 @@ export interface AuthResponse {
   user: User;
   workspaces: WorkspaceContext[];
   current_workspace_id: string | null;
+  // Only ever set once, in the response to /auth/register when a freshly
+  // claimed invite code also auto-issued the new user their own API key.
+  // Always null/absent from /auth/login and /auth/me.
+  issued_api_key?: string | null;
 }
 
 export interface PipelineStage {

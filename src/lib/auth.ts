@@ -11,7 +11,14 @@ interface AuthState {
   loading: boolean;
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (input: { email: string; password: string; first_name?: string; last_name?: string; workspace_name?: string }) => Promise<void>;
+  register: (input: {
+    email: string;
+    password: string;
+    first_name?: string;
+    last_name?: string;
+    workspace_name?: string;
+    license_key: string;
+  }) => Promise<{ issuedApiKey: string | null }>;
   logout: () => void;
   switchWorkspace: (id: string) => void;
 }
@@ -57,6 +64,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     setSession(res.access_token, res.current_workspace_id);
     const ws = res.workspaces.find((w) => w.id === res.current_workspace_id) || res.workspaces[0] || null;
     set({ user: res.user, workspace: ws, workspaces: res.workspaces });
+    return { issuedApiKey: res.issued_api_key ?? null };
   },
   logout: () => {
     clearSession();

@@ -224,6 +224,31 @@ export default function LicenseKeysPage() {
     onError: (e) => setGrantError(grantErrorMessage(e)),
   });
 
+  // ── Invite someone who hasn't signed up yet ─────────────────────────────
+  // Registration now REQUIRES a license key (see auth.py:register) — nobody
+  // can create an account at all without one. This generates that code
+  // up front, pinned to an email, before any account exists — see
+  // admin_access.py:invite_new_user. Once they register with it, the same
+  // key is bound to their new workspace and already works for the
+  // extension; an API key is auto-issued at that same moment too.
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteCode, setInviteCode] = useState<{ key: string; email: string } | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  const createInvite = useMutation({
+    mutationFn: (email: string) =>
+      api<{ key: string; invite_email: string }>("/admin/access/invite", { method: "POST", body: { email } }),
+    onSuccess: (res) => {
+      setInviteCode({ key: res.key, email: res.invite_email });
+      setInviteError(null);
+    },
+    onError: (e) => {
+      const msg = extractDetail(e);
+      setInviteError(msg === "email_already_has_account" ? "That email already has an account — use “Grant access to an existing account” below instead." : msg);
+    },
+  });
+
   const previewExpiry = computeExpiry(form.expiryMode, form.customAmount, form.customUnit);
 
   const create = useMutation({
@@ -326,12 +351,76 @@ export default function LicenseKeysPage() {
     <>
     {canIssueKeys && (
       <div className="card mb-4 max-w-4xl p-6">
-        <h2 className="mb-1 text-base font-semibold">Grant a new user access</h2>
+        <h2 className="mb-1 text-base font-semibold">Invite a new user</h2>
         <p className="mb-4 text-sm text-slate-500">
-          For someone who signed up and created their <b>own</b> workspace — not a teammate you invited into
-          this one. Find them by the email they registered with, then issue an API key and license key
-          straight into their workspace. You never join it and can&apos;t see their leads, campaigns, or
-          anything else in it — this only ever touches the two credentials below.
+          Registration now requires a license key — nobody can create an account without one. Generate a
+          code for their email, send it to them, and they enter it on the registration page along with their
+          own email/password/workspace name. The same code activates their extension too, and an API key is
+          issued for them automatically the moment they register.
+        </p>
+
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const email = inviteEmail.trim();
+            if (email) createInvite.mutate(email);
+          }}
+        >
+          <label className="text-sm">
+            <span className="mb-1 block text-slate-600">Their email</span>
+            <input
+              type="email"
+              className="input w-72"
+              placeholder="newuser@example.com"
+              value={inviteEmail}
+              onChange={(e) => { setInviteEmail(e.target.value); setInviteCode(null); setInviteError(null); }}
+            />
+          </label>
+          <button type="submit" className="btn-primary" disabled={!inviteEmail.trim() || createInvite.isPending}>
+            {createInvite.isPending ? "Generating…" : "Generate invite code"}
+          </button>
+        </form>
+
+        {inviteError && <p className="mt-3 text-sm text-rose-600">{inviteError}</p>}
+
+        {inviteCode && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="mb-2 font-medium">
+              Invite code for {inviteCode.email} — copy it now, it won&apos;t be shown again. Send it to
+              them; they&apos;ll paste it into the <b>License key</b> field on the registration page.
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 break-all rounded bg-white px-2 py-1 font-mono text-xs">{inviteCode.key}</code>
+              <button
+                className="btn-secondary"
+                onClick={async () => {
+                  const ok = await copyToClipboard(inviteCode.key);
+                  if (ok) { setInviteCopied(true); setTimeout(() => setInviteCopied(false), 1500); }
+                }}
+              >
+                {inviteCopied ? (<><Check className="h-4 w-4 text-emerald-600" /> Copied</>) : (<><Copy className="h-4 w-4" /> Copy</>)}
+              </button>
+            </div>
+            <button
+              className="mt-2 text-amber-700 underline"
+              onClick={() => { setInviteCode(null); setInviteEmail(""); }}
+            >
+              Done — invite another
+            </button>
+          </div>
+        )}
+      </div>
+    )}
+    {canIssueKeys && (
+      <div className="card mb-4 max-w-4xl p-6">
+        <h2 className="mb-1 text-base font-semibold">Grant access to an existing account</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          For someone who already has an account and their <b>own</b> workspace — e.g. they registered before
+          invite codes existed, or you're re-issuing after a revoke. Find them by the email they registered
+          with, then issue an API key and license key straight into their workspace. You never join it and
+          can&apos;t see their leads, campaigns, or anything else in it — this only ever touches the two
+          credentials below.
         </p>
 
         <form
