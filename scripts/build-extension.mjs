@@ -36,13 +36,26 @@
  *
  * OUTPUT
  * ------
- *   extension-dist/   mirror of extension/, JS protected, everything else verbatim
- *   (caller then zips extension-dist/ into public/extensions/…zip)
+ *   extension-dist/                              mirror of extension/, JS protected
+ *   public/extensions/leadcaptura-extension-v<ver>.zip   the publishable zip
+ *   public/leadcaptura-extension.zip                     stable-URL copy of the same
+ *
+ * ZIP LAYOUT — RULE, not a suggestion
+ * ------------------------------------
+ * The zip's top-level entry is ALWAYS a single folder named "LeadCaptura" (see
+ * STAGE_FOLDER_NAME below), never a bare file listing and never named
+ * "extension". A zip with no wrapping folder spills every file loose into
+ * whatever directory the user unzips into — reported once as "opens as
+ * different files" instead of one clean folder. This script is the ONLY
+ * place a distributable zip gets built specifically so that layout can never
+ * drift again by a future manual `zip` invocation forgetting the wrapper —
+ * do not hand-roll `zip` elsewhere for this purpose.
  *
  * USAGE
  * -----
- *   node scripts/build-extension.mjs      # build + verify → extension-dist/
+ *   node scripts/build-extension.mjs      # build + verify + package → zip
  *   npm run build:extension                # same, via package.json script
+ *   node scripts/build-extension.mjs --no-zip   # build only, skip packaging
  */
 import { promises as fs, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
@@ -55,6 +68,12 @@ import * as acorn from "acorn";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "extension");
 const OUT = path.join(ROOT, "extension-dist");
+const EXTENSIONS_DIR = path.join(ROOT, "public", "extensions");
+const STABLE_ZIP = path.join(ROOT, "public", "leadcaptura-extension.zip");
+// The single folder name every published zip wraps its contents in. Loading
+// unpacked in chrome://extensions also shows this as the folder's display
+// name in the file picker, so it doubles as "which folder do I pick" cue.
+const STAGE_FOLDER_NAME = "LeadCaptura";
 
 // The behaviour-preserving terser config. Do NOT enable compress, toplevel
 // mangling, or property mangling — see the SAFETY note above.
@@ -182,6 +201,54 @@ async function main() {
   console.log(`  ${protectedCount} JS files protected (comments stripped, minified, locals mangled)`);
   console.log(`  ${copiedCount} other files copied verbatim (manifest/html/css/png)`);
   console.log(`  every output passed node --check + top-level-name identity check`);
+
+  if (process.argv.includes("--no-zip")) {
+    console.log("  --no-zip passed: skipping packaging.");
+    return;
+  }
+  await packageZip();
+}
+
+// Stage extension-dist/ under a single "LeadCaptura" folder and zip it —
+// see "ZIP LAYOUT — RULE" at the top of this file. This is the one and only
+// place a publishable extension zip should be produced.
+async function packageZip() {
+  const manifest = JSON.parse(await fs.readFile(path.join(SRC, "manifest.json"), "utf8"));
+  const version = manifest.version;
+  if (!version) throw new Error("manifest.json has no version field — cannot name the zip.");
+
+  const stageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "lc-package-"));
+  const stageTarget = path.join(stageRoot, STAGE_FOLDER_NAME);
+  try {
+    await fs.cp(OUT, stageTarget, { recursive: true });
+
+    await fs.mkdir(EXTENSIONS_DIR, { recursive: true });
+    const zipName = `leadcaptura-extension-v${version}.zip`;
+    const zipPath = path.join(EXTENSIONS_DIR, zipName);
+    await fs.rm(zipPath, { force: true });
+    // zip's argument IS the folder name, so cwd must be stageRoot — that's
+    // what puts "LeadCaptura/" (not the temp dir's own name) as the zip's
+    // sole top-level entry.
+    execFileSync("zip", ["-rq", zipPath, STAGE_FOLDER_NAME], { cwd: stageRoot, stdio: "pipe" });
+
+    await fs.copyFile(zipPath, STABLE_ZIP);
+
+    // Keep only the current version's zip in public/extensions/ (documented
+    // convention — old zips are deleted, not left publicly fetchable).
+    let removed = [];
+    for (const entry of await fs.readdir(EXTENSIONS_DIR)) {
+      if (entry === zipName) continue;
+      if (!/^leadcaptura-extension-v.*\.zip$/.test(entry)) continue;
+      await fs.rm(path.join(EXTENSIONS_DIR, entry), { force: true });
+      removed.push(entry);
+    }
+
+    console.log(`Packaged → ${path.relative(ROOT, zipPath)} (top-level folder: ${STAGE_FOLDER_NAME}/)`);
+    console.log(`  also copied to ${path.relative(ROOT, STABLE_ZIP)}`);
+    if (removed.length) console.log(`  removed superseded zip(s): ${removed.join(", ")}`);
+  } finally {
+    await fs.rm(stageRoot, { recursive: true, force: true });
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.384",
+    date: "Aug 20, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.384.zip",
+    latest: true,
+    changes: [
+      "Fixed the download unzipping into a scatter of loose folders (options/, content/, background/, manifest.json, ...) instead of one named folder — an earlier repackage had dropped the wrapping folder. Every published zip now always unzips into a single \"LeadCaptura\" folder, and packaging is a single automated step so this can't happen again.",
+    ],
+  },
+  {
     version: "1.0.383",
     date: "Aug 20, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.383.zip",
-    latest: true,
     changes: [
       "Removed the baked-in default API key. Every fresh install used to fall back to one specific account's key until you pasted your own, which meant it silently captured into THAT account's workspace instead of yours — with no visible sign anything was wrong. There's no shared default anymore: installs still on the old key are automatically reset to \"not connected\" on this update, and everyone now gets their own API key + license key from their admin (Settings → License Keys → \"Invite a new user\" or \"Grant access\").",
     ],

@@ -67,10 +67,11 @@ for f in $(find extension -name '*.js'); do node --check "$f" || break; done
 python3 -c "import json; json.load(open('extension/manifest.json'))"
 
 # Package the PROTECTED distribution (what the public downloads)
-npm run build:extension            # → extension-dist/ (verified, comment-stripped, minified, locals mangled)
-rm -rf /tmp/lcpack && mkdir -p /tmp/lcpack/extension && cp -r extension-dist/. /tmp/lcpack/extension/
-(cd /tmp/lcpack && zip -rq "$OLDPWD/public/extensions/leadcaptura-extension-v<ver>.zip" extension)
-cp public/extensions/leadcaptura-extension-v<ver>.zip public/leadcaptura-extension.zip
+npm run build:extension            # → extension-dist/, THEN zips it straight to
+                                    #   public/extensions/leadcaptura-extension-v<ver>.zip
+                                    #   (version read from extension/manifest.json)
+                                    #   + public/leadcaptura-extension.zip (stable-URL copy)
+                                    # `--no-zip` skips packaging if you only want extension-dist/.
 ```
 
 After editing content scripts, reload the extension (`chrome://extensions` → 🔄) **and** hard-reload the LinkedIn tab (Ctrl+R) — Chrome only injects content scripts on tab load, so an open tab keeps the old code. Confirm the new build is live by checking the `LeadCaptura v<version>` badge in the bottom toolbar.
@@ -98,8 +99,15 @@ published zip is a protected build**, never the raw source:
 - **Honest limit:** client-side code always runs on the user's machine, so this is strong
   *deterrence* (removes the how-it-works comments, makes it hostile to read or hand to an AI),
   **not** an uncrackable vault. True one-tap-uncopyable is only possible off-device.
-- Only the single current protected zip is kept in `public/extensions/`; old **readable**
-  zips were removed so they're no longer publicly fetchable.
+- **The same script then zips it — this is the ONLY place a distributable zip gets
+  built.** The zip's top-level entry is always a single folder named `LeadCaptura` (never a
+  bare file listing, never `extension`) — unzipping any other way scatters loose folders
+  instead of one named folder, which is exactly the bug this convention exists to prevent.
+  Never hand-roll a `zip …` command for this elsewhere; if the packaging step ever needs to
+  change, change it in `scripts/build-extension.mjs`, not inline in a shell command.
+- Only the single current protected zip is kept in `public/extensions/` — the script deletes
+  every other `leadcaptura-extension-v*.zip` there itself, so old **readable** zips are never
+  left publicly fetchable.
 - To hand the admin an open build on purpose, just zip the source dir directly
   (`zip -r open.zip extension`) — do **not** publish that artifact.
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.383",
-  "zip": "/extensions/leadcaptura-extension-v1.0.383.zip",
-  "notes": "Fixed every fresh install silently capturing into one specific account's workspace instead of your own: the extension used to ship with that account's API key baked in as a fallback default, so anyone who installed it without pasting their own key was actually using someone else's workspace without knowing it. There is no shared default anymore — existing installs still on the old baked-in key are automatically reset to \"not connected\" on this update. Ask your admin for your own API key and license key (Settings → API Keys / License Keys) and paste them into Options to reconnect to your own workspace."
+  "version": "1.0.384",
+  "zip": "/extensions/leadcaptura-extension-v1.0.384.zip",
+  "notes": "Fixed the downloaded zip extracting as a scatter of loose folders/files (options/, content/, background/, manifest.json, ...) instead of one named folder — an earlier repackage had dropped the wrapping folder the zip is supposed to have. Every published zip now always unzips into a single \"LeadCaptura\" folder. Packaging itself is now a single automated step (npm run build:extension) so this can't drift again."
 }
