@@ -7,10 +7,12 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/utils";
 
-// API keys double as the product's license/activation key — mirrors the
-// backend restriction in api/app/api/v1/workspaces.py::create_api_key.
-// Keeping this in sync is a UX nicety (hides a button that would 403), not
-// the actual gate — the backend enforces it regardless of this check.
+// Every user can self-serve an API key for their OWN account (that's what
+// connects the extension to their own workspace). Issuing one for someone
+// ELSE stays admin-only — mirrors api/app/api/v1/workspaces.py::create_api_key.
+// Keeping this in sync is a UX nicety (hides the teammate picker that would
+// 403 for anyone else), not the actual gate — the backend enforces it
+// regardless of this check.
 const LICENSED_API_KEY_ADMIN_EMAIL = "acemedia.qa@gmail.com";
 
 interface ApiKeyRow {
@@ -34,7 +36,9 @@ interface TeamMember {
 export default function ApiKeysPage() {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const canCreateKeys = (user?.email || "").trim().toLowerCase() === LICENSED_API_KEY_ADMIN_EMAIL;
+  // Everyone can create a key for themselves; only the admin additionally
+  // sees the "For <teammate>" picker to issue on someone else's behalf.
+  const canManageOthers = (user?.email || "").trim().toLowerCase() === LICENSED_API_KEY_ADMIN_EMAIL;
   const { data: keys } = useQuery<ApiKeyRow[]>({
     queryKey: ["api-keys"],
     queryFn: () => api("/workspaces/current/api-keys"),
@@ -48,7 +52,7 @@ export default function ApiKeysPage() {
   const { data: members } = useQuery<TeamMember[]>({
     queryKey: ["team-members"],
     queryFn: () => api("/workspaces/current/members"),
-    enabled: canCreateKeys,
+    enabled: canManageOthers,
   });
 
   const [created, setCreated] = useState<string | null>(null);
@@ -62,7 +66,7 @@ export default function ApiKeysPage() {
   // caller's own (wipe_api_keys is unchanged), so this count must match
   // that, not the full list length, or the confirm dialog would overstate
   // what's about to happen.
-  const ownKeyCount = canCreateKeys
+  const ownKeyCount = canManageOthers
     ? (keys?.filter((k) => !k.user_email || k.user_email.toLowerCase() === (user?.email || "").toLowerCase()).length ?? 0)
     : (keys?.length ?? 0);
 
@@ -76,8 +80,9 @@ export default function ApiKeysPage() {
       qc.invalidateQueries({ queryKey: ["api-keys"] });
       setCreated(res.key);
       setCreateError(null);
+      setForUserId("");
     },
-    onError: () => setCreateError("Only the account holder can generate new API keys."),
+    onError: () => setCreateError("Only your admin can issue a key for someone else."),
   });
 
   const revoke = useMutation({
@@ -137,42 +142,36 @@ export default function ApiKeysPage() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {canCreateKeys ? (
-          <>
-            <select
-              className="input py-1.5 text-sm"
-              value={forUserId}
-              onChange={(e) => setForUserId(e.target.value)}
-            >
-              <option value="">For myself</option>
-              {members
-                ?.filter((m) => m.email.toLowerCase() !== (user?.email || "").toLowerCase())
-                .map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    For {(`${m.first_name || ""} ${m.last_name || ""}`.trim() || m.email)} ({m.email})
-                  </option>
-                ))}
-            </select>
-            <button
-              className="btn-primary"
-              onClick={() => create.mutate("Chrome Extension")}
-              disabled={create.isPending}
-            >
-              <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
-            </button>
-          </>
-        ) : (
-          <p className="text-sm text-slate-500">
-            Only the account holder can generate new API keys. Contact your admin for a key.
-          </p>
+        {canManageOthers && (
+          <select
+            className="input py-1.5 text-sm"
+            value={forUserId}
+            onChange={(e) => setForUserId(e.target.value)}
+          >
+            <option value="">For myself</option>
+            {members
+              ?.filter((m) => m.email.toLowerCase() !== (user?.email || "").toLowerCase())
+              .map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  For {(`${m.first_name || ""} ${m.last_name || ""}`.trim() || m.email)} ({m.email})
+                </option>
+              ))}
+          </select>
         )}
+        <button
+          className="btn-primary"
+          onClick={() => create.mutate("Chrome Extension")}
+          disabled={create.isPending}
+        >
+          <KeyRound className="h-4 w-4" /> {create.isPending ? "Creating…" : "Generate new key"}
+        </button>
         {ownKeyCount > 0 && (
           <button
             className="btn-danger"
             onClick={() => {
               if (
                 confirm(
-                  `Delete all ${ownKeyCount} of your own API key${ownKeyCount === 1 ? "" : "s"}? Any extension or integration using ${ownKeyCount === 1 ? "it" : "them"} will stop working. This cannot be undone.${canCreateKeys ? " (Keys issued to teammates are untouched.)" : ""}`
+                  `Delete all ${ownKeyCount} of your own API key${ownKeyCount === 1 ? "" : "s"}? Any extension or integration using ${ownKeyCount === 1 ? "it" : "them"} will stop working. This cannot be undone.${canManageOthers ? " (Keys issued to teammates are untouched.)" : ""}`
                 )
               ) {
                 wipeAll.mutate();
@@ -190,7 +189,7 @@ export default function ApiKeysPage() {
         <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th className="py-2">Name</th>
-            {canCreateKeys && <th className="py-2">For</th>}
+            {canManageOthers && <th className="py-2">For</th>}
             <th className="py-2">Prefix</th>
             <th className="py-2">Last used</th>
             <th className="py-2">Status</th>
@@ -201,7 +200,7 @@ export default function ApiKeysPage() {
           {keys?.map((k) => (
             <tr key={k.id} className="border-b border-slate-100">
               <td className="py-2">{k.name}</td>
-              {canCreateKeys && <td className="py-2 text-slate-500">{k.user_email || "—"}</td>}
+              {canManageOthers && <td className="py-2 text-slate-500">{k.user_email || "—"}</td>}
               <td className="py-2 font-mono text-xs">{k.key_prefix}…</td>
               <td className="py-2 text-slate-500">{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "Never"}</td>
               <td className="py-2">
@@ -225,7 +224,7 @@ export default function ApiKeysPage() {
           ))}
           {keys?.length === 0 && (
             <tr>
-              <td colSpan={canCreateKeys ? 6 : 5} className="py-6 text-center text-slate-500">
+              <td colSpan={canManageOthers ? 6 : 5} className="py-6 text-center text-slate-500">
                 No API keys yet.
               </td>
             </tr>

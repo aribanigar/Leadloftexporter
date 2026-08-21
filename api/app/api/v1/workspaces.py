@@ -13,12 +13,17 @@ from app.schemas import WorkspaceOut
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 # API keys determine which account a captured lead is attributed to
-# (ApiKey.user_id -> Lead.owner_id) and, alongside a license key
-# (see licenses.py), let the Chrome extension activate. Key *creation* is
-# restricted to this single account so signing up alone can't self-issue a
-# working credential; existing keys already issued to other users keep
-# working (list/use/revoke below are untouched) and nothing else about auth
-# changes.
+# (ApiKey.user_id -> Lead.owner_id) and, alongside a license key (see
+# licenses.py), let the Chrome extension activate. Every registered user
+# already has their own workspace (auth.py:register) and may freely mint API
+# keys for THEIR OWN account — that's what "connect to your own workspace"
+# means and was the original self-service design. What stays gated to this
+# one account is issuing a key for someone ELSE (create_api_key's `user_id`
+# override below) — the actual access-control gate is the License Key
+# (invite-only, admin-issued, required to log in at all — see
+# auth.py:_require_license_to_sign_in), not the API key, so self-service API
+# keys don't reopen the loophole this account restriction was first added
+# for.
 LICENSED_API_KEY_ADMIN_EMAIL = "acemedia.qa@gmail.com"
 
 
@@ -135,15 +140,18 @@ def create_api_key(
     ctx: AuthContext = Depends(get_workspace_context),
     db: Session = Depends(get_db),
 ):
-    if not _is_key_admin(ctx):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "api_key_creation_restricted")
-    # The admin can issue a key for themselves (default) or for any teammate
-    # already in this workspace via body.user_id — the key is still created
-    # under THAT person's user_id (that's what makes their captured leads
-    # save to their own account, ApiKey.user_id -> Lead.owner_id), the admin
-    # just hands it to them directly instead of them self-serving it.
+    # Self-service: anyone may mint a key for THEIR OWN account — that's
+    # what actually connects the extension to their own workspace. Issuing
+    # one for someone ELSE (body.user_id pointing at a teammate) stays
+    # restricted to the admin, who can do it on behalf of a teammate; the
+    # key is still created under THAT person's user_id (that's what makes
+    # their captured leads save to their own account,
+    # ApiKey.user_id -> Lead.owner_id) — the admin just hands it to them
+    # directly instead of them self-serving it.
     target_user_id = body.get("user_id") or ctx.user_id
     if target_user_id != ctx.user_id:
+        if not _is_key_admin(ctx):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
         target_membership = (
             db.query(Membership)
             .filter(Membership.user_id == target_user_id, Membership.workspace_id == ctx.workspace_id)
@@ -179,7 +187,11 @@ def delete_api_key(
     """Hard-delete a single API key. Replaces the previous soft-revoke
     behavior — soft-revoked keys cluttered the dashboard, and the
     auth path already enforces `revoked_at IS NULL` so the user still
-    cannot use the deleted token even with the row removed."""
+    cannot use the deleted token even with the row removed.
+
+    Scoped to the key's own owner or the admin — now that key creation is
+    self-service again, any other workspace member deleting a teammate's key
+    would be a real gap, not just an unlikely edge case."""
     k = (
         db.query(ApiKey)
         .filter(ApiKey.id == key_id, ApiKey.workspace_id == ctx.workspace_id)
@@ -187,6 +199,8 @@ def delete_api_key(
     )
     if not k:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    if k.user_id != ctx.user_id and not _is_key_admin(ctx):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
     db.delete(k)
     db.commit()
     return {"ok": True}
