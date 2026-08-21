@@ -365,18 +365,37 @@ async function retryPendingSaves() {
   if (!list.length) return;
   const now = Date.now();
   const remaining = [];
+  // If a rate limit (429) shows up mid-sweep, stop attempting further items
+  // THIS cycle — retrying the rest back-to-back would just re-present as
+  // another burst to whatever is throttling us and hit the same wall. Leave
+  // them queued; the next 3-minute alarm (lc-pending-saves-retry) tries
+  // again once the window has had time to clear.
+  let rateLimited = false;
   for (const entry of list) {
     if (now - (entry.queuedAt || 0) > PENDING_SAVES_MAX_AGE_MS) {
       console.log(`[LeadCaptura SW] dropping stale pending save ${entry.key} (queued ${Math.round((now - entry.queuedAt) / 86400000)}d ago)`);
+      continue;
+    }
+    if (rateLimited) {
+      remaining.push(entry);
       continue;
     }
     try {
       await fetchJson("/extension/sync/profile", { method: "POST", body: entry.profile });
       console.log(`[LeadCaptura SW] pending save synced ✓ ${entry.key}`);
     } catch (e) {
+      const msg = e?.message || String(e);
       remaining.push({ ...entry, attempts: (entry.attempts || 0) + 1 });
-      console.log(`[LeadCaptura SW] pending save retry failed (attempt ${(entry.attempts || 0) + 1}) ${entry.key}: ${e?.message || e}`);
+      console.log(`[LeadCaptura SW] pending save retry failed (attempt ${(entry.attempts || 0) + 1}) ${entry.key}: ${msg}`);
+      if (/HTTP 429/i.test(msg)) {
+        rateLimited = true;
+        console.log(`[LeadCaptura SW] rate limited during retry sweep — deferring the rest of the queue to the next cycle`);
+      }
     }
+    // Small stagger between attempts — a queue of many items retried
+    // back-to-back with zero gap is itself the kind of burst pattern that
+    // can trip a host-side rate limiter in the first place.
+    if (!rateLimited) await sleep(jitter(400, 900));
   }
   await chrome.storage.local.set({ [PENDING_SAVES_KEY]: remaining });
 }
@@ -391,11 +410,15 @@ const handlers = {
       return await fetchJson("/extension/sync/profile", { method: "POST", body: profile });
     } catch (e) {
       const msg = e?.message || String(e);
-      // Only queue for retry when the backend itself is unreachable (network
-      // failure, or the host/app is down with a 5xx) — never on a 4xx, which
-      // means the request itself is wrong (bad API key, validation) and
-      // retrying it unchanged would just fail again.
-      if (/^Failed to fetch|HTTP 5\d\d/i.test(msg)) {
+      // Queue for retry whenever the FAILURE ITSELF is transient — network
+      // unreachable, the host/app down with a 5xx, OR rate-limited/challenged
+      // (429, sometimes surfaced as "Just a moment..." — the hosting
+      // provider's own anti-bot/rate-limit interstitial, not a LeadCaptura
+      // rejection). All three go away on their own; retrying unchanged is
+      // correct. Everything else (400/401/403/404/422 — bad API key, bad
+      // request body, validation) means retrying unchanged would just fail
+      // again, so those are deliberately NOT queued.
+      if (/^Failed to fetch|HTTP 5\d\d|HTTP 429/i.test(msg)) {
         await queuePendingSave(profile).catch(() => {});
         e.message = `${msg} — saved offline, will retry automatically once the backend is reachable`;
       }

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.384",
-  "zip": "/extensions/leadcaptura-extension-v1.0.384.zip",
-  "notes": "Fixed the downloaded zip extracting as a scatter of loose folders/files (options/, content/, background/, manifest.json, ...) instead of one named folder — an earlier repackage had dropped the wrapping folder the zip is supposed to have. Every published zip now always unzips into a single \"LeadCaptura\" folder. Packaging itself is now a single automated step (npm run build:extension) so this can't drift again."
+  "version": "1.0.385",
+  "zip": "/extensions/leadcaptura-extension-v1.0.385.zip",
+  "notes": "Fixed captured profiles being silently dropped instead of retried when the backend responds with HTTP 429 (rate-limited — sometimes shown as the hosting provider's \"Just a moment...\" page). The offline retry queue only recognized network failures and 5xx errors as retryable; 429 fell through as a permanent failure and that lead was lost instead of queued. It's now queued and retried automatically like any other transient failure. Also paced the retry sweep itself (small gap between items, and it backs off for the rest of that cycle the moment it hits another 429) so retrying a backlog can't re-trigger the same rate limit."
 }

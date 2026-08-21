@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.385",
+    date: "Aug 21, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.385.zip",
+    latest: true,
+    changes: [
+      "Fixed captured profiles being silently dropped instead of retried when the backend responds with HTTP 429 (rate-limited — sometimes shown as the hosting provider's “Just a moment...” page). Those now get queued and retried automatically like any other transient failure, instead of the lead just being lost. The retry sweep itself is also paced now, and backs off for the rest of that cycle the moment it hits another 429, so working through a backlog can't re-trigger the same rate limit.",
+    ],
+  },
+  {
     version: "1.0.384",
     date: "Aug 20, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.384.zip",
-    latest: true,
     changes: [
       "Fixed the download unzipping into a scatter of loose folders (options/, content/, background/, manifest.json, ...) instead of one named folder — an earlier repackage had dropped the wrapping folder. Every published zip now always unzips into a single \"LeadCaptura\" folder, and packaging is a single automated step so this can't happen again.",
     ],
