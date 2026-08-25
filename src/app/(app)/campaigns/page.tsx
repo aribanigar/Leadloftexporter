@@ -193,6 +193,18 @@ export default function EmailCampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dupLoading, setDupLoading] = useState<string | null>(null);
+  // Which sender groups are expanded. Starts empty (everything collapsed) —
+  // with dozens of senders and 80+ campaigns, showing every group fully
+  // expanded on load made it impossible to find one specific campaign
+  // without scrolling past everything else first.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // ── API logic ───────────────────────────────────────────────────────────────
   const fetchCampaigns = useCallback(async () => {
@@ -459,6 +471,33 @@ export default function EmailCampaignsPage() {
                   ))}
                 </div>
 
+                {/* Expand/collapse all sender groups at once */}
+                {groups.length > 1 && (
+                  <button
+                    onClick={() => setExpandedGroups(
+                      expandedGroups.size === groups.length
+                        ? new Set()
+                        : new Set(groups.map(g => g.key))
+                    )}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      background: 'transparent',
+                      border: `1px solid rgba(65,73,66,0.15)`,
+                      borderRadius: T.rFull,
+                      padding: '5px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: T.onSurfaceVar,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {expandedGroups.size === groups.length ? 'Collapse all' : 'Expand all'}
+                  </button>
+                )}
+
                 {/* Create Campaign CTA */}
                 <Link
                   href="/campaigns/new"
@@ -532,15 +571,23 @@ export default function EmailCampaignsPage() {
                       </td>
                     </tr>
                   ) : (
-                    groups.flatMap((g) => [
-                      // ── Mailbox header row — one per connected account ──
-                      <tr key={`hdr-${g.key}`}>
+                    groups.flatMap((g) => {
+                      const isOpen = expandedGroups.has(g.key);
+                      return [
+                      // ── Mailbox header row — one per connected account, click to expand/collapse ──
+                      <tr key={`hdr-${g.key}`} onClick={() => toggleGroup(g.key)} style={{ cursor: 'pointer' }}>
                         <td colSpan={5} style={{
                           padding: '14px 16px 8px',
                           background: T.surfaceLow,
                           borderTop: `1px solid rgba(65,73,66,0.08)`,
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <svg
+                              width="12" height="12" viewBox="0 0 12 12" fill="none"
+                              style={{ flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}
+                            >
+                              <path d="M4 2.5l4 3.5-4 3.5" stroke={T.onSurfaceVar} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                             <span style={{
                               display: 'inline-grid',
                               placeItems: 'center',
@@ -580,7 +627,7 @@ export default function EmailCampaignsPage() {
                           </div>
                         </td>
                       </tr>,
-                      ...g.campaigns.map((c, idx) => {
+                      ...(isOpen ? g.campaigns : []).map((c, idx) => {
                       const badge = STATUS_BADGE[c.status] || STATUS_BADGE.draft;
                       const openRateNum = c.sent_count ? (c.opened_count / c.sent_count) * 100 : 0;
                       const openRateStr = fmtRateDisplay(c.opened_count, c.sent_count);
@@ -796,8 +843,8 @@ export default function EmailCampaignsPage() {
                           </td>
                         </tr>
                       );
-                    }),
-                    ])
+                    })];
+                    })
                   )}
                 </tbody>
               </table>
@@ -837,14 +884,24 @@ export default function EmailCampaignsPage() {
                   </p>
                 </div>
               ) : (
-                groups.map((g) => (
+                groups.map((g) => {
+                  const isOpen = expandedGroups.has(g.key);
+                  return (
                   <div key={g.key}>
-                    {/* Mailbox header */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '12px 14px 8px', background: T.surfaceLow,
-                      borderTop: `1px solid rgba(65,73,66,0.08)`,
-                    }}>
+                    {/* Mailbox header — tap to expand/collapse */}
+                    <div
+                      onClick={() => toggleGroup(g.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                        padding: '12px 14px 8px', background: T.surfaceLow,
+                        borderTop: `1px solid rgba(65,73,66,0.08)`,
+                      }}>
+                      <svg
+                        width="11" height="11" viewBox="0 0 12 12" fill="none"
+                        style={{ flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}
+                      >
+                        <path d="M4 2.5l4 3.5-4 3.5" stroke={T.onSurfaceVar} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                       <span style={{
                         display: 'inline-grid', placeItems: 'center', width: 20, height: 20,
                         borderRadius: T.rFull, background: PROVIDER_COLOR[g.provider] || T.secondary,
@@ -864,7 +921,7 @@ export default function EmailCampaignsPage() {
                       </span>
                     </div>
 
-                    {g.campaigns.map((c, idx) => {
+                    {(isOpen ? g.campaigns : []).map((c, idx) => {
                       const badge = STATUS_BADGE[c.status] || STATUS_BADGE.draft;
                       const openRateNum = c.sent_count ? (c.opened_count / c.sent_count) * 100 : 0;
                       const openRateStr = fmtRateDisplay(c.opened_count, c.sent_count);
@@ -979,7 +1036,8 @@ export default function EmailCampaignsPage() {
                       );
                     })}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
