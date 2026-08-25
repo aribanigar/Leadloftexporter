@@ -13,10 +13,16 @@
  * with zero further configuration. Same applies to the verify step in
  * `api/app/api/v1/integrations.py:smtp_connect`.
  *
- * Auth: optional shared secret in `X-LC-Relay-Secret`. If
- * `LC_SMTP_RELAY_SECRET` is unset on Vercel the relay accepts any caller
- * — the SMTP credentials themselves are the real auth, since wrong
- * password = SMTP returns 535 = relay returns 401 to caller.
+ * Auth: optional shared secret in `X-LC-Relay-Secret`. Accepts either
+ * `SMTP_RELAY_SECRET` (the name the backend actually documents and sets —
+ * .env.api.example, DEPLOY.md, render-free.yaml) or the legacy
+ * `LC_SMTP_RELAY_SECRET` this route originally checked, so a Vercel env var
+ * under either name works — a mismatch here means the backend's secret
+ * never matches what this route expects, and EVERY relay call 401s
+ * regardless of how correct the sender's own SMTP credentials are. If
+ * neither is set on Vercel the relay accepts any caller — the SMTP
+ * credentials themselves are the real auth, since wrong password = SMTP
+ * returns 535 = relay returns 401 to caller.
  *
  * Runs on the Node runtime (NOT Edge) — Edge functions don't have raw
  * TCP sockets, which nodemailer needs.
@@ -48,7 +54,7 @@ function bad(msg: string, status = 400) {
 }
 
 export async function POST(req: NextRequest) {
-  const expected = process.env.LC_SMTP_RELAY_SECRET || "";
+  const expected = process.env.SMTP_RELAY_SECRET || process.env.LC_SMTP_RELAY_SECRET || "";
   if (expected) {
     const got = req.headers.get("x-lc-relay-secret") || "";
     if (got !== expected) return bad("unauthorized", 401);
