@@ -208,6 +208,15 @@ export default function EmailCampaignsPage() {
       return next;
     });
   };
+  // In-app toast for delete errors — was a native alert() popup, which is
+  // jarring and blocks the tab. Auto-dismisses; doesn't touch loading/skeleton
+  // state at all.
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
   // Which sender groups are expanded. Starts empty (everything collapsed) —
   // with dozens of senders and 80+ campaigns, showing every group fully
   // expanded on load made it impossible to find one specific campaign
@@ -267,7 +276,7 @@ export default function EmailCampaignsPage() {
       // Surface the real reason — silently refreshing made it impossible to
       // tell that the delete had 405'd on the missing backend endpoint.
       const msg = e instanceof ApiError ? (e.message || `Delete failed (${e.status})`) : 'Delete failed';
-      alert(msg);
+      setToast(msg);
       await fetchCampaigns();
     } finally {
       setDeleteId(null);
@@ -292,7 +301,7 @@ export default function EmailCampaignsPage() {
     setBulkDeleteConfirm(false);
     setBulkDeleting(false);
     if (failed.length) {
-      alert(`${failed.length} of ${ids.length} campaign${ids.length === 1 ? '' : 's'} couldn't be deleted. They're still selected — try again.`);
+      setToast(`${failed.length} of ${ids.length} campaign${ids.length === 1 ? '' : 's'} couldn't be deleted. They're still selected — try again.`);
     }
   }
 
@@ -1162,6 +1171,42 @@ export default function EmailCampaignsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Toast — in-app error notice, replaces the old alert() popup ──── */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1100,
+          maxWidth: 480,
+          width: 'calc(100% - 32px)',
+          background: '#2a1414',
+          color: '#ffe0e0',
+          borderRadius: T.rLg,
+          padding: '12px 16px',
+          fontSize: 13,
+          lineHeight: 1.5,
+          boxShadow: T.shadowLg,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          animation: 'fadeSlideIn 0.2s ease',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 22 22" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+            <path d="M3 5.5h16M8.5 5.5V4a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v1.5M17 5.5l-1.1 11.3a1.5 1.5 0 0 1-1.5 1.2H7.6a1.5 1.5 0 0 1-1.5-1.2L5 5.5" stroke="#ff9999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{ flex: 1 }}>{toast}</span>
+          <button
+            onClick={() => setToast(null)}
+            style={{ background: 'transparent', border: 'none', color: '#ff9999', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ── Delete Confirm Modal (Alpine Editorial styled) ──────────────── */}
       {deleteId && (
