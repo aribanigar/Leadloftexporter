@@ -103,7 +103,7 @@ function avatarColor(name: string): string {
 function SkeletonRow() {
   return (
     <tr>
-      {[120, 80, 60, 90].map((w, i) => (
+      {[16, 120, 80, 60, 90].map((w, i) => (
         <td key={i} style={{ padding: '14px 16px' }}>
           <div style={{
             height: 12, width: w, borderRadius: 6,
@@ -193,6 +193,21 @@ export default function EmailCampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dupLoading, setDupLoading] = useState<string | null>(null);
+  // Bulk select-and-delete. Reuses the existing single DELETE /campaigns/:id
+  // endpoint per selected campaign (small concurrency batches) rather than
+  // adding a new backend bulk-delete route -- same guarantees per campaign
+  // (a "sending" one is cancelled first, recipients cascade), nothing new
+  // to trust on the server side.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
   // Which sender groups are expanded. Starts empty (everything collapsed) —
   // with dozens of senders and 80+ campaigns, showing every group fully
   // expanded on load made it impossible to find one specific campaign
@@ -207,15 +222,20 @@ export default function EmailCampaignsPage() {
   };
 
   // ── API logic ───────────────────────────────────────────────────────────────
-  const fetchCampaigns = useCallback(async () => {
-    setLoading(true);
+  // `background: true` (the periodic 10s refresh) never touches the loading
+  // skeleton or clears campaigns on failure — it used to call setLoading(true)
+  // unconditionally, which flipped the whole table back to skeleton
+  // placeholders and back every 10 seconds, forever, even mid-scroll or
+  // mid-selection. The skeleton is now only ever shown for the real first load.
+  const fetchCampaigns = useCallback(async (opts?: { background?: boolean }) => {
+    if (!opts?.background) setLoading(true);
     try {
       const data = await api<Campaign[]>('/campaigns');
       setCampaigns(Array.isArray(data) ? data : []);
     } catch {
-      setCampaigns([]);
+      if (!opts?.background) setCampaigns([]);
     } finally {
-      setLoading(false);
+      if (!opts?.background) setLoading(false);
     }
   }, []);
 
@@ -223,7 +243,7 @@ export default function EmailCampaignsPage() {
 
   // refresh periodically so live stats settle without a manual reload
   useEffect(() => {
-    const interval = setInterval(() => { fetchCampaigns(); }, 10000);
+    const interval = setInterval(() => { fetchCampaigns({ background: true }); }, 10000);
     return () => clearInterval(interval);
   }, [fetchCampaigns]);
 
@@ -254,10 +274,40 @@ export default function EmailCampaignsPage() {
     }
   }
 
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    const failed: string[] = [];
+    const CONCURRENCY = 4;
+    for (let i = 0; i < ids.length; i += CONCURRENCY) {
+      const batch = ids.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(id => api(`/campaigns/${id}`, { method: 'DELETE' }))
+      );
+      results.forEach((r, idx) => { if (r.status === 'rejected') failed.push(batch[idx]); });
+    }
+    setCampaigns(prev => prev.filter(c => !ids.includes(c.id) || failed.includes(c.id)));
+    setSelectedIds(new Set(failed));
+    setBulkDeleteConfirm(false);
+    setBulkDeleting(false);
+    if (failed.length) {
+      alert(`${failed.length} of ${ids.length} campaign${ids.length === 1 ? '' : 's'} couldn't be deleted. They're still selected — try again.`);
+    }
+  }
+
   // ── Visible slice for the chosen tab ────────────────────────────────────────
   const visible = tab === 'completed'
     ? campaigns.filter(c => c.status === 'completed')
     : campaigns;
+
+  // "Select all" covers every campaign in the current tab's filter, not just
+  // the ones currently visible in an expanded group — matches how the list
+  // is understood (a collapsed group's campaigns are still "in the list").
+  const allVisibleSelected = visible.length > 0 && visible.every(c => selectedIds.has(c.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(allVisibleSelected ? new Set() : new Set(visible.map(c => c.id)));
+  };
 
   // ── Group by sender mailbox (the connected email account the campaign
   //     was/is sent from). A campaign with multiple senders shows once per
@@ -438,6 +488,44 @@ export default function EmailCampaignsPage() {
               </h2>
 
               <div className="ec-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                {/* Bulk-select action bar — only shown once something's selected */}
+                {selectedIds.size > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: '#ffd5d5', borderRadius: T.rFull, padding: '4px 6px 4px 14px',
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#7a1414', whiteSpace: 'nowrap' }}>
+                      {selectedIds.size} selected
+                    </span>
+                    <button
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      disabled={bulkDeleting}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        background: 'linear-gradient(135deg, #b91c1c, #dc2626)',
+                        color: '#ffffff', border: 'none', borderRadius: T.rFull,
+                        padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                        cursor: bulkDeleting ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                        opacity: bulkDeleting ? 0.6 : 1,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M11 3.5l-.7 7.2a1 1 0 0 1-1 .8H4.7a1 1 0 0 1-1-.8L3 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Delete selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedIds(new Set())}
+                      style={{
+                        background: 'transparent', border: 'none', color: '#7a1414',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 8px',
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
                 {/* Filter tabs: All Status / Completed */}
                 <div style={{
                   display: 'flex',
@@ -536,6 +624,15 @@ export default function EmailCampaignsPage() {
               }}>
                 <thead>
                   <tr style={{ background: T.surfaceLow }}>
+                    <th style={{ padding: '10px 12px', width: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAll}
+                        style={{ width: 15, height: 15, cursor: 'pointer' }}
+                        title={allVisibleSelected ? 'Deselect all' : 'Select all'}
+                      />
+                    </th>
                     {['Campaign Name', 'Status', 'Recipients', 'Open Rate', 'Actions'].map(h => (
                       <th key={h} style={{
                         padding: '10px 16px',
@@ -557,7 +654,7 @@ export default function EmailCampaignsPage() {
                     [1, 2, 3, 4].map(i => <SkeletonRow key={i} />)
                   ) : visible.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '56px 24px', textAlign: 'center' }}>
+                      <td colSpan={6} style={{ padding: '56px 24px', textAlign: 'center' }}>
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ display: 'block', margin: '0 auto 14px' }}>
                           <rect x="2" y="4" width="20" height="16" rx="3" stroke="#b8bfb9" strokeWidth="1.5"/>
                           <path d="M2 8l10 7 10-7" stroke="#b8bfb9" strokeWidth="1.5" strokeLinecap="round"/>
@@ -576,7 +673,7 @@ export default function EmailCampaignsPage() {
                       return [
                       // ── Mailbox header row — one per connected account, click to expand/collapse ──
                       <tr key={`hdr-${g.key}`} onClick={() => toggleGroup(g.key)} style={{ cursor: 'pointer' }}>
-                        <td colSpan={5} style={{
+                        <td colSpan={6} style={{
                           padding: '14px 16px 8px',
                           background: T.surfaceLow,
                           borderTop: `1px solid rgba(65,73,66,0.08)`,
@@ -643,6 +740,17 @@ export default function EmailCampaignsPage() {
                             background: T.surfaceLowest,
                           }}
                         >
+                          {/* Select checkbox */}
+                          <td style={{ padding: '14px 12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(c.id)}
+                              onChange={() => toggleSelect(c.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: 15, height: 15, cursor: 'pointer' }}
+                            />
+                          </td>
+
                           {/* Campaign Name + Subject */}
                           <td style={{ padding: '14px 16px', minWidth: 220 }}>
                             <Link href={`/campaigns/${c.id}`} style={{ textDecoration: 'none' }}>
@@ -933,8 +1041,18 @@ export default function EmailCampaignsPage() {
                             padding: '12px 14px',
                             borderBottom: `1px solid rgba(65,73,66,0.06)`,
                             background: T.surfaceLowest,
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
                           }}
                         >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(c.id)}
+                            onChange={() => toggleSelect(c.id)}
+                            style={{ width: 17, height: 17, cursor: 'pointer', marginTop: 9, flexShrink: 0 }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
                           <Link href={`/campaigns/${c.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                               <div style={{
@@ -1031,6 +1149,7 @@ export default function EmailCampaignsPage() {
                                 <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M11 3.5l-.7 7.2a1 1 0 0 1-1 .8H4.7a1 1 0 0 1-1-.8L3 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
+                          </div>
                           </div>
                         </div>
                       );
@@ -1133,6 +1252,103 @@ export default function EmailCampaignsPage() {
                 }}
               >
                 Delete Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Delete Confirm Modal ────────────────────────────────────── */}
+      {bulkDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(25,28,29,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 16,
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            background: T.surfaceLowest,
+            borderRadius: T.rXl + 4,
+            padding: 32,
+            maxWidth: 400,
+            width: '100%',
+            boxShadow: T.shadowLg,
+            animation: 'fadeSlideIn 0.2s ease',
+          }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: T.rXl,
+              background: '#ffd5d5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}>
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <path d="M3 5.5h16M8.5 5.5V4a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v1.5M17 5.5l-1.1 11.3a1.5 1.5 0 0 1-1.5 1.2H7.6a1.5 1.5 0 0 1-1.5-1.2L5 5.5" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            <h3 style={{
+              margin: '0 0 8px',
+              color: T.onSurface,
+              fontSize: 18,
+              fontWeight: 700,
+              fontFamily: 'Manrope, Inter, system-ui, sans-serif',
+            }}>
+              Delete {selectedIds.size} campaign{selectedIds.size === 1 ? '' : 's'}?
+            </h3>
+            <p style={{
+              margin: '0 0 24px',
+              color: T.onSurfaceVar,
+              fontSize: 14,
+              lineHeight: 1.55,
+            }}>
+              This action cannot be undone. All selected campaigns and their stats will be permanently deleted. Any still sending will be cancelled first.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                disabled={bulkDeleting}
+                style={{
+                  background: T.surfaceLow,
+                  color: T.onSurface,
+                  border: 'none',
+                  borderRadius: T.rFull,
+                  padding: '10px 20px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: bulkDeleting ? 'wait' : 'pointer',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  transition: 'background 0.15s',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                style={{
+                  background: 'linear-gradient(135deg, #b91c1c, #dc2626)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: T.rFull,
+                  padding: '10px 20px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: bulkDeleting ? 'wait' : 'pointer',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  boxShadow: '0 4px 16px rgba(185,28,28,0.3)',
+                  opacity: bulkDeleting ? 0.6 : 1,
+                }}
+              >
+                {bulkDeleting ? 'Deleting…' : `Delete ${selectedIds.size} campaign${selectedIds.size === 1 ? '' : 's'}`}
               </button>
             </div>
           </div>
