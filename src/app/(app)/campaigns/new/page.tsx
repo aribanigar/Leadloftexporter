@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
@@ -930,7 +930,18 @@ function NewCampaignPageInner() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const htmlFileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeSenders = senders.filter(s => s.status === 'active');
+  // Grouped by domain (like the Campaigns list groups by mailbox) so
+  // sales@hudace.com / partner@hudace.com / info@hudace.com sit together
+  // instead of scattered in whatever order the API happened to return them.
+  // Domains sort alphabetically; addresses within the same domain do too.
+  const activeSenders = useMemo(() => {
+    const emailOf = (s: Sender) => (s.from_address || s.label || '').toLowerCase();
+    const domainOf = (s: Sender) => emailOf(s).split('@')[1] || '';
+    return senders
+      .filter(s => s.status === 'active')
+      .slice()
+      .sort((a, b) => domainOf(a).localeCompare(domainOf(b)) || emailOf(a).localeCompare(emailOf(b)));
+  }, [senders]);
 
   const currentHtml = form.contentMode === 'visual' && editorRef.current
     ? editorRef.current.innerHTML
