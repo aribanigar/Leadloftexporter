@@ -318,42 +318,52 @@ export default function EmailCampaignsPage() {
     setSelectedIds(allVisibleSelected ? new Set() : new Set(visible.map(c => c.id)));
   };
 
-  // ── Group by sender mailbox (the connected email account the campaign
-  //     was/is sent from). A campaign with multiple senders shows once per
-  //     sender so the section row count tells the truth. Campaigns with no
-  //     resolved sender fall into "Unassigned". ──────────────────────────
+  // ── Group by SENDER DOMAIN (not individual mailbox) — sales@hudace.com,
+  //     partner@hudace.com, info@hudace.com all collapse into one
+  //     "hudace.com" section instead of three separate ones, same idea as
+  //     the Send From picker in Campaign Builder sorting by domain. A
+  //     campaign with senders on the same domain is deduped to one row in
+  //     that domain's section; senders on different domains still put the
+  //     same campaign in each domain's section (mirrors the old per-sender
+  //     behavior, just one level coarser). Campaigns with no resolved
+  //     sender fall into "Unassigned". ──────────────────────────────────
   interface CampaignGroup {
     key: string;
-    address: string;
+    domain: string;
+    addresses: string[];
     provider: string;
-    label: string | null;
     campaigns: Campaign[];
   }
   const groupMap = new Map<string, CampaignGroup>();
   for (const c of visible) {
     const senders = c.senders && c.senders.length > 0 ? c.senders : [null];
+    const domainsSeen = new Set<string>();
     for (const s of senders) {
-      const key = s?.id || '__unassigned__';
-      const addr = s?.address || s?.label || 'No mailbox assigned';
+      const addr = s?.address || s?.label || '';
+      const domain = addr.includes('@') ? addr.split('@')[1]?.toLowerCase() || '' : '';
+      const key = domain || '__unassigned__';
+      if (domainsSeen.has(key)) continue; // same campaign, another mailbox on the same domain
+      domainsSeen.add(key);
       let g = groupMap.get(key);
       if (!g) {
         g = {
           key,
-          address: addr,
+          domain: domain || 'No mailbox assigned',
+          addresses: [],
           provider: s?.provider || 'smtp',
-          label: s?.label || null,
           campaigns: [],
         };
         groupMap.set(key, g);
       }
+      if (addr && !g.addresses.includes(addr)) g.addresses.push(addr);
       g.campaigns.push(c);
     }
   }
-  // Sort: real mailboxes first (alphabetical), unassigned last
+  // Sort: real domains first (alphabetical), unassigned last
   const groups = Array.from(groupMap.values()).sort((a, b) => {
     if (a.key === '__unassigned__') return 1;
     if (b.key === '__unassigned__') return -1;
-    return a.address.localeCompare(b.address);
+    return a.domain.localeCompare(b.domain);
   });
 
   // ── Aggregate KPIs ──────────────────────────────────────────────────────────
@@ -705,7 +715,7 @@ export default function EmailCampaignsPage() {
                               fontSize: 11,
                               fontWeight: 700,
                             }}>
-                              {(g.address || '?').charAt(0).toUpperCase()}
+                              {(g.domain || '?').charAt(0).toUpperCase()}
                             </span>
                             <span style={{
                               fontSize: 13,
@@ -713,7 +723,7 @@ export default function EmailCampaignsPage() {
                               color: T.onSurface,
                               fontFamily: 'Manrope, Inter, sans-serif',
                             }}>
-                              {g.address}
+                              {g.domain}
                             </span>
                             <span style={{
                               fontSize: 11,
@@ -725,7 +735,7 @@ export default function EmailCampaignsPage() {
                               background: T.surfaceContainer,
                               borderRadius: T.rFull,
                             }}>
-                              {g.provider}
+                              {g.addresses.length > 1 ? `${g.addresses.length} mailboxes` : g.provider}
                             </span>
                             <span style={{ marginLeft: 'auto', fontSize: 12, color: T.onSurfaceVar }}>
                               {g.campaigns.length} campaign{g.campaigns.length === 1 ? '' : 's'}
@@ -1024,14 +1034,14 @@ export default function EmailCampaignsPage() {
                         borderRadius: T.rFull, background: PROVIDER_COLOR[g.provider] || T.secondary,
                         color: '#ffffff', fontSize: 10, fontWeight: 700, flexShrink: 0,
                       }}>
-                        {(g.address || '?').charAt(0).toUpperCase()}
+                        {(g.domain || '?').charAt(0).toUpperCase()}
                       </span>
                       <span style={{
                         fontSize: 12.5, fontWeight: 700, color: T.onSurface,
                         fontFamily: 'Manrope, Inter, sans-serif', overflow: 'hidden',
                         textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
                       }}>
-                        {g.address}
+                        {g.domain}
                       </span>
                       <span style={{ marginLeft: 'auto', fontSize: 11, color: T.onSurfaceVar, flexShrink: 0 }}>
                         {g.campaigns.length}
