@@ -84,11 +84,16 @@ class Settings(BaseSettings):
     # that performs the SMTP send from Vercel's network instead — Vercel
     # doesn't block outbound SMTP. `email_sender.py` falls back to it
     # automatically, and `integrations.py:smtp_connect` uses it to verify
-    # creds on save. Both URL and secret default to sensible auto-derived
-    # values so no extra env vars are required for the default deploy.
-    # Hardcoded to the Vercel production URL so SMTP relay works zero-config.
-    # Override via SMTP_RELAY_URL env var only if the domain changes.
-    smtp_relay_url: str = "https://leadloftexporter-neon.vercel.app/api/smtp-relay"
+    # creds on save.
+    # Left empty by default so `resolved_smtp_relay_url` below derives it
+    # from FRONTEND_ORIGINS instead. A hardcoded *.vercel.app URL here goes
+    # stale the moment the project's default alias changes (it did: the old
+    # hardcoded alias started returning 402 DEPLOYMENT_DISABLED and broke
+    # every sender), while FRONTEND_ORIGINS already has to track the real,
+    # stable frontend URL (currently the leads.hudace.com custom domain)
+    # for CORS to work at all. Set SMTP_RELAY_URL explicitly only if the
+    # relay ever needs to live somewhere other than the frontend.
+    smtp_relay_url: str = ""
     smtp_relay_secret: str = ""
 
     # Public, internet-reachable base URL of THIS backend. Used to build
