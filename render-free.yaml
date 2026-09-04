@@ -13,7 +13,7 @@
 #   4. Render reads this file, creates ONE web service as Docker
 #   5. It will prompt you for the sync:false env vars below — paste:
 #        DATABASE_URL      = your Postgres External URL
-#        FRONTEND_ORIGINS  = https://leadloftexporter.vercel.app
+#        FRONTEND_ORIGINS  = https://leads.hudace.com
 #        ANTHROPIC_API_KEY = (your key)
 #        PUBLIC_API_URL    = (the URL Render gives this service)
 #      (the rest are optional — leave blank if you don't use them)
@@ -80,7 +80,7 @@ services:
       - key: GOOGLE_PLACES_API_KEY
         sync: false
       - key: SMTP_RELAY_URL
-        value: https://leadloftexporter.vercel.app/api/smtp-relay
+        value: https://leads.hudace.com/api/smtp-relay
       - key: SMTP_RELAY_SECRET
         sync: false
       - key: SENTRY_DSN

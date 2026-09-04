@@ -44,7 +44,7 @@ jobs:
       - name: Drain sending campaigns
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          DEFAULT_FRONTEND: https://leadloftexporter.vercel.app
+          DEFAULT_FRONTEND: https://leads.hudace.com
         run: |
           set -u
           if [ -z "${CRON_SECRET}" ]; then
