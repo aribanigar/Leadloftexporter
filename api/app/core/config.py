@@ -85,15 +85,17 @@ class Settings(BaseSettings):
     # doesn't block outbound SMTP. `email_sender.py` falls back to it
     # automatically, and `integrations.py:smtp_connect` uses it to verify
     # creds on save.
-    # Left empty by default so `resolved_smtp_relay_url` below derives it
-    # from FRONTEND_ORIGINS instead. A hardcoded *.vercel.app URL here goes
-    # stale the moment the project's default alias changes (it did: the old
-    # hardcoded alias started returning 402 DEPLOYMENT_DISABLED and broke
-    # every sender), while FRONTEND_ORIGINS already has to track the real,
-    # stable frontend URL (currently the leads.hudace.com custom domain)
-    # for CORS to work at all. Set SMTP_RELAY_URL explicitly only if the
+    # Pinned to the leads.hudace.com custom domain, not a *.vercel.app
+    # alias: Vercel's auto-generated default alias for this project has
+    # already gone stale once (it silently started returning 402
+    # DEPLOYMENT_DISABLED and broke every sender) and can do so again any
+    # time the project is renamed or redeployed under a new alias. The
+    # custom domain doesn't move. If FRONTEND_ORIGINS ever lists the
+    # broken alias ahead of the custom domain, deriving from it (as this
+    # used to) silently regresses to the same failure — so prefer this
+    # explicit, verified URL. Override via SMTP_RELAY_URL only if the
     # relay ever needs to live somewhere other than the frontend.
-    smtp_relay_url: str = ""
+    smtp_relay_url: str = "https://leads.hudace.com/api/smtp-relay"
     smtp_relay_secret: str = ""
 
     # Public, internet-reachable base URL of THIS backend. Used to build
