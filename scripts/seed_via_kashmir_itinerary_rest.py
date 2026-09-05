@@ -22,10 +22,9 @@ TONE   = "warm-editorial"
 
 SUPABASE_URL   = os.environ.get("SUPABASE_URL", "https://cmdnezltteldysoxyjzh.supabase.co")
 HUB_WORKSPACE  = os.environ.get("HUB_WORKSPACE", "1a716353-9472-4c1d-ae89-f95052e8f015")
-SUPABASE_KEY   = os.environ.get(
-    "SUPABASE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG5lemx0dGVsZHlzb3h5anpoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTkwNjQyOSwiZXhwIjoyMDk3NDgyNDI5fQ.owlPxYZz-f7TyXxJ5ikuVF7z2IVo98dyf6DXKhHMWRM",
-)
+SUPABASE_KEY   = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+if not SUPABASE_KEY:
+    sys.exit("SUPABASE_KEY / SUPABASE_SERVICE_KEY env var not set (never hardcode this — it's a full-admin secret).")
 
 
 def headers(prefer: str = "") -> dict:

@@ -40,14 +40,8 @@ TONE  = "warm-editorial"
 
 HUB_WORKSPACE = os.environ.get("HUB_WORKSPACE", "1a716353-9472-4c1d-ae89-f95052e8f015")
 
-# Defaults match the sibling itinerary seeder so this engine auto-seeds unattended.
-# Env vars override; the repo is private by design (see README security note).
+# Config comes from env vars only — this repo is PUBLIC, never hardcode secrets here.
 _DEFAULT_SUPABASE_URL = "https://cmdnezltteldysoxyjzh.supabase.co"
-_DEFAULT_SUPABASE_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG5l"
-    "emx0dGVsZHlzb3h5anpoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTkwNjQyOSwi"
-    "ZXhwIjoyMDk3NDgyNDI5fQ.owlPxYZz-f7TyXxJ5ikuVF7z2IVo98dyf6DXKhHMWRM"
-)
 
 
 def _project_ref_from_dburl(dburl: str):
@@ -79,7 +73,7 @@ def _resolve_key():
     for name in ("SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_KEY"):
         if os.environ.get(name):
             return os.environ[name]
-    return _DEFAULT_SUPABASE_KEY
+    sys.exit("SUPABASE_SERVICE_KEY env var not set (never hardcode this — it's a full-admin secret).")
 
 
 class Supabase:

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Upload local Pixabay images to Supabase Storage, patch HTML + DB, push to main."""
-import json, re, subprocess, sys, requests
+import json, os, re, subprocess, sys, requests
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DAY = "2026-06-22"
 DAY_DIR = ROOT / "content-hub" / "date-khaas" / DAY
 
-SUPABASE_URL = "https://cmdnezltteldysoxyjzh.supabase.co"
-SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG5lemx0dGVsZHlzb3h5anpoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTkwNjQyOSwiZXhwIjoyMDk3NDgyNDI5fQ.owlPxYZz-f7TyXxJ5ikuVF7z2IVo98dyf6DXKhHMWRM"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://cmdnezltteldysoxyjzh.supabase.co")
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+if not SERVICE_KEY:
+    sys.exit("SUPABASE_SERVICE_KEY env var not set (never hardcode this — it's a full-admin secret).")
 BUCKET = "email"
 
 HEADERS_JSON = {
