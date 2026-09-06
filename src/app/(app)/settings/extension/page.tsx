@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.386",
+    date: "Sep 6, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.386.zip",
+    latest: true,
+    changes: [
+      "Fixed the extension's own update checker, which was silently broken: it fetched its \"is a newer version out?\" manifest from a dead Vercel alias (leadloftexporter.vercel.app — the same stale host behind the earlier SMTP relay outage), so the fetch failed on every install and nobody ever got an update badge or notification, no matter how far behind they were. The Backend URL host permission and the Content Hub \"Push to Extension\" button were scoped to that same dead host and so never actually worked on the live site either. All three now point at leads.hudace.com.",
+    ],
+  },
+  {
     version: "1.0.385",
     date: "Aug 21, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.385.zip",
-    latest: true,
     changes: [
       "Fixed captured profiles being silently dropped instead of retried when the backend responds with HTTP 429 (rate-limited — sometimes shown as the hosting provider's “Just a moment...” page). Those now get queued and retried automatically like any other transient failure, instead of the lead just being lost. The retry sweep itself is also paced now, and backs off for the rest of that cycle the moment it hits another 429, so working through a backlog can't re-trigger the same rate limit.",
     ],

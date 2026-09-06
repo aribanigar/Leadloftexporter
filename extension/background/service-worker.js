@@ -1719,7 +1719,13 @@ retryPendingSaves();
 // trip to chrome://extensions. Purely additive: no existing message, handler,
 // setting, or integration is touched, and NO new permission is requested
 // (alarms/notifications/storage/action are already granted).
-const LC_VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
+//
+// NOTE: this MUST be a live host. leadloftexporter.vercel.app is a dead
+// alias (same one that caused the SMTP-relay 402 outage) — pointing the
+// update check at it means lcCheckForUpdate() silently no-ops forever
+// (fetch fails, function returns early), so installs never learn a newer
+// build exists and never pick up fixes like this one.
+const LC_VERSION_MANIFEST_URL = "https://leads.hudace.com/extension-version.json";
 
 // Numeric dotted-version compare: 1 if a>b, -1 if a<b, 0 if equal.
 function _lcCmpVersion(a, b) {
@@ -1798,7 +1804,7 @@ chrome.notifications?.onClicked.addListener((id) => {
   if (!id || !String(id).startsWith("lc-update-")) return;
   chrome.storage.local.get("lc_update_available", ({ lc_update_available }) => {
     const zip = lc_update_available?.zip || "/leadcaptura-extension.zip";
-    const url = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+    const url = /^https?:/i.test(zip) ? zip : ("https://leads.hudace.com" + zip);
     chrome.tabs.create({ url });
     try { chrome.notifications.clear(id); } catch (_) {}
   });

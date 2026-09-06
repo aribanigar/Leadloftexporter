@@ -1,5 +1,5 @@
 {
-  "version": "1.0.385",
-  "zip": "/extensions/leadcaptura-extension-v1.0.385.zip",
-  "notes": "Fixed captured profiles being silently dropped instead of retried when the backend responds with HTTP 429 (rate-limited — sometimes shown as the hosting provider's \"Just a moment...\" page). The offline retry queue only recognized network failures and 5xx errors as retryable; 429 fell through as a permanent failure and that lead was lost instead of queued. It's now queued and retried automatically like any other transient failure. Also paced the retry sweep itself (small gap between items, and it backs off for the rest of that cycle the moment it hits another 429) so retrying a backlog can't re-trigger the same rate limit."
+  "version": "1.0.386",
+  "zip": "/extensions/leadcaptura-extension-v1.0.386.zip",
+  "notes": "Fixed the extension's own update checker: it was pointed at a dead Vercel alias (leadloftexporter.vercel.app — the same stale host that caused the SMTP relay outage), so lcCheckForUpdate() silently failed on every install and nobody ever saw an \"update available\" badge, no matter how out of date they were. Also fixed the Backend URL host permission and the Content Hub \"Push to Extension\" content script, which were both still scoped to that same dead host and so never worked on the real site. All three now point at leads.hudace.com."
 }
