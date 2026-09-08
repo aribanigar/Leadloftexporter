@@ -124,7 +124,7 @@ Documented in detail in `CLAUDE.md` under the appropriate sections; here are the
 
 ## Production URLs (current)
 
-- Frontend: `https://leadloftexporter.vercel.app`
+- Frontend: `https://leads.hudace.com` (the Vercel project's production alias moved off `leadloftexporter.vercel.app` — that alias now 402s / `DEPLOYMENT_DISABLED`; see `CLAUDE.md` → "Things to watch for")
 - Backend: `https://leadcaptura-api.onrender.com`
 - WhatsApp sidecar: `https://leadcaptura-whatsapp.onrender.com` (private — only API talks to it)
 
