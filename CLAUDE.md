@@ -250,7 +250,7 @@ Multi-business, Google-Drive-style folder system for storing reusable marketing 
 ### Hudace content routine (`public/email/` + `publish.py`)
 
 The Hudace AI content routine writes:
-- **Background photos and baked promo JPGs** → `public/email/` (served by Vercel at `https://leadloftexporter.vercel.app/email/<name>`)
+- **Background photos and baked promo JPGs** → `public/email/` (served by Vercel at `https://leads.hudace.com/email/<name>`)
 - **Content items** → Neon DB `content_assets` table via `publish.py` (HTTP SQL API, not psycopg2 — port 5432 is blocked in the routine environment; `publish.py` uses the Neon HTTP endpoint on port 443)
 - **State tracker** → `.routine/state.json`
 
@@ -564,3 +564,4 @@ LinkedIn rewrites markup often. Prefer multiple selectors via `first(root, [...]
 - **No build step for the extension RUNTIME.** Author raw JS in `extension/`; do not introduce npm/bundlers into the extension's own source or load flow. The ONE exception is packaging for distribution: `npm run build:extension` produces the protected `extension-dist/` that gets zipped and published (see "Code protection" above). Never publish the raw `extension/` source; never load `extension-dist/` as your dev copy (develop against `extension/`).
 - **Models in one file.** Resist the urge to split `app/models/base.py` — the import graph relies on it.
 - **bcrypt is pinned.** See the auth section above before bumping `requirements.txt`.
+- **`leadloftexporter.vercel.app` is a dead alias — never hardcode it.** The project's production alias moved to `leadloftexporter-neon.vercel.app` (same Vercel project that serves the live custom domain `leads.hudace.com`); the old alias now 402s (`DEPLOYMENT_DISABLED`). It has silently broken the SMTP relay default (`api/app/core/config.py`), the extension's self-update checker + Backend URL host permission + Content Hub push content script (all in `extension/`), all pointed at it at various times. Any new hardcoded frontend-origin reference (relay URLs, extension manifest hosts, content-pipeline "served at" URLs) must point at `leads.hudace.com`, not a `*.vercel.app` alias.
