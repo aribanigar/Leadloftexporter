@@ -1,5 +1,5 @@
 {
-  "version": "1.0.389",
-  "zip": "/extensions/leadcaptura-extension-v1.0.389.zip",
-  "notes": "Fixed the Hostinger auto-fill (Settings → Email Senders' \"Login\" button) not actually working: it was handing the credentials to the extension via a CustomEvent, which does not reliably carry its payload across Chrome's page/content-script boundary. Switched to window.postMessage, the correct mechanism for this. Also removed the email from the URL of the tab it opens — both email and password now travel only through the same private, extension-only channel as the password did, and are deleted the instant they're used."
+  "version": "1.0.390",
+  "zip": "/extensions/leadcaptura-extension-v1.0.390.zip",
+  "notes": "Fixed the toolbar popup's update check and Download button, which were still pointed at leadloftexporter.vercel.app — a bare Vercel alias that goes down independently of the real site (it was paused) and made the button send you to a dead page. Both now point at the live leads.hudace.com domain, matching the background update-checker, and the popup derives its zip download URL from that one URL instead of hardcoding the host a second time."
 }

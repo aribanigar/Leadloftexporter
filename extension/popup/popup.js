@@ -37,7 +37,14 @@ function cmpVersion(a, b) {
 // versioned zip; the user unzips over the SAME folder and reloads — chrome
 // keeps the extension ID (so chrome.storage.local: API key, settings, learned
 // answers, application profile all persist).
-const VERSION_MANIFEST_URL = "https://leadloftexporter.vercel.app/extension-version.json";
+// Must be a live host — leadloftexporter.vercel.app is the bare Vercel
+// alias and goes down independently of the custom domain (it's been paused
+// before), which silently breaks both the update check and the Download
+// button here. Single source of truth: the zip fallback below is derived
+// from this same URL's origin instead of repeating the host as a second
+// literal, so the two can never drift apart again.
+const VERSION_MANIFEST_URL = "https://leads.hudace.com/extension-version.json";
+const VERSION_MANIFEST_ORIGIN = new URL(VERSION_MANIFEST_URL).origin;
 
 // Render the "Update available" card from a resolved {version, notes, zip}.
 // Called from both the instant storage prefill (may be stale — cached from a
@@ -54,7 +61,7 @@ function renderUpdateCard(cur, info) {
   const latest = info && info.version;
   if (!latest || cmpVersion(latest, cur) <= 0) return;   // already up to date
   const zip = info.zip || "/leadcaptura-extension.zip";
-  _latestZipUrl = /^https?:/i.test(zip) ? zip : ("https://leadloftexporter.vercel.app" + zip);
+  _latestZipUrl = /^https?:/i.test(zip) ? zip : (VERSION_MANIFEST_ORIGIN + zip);
   const verEl = $("#update-ver");
   if (verEl) verEl.textContent = "v" + cur + " → v" + latest;
   const notesEl = $("#update-notes");

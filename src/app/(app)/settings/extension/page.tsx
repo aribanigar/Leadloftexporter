@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.390",
+    date: "Sep 10, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.390.zip",
+    latest: true,
+    changes: [
+      "Fixed the toolbar popup's \"Update extension\" check and Download button, which were still pointed at leadloftexporter.vercel.app — a bare Vercel alias that goes down independently of the real site (it was paused) and made the button send you to a dead page. Both now point at the live leads.hudace.com domain, matching the background update-checker, and the popup now derives its zip download URL from that single URL instead of hardcoding the host a second time so the two can't drift apart again.",
+    ],
+  },
+  {
     version: "1.0.389",
     date: "Sep 10, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.389.zip",
-    latest: true,
     changes: [
       "Fixed the Hostinger auto-fill actually not working: it handed credentials to the extension via a browser CustomEvent, which doesn't reliably carry its payload across Chrome's page/extension boundary. Switched to the correct mechanism (postMessage). Also took the email out of the URL of the tab it opens — both email and password now travel only through the same private channel, used once and deleted immediately.",
     ],
