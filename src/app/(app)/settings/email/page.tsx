@@ -200,12 +200,14 @@ function SenderRow({
 
   // Hostinger's webmail (mail.hostinger.com, Roundcube) is a different
   // origin from this app — a browser will never let our JS read or submit a
-  // form on someone else's site, so a true zero-click auto-login isn't
-  // possible from a plain web page (that's the same rule that stops any
-  // site from silently logging into YOUR bank for you). This is the closest
-  // safe equivalent: reveal this one sender's stored password on click,
-  // copy it to the clipboard, and open Hostinger's login with the username
-  // pre-filled in the URL — one paste instead of typing both fields.
+  // form on someone else's site, so we can't fill it directly from here.
+  // The extension's hostinger_bridge.js content script (running on THIS
+  // page) picks up the `lc:hostinger-login-creds` event below and stages
+  // the credentials in chrome.storage.local; hostinger_autofill.js (running
+  // in the new tab) reads them once and fills both fields — but still never
+  // clicks Login itself, that stays the user's own action on purpose.
+  // Clipboard copy stays as a fallback for anyone on an extension version
+  // before this existed, or without the extension installed at all.
   const [loginCopied, setLoginCopied] = useState(false);
   const hostingerLogin = useMutation<{ username: string; password: string }, Error, void>({
     mutationFn: () => api(`/integrations/accounts/${a.id}/reveal-secret`),
@@ -215,6 +217,18 @@ function SenderRow({
         setLoginCopied(true);
         setTimeout(() => setLoginCopied(false), 4000);
       }
+      try {
+        window.dispatchEvent(
+          new CustomEvent("lc:hostinger-login-creds", {
+            detail: { username: data.username, password: data.password },
+          })
+        );
+      } catch {
+        /* extension not installed / event unsupported — clipboard fallback still works */
+      }
+      // Give the content script a moment to persist to chrome.storage.local
+      // before the new tab (and its own content script) exists to read it.
+      await new Promise((resolve) => setTimeout(resolve, 200));
       window.open(
         `https://mail.hostinger.com/?_task=login&_user=${encodeURIComponent(data.username)}`,
         "_blank",
@@ -264,7 +278,7 @@ function SenderRow({
           {loginCopied && (
             <>
               <span>·</span>
-              <span className="text-emerald-600">✓ password copied — paste it into the Hostinger login</span>
+              <span className="text-emerald-600">✓ Hostinger login opened — email &amp; password auto-filled (also copied, just in case)</span>
             </>
           )}
         </div>
@@ -303,7 +317,7 @@ function SenderRow({
           className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
           onClick={() => hostingerLogin.mutate()}
           disabled={hostingerLogin.isPending}
-          title="Copy this inbox's password and open Hostinger webmail login"
+          title="Open Hostinger webmail login with the email + password auto-filled — you click Login yourself"
         >
           {hostingerLogin.isPending ? (
             <Loader2 className="h-3 w-3 animate-spin" />

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.387",
-  "zip": "/extensions/leadcaptura-extension-v1.0.387.zip",
-  "notes": "Settings → Email Senders' \"Login\" button (for Hostinger-hosted mailboxes) now also auto-fills the email field on Hostinger's own webmail login page when it opens — you just paste the password (already copied to your clipboard) and click Login yourself. Requires a new host permission for mail.hostinger.com, which Chrome will ask you to approve on this update; nothing else changed."
+  "version": "1.0.388",
+  "zip": "/extensions/leadcaptura-extension-v1.0.388.zip",
+  "notes": "Settings → Email Senders' \"Login\" button (for Hostinger-hosted mailboxes) now auto-fills BOTH the email and password fields on Hostinger's own webmail login page, not just email — you still click Login yourself. The password never travels through a URL: the page hands it to the extension via a one-time event the moment you click, it's staged briefly in extension-only storage, and the new tab's content script reads and deletes it the instant it's used."
 }
