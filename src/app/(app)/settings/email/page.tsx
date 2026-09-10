@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Mail,
@@ -89,6 +89,33 @@ const HOSTINGER_BOOKMARKLET_HREF =
   "}).catch(function(){d('LeadCaptura: could not read the clipboard. If Chrome just asked for permission, click Allow, then click this bookmark again.');});" +
   "})();";
 
+// React 19 hard-blocks a `javascript:` href passed through JSX props —
+// clicking/dragging one throws "React has blocked a javascript: URL as a
+// security precaution" instead of setting the attribute, since React
+// treats it the same as unsanitized string interpolation (a reasonable
+// default against attacker-controlled hrefs). This one isn't attacker
+// input, it's the fixed constant above, so the fix is to set the
+// attribute directly on the DOM node via a ref — that bypasses React's
+// prop-diffing entirely, which is the only place the check lives.
+function HostingerBookmarkletLink() {
+  const ref = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    ref.current?.setAttribute("href", HOSTINGER_BOOKMARKLET_HREF);
+  }, []);
+  return (
+    <a
+      ref={ref}
+      href="#"
+      onClick={(e) => e.preventDefault()}
+      draggable
+      className="inline-flex items-center rounded-md border border-indigo-300 bg-white px-2 py-1 font-medium text-indigo-700 shadow-sm cursor-move select-none"
+      title="Drag me to your bookmarks bar"
+    >
+      🔖 Fill Hostinger Login
+    </a>
+  );
+}
+
 export default function EmailSendersPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("smtp");
@@ -147,15 +174,7 @@ export default function EmailSendersPage() {
             </p>
             <p>
               Drag this to your bookmarks bar (no browser extension needed):{" "}
-              <a
-                href={HOSTINGER_BOOKMARKLET_HREF}
-                onClick={(e) => e.preventDefault()}
-                draggable
-                className="inline-flex items-center rounded-md border border-indigo-300 bg-white px-2 py-1 font-medium text-indigo-700 shadow-sm cursor-move select-none"
-                title="Drag me to your bookmarks bar"
-              >
-                🔖 Fill Hostinger Login
-              </a>
+              <HostingerBookmarkletLink />
               . Then click &quot;Login&quot; next to a Hostinger sender below — it copies the
               credentials and opens Hostinger&apos;s login page — and click that bookmark
               on the Hostinger tab to fill both fields. You click Login yourself.
