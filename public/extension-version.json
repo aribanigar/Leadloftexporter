@@ -1,5 +1,5 @@
 {
-  "version": "1.0.388",
-  "zip": "/extensions/leadcaptura-extension-v1.0.388.zip",
-  "notes": "Settings → Email Senders' \"Login\" button (for Hostinger-hosted mailboxes) now auto-fills BOTH the email and password fields on Hostinger's own webmail login page, not just email — you still click Login yourself. The password never travels through a URL: the page hands it to the extension via a one-time event the moment you click, it's staged briefly in extension-only storage, and the new tab's content script reads and deletes it the instant it's used."
+  "version": "1.0.389",
+  "zip": "/extensions/leadcaptura-extension-v1.0.389.zip",
+  "notes": "Fixed the Hostinger auto-fill (Settings → Email Senders' \"Login\" button) not actually working: it was handing the credentials to the extension via a CustomEvent, which does not reliably carry its payload across Chrome's page/content-script boundary. Switched to window.postMessage, the correct mechanism for this. Also removed the email from the URL of the tab it opens — both email and password now travel only through the same private, extension-only channel as the password did, and are deleted the instant they're used."
 }

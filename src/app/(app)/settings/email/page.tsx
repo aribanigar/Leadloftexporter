@@ -201,13 +201,18 @@ function SenderRow({
   // Hostinger's webmail (mail.hostinger.com, Roundcube) is a different
   // origin from this app — a browser will never let our JS read or submit a
   // form on someone else's site, so we can't fill it directly from here.
-  // The extension's hostinger_bridge.js content script (running on THIS
-  // page) picks up the `lc:hostinger-login-creds` event below and stages
-  // the credentials in chrome.storage.local; hostinger_autofill.js (running
-  // in the new tab) reads them once and fills both fields — but still never
-  // clicks Login itself, that stays the user's own action on purpose.
-  // Clipboard copy stays as a fallback for anyone on an extension version
-  // before this existed, or without the extension installed at all.
+  // Neither the email nor the password goes through the URL of the tab we
+  // open (a URL is the wrong place for either — browser history, address
+  // bar, any Referer a page sends): both travel via window.postMessage to
+  // the extension's hostinger_bridge.js content script (running on THIS
+  // page), which stages them in chrome.storage.local; hostinger_autofill.js
+  // (running in the new tab) reads them once and fills both fields — but
+  // still never clicks Login itself, that stays the user's own action on
+  // purpose. postMessage, not a CustomEvent — a CustomEvent's `.detail`
+  // does not reliably survive the isolated-world/main-world boundary in
+  // Chrome, postMessage does a real structured clone across it. Clipboard
+  // copy stays as a fallback for anyone on an extension version before this
+  // existed, or without the extension installed at all.
   const [loginCopied, setLoginCopied] = useState(false);
   const hostingerLogin = useMutation<{ username: string; password: string }, Error, void>({
     mutationFn: () => api(`/integrations/accounts/${a.id}/reveal-secret`),
@@ -218,22 +223,17 @@ function SenderRow({
         setTimeout(() => setLoginCopied(false), 4000);
       }
       try {
-        window.dispatchEvent(
-          new CustomEvent("lc:hostinger-login-creds", {
-            detail: { username: data.username, password: data.password },
-          })
+        window.postMessage(
+          { type: "lc:hostinger-login-creds", username: data.username, password: data.password },
+          window.location.origin
         );
       } catch {
-        /* extension not installed / event unsupported — clipboard fallback still works */
+        /* extension not installed / postMessage unsupported — clipboard fallback still works */
       }
       // Give the content script a moment to persist to chrome.storage.local
       // before the new tab (and its own content script) exists to read it.
       await new Promise((resolve) => setTimeout(resolve, 200));
-      window.open(
-        `https://mail.hostinger.com/?_task=login&_user=${encodeURIComponent(data.username)}`,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.open("https://mail.hostinger.com/?_task=login", "_blank", "noopener,noreferrer");
     },
   });
 

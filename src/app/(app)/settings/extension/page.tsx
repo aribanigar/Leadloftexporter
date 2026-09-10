@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.389",
+    date: "Sep 10, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.389.zip",
+    latest: true,
+    changes: [
+      "Fixed the Hostinger auto-fill actually not working: it handed credentials to the extension via a browser CustomEvent, which doesn't reliably carry its payload across Chrome's page/extension boundary. Switched to the correct mechanism (postMessage). Also took the email out of the URL of the tab it opens — both email and password now travel only through the same private channel, used once and deleted immediately.",
+    ],
+  },
+  {
     version: "1.0.388",
     date: "Sep 10, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.388.zip",
-    latest: true,
     changes: [
       "The Hostinger \"Login\" button (Settings → Email Senders) now auto-fills both the email AND password fields on Hostinger's webmail login page, not just email — you still click Login yourself. The password never travels through the URL: it's handed to the extension the instant you click, held only in extension-local storage, and the new tab reads + deletes it the moment it's used.",
     ],
