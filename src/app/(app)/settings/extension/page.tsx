@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.391",
+    date: "Sep 10, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.391.zip",
+    latest: true,
+    changes: [
+      "Hostinger auto-fill (Settings → Email Senders' \"Login\" button) is now fully automatic end to end — no extra click needed. If a different mailbox is already logged in on the tab that opens, the extension logs that session out itself (account menu → Log out), waits for the fresh login form, then fills the email + password fields automatically. It also now survives a hard page reload mid-logout by keeping the staged credentials until the fields are actually filled, instead of deleting them the instant they're read.",
+    ],
+  },
+  {
     version: "1.0.390",
     date: "Sep 10, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.390.zip",
-    latest: true,
     changes: [
       "Fixed the toolbar popup's \"Update extension\" check and Download button, which were still pointed at leadloftexporter.vercel.app — a bare Vercel alias that goes down independently of the real site (it was paused) and made the button send you to a dead page. Both now point at the live leads.hudace.com domain, matching the background update-checker, and the popup now derives its zip download URL from that single URL instead of hardcoding the host a second time so the two can't drift apart again.",
     ],
