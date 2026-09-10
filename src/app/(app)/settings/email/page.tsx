@@ -83,9 +83,33 @@ function isHostingerAccount(a: ConnectedAccount): boolean {
 const HOSTINGER_BOOKMARKLET_HREF =
   "javascript:" +
   "(function(){" +
+  "try{" +
   "function d(m){if(m){alert(m);}}" +
   "function find(sels){for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el){return el;}}return null;}" +
   "function fill(el,value){var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}" +
+  // Plain el.click() silently did nothing for the account-menu trigger and
+  // the Log out item — dropdown components commonly open/act on pointerdown
+  // or mousedown rather than the synthesized click alone, especially when
+  // they also listen document-wide for an outside-click-to-close handler.
+  // Fire a full pointer/mouse sequence with real coordinates first, same
+  // fix this codebase already needed for LinkedIn (Ember) buttons, then
+  // fall back to plain .click() in case the target only wires the simple
+  // handler.
+  "function forceClick(el){" +
+  "try{" +
+  "var r=el.getBoundingClientRect();" +
+  "var x=r.left+r.width/2;" +
+  "var y=r.top+r.height/2;" +
+  "var o={bubbles:true,cancelable:true,view:window,clientX:x,clientY:y};" +
+  "var PE=window.PointerEvent||window.MouseEvent;" +
+  "el.dispatchEvent(new PE('pointerover',o));" +
+  "el.dispatchEvent(new PE('pointerdown',o));" +
+  "el.dispatchEvent(new MouseEvent('mousedown',o));" +
+  "el.dispatchEvent(new PE('pointerup',o));" +
+  "el.dispatchEvent(new MouseEvent('mouseup',o));" +
+  "}catch(e){}" +
+  "el.click();" +
+  "}" +
   "var EMAIL_SELS=['input[data-qa=login-email-input-input]','input#email','input[autocomplete=username]'];" +
   "var PASS_SELS=['input[data-qa=login-password-input-input]','input#password','input[autocomplete=current-password]'];" +
   "function doFill(){" +
@@ -110,20 +134,21 @@ const HOSTINGER_BOOKMARKLET_HREF =
   "}" +
   "if(find(EMAIL_SELS)){doFill();return;}" +
   "var logoutBtn=document.querySelector('[data-qa=profile-logout]');" +
-  "if(logoutBtn){logoutBtn.click();waitForLoginThenFill();return;}" +
+  "if(logoutBtn){forceClick(logoutBtn);waitForLoginThenFill();return;}" +
   "var menuTrigger=document.querySelector('[data-qa=profile-menu-trigger]');" +
   "if(menuTrigger){" +
-  "menuTrigger.click();" +
+  "forceClick(menuTrigger);" +
   "var mtries=0;" +
   "var mIv=setInterval(function(){" +
   "mtries=mtries+1;" +
   "var lb=document.querySelector('[data-qa=profile-logout]');" +
-  "if(lb){clearInterval(mIv);lb.click();waitForLoginThenFill();return;}" +
+  "if(lb){clearInterval(mIv);forceClick(lb);waitForLoginThenFill();return;}" +
   "if(mtries>15){clearInterval(mIv);d('LeadCaptura: opened the account menu but could not find Log out. Click this bookmark again, or log out manually.');}" +
   "},200);" +
   "return;" +
   "}" +
   "doFill();" +
+  "}catch(err){alert('LeadCaptura bookmarklet error: '+(err&&err.message?err.message:err));}" +
   "})();";
 
 // React 19 hard-blocks a `javascript:` href passed through JSX props —
