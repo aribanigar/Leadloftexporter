@@ -11,8 +11,10 @@ import {
   Send,
   Sparkles,
   AlertCircle,
+  LogIn,
 } from "lucide-react";
 import { api, getToken, getWorkspaceId } from "@/lib/api";
+import { copyToClipboard } from "@/lib/utils";
 
 interface ConnectedAccount {
   id: string;
@@ -36,6 +38,22 @@ interface SenderListItem {
 
 type Tab = "smtp" | "gmail" | "resend" | "sendgrid";
 
+function domainOf(a: ConnectedAccount): string {
+  const addr = a.external_id || (a.config?.username as string) || a.label || "";
+  const at = addr.lastIndexOf("@");
+  return at >= 0 ? addr.slice(at + 1).toLowerCase() : "";
+}
+
+// Hostinger-hosted mailboxes (smtp.hostinger.com / smtp.hostinger.in) get a
+// one-click "Login" button — see SenderRow's useHostingerLogin below for why
+// this can only copy the password + open the login page rather than a true
+// zero-click auto-submit.
+function isHostingerAccount(a: ConnectedAccount): boolean {
+  if (a.provider !== "smtp") return false;
+  const host = String(a.config?.host || "").toLowerCase();
+  return host.includes("hostinger");
+}
+
 export default function EmailSendersPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("smtp");
@@ -52,9 +70,17 @@ export default function EmailSendersPage() {
   });
   const warmupById = new Map((senderList || []).map((s) => [s.id, s.warmup]));
 
-  const emailAccounts = (accounts || []).filter((a) =>
-    ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider)
-  );
+  // Grouped by domain so every @hudace.com / @giftsgulf.com / etc. sender
+  // sits together instead of scattered in whatever order they were
+  // connected — purely a client-side sort of already-fetched rows, doesn't
+  // touch fetching, mutations, or anything else that reads `accounts`.
+  const emailAccounts = (accounts || [])
+    .filter((a) => ["smtp", "gmail", "resend", "sendgrid"].includes(a.provider))
+    .sort((a, b) => {
+      const d = domainOf(a).localeCompare(domainOf(b));
+      if (d !== 0) return d;
+      return (a.external_id || "").localeCompare(b.external_id || "");
+    });
 
   const disconnect = useMutation({
     mutationFn: (id: string) => api(`/integrations/accounts/${id}`, { method: "DELETE" }),
@@ -172,6 +198,31 @@ function SenderRow({
   });
   const warmOn = !!warmup?.enabled;
 
+  // Hostinger's webmail (mail.hostinger.com, Roundcube) is a different
+  // origin from this app — a browser will never let our JS read or submit a
+  // form on someone else's site, so a true zero-click auto-login isn't
+  // possible from a plain web page (that's the same rule that stops any
+  // site from silently logging into YOUR bank for you). This is the closest
+  // safe equivalent: reveal this one sender's stored password on click,
+  // copy it to the clipboard, and open Hostinger's login with the username
+  // pre-filled in the URL — one paste instead of typing both fields.
+  const [loginCopied, setLoginCopied] = useState(false);
+  const hostingerLogin = useMutation<{ username: string; password: string }, Error, void>({
+    mutationFn: () => api(`/integrations/accounts/${a.id}/reveal-secret`),
+    onSuccess: async (data) => {
+      const ok = await copyToClipboard(data.password);
+      if (ok) {
+        setLoginCopied(true);
+        setTimeout(() => setLoginCopied(false), 4000);
+      }
+      window.open(
+        `https://mail.hostinger.com/?_task=login&_user=${encodeURIComponent(data.username)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    },
+  });
+
   const providerColors: Record<string, string> = {
     smtp: "bg-slate-100 text-slate-700",
     gmail: "bg-red-50 text-red-700",
@@ -210,12 +261,23 @@ function SenderRow({
               <span className="text-amber-600">warmup {warmup.sent_today}/{warmup.daily_cap_today} today</span>
             </>
           )}
+          {loginCopied && (
+            <>
+              <span>·</span>
+              <span className="text-emerald-600">✓ password copied — paste it into the Hostinger login</span>
+            </>
+          )}
         </div>
         {/* Full-width, wrappable error so the real transport reason is readable
             (e.g. "test_send_failed: smtp_relay: 535 5.7.8 auth failed"). */}
         {test.isError && (
           <div className="mt-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-[11px] leading-snug text-red-700 break-words">
             {test.error?.message || "test failed"}
+          </div>
+        )}
+        {hostingerLogin.isError && (
+          <div className="mt-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-[11px] leading-snug text-red-700 break-words">
+            {hostingerLogin.error?.message || "couldn't retrieve the saved password"}
           </div>
         )}
       </div>
@@ -236,6 +298,21 @@ function SenderRow({
         {toggleWarmup.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
         Warmup {warmOn ? "On" : "Off"}
       </button>
+      {isHostingerAccount(a) && (
+        <button
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          onClick={() => hostingerLogin.mutate()}
+          disabled={hostingerLogin.isPending}
+          title="Copy this inbox's password and open Hostinger webmail login"
+        >
+          {hostingerLogin.isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <LogIn className="h-3 w-3" />
+          )}
+          {hostingerLogin.isPending ? "Opening…" : "Login"}
+        </button>
+      )}
       <button
         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
         onClick={() => test.mutate()}

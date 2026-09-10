@@ -197,6 +197,47 @@ def test_send_account(
     return {"ok": True, "to": to_address, "provider": acct.provider}
 
 
+@router.get("/accounts/{account_id}/reveal-secret")
+def reveal_account_secret(
+    account_id: str,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Return the raw stored password for ONE SMTP sender, on an explicit
+    user click only — every other account endpoint (list_accounts above,
+    campaigns/senders/list, etc.) deliberately never sends this back;
+    `access_token` doubles as the SMTP password (see smtp_connect) and isn't
+    part of any of those response shapes. This exists specifically to power
+    a "Login" shortcut for webmail providers we can't single-sign-on into
+    (e.g. Hostinger's hosted Roundcube) — the frontend copies the password
+    to the clipboard and opens the provider's own login page, since a
+    same-origin browser can't read or submit a form on a different origin
+    for us. Scoped to the same workspace as every other /accounts/{id}
+    route (test/delete already let any workspace member fully use or remove
+    any connected sender — this matches that existing trust level, not a
+    new restriction)."""
+    acct = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.id == account_id,
+            ConnectedAccount.workspace_id == ctx.workspace_id,
+        )
+        .first()
+    )
+    if not acct:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not_found")
+    if acct.provider != "smtp":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_an_smtp_account")
+    if not acct.access_token:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no_stored_password")
+    cfg = acct.config or {}
+    return {
+        "username": cfg.get("username") or acct.external_id or "",
+        "password": acct.access_token,
+        "host": cfg.get("host") or "",
+    }
+
+
 @router.delete("/accounts/{account_id}")
 def delete_account(
     account_id: str,
