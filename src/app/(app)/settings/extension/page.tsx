@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.387",
+    date: "Sep 10, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.387.zip",
+    latest: true,
+    changes: [
+      "The \"Login\" button on Hostinger-hosted email senders (Settings → Email Senders) now auto-fills the email field on Hostinger's own webmail login page as soon as it opens, so you only need to paste the password (already on your clipboard) and click Login. Adds a new permission for mail.hostinger.com — Chrome will ask you to approve it on this update. Never touches the password field or submits the form for you; that part is still yours on purpose.",
+    ],
+  },
+  {
     version: "1.0.386",
     date: "Sep 6, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.386.zip",
-    latest: true,
     changes: [
       "Fixed the extension's own update checker, which was silently broken: it fetched its \"is a newer version out?\" manifest from a dead Vercel alias (leadloftexporter.vercel.app — the same stale host behind the earlier SMTP relay outage), so the fetch failed on every install and nobody ever got an update badge or notification, no matter how far behind they were. The Backend URL host permission and the Content Hub \"Push to Extension\" button were scoped to that same dead host and so never actually worked on the live site either. All three now point at leads.hudace.com.",
     ],

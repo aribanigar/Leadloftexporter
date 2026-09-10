@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeadCaptura — LinkedIn Capture",
-  "version": "1.0.386",
+  "version": "1.0.387",
   "description": "Capture LinkedIn profiles to your LeadCaptura workspace and run human-paced outreach actions from inside your own browser.",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms", "notifications", "debugger"],
   "host_permissions": [
@@ -9,7 +9,8 @@
     "https://linkedin.com/*",
     "https://leadloftexporter-1.onrender.com/*",
     "https://leadloftexporter.onrender.com/*",
-    "https://leads.hudace.com/*"
+    "https://leads.hudace.com/*",
+    "https://mail.hostinger.com/*"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
@@ -73,6 +74,12 @@
     {
       "matches": ["https://leads.hudace.com/*"],
       "js": ["content/content_hub_push.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://mail.hostinger.com/*"],
+      "js": ["content/hostinger_autofill.js"],
       "run_at": "document_idle",
       "all_frames": false
     },

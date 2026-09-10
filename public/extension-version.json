@@ -1,5 +1,5 @@
 {
-  "version": "1.0.386",
-  "zip": "/extensions/leadcaptura-extension-v1.0.386.zip",
-  "notes": "Fixed the extension's own update checker: it was pointed at a dead Vercel alias (leadloftexporter.vercel.app — the same stale host that caused the SMTP relay outage), so lcCheckForUpdate() silently failed on every install and nobody ever saw an \"update available\" badge, no matter how out of date they were. Also fixed the Backend URL host permission and the Content Hub \"Push to Extension\" content script, which were both still scoped to that same dead host and so never worked on the real site. All three now point at leads.hudace.com."
+  "version": "1.0.387",
+  "zip": "/extensions/leadcaptura-extension-v1.0.387.zip",
+  "notes": "Settings → Email Senders' \"Login\" button (for Hostinger-hosted mailboxes) now also auto-fills the email field on Hostinger's own webmail login page when it opens — you just paste the password (already copied to your clipboard) and click Login yourself. Requires a new host permission for mail.hostinger.com, which Chrome will ask you to approve on this update; nothing else changed."
 }
