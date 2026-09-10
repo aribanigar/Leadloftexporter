@@ -54,6 +54,41 @@ function isHostingerAccount(a: ConnectedAccount): boolean {
   return host.includes("hostinger");
 }
 
+// A plain bookmarklet — works with NO browser extension at all, since
+// dragging/clicking it runs the script in the CURRENT tab's own origin
+// (mail.hostinger.com), the same way typing it into DevTools would. That
+// sidesteps the cross-origin wall that stops this app's own JS from ever
+// touching that tab directly. It reads {u,p} JSON off the clipboard (the
+// "Login" button below copies it there right before opening the tab) and
+// fills the email + password inputs using a native value-setter + input/
+// change events — Hostinger's login is a Vue app, and setting .value alone
+// does not notify v-model, same class of problem React has. It never
+// touches the Login button itself; that stays the user's own click.
+//
+// No apostrophes anywhere in the strings below on purpose — the whole
+// thing is wrapped in an outer double-quoted TS string, and every inner
+// JS string literal uses single quotes, so a stray apostrophe would
+// terminate an inner string early. Selectors use unquoted CSS attribute
+// values (data-qa identifiers only contain letters/hyphens, which is
+// valid unquoted) so no inner double-quote is needed either.
+const HOSTINGER_BOOKMARKLET_HREF =
+  "javascript:" +
+  "(function(){" +
+  "function d(m){if(m){alert(m);}}" +
+  "if(!navigator.clipboard||!navigator.clipboard.readText){d('LeadCaptura: this browser does not support reading the clipboard from a bookmarklet.');return;}" +
+  "navigator.clipboard.readText().then(function(raw){" +
+  "var data=null;try{data=JSON.parse(raw);}catch(e){}" +
+  "if(!data||!data.u||!data.p){d('LeadCaptura: no credentials on your clipboard yet. Go back to Settings, Email Senders, click Login next to the Hostinger sender, then click this bookmark again.');return;}" +
+  "function find(sels){for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el){return el;}}return null;}" +
+  "function fill(el,value){var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}" +
+  "var emailEl=find(['input[data-qa=login-email-input-input]','input#email','input[autocomplete=username]']);" +
+  "var passEl=find(['input[data-qa=login-password-input-input]','input#password','input[autocomplete=current-password]']);" +
+  "if(emailEl){fill(emailEl,data.u);}" +
+  "if(passEl){fill(passEl,data.p);}" +
+  "if(!emailEl||!passEl){d('LeadCaptura: could not find the '+(emailEl?'password':'email')+' field on this page.');}" +
+  "}).catch(function(){d('LeadCaptura: could not read the clipboard. If Chrome just asked for permission, click Allow, then click this bookmark again.');});" +
+  "})();";
+
 export default function EmailSendersPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("smtp");
@@ -102,6 +137,32 @@ export default function EmailSendersPage() {
           rotate across all active senders automatically.
         </p>
       </div>
+
+      {emailAccounts.some(isHostingerAccount) && (
+        <div className="card p-4 flex items-start gap-3 border-indigo-100 bg-indigo-50/40">
+          <LogIn className="h-4 w-4 flex-shrink-0 mt-0.5 text-indigo-600" />
+          <div className="min-w-0 text-xs text-slate-600 leading-relaxed">
+            <p className="font-medium text-slate-700 mb-1">
+              One-time setup for the Hostinger &quot;Login&quot; button
+            </p>
+            <p>
+              Drag this to your bookmarks bar (no browser extension needed):{" "}
+              <a
+                href={HOSTINGER_BOOKMARKLET_HREF}
+                onClick={(e) => e.preventDefault()}
+                draggable
+                className="inline-flex items-center rounded-md border border-indigo-300 bg-white px-2 py-1 font-medium text-indigo-700 shadow-sm cursor-move select-none"
+                title="Drag me to your bookmarks bar"
+              >
+                🔖 Fill Hostinger Login
+              </a>
+              . Then click &quot;Login&quot; next to a Hostinger sender below — it copies the
+              credentials and opens Hostinger&apos;s login page — and click that bookmark
+              on the Hostinger tab to fill both fields. You click Login yourself.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Connected senders list */}
       <div className="card divide-y divide-slate-100">
@@ -198,29 +259,29 @@ function SenderRow({
   });
   const warmOn = !!warmup?.enabled;
 
-  // Hostinger's webmail (mail.hostinger.com, Roundcube) is a different
+  // Hostinger's webmail (mail.hostinger.com, a Vue app) is a different
   // origin from this app — a browser will never let our JS read or submit a
   // form on someone else's site, so we can't fill it directly from here.
-  // Neither the email nor the password goes through the URL of the tab we
-  // open (a URL is the wrong place for either — browser history, address
-  // bar, any Referer a page sends): both travel via window.postMessage to
-  // the extension's hostinger_bridge.js content script (running on THIS
-  // page), which stages them in chrome.storage.local; hostinger_autofill.js
-  // (running in the new tab) reads them once and fills both fields — but
-  // still never clicks Login itself, that stays the user's own action on
-  // purpose. postMessage, not a CustomEvent — a CustomEvent's `.detail`
-  // does not reliably survive the isolated-world/main-world boundary in
-  // Chrome, postMessage does a real structured clone across it. Clipboard
-  // copy stays as a fallback for anyone on an extension version before this
-  // existed, or without the extension installed at all.
+  // Two independent bridges, neither required for the other to work:
+  //  1) The LeadCaptura browser extension, if installed — postMessage to
+  //     hostinger_bridge.js (content script on THIS page) → chrome.storage
+  //     .local → hostinger_autofill.js (content script on the new tab)
+  //     fills both fields silently, no further action needed.
+  //  2) The HOSTINGER_BOOKMARKLET_HREF bookmarklet above — works with NO
+  //     extension. It reads the {u,p} JSON this click puts on the
+  //     clipboard and fills the same two fields the same way.
+  // Neither path ever clicks Login itself — that stays the user's own
+  // action on purpose. Neither the email nor the password goes through the
+  // URL of the tab we open (a URL is the wrong place for either — browser
+  // history, address bar, any Referer a page sends).
   const [loginCopied, setLoginCopied] = useState(false);
   const hostingerLogin = useMutation<{ username: string; password: string }, Error, void>({
     mutationFn: () => api(`/integrations/accounts/${a.id}/reveal-secret`),
     onSuccess: async (data) => {
-      const ok = await copyToClipboard(data.password);
+      const ok = await copyToClipboard(JSON.stringify({ u: data.username, p: data.password }));
       if (ok) {
         setLoginCopied(true);
-        setTimeout(() => setLoginCopied(false), 4000);
+        setTimeout(() => setLoginCopied(false), 6000);
       }
       try {
         window.postMessage(
@@ -228,7 +289,7 @@ function SenderRow({
           window.location.origin
         );
       } catch {
-        /* extension not installed / postMessage unsupported — clipboard fallback still works */
+        /* extension not installed / postMessage unsupported — bookmarklet path still works */
       }
       // Give the content script a moment to persist to chrome.storage.local
       // before the new tab (and its own content script) exists to read it.
@@ -278,7 +339,7 @@ function SenderRow({
           {loginCopied && (
             <>
               <span>·</span>
-              <span className="text-emerald-600">✓ Hostinger login opened — email &amp; password auto-filled (also copied, just in case)</span>
+              <span className="text-emerald-600">✓ Hostinger login opened — click your &quot;Fill Hostinger Login&quot; bookmarklet on that tab (or wait for the extension to auto-fill)</span>
             </>
           )}
         </div>
@@ -317,7 +378,7 @@ function SenderRow({
           className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
           onClick={() => hostingerLogin.mutate()}
           disabled={hostingerLogin.isPending}
-          title="Open Hostinger webmail login with the email + password auto-filled — you click Login yourself"
+          title="Copies the email + password and opens Hostinger webmail login — use the bookmarklet above (or the extension) to fill both fields, then click Login yourself"
         >
           {hostingerLogin.isPending ? (
             <Loader2 className="h-3 w-3 animate-spin" />
