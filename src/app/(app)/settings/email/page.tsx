@@ -65,6 +65,15 @@ function isHostingerAccount(a: ConnectedAccount): boolean {
 // does not notify v-model, same class of problem React has. It never
 // touches the Login button itself; that stays the user's own click.
 //
+// Also handles switching senders: if the tab already has a DIFFERENT
+// Hostinger mailbox logged in (no login fields on screen), it opens the
+// account menu ([data-qa=profile-menu-trigger], confirmed live in DevTools),
+// clicks Log out ([data-qa=profile-logout], also confirmed live — it is
+// already in the DOM once the menu is open, no extra step needed there),
+// waits for the login form to reappear, then fills the new credentials —
+// all from the one click on this bookmark. If already on the login page
+// (nothing logged in), it skips straight to filling, same as before.
+//
 // No apostrophes anywhere in the strings below on purpose — the whole
 // thing is wrapped in an outer double-quoted TS string, and every inner
 // JS string literal uses single quotes, so a stray apostrophe would
@@ -75,18 +84,46 @@ const HOSTINGER_BOOKMARKLET_HREF =
   "javascript:" +
   "(function(){" +
   "function d(m){if(m){alert(m);}}" +
+  "function find(sels){for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el){return el;}}return null;}" +
+  "function fill(el,value){var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}" +
+  "var EMAIL_SELS=['input[data-qa=login-email-input-input]','input#email','input[autocomplete=username]'];" +
+  "var PASS_SELS=['input[data-qa=login-password-input-input]','input#password','input[autocomplete=current-password]'];" +
+  "function doFill(){" +
   "if(!navigator.clipboard||!navigator.clipboard.readText){d('LeadCaptura: this browser does not support reading the clipboard from a bookmarklet.');return;}" +
   "navigator.clipboard.readText().then(function(raw){" +
   "var data=null;try{data=JSON.parse(raw);}catch(e){}" +
   "if(!data||!data.u||!data.p){d('LeadCaptura: no credentials on your clipboard yet. Go back to Settings, Email Senders, click Login next to the Hostinger sender, then click this bookmark again.');return;}" +
-  "function find(sels){for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el){return el;}}return null;}" +
-  "function fill(el,value){var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;setter.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}" +
-  "var emailEl=find(['input[data-qa=login-email-input-input]','input#email','input[autocomplete=username]']);" +
-  "var passEl=find(['input[data-qa=login-password-input-input]','input#password','input[autocomplete=current-password]']);" +
+  "var emailEl=find(EMAIL_SELS);" +
+  "var passEl=find(PASS_SELS);" +
   "if(emailEl){fill(emailEl,data.u);}" +
   "if(passEl){fill(passEl,data.p);}" +
   "if(!emailEl||!passEl){d('LeadCaptura: could not find the '+(emailEl?'password':'email')+' field on this page.');}" +
   "}).catch(function(){d('LeadCaptura: could not read the clipboard. If Chrome just asked for permission, click Allow, then click this bookmark again.');});" +
+  "}" +
+  "function waitForLoginThenFill(){" +
+  "var tries=0;" +
+  "var iv=setInterval(function(){" +
+  "tries=tries+1;" +
+  "if(find(EMAIL_SELS)){clearInterval(iv);doFill();return;}" +
+  "if(tries>75){clearInterval(iv);d('LeadCaptura: logged out, but the login page did not reappear. Click this bookmark again once you see the login form.');}" +
+  "},200);" +
+  "}" +
+  "if(find(EMAIL_SELS)){doFill();return;}" +
+  "var logoutBtn=document.querySelector('[data-qa=profile-logout]');" +
+  "if(logoutBtn){logoutBtn.click();waitForLoginThenFill();return;}" +
+  "var menuTrigger=document.querySelector('[data-qa=profile-menu-trigger]');" +
+  "if(menuTrigger){" +
+  "menuTrigger.click();" +
+  "var mtries=0;" +
+  "var mIv=setInterval(function(){" +
+  "mtries=mtries+1;" +
+  "var lb=document.querySelector('[data-qa=profile-logout]');" +
+  "if(lb){clearInterval(mIv);lb.click();waitForLoginThenFill();return;}" +
+  "if(mtries>15){clearInterval(mIv);d('LeadCaptura: opened the account menu but could not find Log out. Click this bookmark again, or log out manually.');}" +
+  "},200);" +
+  "return;" +
+  "}" +
+  "doFill();" +
   "})();";
 
 // React 19 hard-blocks a `javascript:` href passed through JSX props —
