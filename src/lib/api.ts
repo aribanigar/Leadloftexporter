@@ -8,12 +8,17 @@
 const CONFIGURED = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 // Ordered candidate list. The configured URL is preferred (so normal deploys
-// behave exactly as before); the two known Render hosts are resilience
-// fallbacks. Deduped; localhost is dropped once any https backend is present so
+// behave exactly as before); the known Render host is a resilience fallback.
+// Deduped; localhost is dropped once any https backend is present so
 // production never accidentally falls back to a dev URL.
+//
+// leadloftexporter-1.onrender.com used to be listed here too — it was
+// permanently suspended by its owner on Render weeks ago (see
+// .github/workflows/keep-alive.yml's history), so every single request this
+// module made was racing a dead host for no benefit, just wasted round trips
+// and confusing DevTools output. Removed.
 const KNOWN_HOSTS = [
   "https://leadloftexporter.onrender.com",
-  "https://leadloftexporter-1.onrender.com",
 ];
 function candidateBases(): string[] {
   const raw = [CONFIGURED, ...KNOWN_HOSTS];
