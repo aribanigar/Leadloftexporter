@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useAuth } from "@/lib/auth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { isNetworkErrorMessage, withNetworkRetry } from "@/lib/backoff-retry";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,33 +14,18 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const warmedRef = useRef(false);
 
-  // Pre-warm the backend the moment the login page mounts. Fires a
-  // lightweight unauthenticated /cron/health probe so Render's container and
-  // the Neon DB connection are hot by the time the user hits "Sign in". Fail
-  // silently — this is a side-channel and never blocks the form.
-  useEffect(() => {
-    if (warmedRef.current) return;
-    warmedRef.current = true;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 15_000);
-    fetch(`${API_URL}/api/v1/cron/health`, { signal: ctrl.signal, cache: "no-store" })
-      .catch(() => { /* silent — best-effort warm-up */ })
-      .finally(() => clearTimeout(t));
-    return () => { clearTimeout(t); ctrl.abort(); };
-  }, []);
+  // Pre-warming now happens app-wide, the instant ANY page mounts (see
+  // <Providers> in src/components/providers.tsx) — that covers this page
+  // too, and starts even earlier for anyone who was already elsewhere in the
+  // app before landing here.
 
-  // Sign-in is auto-retried up to RETRY_MAX times with exponential backoff so
+  // Sign-in is auto-retried (see withNetworkRetry, ~43s of total backoff) so
   // a Render cold-start, Neon wake-up, or any other transient backend blip
   // doesn't strand the user. Only NETWORK errors are retried — wrong-password
-  // / disabled-user fail fast (no point retrying a 401). The user can also
-  // abort by pressing the cancel button (we'll add it next to "Signing in…").
-  const RETRY_MAX = 6;          // ~ 1 + 2 + 4 + 6 + 8 + 10 = 31s of total backoff
-  const RETRY_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10000];
-
+  // / disabled-user fail fast (no point retrying a 401).
   function classifyError(message: string): "network" | "credentials" | "disabled" | "license" | "other" {
-    if (/Failed to fetch|NetworkError|TypeError|Request timed out|fetch failed|networkerror/i.test(message)) return "network";
+    if (isNetworkErrorMessage(message)) return "network";
     if (/invalid_credentials|wrong email|wrong password/i.test(message)) return "credentials";
     if (/inactive_user|disabled/i.test(message)) return "disabled";
     if (/license_required/i.test(message)) return "license";
@@ -51,52 +35,30 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
-    setStatusMsg("Connecting…");
     setPending(true);
-
-    let attempt = 0;
-    let lastError: unknown = null;
-    while (attempt <= RETRY_MAX) {
-      try {
-        if (attempt === 0) {
-          setStatusMsg("Connecting…");
-        } else {
-          setStatusMsg(`Backend is waking up — retrying (attempt ${attempt + 1} of ${RETRY_MAX + 1})…`);
-        }
-        await login(email, password);
-        router.replace("/prospecting");
-        return;
-      } catch (e: unknown) {
-        lastError = e;
-        const message = e instanceof Error ? e.message : "Sign in failed";
-        const kind = classifyError(message);
-        // Non-network errors are TERMINAL — do not retry a wrong-password.
-        if (kind !== "network") {
-          let friendly = message;
-          if (kind === "credentials") friendly = "Wrong email or password.";
-          else if (kind === "disabled") friendly = "This account is disabled. Contact support.";
-          else if (kind === "license") friendly = "Your license key isn't active. Contact your admin.";
-          setErr(friendly);
-          setStatusMsg(null);
-          setPending(false);
-          return;
-        }
-        // Network error — backoff and retry.
-        if (attempt >= RETRY_MAX) break;
-        const wait = RETRY_DELAYS_MS[attempt] ?? 10000;
-        await new Promise(r => setTimeout(r, wait));
-        attempt += 1;
-      }
+    try {
+      await withNetworkRetry(
+        () => login(email, password),
+        (attempt, max) =>
+          setStatusMsg(
+            attempt === 0 ? "Connecting…" : `Backend is waking up — retrying (attempt ${attempt + 1} of ${max + 1})…`,
+          ),
+      );
+      router.replace("/prospecting");
+      return;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Sign in failed";
+      const kind = classifyError(message);
+      let friendly = message;
+      if (kind === "credentials") friendly = "Wrong email or password.";
+      else if (kind === "disabled") friendly = "This account is disabled. Contact support.";
+      else if (kind === "license") friendly = "Your license key isn't active. Contact your admin.";
+      else if (kind === "network") friendly = "Can't reach the LeadCaptura service after several attempts. It may be cold-starting (give it 1–2 minutes) or the service is down. Try again.";
+      setErr(friendly);
+    } finally {
+      setStatusMsg(null);
+      setPending(false);
     }
-    // Out of retries.
-    const finalMsg = lastError instanceof Error ? lastError.message : "Sign in failed";
-    setErr(
-      /Failed to fetch|NetworkError|TypeError|Request timed out/i.test(finalMsg)
-        ? "Can't reach the LeadCaptura service after several attempts. It may be cold-starting (give it 1–2 minutes) or the service is down. Try again."
-        : finalMsg,
-    );
-    setStatusMsg(null);
-    setPending(false);
   }
 
   return (
