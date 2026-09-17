@@ -98,11 +98,27 @@ class Settings(BaseSettings):
     smtp_relay_url: str = "https://leads.hudace.com/api/smtp-relay"
     smtp_relay_secret: str = ""
 
-    # Public, internet-reachable base URL of THIS backend. Used to build
-    # absolute open-/click-tracking URLs embedded in campaign emails — they
-    # must resolve from the recipient's mail client, so a relative path or
-    # localhost won't do. Defaults to the production Render host.
+    # Public, internet-reachable base URL of THIS backend. Also drives the
+    # Google OAuth redirect URI (resolved_google_redirect_uri below) — that
+    # exact value must match what's registered on the Google Cloud OAuth
+    # client, so don't repoint this at a proxy or alias casually.
     public_api_url: str = "https://leadloftexporter.onrender.com"
+
+    # Base URL embedded in campaign emails' open-/click-tracking links
+    # (built by campaigns._inject_tracking, served by api/v1/tracking.py).
+    # Deliberately NOT public_api_url / a raw Render alias: the Render host
+    # has already gone stale and been suspended more than once (same failure
+    # class documented above smtp_relay_url), and every campaign email ever
+    # sent has this link baked into its body forever — a dead alias there
+    # means "This service has been suspended by its owner" on every click,
+    # in every email already delivered, with no way to fix already-sent mail.
+    # The custom domain doesn't move. next.config.mjs rewrites
+    # /api/v1/track/:path* on this domain through to whatever
+    # NEXT_PUBLIC_API_URL currently is, so a future backend move only needs
+    # the frontend's env var updated (which already has to happen for the
+    # app itself to keep working) — no code change here, and no dead links
+    # left behind in mail people already received.
+    tracking_base_url: str = "https://leads.hudace.com"
 
     @property
     def cors_origins(self) -> List[str]:

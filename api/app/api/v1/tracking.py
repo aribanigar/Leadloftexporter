@@ -63,9 +63,10 @@ def track_click(
     db: Session = Depends(get_db),
 ):
     # Fallback target if the tracking_id isn't found in the campaign's link
-    # registry (rare). Use the configured public API origin instead of a
-    # hardcoded host so it never points at a dead/old deployment.
-    target = (get_settings().public_api_url or "https://leadloftexporter.onrender.com").rstrip("/")
+    # registry (rare). Use the same stable tracking domain campaign links are
+    # built on (see config.py: tracking_base_url) rather than a raw backend
+    # alias, so this never points at a dead/old deployment either.
+    target = (get_settings().tracking_base_url or "https://leads.hudace.com").rstrip("/")
     try:
         c = db.get(Campaign, campaign_id)
         if c is not None:

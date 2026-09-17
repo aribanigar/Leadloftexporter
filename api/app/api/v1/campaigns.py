@@ -1979,7 +1979,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
         # id across recipients. Re-assign so SQLAlchemy flags the JSONB dirty.
         links = list(campaign.links or [])
         msg.body_html = _inject_tracking(
-            body_html, settings.public_api_url, campaign.id, r.id, links
+            body_html, settings.tracking_base_url, campaign.id, r.id, links
         )
         campaign.links = links
         db.flush()
@@ -2212,7 +2212,7 @@ def _prepare_tick_batch(
 
         links = list(campaign.links or [])
         tracked_html = _inject_tracking(
-            body_html, settings.public_api_url, campaign.id, r.id, links
+            body_html, settings.tracking_base_url, campaign.id, r.id, links
         )
         msg.body_html = tracked_html
         campaign.links = links
