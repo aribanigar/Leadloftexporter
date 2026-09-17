@@ -1760,6 +1760,39 @@ async function _lcClearUpdateBadge() {
   } catch (_) {}
 }
 
+// Keep chrome.storage.local.settings.apiUrl in sync with the live backend
+// host, read from the SAME manifest fetch below (info.apiUrl) rather than a
+// literal baked into this file. Render has renamed/recreated this backend
+// service more than once — every time that happens, every install that was
+// never manually reconfigured (fresh installs, or ones the OLD_DEFAULT_
+// API_URLS migration above already carried forward) silently keeps talking
+// to a dead host until someone downloads and reinstalls a whole new
+// extension version. This makes that a one-line edit to
+// extension-version.json instead: every install re-checks on the same
+// 6-hour cadence already used for update checks, no new version, no
+// reinstall. Never touches an install where the user has explicitly saved
+// their own value in Options (settings.apiUrlPinned) — same "leave
+// deliberate customization alone" guarantee the migration above has.
+//
+// One real limit: if the new host isn't already covered by a granted
+// permission, actual API calls still fail with a permission error until the
+// user opens Options and clicks Save/Test once (that's a genuine user
+// gesture, which Chrome requires before granting a new origin — a
+// background alarm can't silently expand what a page is allowed to fetch).
+// In practice this rarely bites: anyone who has ever saved Options with
+// "Enable website scraping" on (the default) already holds broad
+// https://*/* permission from that flow, which covers any future host too.
+async function _lcSyncApiUrl(remoteApiUrl) {
+  if (!remoteApiUrl || typeof remoteApiUrl !== "string") return;
+  try {
+    const { settings } = await chrome.storage.local.get("settings");
+    const s = settings || {};
+    if (s.apiUrlPinned) return; // user explicitly set their own — never touch
+    if (s.apiUrl === remoteApiUrl) return; // already in sync
+    await chrome.storage.local.set({ settings: { ...s, apiUrl: remoteApiUrl } });
+  } catch (_) {}
+}
+
 // Check the hosted version manifest and reconcile local update state. Best-effort:
 // any failure (offline, blocked) leaves everything exactly as-is.
 async function lcCheckForUpdate() {
@@ -1768,6 +1801,7 @@ async function lcCheckForUpdate() {
     const res = await fetch(LC_VERSION_MANIFEST_URL + "?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) return;
     const info = await res.json();
+    await _lcSyncApiUrl(info && info.apiUrl);
     const latest = info && info.version;
     if (!latest) return;
     if (_lcCmpVersion(latest, cur) <= 0) {

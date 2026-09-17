@@ -479,8 +479,19 @@ async function resetLearnedAnswers() {
 }
 
 async function onSave() {
+  const cur = await load();
+  const newApiUrl = $("#apiUrl").value.trim().replace(/\/+$/, "");
+  // Only PIN the backend URL (stop the background service worker's
+  // extension-version.json sync from ever touching it again — see
+  // _lcSyncApiUrl in service-worker.js) when the user actually changed it
+  // here. Saving unrelated settings (CV text, a checkbox, ...) re-submits
+  // this same field pre-filled with whatever's already stored without the
+  // user having looked at it, so that must NOT count as "deliberately
+  // customized" or every save would freeze the URL and defeat the sync.
+  const apiUrlPinnedPatch = newApiUrl !== cur.apiUrl ? { apiUrlPinned: true } : {};
   await save({
-    apiUrl: $("#apiUrl").value.trim().replace(/\/+$/, ""),
+    apiUrl: newApiUrl,
+    ...apiUrlPinnedPatch,
     apiKey: $("#apiKey").value.trim(),
     licenseKey: $("#licenseKey").value.trim(),
     enabled: $("#enabled").checked,

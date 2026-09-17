@@ -25,11 +25,20 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
+    version: "1.0.393",
+    date: "Sep 17, 2026",
+    size: "148 KB",
+    file: "/extensions/leadcaptura-extension-v1.0.393.zip",
+    latest: true,
+    changes: [
+      "Backend URL is now dynamic instead of hardcoded in four separate files. Every install already checks extension-version.json every 6 hours for updates — it now also reads a live \"apiUrl\" field from there and keeps your backend URL in sync automatically, unless you've explicitly saved your own value in Settings → Backend URL (that's never touched). The next time the backend moves, fixing every install is a one-line edit on our side instead of a whole new extension version and manual reinstall for everyone.",
+    ],
+  },
+  {
     version: "1.0.392",
     date: "Sep 17, 2026",
     size: "148 KB",
     file: "/extensions/leadcaptura-extension-v1.0.392.zip",
-    latest: true,
     changes: [
       "Fixed the extension's default backend URL — every fresh install (and anyone who never touched Settings → Backend URL) silently pointed at a Render backend that's now suspended, so nothing worked until you manually pasted the correct URL. All four default-settings locations plus the manifest's host permission now point at the actual live backend. If your Options page already has a different URL saved, this doesn't touch it — only fresh/never-configured installs were affected.",
     ],
