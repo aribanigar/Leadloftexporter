@@ -7,7 +7,7 @@
  */
 
 const DEFAULT_SETTINGS = {
-  apiUrl: "https://leadloftexporter.onrender.com",
+  apiUrl: "https://leadloftexporter-0hsl.onrender.com",
   // No baked-in API key: it used to default to one specific account's key, so
   // every fresh install silently captured into THAT account's workspace
   // instead of whichever workspace the person actually signed up for. Each
@@ -1624,19 +1624,27 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     }
   } catch {}
 
-  // One-time migration: move any install still pointed at the OLD default
-  // backend host (leadloftexporter-1.onrender.com, since suspended by its
-  // owner on Render) over to the current one. Same reasoning as the apiKey
-  // migration above — stored settings win over DEFAULTS forever once saved,
-  // so bumping DEFAULTS.apiUrl alone only helps fresh installs; every
-  // existing install kept silently talking to a dead host. Only rewrites the
-  // OLD DEFAULT value exactly, so a user who deliberately pointed their
+  // One-time migration: move any install still pointed at an OLD default
+  // backend host over to the current one. Render has renamed/recreated this
+  // backend service more than once now — leadloftexporter-1.onrender.com
+  // was suspended first, this migration moved installs off it onto
+  // leadloftexporter.onrender.com, and THAT has since been suspended too.
+  // Listing every dead default this has ever been (not just the most
+  // recent one) means an install that's been sitting untouched since any
+  // past version still gets carried forward correctly, not just the ones
+  // that already migrated once. Same reasoning as the apiKey migration
+  // above — stored settings win over DEFAULTS forever once saved, so
+  // bumping DEFAULTS.apiUrl alone only helps fresh installs. Only rewrites
+  // an EXACT old-default match, so a user who deliberately pointed their
   // apiUrl elsewhere (self-hosted backend, etc.) is left untouched.
   try {
-    const OLD_DEFAULT_API_URL = "https://leadloftexporter-1.onrender.com";
-    const NEW_DEFAULT_API_URL = "https://leadloftexporter.onrender.com";
+    const OLD_DEFAULT_API_URLS = new Set([
+      "https://leadloftexporter-1.onrender.com",
+      "https://leadloftexporter.onrender.com",
+    ]);
+    const NEW_DEFAULT_API_URL = "https://leadloftexporter-0hsl.onrender.com";
     const { settings } = await chrome.storage.local.get("settings");
-    if (settings && settings.apiUrl === OLD_DEFAULT_API_URL) {
+    if (settings && OLD_DEFAULT_API_URLS.has(settings.apiUrl)) {
       await chrome.storage.local.set({
         settings: { ...settings, apiUrl: NEW_DEFAULT_API_URL },
       });

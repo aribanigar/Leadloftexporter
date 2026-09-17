@@ -17,8 +17,17 @@ const CONFIGURED = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").
 // .github/workflows/keep-alive.yml's history), so every single request this
 // module made was racing a dead host for no benefit, just wasted round trips
 // and confusing DevTools output. Removed.
+//
+// leadloftexporter.onrender.com (the entry that took its place below) has
+// SINCE also been suspended — confirmed live, it now serves Render's "This
+// service has been suspended by its owner" page too. The actual current
+// backend is a third, differently-named Render service. Render renames/
+// recreates this service's hostname periodically (this is the second alias
+// to go dead), so don't assume this one stays accurate forever either — if
+// login/API calls start failing again, check what NEXT_PUBLIC_API_URL is
+// currently set to on Vercel and swap this fallback to match.
 const KNOWN_HOSTS = [
-  "https://leadloftexporter.onrender.com",
+  "https://leadloftexporter-0hsl.onrender.com",
 ];
 function candidateBases(): string[] {
   const raw = [CONFIGURED, ...KNOWN_HOSTS];

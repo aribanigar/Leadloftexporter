@@ -30,7 +30,7 @@ Env:
   CRM ingest backend (PREFERRED — works when the DB is only reachable by the
   backend, e.g. Supabase egress-restricted / Postgres ports blocked):
     CONTENT_INGEST_TOKEN  shared secret; MUST match the backend's CONTENT_INGEST_TOKEN.
-    CONTENT_INGEST_URL    backend base URL (default https://leadloftexporter.onrender.com).
+    CONTENT_INGEST_URL    backend base URL (default https://leadloftexporter-0hsl.onrender.com).
   Supabase backend (used if no ingest token):
     SUPABASE_URL          e.g. https://abcd.supabase.co
     SUPABASE_SERVICE_KEY  service_role key (bypasses RLS)
@@ -345,7 +345,7 @@ def main() -> int:
     # DB is only reachable by the backend, e.g. Supabase egress-restricted /
     # Postgres ports blocked). Falls back to the direct DB channels.
     ingest_token = os.environ.get("CONTENT_INGEST_TOKEN")
-    ingest_url = os.environ.get("CONTENT_INGEST_URL", "https://leadloftexporter.onrender.com")
+    ingest_url = os.environ.get("CONTENT_INGEST_URL", "https://leadloftexporter-0hsl.onrender.com")
     sb_url = os.environ.get("SUPABASE_URL")
     sb_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     db = os.environ.get("DATABASE_URL")

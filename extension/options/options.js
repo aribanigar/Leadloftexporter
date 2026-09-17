@@ -6,7 +6,7 @@ const $ = (s) => document.querySelector(s);
 const DEFAULT_CV = "";
 
 const DEFAULTS = {
-  apiUrl: "https://leadloftexporter.onrender.com",
+  apiUrl: "https://leadloftexporter-0hsl.onrender.com",
   // No baked-in API key: it used to default to one specific account's key, so
   // every fresh install silently captured into THAT account's workspace
   // instead of whichever workspace the person actually signed up for. Each
