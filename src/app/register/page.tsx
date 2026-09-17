@@ -6,6 +6,7 @@ import { Check, Copy } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/utils";
+import { isNetworkErrorMessage, withNetworkRetry } from "@/lib/backoff-retry";
 
 function licenseKeyErrorMessage(message: string): string {
   if (message === "license_key_required") return "A license key is required — ask your admin for one.";
@@ -30,15 +31,24 @@ export default function RegisterPage() {
   });
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [issuedApiKey, setIssuedApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Same cold-start resilience as /login (see withNetworkRetry) — a Render
+  // free-tier spin-down shouldn't make account creation look broken either.
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
     setPending(true);
     try {
-      const { issuedApiKey } = await register(form);
+      const { issuedApiKey } = await withNetworkRetry(
+        () => register(form),
+        (attempt, max) =>
+          setStatusMsg(
+            attempt === 0 ? "Creating your workspace…" : `Backend is waking up — retrying (attempt ${attempt + 1} of ${max + 1})…`,
+          ),
+      );
       if (issuedApiKey) {
         // Don't navigate away yet — this is the only time the API key is
         // ever shown. The license key they just typed also already works
@@ -48,8 +58,14 @@ export default function RegisterPage() {
         router.replace("/prospecting");
       }
     } catch (e: unknown) {
-      setErr(e instanceof Error ? licenseKeyErrorMessage(e.message) : "Could not create account");
+      const message = e instanceof Error ? e.message : "Could not create account";
+      setErr(
+        isNetworkErrorMessage(message)
+          ? "Can't reach the LeadCaptura service after several attempts. It may be cold-starting (give it 1–2 minutes) or the service is down. Try again."
+          : licenseKeyErrorMessage(message),
+      );
     } finally {
+      setStatusMsg(null);
       setPending(false);
     }
   }
@@ -162,6 +178,7 @@ export default function RegisterPage() {
             />
           </div>
           {err && <p className="text-sm text-rose-600">{err}</p>}
+          {statusMsg && !err && <p className="text-sm text-amber-700">{statusMsg}</p>}
           <button className="btn-primary w-full" disabled={pending} type="submit">
             {pending ? "Creating…" : "Create workspace"}
           </button>
