@@ -42,6 +42,8 @@ from app.models.base import (
     CompanyFinderBusiness,
     SenderWarmup,
     Suppression,
+    SheetConnection,
+    SheetTab,
 )
 
 __all__ = [
@@ -88,4 +90,6 @@ __all__ = [
     "CompanyFinderBusiness",
     "SenderWarmup",
     "Suppression",
+    "SheetConnection",
+    "SheetTab",
 ]

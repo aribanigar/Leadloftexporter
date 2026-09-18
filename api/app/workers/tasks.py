@@ -436,3 +436,99 @@ def generate_daily_agendas() -> dict:
                 except Exception as exc:  # noqa: BLE001
                     log.exception("daily agenda failed for user %s: %s", user_id, exc)
     return {"generated": generated}
+
+
+@celery_app.task
+def sync_sheet_tracking() -> dict:
+    """Write "last emailed" back into each Google-Sheet-sourced campaign
+    recipient's tracking column.
+
+    Fully decoupled from the actual send: this only ever READS
+    CampaignRecipient.status/sent_at, which the existing send path
+    (send_email_message, called from tick_email_campaigns/_process_tick)
+    already writes — nothing about how campaigns actually send is touched
+    by this task existing.
+
+    Batched per (spreadsheet, tab): campaigns are scanned first (bounded,
+    cheap — there are far fewer campaigns than recipients) to find the small
+    subset that are sheet-sourced, THEN their due recipients are pulled and
+    grouped, so one sheet with many due rows gets exactly ONE Sheets API
+    write call, never one call per recipient (see write_tracking_values).
+    """
+    from app.models import Campaign, CampaignRecipient, SheetConnection
+    from app.services import google_sheets as sheets_svc
+
+    synced_rows = 0
+    groups_ok = 0
+    groups_failed = 0
+    with session_scope() as db:
+        recent_campaigns = (
+            db.query(Campaign)
+            .filter(Campaign.recipient_sources.isnot(None))
+            .order_by(Campaign.updated_at.desc())
+            .limit(300)
+            .all()
+        )
+        sheet_campaigns = {
+            c.id: (c.recipient_sources or {}).get("sheet_source")
+            for c in recent_campaigns
+            if (c.recipient_sources or {}).get("sheet_source")
+        }
+        if not sheet_campaigns:
+            return {"synced_rows": 0, "groups_ok": 0, "groups_failed": 0}
+
+        due = (
+            db.query(CampaignRecipient)
+            .filter(
+                CampaignRecipient.campaign_id.in_(sheet_campaigns.keys()),
+                CampaignRecipient.status == "sent",
+                CampaignRecipient.sheet_synced_at.is_(None),
+                CampaignRecipient.sent_at.isnot(None),
+            )
+            .order_by(CampaignRecipient.sent_at.asc())
+            .limit(1000)
+            .all()
+        )
+        if not due:
+            return {"synced_rows": 0, "groups_ok": 0, "groups_failed": 0}
+
+        groups: dict[tuple[str, str], list[CampaignRecipient]] = {}
+        group_src: dict[tuple[str, str], dict] = {}
+        for r in due:
+            src = sheet_campaigns[r.campaign_id]
+            key = (src["spreadsheet_id"], src["gid"])
+            groups.setdefault(key, []).append(r)
+            group_src[key] = src
+
+        for key, rows in groups.items():
+            spreadsheet_id, gid = key
+            src = group_src[key]
+            updates = {r.email: r.sent_at.date().isoformat() for r in rows if r.sent_at}
+            try:
+                sheets_svc.write_tracking_values(
+                    spreadsheet_id, gid, src["email_column"], src["tracking_column"], updates,
+                )
+                now = datetime.now(timezone.utc)
+                for r in rows:
+                    r.sheet_synced_at = now
+                db.commit()
+                synced_rows += len(rows)
+                groups_ok += 1
+            except sheets_svc.SheetAccessError as exc:
+                db.rollback()
+                conn = (
+                    db.query(SheetConnection)
+                    .filter(SheetConnection.spreadsheet_id == spreadsheet_id)
+                    .first()
+                )
+                if conn:
+                    conn.status = "error"
+                    conn.last_error = str(exc)
+                    db.commit()
+                groups_failed += 1
+                log.warning("sheet tracking sync failed for %s/%s: %s", spreadsheet_id, gid, exc)
+            except Exception as exc:  # noqa: BLE001
+                db.rollback()
+                groups_failed += 1
+                log.exception("sheet tracking sync failed for %s/%s: %s", spreadsheet_id, gid, exc)
+    return {"synced_rows": synced_rows, "groups_ok": groups_ok, "groups_failed": groups_failed}

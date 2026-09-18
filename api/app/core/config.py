@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = ""
 
+    # ---- Google Sheets (Campaigns recipient source) ----
+    # Service-account auth, NOT OAuth: the user shares each sheet with this
+    # account's email (from the JSON key's "client_email") instead of going
+    # through a Google consent screen — no refresh-token/expiry handling to
+    # maintain. Paste the FULL service-account JSON key as one env var.
+    # See services/google_sheets.py and api/v1/sheets.py.
+    google_service_account_json: str = ""
+
     # ---- Company Finder (Google Places API New) ----
     # Server-wide fallback key for Company Finder's business discovery. A
     # workspace can also set its own key in the UI (Workspace.settings

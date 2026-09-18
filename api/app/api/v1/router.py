@@ -30,6 +30,7 @@ from app.api.v1 import (
     routing,
     notetaker,
     cron,
+    sheets,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -67,3 +68,4 @@ api_router.include_router(routing.router)
 api_router.include_router(routing.public_router)
 api_router.include_router(notetaker.router)
 api_router.include_router(cron.router)
+api_router.include_router(sheets.router)

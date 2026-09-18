@@ -58,10 +58,13 @@ from app.models import (
     EmailThread,
     Lead,
     SenderWarmup,
+    SheetConnection,
+    SheetTab,
     Suppression,
     User,
     Workspace,
 )
+from app.services import google_sheets as sheets_svc
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -87,6 +90,27 @@ def _own_campaign(db: Session, ctx: AuthContext, campaign_id: str) -> Campaign:
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "campaign_not_found")
     return c
+
+
+def _last_contacted_map(db: Session, workspace_id: str, emails: list[str]) -> dict[str, datetime]:
+    """email(lowercased) -> most recent sent_at across every campaign this
+    workspace has ever sent to that address. Used to pre-fill a newly
+    connected Google Sheet's tracking column with prior history (not just
+    dates from sends that happen after the sheet is connected)."""
+    if not emails:
+        return {}
+    rows = (
+        db.query(CampaignRecipient.email, func.max(CampaignRecipient.sent_at))
+        .join(Campaign, Campaign.id == CampaignRecipient.campaign_id)
+        .filter(
+            Campaign.workspace_id == workspace_id,
+            CampaignRecipient.status == "sent",
+            CampaignRecipient.email.in_([e.lower() for e in emails]),
+        )
+        .group_by(CampaignRecipient.email)
+        .all()
+    )
+    return {email: sent_at for email, sent_at in rows if sent_at}
 
 
 def _render_token(template: str, lead: Lead) -> str:
@@ -483,6 +507,9 @@ class CampaignCreateIn(BaseModel):
     # Marketing metadata.
     goal: Optional[str] = None
     tags: list[str] = []
+    # Set when this campaign was started from a saved Template — drives
+    # GET /templates/last-used?domain=.
+    template_id: Optional[str] = None
     follow_ups: list[FollowUpIn] = []
     attachments: list[AttachmentIn] = []
     # Personalisation.
@@ -516,6 +543,7 @@ class CampaignUpdateIn(BaseModel):
     reply_to: Optional[str] = None
     goal: Optional[str] = None
     tags: Optional[list[str]] = None
+    template_id: Optional[str] = None
     follow_ups: Optional[list[FollowUpIn]] = None
     attachments: Optional[list[AttachmentIn]] = None
     sender_account_ids: Optional[list[str]] = None
@@ -737,6 +765,7 @@ def create_campaign(
         reply_to=(body.reply_to or "").strip() or None,
         goal=body.goal,
         tags=body.tags or [],
+        template_id=body.template_id or None,
         follow_ups=[f.model_dump() for f in body.follow_ups],
         attachments=_sanitize_attachments(body.attachments),
         merge_columns=body.merge_columns or [],
@@ -831,6 +860,123 @@ def create_campaign(
         "status": c.status,
         "total_recipients": c.total_recipients,
         "skipped_suppressed": skipped_suppressed,
+    }
+
+
+@router.post("/{campaign_id}/import-from-sheet", status_code=status.HTTP_201_CREATED)
+def import_from_sheet(
+    campaign_id: str,
+    body: dict,
+    ctx: AuthContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Pull rows from a configured Google Sheet tab into this campaign's
+    recipients. Mirrors create_campaign()'s _add() dedup + suppression rules
+    (same email regex, same "first-seen wins", same suppression skip) but
+    also dedupes against recipients this campaign already has (CSV/manual/an
+    earlier sheet import), since unlike create_campaign this can be called
+    against a campaign that isn't brand new. Remembers the sheet in
+    recipient_sources so sync_sheet_tracking (Celery) can write each row's
+    outcome back to the sheet later, and immediately backfills the tracking
+    column with any prior send history for these emails."""
+    c = _own_campaign(db, ctx, campaign_id)
+    sheet_tab_id = (body.get("sheet_tab_id") or "").strip()
+    if not sheet_tab_id:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "sheet_tab_id_required")
+
+    tab = (
+        db.query(SheetTab)
+        .join(SheetConnection, SheetConnection.id == SheetTab.connection_id)
+        .filter(SheetTab.id == sheet_tab_id, SheetConnection.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not tab:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "sheet_tab_not_found")
+    connection = db.query(SheetConnection).filter(SheetConnection.id == tab.connection_id).first()
+
+    try:
+        headers, rows = sheets_svc.fetch_rows(connection.spreadsheet_id, tab.gid, tab.header_row)
+    except sheets_svc.SheetAccessError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    email_idx = sheets_svc.find_header_column(headers, tab.email_column)
+    if email_idx is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f'Email column "{tab.email_column}" no longer found in the sheet.',
+        )
+    merge_headers = [h for i, h in enumerate(headers) if i != email_idx and h]
+
+    suppressed = {
+        s.email.lower()
+        for s in db.query(Suppression).filter(Suppression.workspace_id == ctx.workspace_id)
+    }
+    existing = {
+        r.email
+        for r in db.query(CampaignRecipient.email).filter(CampaignRecipient.campaign_id == c.id)
+    }
+
+    added = 0
+    skipped_suppressed = 0
+    sheet_emails: list[str] = []
+    for row in rows:
+        raw_email = row[email_idx] if email_idx < len(row) else ""
+        for e in _split_emails(raw_email):
+            if not e or not _EMAIL_RE.match(e) or e in existing:
+                continue
+            existing.add(e)
+            sheet_emails.append(e)
+            if e in suppressed:
+                skipped_suppressed += 1
+                continue
+            merge = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers) if i != email_idx and h}
+            db.add(
+                CampaignRecipient(
+                    campaign_id=c.id, lead_id=None, email=e, name=None,
+                    merge_data=merge, status="pending",
+                )
+            )
+            added += 1
+
+    # Merge into recipient_sources rather than replace it — _set_cooldown
+    # also stashes a value there and must not be clobbered.
+    src = dict(c.recipient_sources or {})
+    src["sheet_source"] = {
+        "connection_id": connection.id,
+        "sheet_tab_id": tab.id,
+        "spreadsheet_id": connection.spreadsheet_id,
+        "gid": tab.gid,
+        "email_column": tab.email_column,
+        "tracking_column": tab.tracking_column,
+    }
+    c.recipient_sources = src
+    c.merge_columns = sorted(set(c.merge_columns or []) | set(merge_headers))
+    c.total_recipients = (c.total_recipients or 0) + added
+    db.commit()
+
+    # Pre-fill "last contacted" for rows that already have campaign history
+    # in this workspace, so the sheet reflects reality immediately instead
+    # of only after the next new send.
+    contacted = _last_contacted_map(db, ctx.workspace_id, sheet_emails)
+    if contacted:
+        updates = {email: dt.date().isoformat() for email, dt in contacted.items()}
+        try:
+            sheets_svc.write_tracking_values(
+                connection.spreadsheet_id, tab.gid, tab.email_column,
+                tab.tracking_column, updates, tab.header_row,
+            )
+        except sheets_svc.SheetAccessError:
+            pass  # best-effort — the import itself already succeeded
+
+    tab.row_count = len(rows)
+    tab.last_synced_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {
+        "added": added,
+        "skipped_suppressed": skipped_suppressed,
+        "total_rows_in_sheet": len(rows),
+        "total_recipients": c.total_recipients,
     }
 
 
@@ -969,6 +1115,7 @@ def _campaign_dict(c: Campaign, db: Session | None = None) -> dict:
         "reply_to": c.reply_to,
         "goal": c.goal,
         "tags": c.tags or [],
+        "template_id": c.template_id,
         "follow_ups": c.follow_ups or [],
         # Attachment metadata only (never ship the base64 back on list/detail).
         "attachments": [
@@ -1041,7 +1188,7 @@ def update_campaign(
         "name", "subject", "preheader", "body_html", "body_text",
         "body_amp", "preview_text", "brand_color",
         "from_name", "from_email", "reply_to", "goal", "tags", "follow_ups",
-        "sender_account_ids", "warmup_enabled",
+        "sender_account_ids", "warmup_enabled", "template_id",
     ):
         if field in data and data[field] is not None:
             setattr(c, field, data[field])

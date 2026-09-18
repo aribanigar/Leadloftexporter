@@ -369,6 +369,25 @@ interface CampaignAttachment {
   size: number;   // decoded bytes (for display)
 }
 
+interface SheetTabLite {
+  id: string;
+  title: string;
+  email_column: string;
+  tracking_column: string;
+  row_count: number;
+}
+interface SheetConnectionLite {
+  id: string;
+  label: string;
+  tabs: SheetTabLite[];
+}
+interface TemplateLite {
+  id: string;
+  name: string;
+  subject?: string | null;
+  body: string;
+}
+
 interface FormState {
   name: string;
   goal: string;
@@ -395,6 +414,7 @@ interface FormState {
   mergeColumns: string[];
   csvRecipients: CsvRecipient[];
   attachments: CampaignAttachment[];
+  templateId: string | null; // set when the composer was started from a saved Template
 }
 
 // Pipeline stage from GET /pipeline/stages
@@ -903,6 +923,7 @@ function NewCampaignPageInner() {
     mergeColumns: [],
     csvRecipients: [],
     attachments: [],
+    templateId: null,
   });
 
   const [campaignId, setCampaignId] = useState<string | null>(editId || null);
@@ -923,6 +944,15 @@ function NewCampaignPageInner() {
   const [validationResult, setValidationResult] = useState<{ valid: number; invalid: number; results: EmailResult[] } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [healthOpen, setHealthOpen] = useState(false);
+
+  // ── Google Sheets recipient source (Settings → Google Sheets)
+  const [sheetConnections, setSheetConnections] = useState<SheetConnectionLite[]>([]);
+  const [showSheetImport, setShowSheetImport] = useState(false);
+  const [importingTabId, setImportingTabId] = useState<string | null>(null);
+  // ── Templates (Settings → Email Templates)
+  const [templates, setTemplates] = useState<TemplateLite[]>([]);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [suggestedTemplate, setSuggestedTemplate] = useState<TemplateLite & { used_at: string } | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const fuEditorRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -1036,10 +1066,48 @@ function NewCampaignPageInner() {
     }
   }, []);
 
+  // ── Load connected Google Sheets (Settings → Google Sheets)
+  const fetchSheetConnections = useCallback(async () => {
+    try {
+      const list = await api<SheetConnectionLite[]>('/sheets/connections');
+      setSheetConnections(Array.isArray(list) ? list : []);
+    } catch {
+      setSheetConnections([]);
+    }
+  }, []);
+
+  // ── Load saved templates (Settings → Email Templates)
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const list = await api<TemplateLite[]>('/templates');
+      setTemplates(Array.isArray(list) ? list : []);
+    } catch {
+      setTemplates([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSenders();
     fetchStages();
-  }, [fetchSenders, fetchStages]);
+    fetchSheetConnections();
+    fetchTemplates();
+  }, [fetchSenders, fetchStages, fetchSheetConnections, fetchTemplates]);
+
+  // ── "You last used X for this domain" suggestion — fires once a sender is
+  // picked, so the composer can offer the template last used from THIS
+  // sender's domain instead of the user having to remember/search for it.
+  useEffect(() => {
+    if (form.senderIds.length === 0) { setSuggestedTemplate(null); return; }
+    const first = activeSenders.find(s => form.senderIds.includes(s.id));
+    const addr = (first?.from_address || first?.label || '').toLowerCase();
+    const domain = addr.split('@')[1];
+    if (!domain) { setSuggestedTemplate(null); return; }
+    let cancelled = false;
+    api<(TemplateLite & { used_at: string }) | null>(`/templates/last-used?domain=${encodeURIComponent(domain)}`)
+      .then(res => { if (!cancelled) setSuggestedTemplate(res || null); })
+      .catch(() => { if (!cancelled) setSuggestedTemplate(null); });
+    return () => { cancelled = true; };
+  }, [form.senderIds, activeSenders]);
 
   // ── Pull the actual leads (with emails) for the selected pipeline stage so
   //    the user can VALIDATE the recipient list before launching. Reads live
@@ -1121,6 +1189,7 @@ function NewCampaignPageInner() {
             ...(r.merge || {}),
           })),
           attachments: [],
+          templateId: (c as CampaignDetail & { template_id?: string | null }).template_id || null,
         });
         // Fetch full attachment payloads (with base64) so edits round-trip losslessly.
         api<{ attachments: { filename: string; content_type: string; data: string }[] }>(`/campaigns/${editId}/attachments`)
@@ -1385,6 +1454,7 @@ function NewCampaignPageInner() {
       reply_to: form.replyTo || undefined,
       goal: form.goal || undefined,
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      template_id: form.templateId || undefined,
       merge_columns: form.mergeColumns,
       recipients,
       manual_emails: manualOnly,
@@ -1430,6 +1500,7 @@ function NewCampaignPageInner() {
       reply_to: form.replyTo || undefined,
       goal: form.goal || undefined,
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      template_id: form.templateId || undefined,
       sender_account_ids: form.senderIds,
       batch_size: form.batchSize,
       seconds_between_sends: form.sendDelay,
@@ -1487,6 +1558,69 @@ function NewCampaignPageInner() {
 
   const removeAttachment = (idx: number) =>
     setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }));
+
+  // ── Google Sheets: ensure a campaign row exists before importing into it —
+  // unlike CSV/pasted recipients (inlined into the create body client-side),
+  // sheet-sourced rows are created server-side against a real campaign id.
+  // Mirrors saveDraft's own create branch exactly.
+  const ensureCampaignId = async (): Promise<string> => {
+    if (campaignId) return campaignId;
+    const created = await api<{ id: string }>('/campaigns', { method: 'POST', body: buildCreateBody() });
+    setCampaignId(String(created.id));
+    router.replace(`/campaigns/new?id=${created.id}`);
+    return String(created.id);
+  };
+
+  const handleImportFromSheet = async (tab: SheetTabLite) => {
+    setImportingTabId(tab.id);
+    try {
+      const id = await ensureCampaignId();
+      const res = await api<{ added: number; skipped_suppressed: number; total_recipients: number }>(
+        `/campaigns/${id}/import-from-sheet`,
+        { method: 'POST', body: { sheet_tab_id: tab.id } },
+      );
+      setToast({
+        msg: `Imported ${res.added} recipient${res.added === 1 ? '' : 's'} from "${tab.title}"` +
+          (res.skipped_suppressed ? ` (${res.skipped_suppressed} suppressed, skipped)` : ''),
+        type: res.added > 0 ? 'success' : 'error',
+      });
+      setShowSheetImport(false);
+    } catch (e) {
+      setToast({ msg: e instanceof ApiError ? e.message : 'Import from sheet failed', type: 'error' });
+    } finally {
+      setImportingTabId(null);
+    }
+  };
+
+  // ── Templates: save the current draft as a reusable template, or load one in.
+  const handleSaveAsTemplate = async () => {
+    const bodyHtml = form.contentMode === 'visual' && editorRef.current
+      ? editorRef.current.innerHTML
+      : form.htmlContent;
+    if (!bodyHtml || !bodyHtml.trim()) {
+      setToast({ msg: 'Write the email body before saving it as a template.', type: 'error' });
+      return;
+    }
+    const name = window.prompt('Template name:', form.subject || form.name || '');
+    if (!name || !name.trim()) return;
+    try {
+      await api('/templates', {
+        method: 'POST',
+        body: { name: name.trim(), channel: 'email', subject: form.subject, body: bodyHtml },
+      });
+      setToast({ msg: 'Saved as template', type: 'success' });
+      fetchTemplates();
+    } catch (e) {
+      setToast({ msg: e instanceof ApiError ? e.message : 'Could not save template', type: 'error' });
+    }
+  };
+
+  const handleUseTemplate = (t: TemplateLite) => {
+    setForm(f => ({ ...f, subject: t.subject || f.subject, htmlContent: t.body, templateId: t.id }));
+    if (editorRef.current) editorRef.current.innerHTML = t.body;
+    setShowTemplatePicker(false);
+    setToast({ msg: `Loaded template "${t.name}"`, type: 'success' });
+  };
 
   // ── Save draft (create or PATCH)
   const saveDraft = async () => {
@@ -2226,6 +2360,73 @@ function NewCampaignPageInner() {
               </button>
               <input ref={csvInputRef} type="file" accept=".csv" style={{ display: 'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f); }} />
+
+              {/* Google Sheet import button */}
+              <button
+                onClick={() => setShowSheetImport(s => !s)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 14px', marginTop: '8px',
+                  borderRadius: T.radiusLg,
+                  border: 'none',
+                  backgroundColor: T.surfaceContainerLow,
+                  color: T.onSurfaceVariant,
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'Inter, sans-serif', textAlign: 'left',
+                  width: '100%',
+                }}
+              >
+                <Icon name={'upload_file'} size={16} />
+                Import from Google Sheet
+              </button>
+              {showSheetImport && (
+                <div style={{
+                  marginTop: '6px', padding: '10px', borderRadius: T.radiusLg,
+                  backgroundColor: T.surfaceContainerLow, fontFamily: 'Inter, sans-serif',
+                }}>
+                  {sheetConnections.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: T.onSurfaceVariant }}>
+                      No sheets connected yet —{' '}
+                      <Link href="/settings/sheets" style={{ color: '#0a66c2', fontWeight: 600 }}>
+                        connect one in Settings
+                      </Link>.
+                    </div>
+                  ) : (
+                    sheetConnections.map(conn => (
+                      <div key={conn.id} style={{ marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: T.onSurfaceVariant, marginBottom: '4px' }}>
+                          {conn.label}
+                        </div>
+                        {conn.tabs.length === 0 ? (
+                          <div style={{ fontSize: '11px', color: T.onSurfaceVariant, paddingLeft: '4px' }}>
+                            No tabs configured yet.
+                          </div>
+                        ) : (
+                          conn.tabs.map(tab => (
+                            <button
+                              key={tab.id}
+                              onClick={() => handleImportFromSheet(tab)}
+                              disabled={importingTabId === tab.id}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                width: '100%', padding: '6px 8px', marginBottom: '4px',
+                                borderRadius: T.radiusLg, border: '1px solid #e2e4e3',
+                                backgroundColor: '#fff', cursor: 'pointer',
+                                fontSize: '12px', fontFamily: 'Inter, sans-serif',
+                              }}
+                            >
+                              <span>{tab.title} <span style={{ color: T.onSurfaceVariant }}>({tab.row_count} rows)</span></span>
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#0a66c2' }}>
+                                {importingTabId === tab.id ? 'Importing…' : 'Import'}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Manual Entry / Paste emails */}
@@ -3251,7 +3452,73 @@ function NewCampaignPageInner() {
                       >
                         H2
                       </button>
+                      <div style={{ flex: 1 }} />
+                      <button
+                        title="Load a saved template"
+                        onMouseDown={e => { e.preventDefault(); setShowTemplatePicker(s => !s); }}
+                        style={{
+                          padding: '4px 10px', border: `1px solid ${T.surfaceContainer}`, borderRadius: '6px',
+                          background: T.surfaceContainerLowest, cursor: 'pointer', color: T.onSurfaceVariant,
+                          fontSize: '11px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
+                        }}
+                      >
+                        Templates
+                      </button>
+                      <button
+                        title="Save this email as a reusable template"
+                        onMouseDown={e => { e.preventDefault(); handleSaveAsTemplate(); }}
+                        style={{
+                          padding: '4px 10px', border: `1px solid ${T.surfaceContainer}`, borderRadius: '6px',
+                          background: T.surfaceContainerLowest, cursor: 'pointer', color: T.onSurfaceVariant,
+                          fontSize: '11px', fontWeight: 700, fontFamily: 'Inter, sans-serif',
+                        }}
+                      >
+                        Save as template
+                      </button>
                     </div>
+                    {showTemplatePicker && (
+                      <div style={{
+                        padding: '10px 14px', backgroundColor: T.surfaceContainerLow,
+                        borderBottom: `1px solid ${T.surfaceContainer}`, fontFamily: 'Inter, sans-serif',
+                      }}>
+                        {suggestedTemplate && (
+                          <button
+                            onClick={() => handleUseTemplate(suggestedTemplate)}
+                            style={{
+                              display: 'block', width: '100%', textAlign: 'left', marginBottom: '8px',
+                              padding: '8px', borderRadius: T.radiusLg, border: '1px solid #0a66c2',
+                              background: '#eef4fc', cursor: 'pointer', fontSize: '12px',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: '#0a66c2' }}>
+                              Last used for this sender&apos;s domain: {suggestedTemplate.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: T.onSurfaceVariant }}>Click to use it</div>
+                          </button>
+                        )}
+                        {templates.length === 0 ? (
+                          <div style={{ fontSize: '12px', color: T.onSurfaceVariant }}>
+                            No saved templates yet — write an email and click &quot;Save as template&quot;.
+                          </div>
+                        ) : (
+                          templates.map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => handleUseTemplate(t)}
+                              style={{
+                                display: 'flex', width: '100%', justifyContent: 'space-between',
+                                padding: '6px 8px', marginBottom: '4px', borderRadius: T.radiusLg,
+                                border: '1px solid #e2e4e3', background: '#fff', cursor: 'pointer',
+                                fontSize: '12px', fontFamily: 'Inter, sans-serif',
+                              }}
+                            >
+                              <span>{t.name}</span>
+                              <span style={{ fontSize: '11px', color: '#0a66c2', fontWeight: 600 }}>Use</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                     <div
                       ref={editorRef}
                       contentEditable

@@ -112,6 +112,28 @@ export interface Template {
   variables: string[];
 }
 
+export interface SheetTab {
+  id: string;
+  connection_id: string;
+  gid: string;
+  title: string;
+  email_column: string;
+  tracking_column: string;
+  header_row: number;
+  row_count: number;
+  last_synced_at: string | null;
+}
+
+export interface SheetConnection {
+  id: string;
+  label: string;
+  sheet_url: string;
+  spreadsheet_id: string;
+  status: "active" | "error";
+  last_error: string | null;
+  tabs: SheetTab[];
+}
+
 export interface PlaybookStep {
   id: string;
   position: number;

@@ -15,6 +15,7 @@ const SECTIONS = [
     { href: "/settings/email", label: "Email Senders" },
     { href: "/settings/outreach", label: "Outreach Settings" },
     { href: "/settings/templates", label: "Email Templates" },
+    { href: "/settings/sheets", label: "Google Sheets" },
     { href: "/settings/ai-writer", label: "AI Writer" },
   ]},
   { title: "Workspace Settings", items: [

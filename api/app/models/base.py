@@ -821,6 +821,11 @@ class Campaign(Base, TimestampMixin):
     links: Mapped[list] = mapped_column(JSONB, default=list)
     # Recipients selection (snapshot at campaign-create time)
     recipient_filter: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Set when this campaign was started from a saved Template (Settings →
+    # Email Templates) — drives "last template used for this sender domain".
+    template_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("templates.id", ondelete="SET NULL")
+    )
     # Sender pool — list of ConnectedAccount.id strings to rotate across.
     # Empty list = let _pick_account choose per-send.
     sender_account_ids: Mapped[list] = mapped_column(JSONB, default=list)
@@ -911,6 +916,57 @@ class CampaignRecipient(Base, TimestampMixin):
     clicked_links: Mapped[list] = mapped_column(JSONB, default=list)
     bounce_reason: Mapped[Optional[str]] = mapped_column(Text)
     bounced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Set once this row's outcome has been written back to its source Google
+    # Sheet's tracking column (see services/google_sheets.py + the
+    # sync_sheet_tracking Celery task). NULL = not yet synced (or not
+    # sheet-sourced). Only meaningful when the parent Campaign's
+    # recipient_sources has a "sheet_source" entry.
+    sheet_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class SheetConnection(Base, TimestampMixin):
+    """One connected Google Sheet URL (a whole workbook). Access is via a
+    single service account (see core/config.py:google_service_account_json)
+    — the user shares the sheet with that account's email instead of an
+    OAuth consent flow. See services/google_sheets.py."""
+
+    __tablename__ = "sheet_connections"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    label: Mapped[str] = mapped_column(String(240), nullable=False)
+    sheet_url: Mapped[str] = mapped_column(Text, nullable=False)
+    spreadsheet_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active | error
+    last_error: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class SheetTab(Base, TimestampMixin):
+    """One configured tab within a SheetConnection's workbook. Rows are
+    matched by `email_column`; the system keeps `tracking_column` updated
+    with each contact's last-emailed (or last-contacted) date."""
+
+    __tablename__ = "sheet_tabs"
+    __table_args__ = (
+        UniqueConstraint("connection_id", "gid", name="uq_sheet_tab_connection_gid"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    connection_id: Mapped[str] = mapped_column(
+        ForeignKey("sheet_connections.id", ondelete="CASCADE"), index=True
+    )
+    gid: Mapped[str] = mapped_column(String(40), nullable=False)  # Google's tab id
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    header_row: Mapped[int] = mapped_column(Integer, default=1)
+    email_column: Mapped[str] = mapped_column(String(120), default="email")
+    tracking_column: Mapped[str] = mapped_column(String(120), default="Last Contacted")
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class SenderWarmup(Base, TimestampMixin):

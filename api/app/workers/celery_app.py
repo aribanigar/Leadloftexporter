@@ -69,6 +69,15 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.generate_daily_agendas",
         "schedule": crontab(minute="5"),
     },
+    # Write "last emailed" back into each Google-Sheet-sourced campaign
+    # recipient's tracking column, in sheet-sized batches (never one API
+    # call per recipient — see services/google_sheets.py). Every 10 minutes
+    # is plenty for a value nobody needs sub-minute-fresh, and keeps well
+    # under Sheets' per-minute write quota even across many workspaces.
+    "sync-sheet-tracking": {
+        "task": "app.workers.tasks.sync_sheet_tracking",
+        "schedule": crontab(minute="*/10"),
+    },
 }
 
 import app.workers.tasks  # noqa: E402,F401
