@@ -949,6 +949,13 @@ function NewCampaignPageInner() {
   const [sheetConnections, setSheetConnections] = useState<SheetConnectionLite[]>([]);
   const [showSheetImport, setShowSheetImport] = useState(false);
   const [importingTabId, setImportingTabId] = useState<string | null>(null);
+  // Sheet-imported recipients live only server-side (CampaignRecipient rows
+  // added by /import-from-sheet) — nothing in `form` reflects them, so the
+  // "N recipients" badge wouldn't otherwise move after an import. Track the
+  // running total here purely for that visible confirmation, and per-tab so
+  // the button itself can show "Imported ✓ (N)" once it's been used.
+  const [sheetImportedCount, setSheetImportedCount] = useState(0);
+  const [importedTabCounts, setImportedTabCounts] = useState<Record<string, number>>({});
   // ── Templates (Settings → Email Templates)
   const [templates, setTemplates] = useState<TemplateLite[]>([]);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -959,6 +966,17 @@ function NewCampaignPageInner() {
   const fuFileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const htmlFileInputRef = useRef<HTMLInputElement>(null);
+  // Set right before a router.replace(`?id=...`) that we trigger ourselves
+  // right after creating the campaign FROM the current form state (see
+  // ensureCampaignId / saveDraft). Without this, the resulting `editId`
+  // change re-fires the "load existing campaign" effect below, which does a
+  // wholesale setForm(...) from the server response — and since manually
+  // pasted emails (form.manualEmails) are stored server-side as plain
+  // CampaignRecipient rows, never echoed back in recipient_data, that
+  // reload silently wiped the Paste Emails textarea the user was looking
+  // at. Local state is already newer than what that fetch would return, so
+  // skip exactly that one reload.
+  const skipNextReloadRef = useRef(false);
 
   // Grouped by domain (like the Campaigns list groups by mailbox) so
   // sales@hudace.com / partner@hudace.com / info@hudace.com sit together
@@ -1036,8 +1054,8 @@ function NewCampaignPageInner() {
     ? (stageLeadsLoading ? (selectedStage?.lead_count ?? 0) : stageLeads.length)
     : 0;
   const recipientCount = form.includeAllLeads
-    ? Math.max(manualCount + stageCount, 1)
-    : manualCount + stageCount;
+    ? Math.max(manualCount + stageCount + sheetImportedCount, 1)
+    : manualCount + stageCount + sheetImportedCount;
 
   const health = computeScores(form, recipientCount);
 
@@ -1136,6 +1154,10 @@ function NewCampaignPageInner() {
   // ── Load existing campaign for editing (when ?id= is in URL)
   useEffect(() => {
     if (!editId) return;
+    if (skipNextReloadRef.current) {
+      skipNextReloadRef.current = false;
+      return;
+    }
     let cancelled = false;
     setLoadingEdit(true);
     api<CampaignDetail>(`/campaigns/${editId}`)
@@ -1567,6 +1589,7 @@ function NewCampaignPageInner() {
     if (campaignId) return campaignId;
     const created = await api<{ id: string }>('/campaigns', { method: 'POST', body: buildCreateBody() });
     setCampaignId(String(created.id));
+    skipNextReloadRef.current = true;
     router.replace(`/campaigns/new?id=${created.id}`);
     return String(created.id);
   };
@@ -1579,12 +1602,16 @@ function NewCampaignPageInner() {
         `/campaigns/${id}/import-from-sheet`,
         { method: 'POST', body: { sheet_tab_id: tab.id } },
       );
+      setSheetImportedCount(n => n + res.added);
+      setImportedTabCounts(m => ({ ...m, [tab.id]: (m[tab.id] || 0) + res.added }));
       setToast({
         msg: `Imported ${res.added} recipient${res.added === 1 ? '' : 's'} from "${tab.title}"` +
           (res.skipped_suppressed ? ` (${res.skipped_suppressed} suppressed, skipped)` : ''),
         type: res.added > 0 ? 'success' : 'error',
       });
-      setShowSheetImport(false);
+      // Leave the panel open (rather than closing it) so the "Imported ✓"
+      // state on the button below is actually visible as confirmation —
+      // the user can import from more tabs, or close it themselves.
     } catch (e) {
       setToast({ msg: e instanceof ApiError ? e.message : 'Import from sheet failed', type: 'error' });
     } finally {
@@ -1637,6 +1664,7 @@ function NewCampaignPageInner() {
         const created = await api<{ id: string }>('/campaigns', { method: 'POST', body: buildCreateBody() });
         setCampaignId(String(created.id));
         // Reflect the new id in the URL so a reload keeps editing the same draft.
+        skipNextReloadRef.current = true;
         router.replace(`/campaigns/new?id=${created.id}`);
         setToast({ msg: 'Draft saved successfully', type: 'success' });
       }
@@ -2402,25 +2430,29 @@ function NewCampaignPageInner() {
                             No tabs configured yet.
                           </div>
                         ) : (
-                          conn.tabs.map(tab => (
-                            <button
-                              key={tab.id}
-                              onClick={() => handleImportFromSheet(tab)}
-                              disabled={importingTabId === tab.id}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                width: '100%', padding: '6px 8px', marginBottom: '4px',
-                                borderRadius: T.radiusLg, border: '1px solid #e2e4e3',
-                                backgroundColor: '#fff', cursor: 'pointer',
-                                fontSize: '12px', fontFamily: 'Inter, sans-serif',
-                              }}
-                            >
-                              <span>{tab.title} <span style={{ color: T.onSurfaceVariant }}>({tab.row_count} rows)</span></span>
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#0a66c2' }}>
-                                {importingTabId === tab.id ? 'Importing…' : 'Import'}
-                              </span>
-                            </button>
-                          ))
+                          conn.tabs.map(tab => {
+                            const importedN = importedTabCounts[tab.id] || 0;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => handleImportFromSheet(tab)}
+                                disabled={importingTabId === tab.id}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  width: '100%', padding: '6px 8px', marginBottom: '4px',
+                                  borderRadius: T.radiusLg,
+                                  border: `1px solid ${importedN > 0 ? '#16a34a' : '#e2e4e3'}`,
+                                  backgroundColor: '#fff', cursor: 'pointer',
+                                  fontSize: '12px', fontFamily: 'Inter, sans-serif',
+                                }}
+                              >
+                                <span>{tab.title} <span style={{ color: T.onSurfaceVariant }}>({tab.row_count} rows)</span></span>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: importedN > 0 ? '#16a34a' : '#0a66c2' }}>
+                                  {importingTabId === tab.id ? 'Importing…' : importedN > 0 ? `Imported ✓ (${importedN})` : 'Import'}
+                                </span>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
                     ))

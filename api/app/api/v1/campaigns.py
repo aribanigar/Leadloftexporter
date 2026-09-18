@@ -35,6 +35,7 @@ day rollover by comparing `day_anchor` to today's YYYY-MM-DD.
 """
 from __future__ import annotations
 
+import logging
 import random
 import re
 import secrets
@@ -65,6 +66,8 @@ from app.models import (
     Workspace,
 )
 from app.services import google_sheets as sheets_svc
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -111,6 +114,52 @@ def _last_contacted_map(db: Session, workspace_id: str, emails: list[str]) -> di
         .all()
     )
     return {email: sent_at for email, sent_at in rows if sent_at}
+
+
+def _sync_sheet_tracking_now(db: Session, campaign: Campaign) -> None:
+    """Write newly-sent recipients' dates back into the campaign's source
+    Google Sheet right after a send tick, instead of waiting on the Celery
+    beat task (workers/tasks.py:sync_sheet_tracking) — that task never runs
+    on Render's free tier, which has no worker/beat dyno (see this module's
+    docstring, "WHY TICK + WORKER + FRONTEND POLL"), so relying on it alone
+    left the sheet's tracking column silently stuck empty. Best-effort and
+    swallows every failure: a flaky or unshared sheet must never break the
+    actual send tick this runs inside of."""
+    src = (campaign.recipient_sources or {}).get("sheet_source")
+    if not src:
+        return
+    due = (
+        db.query(CampaignRecipient)
+        .filter(
+            CampaignRecipient.campaign_id == campaign.id,
+            CampaignRecipient.status == "sent",
+            CampaignRecipient.sheet_synced_at.is_(None),
+            CampaignRecipient.sent_at.isnot(None),
+        )
+        .all()
+    )
+    if not due:
+        return
+    updates = {r.email: r.sent_at.date().isoformat() for r in due if r.sent_at}
+    try:
+        sheets_svc.write_tracking_values(
+            src["spreadsheet_id"], src["gid"], src["email_column"], src["tracking_column"], updates,
+        )
+        now = datetime.now(timezone.utc)
+        for r in due:
+            r.sheet_synced_at = now
+        db.commit()
+    except sheets_svc.SheetAccessError as exc:
+        db.rollback()
+        conn = db.query(SheetConnection).filter(SheetConnection.id == src.get("connection_id")).first()
+        if conn:
+            conn.status = "error"
+            conn.last_error = str(exc)
+            db.commit()
+        log.warning("sheet tracking sync failed for campaign %s: %s", campaign.id, exc)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        log.exception("sheet tracking sync failed for campaign %s", campaign.id)
 
 
 def _render_token(template: str, lead: Lead) -> str:
@@ -2208,6 +2257,7 @@ def _process_tick(db: Session, campaign: Campaign, ctx_user_id: Optional[str] = 
     campaign.rotation_index = rotation_index
     _maybe_finalize(db, campaign)
     db.commit()
+    _sync_sheet_tracking_now(db, campaign)
     return _stats(campaign, sent=sent, failed=failed, skipped=skipped)
 
 
@@ -2488,6 +2538,7 @@ def _commit_tick_results(
 
     _maybe_finalize(db, campaign)
     db.commit()
+    _sync_sheet_tracking_now(db, campaign)
     return _stats(campaign, sent=sent, failed=failed, skipped=skipped)
 
 

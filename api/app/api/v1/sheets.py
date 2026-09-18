@@ -70,6 +70,32 @@ def list_connections(ctx: AuthContext = Depends(get_workspace_context), db: Sess
     return [_connection_dict(c, db) for c in rows]
 
 
+def _auto_configure_tab(db: Session, connection: SheetConnection, gid: str, title: str) -> None:
+    """Best-effort equivalent of create_tab() for a tab whose email column
+    can be guessed — used right after a connection is created so the user
+    doesn't have to click through "Configure sheets" for the common case of
+    a sheet with a plain "email" header. Silently skips a tab that has no
+    rows yet or no detectable email column (e.g. a notes/summary tab) —
+    those stay available for manual "Configure sheets" setup, unchanged."""
+    try:
+        headers, rows = sheets_svc.fetch_rows(connection.spreadsheet_id, gid)
+        guessed = sheets_svc.find_header_column(headers, "email")
+        if guessed is None:
+            return
+        tracking_column = "Last Contacted"
+        sheets_svc.ensure_tracking_column(connection.spreadsheet_id, gid, tracking_column)
+    except sheets_svc.SheetAccessError:
+        return
+    db.add(SheetTab(
+        connection_id=connection.id,
+        gid=gid,
+        title=title,
+        email_column=headers[guessed],
+        tracking_column=tracking_column,
+        row_count=len(rows),
+    ))
+
+
 @router.post("/connections", status_code=status.HTTP_201_CREATED)
 def create_connection(
     body: dict,
@@ -82,7 +108,7 @@ def create_connection(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "label_and_sheet_url_required")
     try:
         spreadsheet_id = sheets_svc.parse_spreadsheet_id(sheet_url)
-        sheets_svc.list_tabs(spreadsheet_id)  # verify access now, fail fast with a clear message
+        tabs = sheets_svc.list_tabs(spreadsheet_id)  # verify access now, fail fast with a clear message
     except sheets_svc.SheetAccessError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
@@ -95,6 +121,14 @@ def create_connection(
         status="active",
     )
     db.add(c)
+    db.flush()  # assigns c.id, needed by SheetTab rows below
+
+    # Auto-configure every tab we can (has a detectable email column) so
+    # connecting a sheet is a single step — no separate "pick a tab, map
+    # columns" click-through for the common case.
+    for t in tabs:
+        _auto_configure_tab(db, c, t["gid"], t["title"])
+
     db.commit()
     db.refresh(c)
     return _connection_dict(c, db)
